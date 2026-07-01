@@ -91,7 +91,7 @@ Readable JSON.
 
 Pretty printed.
 
-Human editable if necessary.
+Human-readable and manually recoverable if necessary.
 
 # Images
 Images may come from:
@@ -113,6 +113,7 @@ Automatic.
 Created whenever the catalog changes.
 Rolling history.
 No user intervention required.
+Backups should never interrupt normal application use.
 
 # Error Handling
 Never lose user data.
@@ -134,6 +135,25 @@ Favor readability.
 Small functions.
 Self-documenting code.
 Consistent formatting.
+Functions should generally perform one task and remain small enough to be easily understood without scrolling extensively.
+
+# Module Communication
+Modules communicate through well-defined interfaces.
+Avoid direct manipulation of another module's internal state.
+Shared functionality belongs in ui.js or other dedicated shared modules.
+
+# File Ownership
+Each file should have a single clear responsibility.
+
+When a feature grows large enough to require multiple responsibilities,
+split it into additional modules rather than expanding existing ones indefinitely.
+
+# Data Evolution
+Catalog Compatibility
+
+Future versions should migrate existing catalog data whenever possible.
+
+Changes to the JSON structure should preserve existing user data automatically.
 
 # Git Workflow
 
