@@ -1,11 +1,21 @@
 # Card Supply Catalog
 
-## Product Specification
+## User Experience & Design Guide
+
+This document defines the visual and interaction principles for Card Supply Catalog. Functional behavior is defined in SPEC.md, and implementation details are defined in ARCHITECTURE.md.
 
 **Version:** 1.0  
 **Status:** Frozen
 
 **Last Updated:** 2026-07-01
+
+# Design Priorities
+
+1. Recognition over recall
+2. Paper before interface
+3. Simplicity before features
+4. Speed before decoration
+5. Consistency before cleverness
 
 # Philosophy: The interface should disappear behind the paper. The UI exists to showcase the DSP—not compete with it.
 
@@ -78,6 +88,8 @@ Primary: Laptop, iPad Landscape
 Secondary: Desktop
 Tertiary: Phone
 
+Desktop and laptop experiences are optimized first. Tablet is a first-class supported experience. Phone support is functional but not the primary design target.
+
 # Forms
 Labels above fields.
 Consistent spacing.
@@ -114,8 +126,20 @@ Cancel always on the left.
 Dialogs behave consistently.
 Similar actions use the same wording throughout the app.
 
+# Image Quality
+Images are the application's primary content.
+
+The interface should maximize the size and clarity of paper thumbnails while maintaining a clean, consistent layout.
+
+Whenever possible, images should be large enough for users to recognize patterns without opening the detail view.
+
 # Delight
 The app should have moments to delight the user. 
 For example: When you add a new DSP, it immediately appears under Recently Added with its four thumbnails.
 
 When in doubt, remove something instead of adding something.
+
+# The Ultimate Test
+Before adding any feature or visual element, ask:
+
+Does this help the user find paper, or is it just adding interface?
