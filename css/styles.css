@@ -183,6 +183,26 @@ h3 {
   padding: clamp(var(--space-4), 4vw, var(--space-7));
 }
 
+.recently-added {
+  margin-bottom: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.recently-added summary {
+  cursor: pointer;
+  padding: 0.85rem var(--space-4);
+  color: var(--color-text);
+  font-weight: 800;
+}
+
+.recently-added p {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-4);
+  color: var(--color-muted);
+}
+
 .library-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(18rem, 28rem);
@@ -595,6 +615,24 @@ h3 {
 
 .color-reference-section {
   margin-bottom: var(--space-7);
+}
+
+.settings-section {
+  margin-bottom: var(--space-7);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-6);
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.settings-actions .button {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-muted);
 }
 
 .color-library-grid {

@@ -1,0 +1,4016 @@
+{
+  "strawberry-slush": {
+    "id": "strawberry-slush",
+    "name": "Strawberry Slush",
+    "hex": "#F26B73",
+    "rgb": [
+      242,
+      107,
+      115
+    ],
+    "family": "in-color",
+    "colorFamily": "red",
+    "collectionYears": "2025-2027",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "timid-tiger": {
+    "id": "timid-tiger",
+    "name": "Timid Tiger",
+    "hex": "#F68E4E",
+    "rgb": [
+      246,
+      142,
+      78
+    ],
+    "family": "in-color",
+    "colorFamily": "orange",
+    "collectionYears": "2025-2027",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "darling-duckling": {
+    "id": "darling-duckling",
+    "name": "Darling Duckling",
+    "hex": "#F0D350",
+    "rgb": [
+      240,
+      211,
+      80
+    ],
+    "family": "in-color",
+    "colorFamily": "yellow",
+    "collectionYears": "2025-2027",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "cloud-cover": {
+    "id": "cloud-cover",
+    "name": "Cloud Cover",
+    "hex": "#B4C5C0",
+    "rgb": [
+      180,
+      197,
+      192
+    ],
+    "family": "in-color",
+    "colorFamily": "gray",
+    "collectionYears": "2025-2027",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "secret-sea": {
+    "id": "secret-sea",
+    "name": "Secret Sea",
+    "hex": "#324248",
+    "rgb": [
+      50,
+      66,
+      72
+    ],
+    "family": "in-color",
+    "colorFamily": "blue",
+    "collectionYears": "2025-2027",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "pretty-in-pink": {
+    "id": "pretty-in-pink",
+    "name": "Pretty in Pink",
+    "hex": "#F7ACB6",
+    "rgb": [
+      247,
+      172,
+      182
+    ],
+    "family": "in-color",
+    "colorFamily": "red",
+    "collectionYears": "2024-2026",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "peach-pie": {
+    "id": "peach-pie",
+    "name": "Peach Pie",
+    "hex": "#FBB473",
+    "rgb": [
+      251,
+      180,
+      115
+    ],
+    "family": "in-color",
+    "colorFamily": "orange",
+    "collectionYears": "2024-2026",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "shy-shamrock": {
+    "id": "shy-shamrock",
+    "name": "Shy Shamrock",
+    "hex": "#48BC8E",
+    "rgb": [
+      72,
+      188,
+      142
+    ],
+    "family": "in-color",
+    "colorFamily": "teal",
+    "collectionYears": "2024-2026",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "summer-splash": {
+    "id": "summer-splash",
+    "name": "Summer Splash",
+    "hex": "#62C4B1",
+    "rgb": [
+      98,
+      196,
+      177
+    ],
+    "family": "in-color",
+    "colorFamily": "teal",
+    "collectionYears": "2024-2026",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "petunia-pop": {
+    "id": "petunia-pop",
+    "name": "Petunia Pop",
+    "hex": "#D37EB4",
+    "rgb": [
+      211,
+      126,
+      180
+    ],
+    "family": "in-color",
+    "colorFamily": "pink",
+    "collectionYears": "2024-2026",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "mossy-meadow": {
+    "id": "mossy-meadow",
+    "name": "Mossy Meadow",
+    "hex": "#69713C",
+    "rgb": [
+      105,
+      113,
+      60
+    ],
+    "family": "neutrals",
+    "colorFamily": "yellow-green",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "misty-moonlight": {
+    "id": "misty-moonlight",
+    "name": "Misty Moonlight",
+    "hex": "#58728E",
+    "rgb": [
+      88,
+      114,
+      142
+    ],
+    "family": "neutrals",
+    "colorFamily": "blue",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "night-of-navy": {
+    "id": "night-of-navy",
+    "name": "Night of Navy",
+    "hex": "#223E6D",
+    "rgb": [
+      34,
+      62,
+      109
+    ],
+    "family": "neutrals",
+    "colorFamily": "blue",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "blackberry-bliss": {
+    "id": "blackberry-bliss",
+    "name": "Blackberry Bliss",
+    "hex": "#582752",
+    "rgb": [
+      88,
+      39,
+      82
+    ],
+    "family": "neutrals",
+    "colorFamily": "purple",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "early-espresso": {
+    "id": "early-espresso",
+    "name": "Early Espresso",
+    "hex": "#64412C",
+    "rgb": [
+      100,
+      65,
+      44
+    ],
+    "family": "neutrals",
+    "colorFamily": "brown",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "pecan-pie": {
+    "id": "pecan-pie",
+    "name": "Pecan Pie",
+    "hex": "#A97449",
+    "rgb": [
+      169,
+      116,
+      73
+    ],
+    "family": "neutrals",
+    "colorFamily": "brown",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "crumb-cake": {
+    "id": "crumb-cake",
+    "name": "Crumb Cake",
+    "hex": "#C8B394",
+    "rgb": [
+      200,
+      179,
+      148
+    ],
+    "family": "neutrals",
+    "colorFamily": "neutral",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "gray-granite": {
+    "id": "gray-granite",
+    "name": "Gray Granite",
+    "hex": "#C1B5AD",
+    "rgb": [
+      193,
+      181,
+      173
+    ],
+    "family": "neutrals",
+    "colorFamily": "gray",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "smoky-slate": {
+    "id": "smoky-slate",
+    "name": "Smoky Slate",
+    "hex": "#BDBDBE",
+    "rgb": [
+      189,
+      189,
+      190
+    ],
+    "family": "neutrals",
+    "colorFamily": "gray",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "basic-gray": {
+    "id": "basic-gray",
+    "name": "Basic Gray",
+    "hex": "#767E85",
+    "rgb": [
+      118,
+      126,
+      133
+    ],
+    "family": "neutrals",
+    "colorFamily": "gray",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "poppy-parade": {
+    "id": "poppy-parade",
+    "name": "Poppy Parade",
+    "hex": "#ED1A3B",
+    "rgb": [
+      237,
+      26,
+      59
+    ],
+    "family": "brights",
+    "colorFamily": "red",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "melon-mambo": {
+    "id": "melon-mambo",
+    "name": "Melon Mambo",
+    "hex": "#E94D88",
+    "rgb": [
+      233,
+      77,
+      136
+    ],
+    "family": "brights",
+    "colorFamily": "red",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "flirty-flamingo": {
+    "id": "flirty-flamingo",
+    "name": "Flirty Flamingo",
+    "hex": "#F69997",
+    "rgb": [
+      246,
+      153,
+      151
+    ],
+    "family": "brights",
+    "colorFamily": "red",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "pumpkin-pie": {
+    "id": "pumpkin-pie",
+    "name": "Pumpkin Pie",
+    "hex": "#F79433",
+    "rgb": [
+      247,
+      148,
+      51
+    ],
+    "family": "brights",
+    "colorFamily": "orange",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "daffodil-delight": {
+    "id": "daffodil-delight",
+    "name": "Daffodil Delight",
+    "hex": "#FFDA69",
+    "rgb": [
+      255,
+      218,
+      105
+    ],
+    "family": "brights",
+    "colorFamily": "yellow",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "lemon-lime-twist": {
+    "id": "lemon-lime-twist",
+    "name": "Lemon Lime Twist",
+    "hex": "#DDE569",
+    "rgb": [
+      221,
+      229,
+      105
+    ],
+    "family": "brights",
+    "colorFamily": "yellow-green",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "granny-apple-green": {
+    "id": "granny-apple-green",
+    "name": "Granny Apple Green",
+    "hex": "#A3C149",
+    "rgb": [
+      163,
+      193,
+      73
+    ],
+    "family": "brights",
+    "colorFamily": "yellow-green",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "coastal-cabana": {
+    "id": "coastal-cabana",
+    "name": "Coastal Cabana",
+    "hex": "#82CDBE",
+    "rgb": [
+      130,
+      205,
+      190
+    ],
+    "family": "brights",
+    "colorFamily": "teal",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "azure-afternoon": {
+    "id": "azure-afternoon",
+    "name": "Azure Afternoon",
+    "hex": "#26A0D6",
+    "rgb": [
+      38,
+      160,
+      214
+    ],
+    "family": "brights",
+    "colorFamily": "blue",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "berry-burst": {
+    "id": "berry-burst",
+    "name": "Berry Burst",
+    "hex": "#B74984",
+    "rgb": [
+      183,
+      73,
+      132
+    ],
+    "family": "brights",
+    "colorFamily": "pink",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "petal-pink": {
+    "id": "petal-pink",
+    "name": "Petal Pink",
+    "hex": "#FCD0BB",
+    "rgb": [
+      252,
+      208,
+      187
+    ],
+    "family": "subtles",
+    "colorFamily": "orange",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "calypso-coral": {
+    "id": "calypso-coral",
+    "name": "Calypso Coral",
+    "hex": "#F37965",
+    "rgb": [
+      243,
+      121,
+      101
+    ],
+    "family": "subtles",
+    "colorFamily": "orange",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "lemon-lolly": {
+    "id": "lemon-lolly",
+    "name": "Lemon Lolly",
+    "hex": "#FFF8A1",
+    "rgb": [
+      255,
+      248,
+      161
+    ],
+    "family": "subtles",
+    "colorFamily": "yellow-green",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "soft-sea-foam": {
+    "id": "soft-sea-foam",
+    "name": "Soft Sea Foam",
+    "hex": "#E5F0D3",
+    "rgb": [
+      229,
+      240,
+      211
+    ],
+    "family": "subtles",
+    "colorFamily": "green",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "lost-lagoon": {
+    "id": "lost-lagoon",
+    "name": "Lost Lagoon",
+    "hex": "#6EA39F",
+    "rgb": [
+      110,
+      163,
+      159
+    ],
+    "family": "subtles",
+    "colorFamily": "teal",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "pool-party": {
+    "id": "pool-party",
+    "name": "Pool Party",
+    "hex": "#A9DCD6",
+    "rgb": [
+      169,
+      220,
+      214
+    ],
+    "family": "subtles",
+    "colorFamily": "teal",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "balmy-blue": {
+    "id": "balmy-blue",
+    "name": "Balmy Blue",
+    "hex": "#A8D9EA",
+    "rgb": [
+      168,
+      217,
+      234
+    ],
+    "family": "subtles",
+    "colorFamily": "blue",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "highland-heather": {
+    "id": "highland-heather",
+    "name": "Highland Heather",
+    "hex": "#A995C7",
+    "rgb": [
+      169,
+      149,
+      199
+    ],
+    "family": "subtles",
+    "colorFamily": "purple",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "fresh-freesia": {
+    "id": "fresh-freesia",
+    "name": "Fresh Freesia",
+    "hex": "#E5B7D6",
+    "rgb": [
+      229,
+      183,
+      214
+    ],
+    "family": "subtles",
+    "colorFamily": "pink",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "bubble-bath": {
+    "id": "bubble-bath",
+    "name": "Bubble Bath",
+    "hex": "#FAD5E5",
+    "rgb": [
+      250,
+      213,
+      229
+    ],
+    "family": "subtles",
+    "colorFamily": "pink",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "cherry-cobbler": {
+    "id": "cherry-cobbler",
+    "name": "Cherry Cobbler",
+    "hex": "#A10537",
+    "rgb": [
+      161,
+      5,
+      55
+    ],
+    "family": "regals",
+    "colorFamily": "red",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "real-red": {
+    "id": "real-red",
+    "name": "Real Red",
+    "hex": "#CA234C",
+    "rgb": [
+      202,
+      35,
+      76
+    ],
+    "family": "regals",
+    "colorFamily": "red",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "cajun-craze": {
+    "id": "cajun-craze",
+    "name": "Cajun Craze",
+    "hex": "#BF492D",
+    "rgb": [
+      191,
+      73,
+      45
+    ],
+    "family": "regals",
+    "colorFamily": "red",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "crushed-curry": {
+    "id": "crushed-curry",
+    "name": "Crushed Curry",
+    "hex": "#F8BD16",
+    "rgb": [
+      248,
+      189,
+      22
+    ],
+    "family": "regals",
+    "colorFamily": "yellow",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "old-olive": {
+    "id": "old-olive",
+    "name": "Old Olive",
+    "hex": "#9EA64F",
+    "rgb": [
+      158,
+      166,
+      79
+    ],
+    "family": "regals",
+    "colorFamily": "yellow-green",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "garden-green": {
+    "id": "garden-green",
+    "name": "Garden Green",
+    "hex": "#4D8B56",
+    "rgb": [
+      77,
+      139,
+      86
+    ],
+    "family": "regals",
+    "colorFamily": "green",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "shaded-spruce": {
+    "id": "shaded-spruce",
+    "name": "Shaded Spruce",
+    "hex": "#00825B",
+    "rgb": [
+      0,
+      130,
+      91
+    ],
+    "family": "regals",
+    "colorFamily": "teal",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "pretty-peacock": {
+    "id": "pretty-peacock",
+    "name": "Pretty Peacock",
+    "hex": "#006F70",
+    "rgb": [
+      0,
+      111,
+      112
+    ],
+    "family": "regals",
+    "colorFamily": "teal",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "blueberry-bushel": {
+    "id": "blueberry-bushel",
+    "name": "Blueberry Bushel",
+    "hex": "#0D5893",
+    "rgb": [
+      13,
+      88,
+      147
+    ],
+    "family": "regals",
+    "colorFamily": "blue",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "gorgeous-grape": {
+    "id": "gorgeous-grape",
+    "name": "Gorgeous Grape",
+    "hex": "#7E5FA8",
+    "rgb": [
+      126,
+      95,
+      168
+    ],
+    "family": "regals",
+    "colorFamily": "purple",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "basic-beige": {
+    "id": "basic-beige",
+    "name": "Basic Beige",
+    "hex": "#E4DCC6",
+    "rgb": [
+      228,
+      220,
+      198
+    ],
+    "family": "basics",
+    "colorFamily": "neutral",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "very-vanilla": {
+    "id": "very-vanilla",
+    "name": "Very Vanilla",
+    "hex": "#FFF7E1",
+    "rgb": [
+      255,
+      247,
+      225
+    ],
+    "family": "basics",
+    "colorFamily": "white",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "basic-white": {
+    "id": "basic-white",
+    "name": "Basic White",
+    "hex": "#F5F5F5",
+    "rgb": [
+      245,
+      245,
+      245
+    ],
+    "family": "basics",
+    "colorFamily": "white",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "basic-black": {
+    "id": "basic-black",
+    "name": "Basic Black",
+    "hex": "#020005",
+    "rgb": [
+      2,
+      0,
+      5
+    ],
+    "family": "basics",
+    "colorFamily": "black",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "blushing-bride": {
+    "id": "blushing-bride",
+    "name": "Blushing Bride",
+    "hex": "#F0BEBE",
+    "rgb": [
+      240,
+      190,
+      190
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "powder-pink": {
+    "id": "powder-pink",
+    "name": "Powder Pink",
+    "hex": "#F1BFBF",
+    "rgb": [
+      241,
+      191,
+      191
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "terracotta-tile": {
+    "id": "terracotta-tile",
+    "name": "Terracotta Tile",
+    "hex": "#D86E6B",
+    "rgb": [
+      216,
+      110,
+      107
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "chocolate-chip": {
+    "id": "chocolate-chip",
+    "name": "Chocolate Chip",
+    "hex": "#715A58",
+    "rgb": [
+      113,
+      90,
+      88
+    ],
+    "family": "legacy",
+    "colorFamily": "brown",
+    "status": "retired",
+    "aliases": [
+      "reddish"
+    ],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "dusty-durango": {
+    "id": "dusty-durango",
+    "name": "Dusty Durango",
+    "hex": "#C86759",
+    "rgb": [
+      200,
+      103,
+      89
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "crisp-cantaloupe": {
+    "id": "crisp-cantaloupe",
+    "name": "Crisp Cantaloupe",
+    "hex": "#FAB0A1",
+    "rgb": [
+      250,
+      176,
+      161
+    ],
+    "family": "legacy",
+    "colorFamily": "orange",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "tangerine-tango": {
+    "id": "tangerine-tango",
+    "name": "Tangerine Tango",
+    "hex": "#E5745D",
+    "rgb": [
+      229,
+      116,
+      93
+    ],
+    "family": "legacy",
+    "colorFamily": "orange",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "close-to-cocoa": {
+    "id": "close-to-cocoa",
+    "name": "Close to Cocoa",
+    "hex": "#9E817A",
+    "rgb": [
+      158,
+      129,
+      122
+    ],
+    "family": "legacy",
+    "colorFamily": "brown",
+    "status": "retired",
+    "aliases": [
+      "reddish"
+    ],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "groovy-guava": {
+    "id": "groovy-guava",
+    "name": "Groovy Guava",
+    "hex": "#F2A491",
+    "rgb": [
+      242,
+      164,
+      145
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "really-rust": {
+    "id": "really-rust",
+    "name": "Really Rust",
+    "hex": "#C67561",
+    "rgb": [
+      198,
+      117,
+      97
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "grapefruit-grove": {
+    "id": "grapefruit-grove",
+    "name": "Grapefruit Grove",
+    "hex": "#FE9D83",
+    "rgb": [
+      254,
+      157,
+      131
+    ],
+    "family": "legacy",
+    "colorFamily": "orange",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "copper-clay": {
+    "id": "copper-clay",
+    "name": "Copper Clay",
+    "hex": "#A56E5D",
+    "rgb": [
+      165,
+      110,
+      93
+    ],
+    "family": "legacy",
+    "colorFamily": "orange",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "blush-blossom": {
+    "id": "blush-blossom",
+    "name": "Blush Blossom",
+    "hex": "#F5D7CC",
+    "rgb": [
+      245,
+      215,
+      204
+    ],
+    "family": "legacy",
+    "colorFamily": "orange",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "only-orange": {
+    "id": "only-orange",
+    "name": "Only Orange",
+    "hex": "#FF8659",
+    "rgb": [
+      255,
+      134,
+      89
+    ],
+    "family": "legacy",
+    "colorFamily": "orange",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "tangelo-twist": {
+    "id": "tangelo-twist",
+    "name": "Tangelo Twist",
+    "hex": "#E37443",
+    "rgb": [
+      227,
+      116,
+      67
+    ],
+    "family": "legacy",
+    "colorFamily": "orange",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "cinnamon-cider": {
+    "id": "cinnamon-cider",
+    "name": "Cinnamon Cider",
+    "hex": "#B78162",
+    "rgb": [
+      183,
+      129,
+      98
+    ],
+    "family": "legacy",
+    "colorFamily": "brown",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "creamy-caramel": {
+    "id": "creamy-caramel",
+    "name": "Creamy Caramel",
+    "hex": "#CDA287",
+    "rgb": [
+      205,
+      162,
+      135
+    ],
+    "family": "legacy",
+    "colorFamily": "brown",
+    "status": "retired",
+    "aliases": [
+      "orangish"
+    ],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "peach-parfait": {
+    "id": "peach-parfait",
+    "name": "Peach Parfait",
+    "hex": "#E89764",
+    "rgb": [
+      232,
+      151,
+      100
+    ],
+    "family": "legacy",
+    "colorFamily": "orange",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "peekaboo-peach": {
+    "id": "peekaboo-peach",
+    "name": "Peekaboo Peach",
+    "hex": "#FFB381",
+    "rgb": [
+      255,
+      179,
+      129
+    ],
+    "family": "legacy",
+    "colorFamily": "orange",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "tip-top-taupe": {
+    "id": "tip-top-taupe",
+    "name": "Tip Top Taupe",
+    "hex": "#A4978E",
+    "rgb": [
+      164,
+      151,
+      142
+    ],
+    "family": "legacy",
+    "colorFamily": "neutral",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "pebbled-path": {
+    "id": "pebbled-path",
+    "name": "Pebbled Path",
+    "hex": "#837D78",
+    "rgb": [
+      131,
+      125,
+      120
+    ],
+    "family": "legacy",
+    "colorFamily": "gray",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "pale-papaya": {
+    "id": "pale-papaya",
+    "name": "Pale Papaya",
+    "hex": "#FDCA9F",
+    "rgb": [
+      253,
+      202,
+      159
+    ],
+    "family": "legacy",
+    "colorFamily": "orange",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "marigold-morning": {
+    "id": "marigold-morning",
+    "name": "Marigold Morning",
+    "hex": "#F8B76F",
+    "rgb": [
+      248,
+      183,
+      111
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "more-mustard": {
+    "id": "more-mustard",
+    "name": "More Mustard",
+    "hex": "#DA9F5D",
+    "rgb": [
+      218,
+      159,
+      93
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "apricot-appeal": {
+    "id": "apricot-appeal",
+    "name": "Apricot Appeal",
+    "hex": "#FFCF95",
+    "rgb": [
+      255,
+      207,
+      149
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "mango-melody": {
+    "id": "mango-melody",
+    "name": "Mango Melody",
+    "hex": "#FEAD49",
+    "rgb": [
+      254,
+      173,
+      73
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "soft-suede": {
+    "id": "soft-suede",
+    "name": "Soft Suede",
+    "hex": "#8B775D",
+    "rgb": [
+      139,
+      119,
+      93
+    ],
+    "family": "legacy",
+    "colorFamily": "brown",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "baked-brown-sugar": {
+    "id": "baked-brown-sugar",
+    "name": "Baked Brown Sugar",
+    "hex": "#AB916B",
+    "rgb": [
+      171,
+      145,
+      107
+    ],
+    "family": "legacy",
+    "colorFamily": "brown",
+    "status": "retired",
+    "aliases": [
+      "goldish"
+    ],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "delightful-dijon": {
+    "id": "delightful-dijon",
+    "name": "Delightful Dijon",
+    "hex": "#C99C57",
+    "rgb": [
+      201,
+      156,
+      87
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "sahara-sand": {
+    "id": "sahara-sand",
+    "name": "Sahara Sand",
+    "hex": "#C8C0B3",
+    "rgb": [
+      200,
+      192,
+      179
+    ],
+    "family": "legacy",
+    "colorFamily": "neutral",
+    "status": "retired",
+    "aliases": [
+      "taupe"
+    ],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "so-saffron": {
+    "id": "so-saffron",
+    "name": "So Saffron",
+    "hex": "#F6D292",
+    "rgb": [
+      246,
+      210,
+      146
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "bumble-bee": {
+    "id": "bumble-bee",
+    "name": "Bumble Bee",
+    "hex": "#EBBA60",
+    "rgb": [
+      235,
+      186,
+      96
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "summer-sun": {
+    "id": "summer-sun",
+    "name": "Summer Sun",
+    "hex": "#FFC24E",
+    "rgb": [
+      255,
+      194,
+      78
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "barely-banana": {
+    "id": "barely-banana",
+    "name": "Barely Banana",
+    "hex": "#FFE1A4",
+    "rgb": [
+      255,
+      225,
+      164
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "true-thyme": {
+    "id": "true-thyme",
+    "name": "True Thyme",
+    "hex": "#90846B",
+    "rgb": [
+      144,
+      132,
+      107
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "hello-honey": {
+    "id": "hello-honey",
+    "name": "Hello Honey",
+    "hex": "#E5BA5B",
+    "rgb": [
+      229,
+      186,
+      91
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "wild-wheat": {
+    "id": "wild-wheat",
+    "name": "Wild Wheat",
+    "hex": "#B29852",
+    "rgb": [
+      178,
+      152,
+      82
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "river-rock": {
+    "id": "river-rock",
+    "name": "River Rock",
+    "hex": "#CFC29A",
+    "rgb": [
+      207,
+      194,
+      154
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow",
+    "status": "retired",
+    "aliases": [
+      "yellow-greenish"
+    ],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "summer-starfruit": {
+    "id": "summer-starfruit",
+    "name": "Summer Starfruit",
+    "hex": "#D6B95B",
+    "rgb": [
+      214,
+      185,
+      91
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "yoyo-yellow": {
+    "id": "yoyo-yellow",
+    "name": "YoYo Yellow",
+    "hex": "#FFDA4D",
+    "rgb": [
+      255,
+      218,
+      77
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "pineapple-punch": {
+    "id": "pineapple-punch",
+    "name": "Pineapple Punch",
+    "hex": "#FFE868",
+    "rgb": [
+      255,
+      232,
+      104
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "kiwi-kiss": {
+    "id": "kiwi-kiss",
+    "name": "Kiwi Kiss",
+    "hex": "#B6AE56",
+    "rgb": [
+      182,
+      174,
+      86
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow-green",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "always-artichoke": {
+    "id": "always-artichoke",
+    "name": "Always Artichoke",
+    "hex": "#7B7C67",
+    "rgb": [
+      123,
+      124,
+      103
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow-green",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "luscious-lime": {
+    "id": "luscious-lime",
+    "name": "Luscious Lime",
+    "hex": "#E1E76E",
+    "rgb": [
+      225,
+      231,
+      110
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow-green",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "mellow-moss": {
+    "id": "mellow-moss",
+    "name": "Mellow Moss",
+    "hex": "#A7A98D",
+    "rgb": [
+      167,
+      169,
+      141
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow-green",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "lucky-limeade": {
+    "id": "lucky-limeade",
+    "name": "Lucky Limeade",
+    "hex": "#A0A756",
+    "rgb": [
+      160,
+      167,
+      86
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow-green",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "pear-pizzazz": {
+    "id": "pear-pizzazz",
+    "name": "Pear Pizzazz",
+    "hex": "#AEB779",
+    "rgb": [
+      174,
+      183,
+      121
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow-green",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "certainly-celery": {
+    "id": "certainly-celery",
+    "name": "Certainly Celery",
+    "hex": "#BBC591",
+    "rgb": [
+      187,
+      197,
+      145
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow-green",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "parakeet-party": {
+    "id": "parakeet-party",
+    "name": "Parakeet Party",
+    "hex": "#BDE165",
+    "rgb": [
+      189,
+      225,
+      101
+    ],
+    "family": "legacy",
+    "colorFamily": "yellow-green",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "gumball-green": {
+    "id": "gumball-green",
+    "name": "Gumball Green",
+    "hex": "#78954B",
+    "rgb": [
+      120,
+      149,
+      75
+    ],
+    "family": "legacy",
+    "colorFamily": "green",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "pistachio-pudding": {
+    "id": "pistachio-pudding",
+    "name": "Pistachio Pudding",
+    "hex": "#C3D5B3",
+    "rgb": [
+      195,
+      213,
+      179
+    ],
+    "family": "legacy",
+    "colorFamily": "green",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "gable-green": {
+    "id": "gable-green",
+    "name": "Gable Green",
+    "hex": "#C5EAA4",
+    "rgb": [
+      197,
+      234,
+      164
+    ],
+    "family": "legacy",
+    "colorFamily": "green",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "wild-wasabi": {
+    "id": "wild-wasabi",
+    "name": "Wild Wasabi",
+    "hex": "#8DA977",
+    "rgb": [
+      141,
+      169,
+      119
+    ],
+    "family": "legacy",
+    "colorFamily": "green",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "green-galore": {
+    "id": "green-galore",
+    "name": "Green Galore",
+    "hex": "#95CF74",
+    "rgb": [
+      149,
+      207,
+      116
+    ],
+    "family": "legacy",
+    "colorFamily": "green",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "cucumber-crush": {
+    "id": "cucumber-crush",
+    "name": "Cucumber Crush",
+    "hex": "#68B16B",
+    "rgb": [
+      104,
+      177,
+      107
+    ],
+    "family": "legacy",
+    "colorFamily": "green",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "mint-melody": {
+    "id": "mint-melody",
+    "name": "Mint Melody",
+    "hex": "#B7DFC4",
+    "rgb": [
+      183,
+      223,
+      196
+    ],
+    "family": "legacy",
+    "colorFamily": "green",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "mint-macaron": {
+    "id": "mint-macaron",
+    "name": "Mint Macaron",
+    "hex": "#A1C4AE",
+    "rgb": [
+      161,
+      196,
+      174
+    ],
+    "family": "legacy",
+    "colorFamily": "green",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "sage-shadow": {
+    "id": "sage-shadow",
+    "name": "Sage Shadow",
+    "hex": "#9CB7A6",
+    "rgb": [
+      156,
+      183,
+      166
+    ],
+    "family": "legacy",
+    "colorFamily": "green",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "call-me-clover": {
+    "id": "call-me-clover",
+    "name": "Call Me Clover",
+    "hex": "#3F9D72",
+    "rgb": [
+      63,
+      157,
+      114
+    ],
+    "family": "legacy",
+    "colorFamily": "teal",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "evening-evergreen": {
+    "id": "evening-evergreen",
+    "name": "Evening Evergreen",
+    "hex": "#4D5C56",
+    "rgb": [
+      77,
+      92,
+      86
+    ],
+    "family": "legacy",
+    "colorFamily": "teal",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "soft-succulent": {
+    "id": "soft-succulent",
+    "name": "Soft Succulent",
+    "hex": "#8CA89F",
+    "rgb": [
+      140,
+      168,
+      159
+    ],
+    "family": "legacy",
+    "colorFamily": "teal",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "just-jade": {
+    "id": "just-jade",
+    "name": "Just Jade",
+    "hex": "#68A491",
+    "rgb": [
+      104,
+      164,
+      145
+    ],
+    "family": "legacy",
+    "colorFamily": "teal",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "emerald-envy": {
+    "id": "emerald-envy",
+    "name": "Emerald Envy",
+    "hex": "#259A7C",
+    "rgb": [
+      37,
+      154,
+      124
+    ],
+    "family": "legacy",
+    "colorFamily": "teal",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "handsome-hunter": {
+    "id": "handsome-hunter",
+    "name": "Handsome Hunter",
+    "hex": "#455A55",
+    "rgb": [
+      69,
+      90,
+      85
+    ],
+    "family": "legacy",
+    "colorFamily": "teal",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "tranquil-tide": {
+    "id": "tranquil-tide",
+    "name": "Tranquil Tide",
+    "hex": "#4D7A71",
+    "rgb": [
+      77,
+      122,
+      113
+    ],
+    "family": "legacy",
+    "colorFamily": "teal",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "glorious-green": {
+    "id": "glorious-green",
+    "name": "Glorious Green",
+    "hex": "#0E947A",
+    "rgb": [
+      14,
+      148,
+      122
+    ],
+    "family": "legacy",
+    "colorFamily": "teal",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "forest-foliage": {
+    "id": "forest-foliage",
+    "name": "Forest Foliage",
+    "hex": "#2B6B68",
+    "rgb": [
+      43,
+      107,
+      104
+    ],
+    "family": "legacy",
+    "colorFamily": "teal",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "bermuda-bay": {
+    "id": "bermuda-bay",
+    "name": "Bermuda Bay",
+    "hex": "#32ACA6",
+    "rgb": [
+      50,
+      172,
+      166
+    ],
+    "family": "legacy",
+    "colorFamily": "teal",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "soft-sky": {
+    "id": "soft-sky",
+    "name": "Soft Sky",
+    "hex": "#BEDADA",
+    "rgb": [
+      190,
+      218,
+      218
+    ],
+    "family": "legacy",
+    "colorFamily": "teal",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "cool-caribbean": {
+    "id": "cool-caribbean",
+    "name": "Cool Caribbean",
+    "hex": "#9BD7DD",
+    "rgb": [
+      155,
+      215,
+      221
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "taken-with-teal": {
+    "id": "taken-with-teal",
+    "name": "Taken with Teal",
+    "hex": "#0095A3",
+    "rgb": [
+      0,
+      149,
+      163
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "baja-breeze": {
+    "id": "baja-breeze",
+    "name": "Baja Breeze",
+    "hex": "#9BBDC4",
+    "rgb": [
+      155,
+      189,
+      196
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "island-indigo": {
+    "id": "island-indigo",
+    "name": "Island Indigo",
+    "hex": "#328394",
+    "rgb": [
+      50,
+      131,
+      148
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "blue-bayou": {
+    "id": "blue-bayou",
+    "name": "Blue Bayou",
+    "hex": "#678B95",
+    "rgb": [
+      103,
+      139,
+      149
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "tempting-turquoise": {
+    "id": "tempting-turquoise",
+    "name": "Tempting Turquoise",
+    "hex": "#54B9D5",
+    "rgb": [
+      84,
+      185,
+      213
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "tahitian-tide": {
+    "id": "tahitian-tide",
+    "name": "Tahitian Tide",
+    "hex": "#5CC3E5",
+    "rgb": [
+      92,
+      195,
+      229
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "pacific-point": {
+    "id": "pacific-point",
+    "name": "Pacific Point",
+    "hex": "#127DAE",
+    "rgb": [
+      18,
+      125,
+      174
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "dapper-denim": {
+    "id": "dapper-denim",
+    "name": "Dapper Denim",
+    "hex": "#3F718A",
+    "rgb": [
+      63,
+      113,
+      138
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "marina-mist": {
+    "id": "marina-mist",
+    "name": "Marina Mist",
+    "hex": "#71A3BF",
+    "rgb": [
+      113,
+      163,
+      191
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "not-quite-navy": {
+    "id": "not-quite-navy",
+    "name": "Not Quite Navy",
+    "hex": "#4C6D80",
+    "rgb": [
+      76,
+      109,
+      128
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "bashful-blue": {
+    "id": "bashful-blue",
+    "name": "Bashful Blue",
+    "hex": "#B5D5ED",
+    "rgb": [
+      181,
+      213,
+      237
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "midnight-muse": {
+    "id": "midnight-muse",
+    "name": "Midnight Muse",
+    "hex": "#405E75",
+    "rgb": [
+      64,
+      94,
+      117
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "bliss-blue": {
+    "id": "bliss-blue",
+    "name": "Bliss Blue",
+    "hex": "#8CBAE1",
+    "rgb": [
+      140,
+      186,
+      225
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "buckaroo-blue": {
+    "id": "buckaroo-blue",
+    "name": "Buckaroo Blue",
+    "hex": "#7F96AA",
+    "rgb": [
+      127,
+      150,
+      170
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "seaside-spray": {
+    "id": "seaside-spray",
+    "name": "Seaside Spray",
+    "hex": "#ABC1D9",
+    "rgb": [
+      171,
+      193,
+      217
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "bordering-blue": {
+    "id": "bordering-blue",
+    "name": "Bordering Blue",
+    "hex": "#9BAABB",
+    "rgb": [
+      155,
+      170,
+      187
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "boho-blue": {
+    "id": "boho-blue",
+    "name": "Boho Blue",
+    "hex": "#8DA7C5",
+    "rgb": [
+      141,
+      167,
+      197
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "brocade-blue": {
+    "id": "brocade-blue",
+    "name": "Brocade Blue",
+    "hex": "#859DC4",
+    "rgb": [
+      133,
+      157,
+      196
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "brilliant-blue": {
+    "id": "brilliant-blue",
+    "name": "Brilliant Blue",
+    "hex": "#4267A4",
+    "rgb": [
+      66,
+      103,
+      164
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "ballet-blue": {
+    "id": "ballet-blue",
+    "name": "Ballet Blue",
+    "hex": "#6991D8",
+    "rgb": [
+      105,
+      145,
+      216
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "almost-amethyst": {
+    "id": "almost-amethyst",
+    "name": "Almost Amethyst",
+    "hex": "#B0BAE1",
+    "rgb": [
+      176,
+      186,
+      225
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "orchid-oasis": {
+    "id": "orchid-oasis",
+    "name": "Orchid Oasis",
+    "hex": "#6B7CC0",
+    "rgb": [
+      107,
+      124,
+      192
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "starry-sky": {
+    "id": "starry-sky",
+    "name": "Starry Sky",
+    "hex": "#4F5892",
+    "rgb": [
+      79,
+      88,
+      146
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "vintage-violet": {
+    "id": "vintage-violet",
+    "name": "Vintage Violet",
+    "hex": "#70738B",
+    "rgb": [
+      112,
+      115,
+      139
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "wisteria-wonder": {
+    "id": "wisteria-wonder",
+    "name": "Wisteria Wonder",
+    "hex": "#999CB8",
+    "rgb": [
+      153,
+      156,
+      184
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "concord-crush": {
+    "id": "concord-crush",
+    "name": "Concord Crush",
+    "hex": "#535176",
+    "rgb": [
+      83,
+      81,
+      118
+    ],
+    "family": "legacy",
+    "colorFamily": "blue",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "lovely-lilac": {
+    "id": "lovely-lilac",
+    "name": "Lovely Lilac",
+    "hex": "#8784BF",
+    "rgb": [
+      135,
+      132,
+      191
+    ],
+    "family": "legacy",
+    "colorFamily": "purple",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "lavender-lace": {
+    "id": "lavender-lace",
+    "name": "Lavender Lace",
+    "hex": "#A595CF",
+    "rgb": [
+      165,
+      149,
+      207
+    ],
+    "family": "legacy",
+    "colorFamily": "purple",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "purple-posy": {
+    "id": "purple-posy",
+    "name": "Purple Posy",
+    "hex": "#E3D6EF",
+    "rgb": [
+      227,
+      214,
+      239
+    ],
+    "family": "legacy",
+    "colorFamily": "purple",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "elegant-eggplant": {
+    "id": "elegant-eggplant",
+    "name": "Elegant Eggplant",
+    "hex": "#685577",
+    "rgb": [
+      104,
+      85,
+      119
+    ],
+    "family": "legacy",
+    "colorFamily": "purple",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "eggplant-envy": {
+    "id": "eggplant-envy",
+    "name": "Eggplant Envy",
+    "hex": "#856793",
+    "rgb": [
+      133,
+      103,
+      147
+    ],
+    "family": "legacy",
+    "colorFamily": "purple",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "perfect-plum": {
+    "id": "perfect-plum",
+    "name": "Perfect Plum",
+    "hex": "#8D7591",
+    "rgb": [
+      141,
+      117,
+      145
+    ],
+    "family": "legacy",
+    "colorFamily": "purple",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "orchid-opulence": {
+    "id": "orchid-opulence",
+    "name": "Orchid Opulence",
+    "hex": "#C08FC3",
+    "rgb": [
+      192,
+      143,
+      195
+    ],
+    "family": "legacy",
+    "colorFamily": "pink",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "marvelous-magenta": {
+    "id": "marvelous-magenta",
+    "name": "Marvelous Magenta",
+    "hex": "#AC6CA2",
+    "rgb": [
+      172,
+      108,
+      162
+    ],
+    "family": "legacy",
+    "colorFamily": "pink",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "pale-plum": {
+    "id": "pale-plum",
+    "name": "Pale Plum",
+    "hex": "#D7BBCC",
+    "rgb": [
+      215,
+      187,
+      204
+    ],
+    "family": "legacy",
+    "colorFamily": "purple",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "mauve-mist": {
+    "id": "mauve-mist",
+    "name": "Mauve Mist",
+    "hex": "#E7BED6",
+    "rgb": [
+      231,
+      190,
+      214
+    ],
+    "family": "legacy",
+    "colorFamily": "pink",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "fresh-fig": {
+    "id": "fresh-fig",
+    "name": "Fresh Fig",
+    "hex": "#815B71",
+    "rgb": [
+      129,
+      91,
+      113
+    ],
+    "family": "legacy",
+    "colorFamily": "purple",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "rich-razzleberry": {
+    "id": "rich-razzleberry",
+    "name": "Rich Razzleberry",
+    "hex": "#8A5070",
+    "rgb": [
+      138,
+      80,
+      112
+    ],
+    "family": "legacy",
+    "colorFamily": "pink",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "magenta-madness": {
+    "id": "magenta-madness",
+    "name": "Magenta Madness",
+    "hex": "#E163A9",
+    "rgb": [
+      225,
+      99,
+      169
+    ],
+    "family": "legacy",
+    "colorFamily": "pink",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "pixie-pink": {
+    "id": "pixie-pink",
+    "name": "Pixie Pink",
+    "hex": "#F290C3",
+    "rgb": [
+      242,
+      144,
+      195
+    ],
+    "family": "legacy",
+    "colorFamily": "pink",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "pink-passion": {
+    "id": "pink-passion",
+    "name": "Pink Passion",
+    "hex": "#E467A3",
+    "rgb": [
+      228,
+      103,
+      163
+    ],
+    "family": "legacy",
+    "colorFamily": "pink",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "sweet-sugarplum": {
+    "id": "sweet-sugarplum",
+    "name": "Sweet Sugarplum",
+    "hex": "#C78AA2",
+    "rgb": [
+      199,
+      138,
+      162
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "polished-pink": {
+    "id": "polished-pink",
+    "name": "Polished Pink",
+    "hex": "#EF7DA7",
+    "rgb": [
+      239,
+      125,
+      167
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "purely-pomegranate": {
+    "id": "purely-pomegranate",
+    "name": "Purely Pomegranate",
+    "hex": "#AC4E6F",
+    "rgb": [
+      172,
+      78,
+      111
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "moody-mauve": {
+    "id": "moody-mauve",
+    "name": "Moody Mauve",
+    "hex": "#AC7789",
+    "rgb": [
+      172,
+      119,
+      137
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "baroque-burgundy": {
+    "id": "baroque-burgundy",
+    "name": "Baroque Burgundy",
+    "hex": "#945165",
+    "rgb": [
+      148,
+      81,
+      101
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "positively-pink": {
+    "id": "positively-pink",
+    "name": "Positively Pink",
+    "hex": "#F886A8",
+    "rgb": [
+      248,
+      134,
+      168
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "rose-red": {
+    "id": "rose-red",
+    "name": "Rose Red",
+    "hex": "#BD5977",
+    "rgb": [
+      189,
+      89,
+      119
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "lovely-lipstick": {
+    "id": "lovely-lipstick",
+    "name": "Lovely Lipstick",
+    "hex": "#BF456A",
+    "rgb": [
+      191,
+      69,
+      106
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "merry-merlot": {
+    "id": "merry-merlot",
+    "name": "Merry Merlot",
+    "hex": "#844858",
+    "rgb": [
+      132,
+      72,
+      88
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "regal-rose": {
+    "id": "regal-rose",
+    "name": "Regal Rose",
+    "hex": "#F493AC",
+    "rgb": [
+      244,
+      147,
+      172
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "raspberry-ripple": {
+    "id": "raspberry-ripple",
+    "name": "Raspberry Ripple",
+    "hex": "#9E4057",
+    "rgb": [
+      158,
+      64,
+      87
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "rose-romance": {
+    "id": "rose-romance",
+    "name": "Rose Romance",
+    "hex": "#DB7990",
+    "rgb": [
+      219,
+      121,
+      144
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "going-gray": {
+    "id": "going-gray",
+    "name": "Going Gray",
+    "hex": "#ACA7A8",
+    "rgb": [
+      172,
+      167,
+      168
+    ],
+    "family": "legacy",
+    "colorFamily": "gray",
+    "status": "retired",
+    "aliases": [
+      "warm gray"
+    ],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "rococo-rose": {
+    "id": "rococo-rose",
+    "name": "Rococo Rose",
+    "hex": "#D28B98",
+    "rgb": [
+      210,
+      139,
+      152
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "bravo-burgundy": {
+    "id": "bravo-burgundy",
+    "name": "Bravo Burgundy",
+    "hex": "#82525B",
+    "rgb": [
+      130,
+      82,
+      91
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "pink-pirouette": {
+    "id": "pink-pirouette",
+    "name": "Pink Pirouette",
+    "hex": "#FDD8DF",
+    "rgb": [
+      253,
+      216,
+      223
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "primrose-petals": {
+    "id": "primrose-petals",
+    "name": "Primrose Petals",
+    "hex": "#C76C7D",
+    "rgb": [
+      199,
+      108,
+      125
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "sweet-sorbet": {
+    "id": "sweet-sorbet",
+    "name": "Sweet Sorbet",
+    "hex": "#DC596C",
+    "rgb": [
+      220,
+      89,
+      108
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "cranberry-crisp": {
+    "id": "cranberry-crisp",
+    "name": "Cranberry Crisp",
+    "hex": "#A56268",
+    "rgb": [
+      165,
+      98,
+      104
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "cameo-coral": {
+    "id": "cameo-coral",
+    "name": "Cameo Coral",
+    "hex": "#F88E96",
+    "rgb": [
+      248,
+      142,
+      150
+    ],
+    "family": "legacy",
+    "colorFamily": "orange",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "ruby-red": {
+    "id": "ruby-red",
+    "name": "Ruby Red",
+    "hex": "#C36169",
+    "rgb": [
+      195,
+      97,
+      105
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "riding-hood-red": {
+    "id": "riding-hood-red",
+    "name": "Riding Hood Red",
+    "hex": "#B6545C",
+    "rgb": [
+      182,
+      84,
+      92
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "rocket-red": {
+    "id": "rocket-red",
+    "name": "Rocket Red",
+    "hex": "#CE555C",
+    "rgb": [
+      206,
+      85,
+      92
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "watermelon-wonder": {
+    "id": "watermelon-wonder",
+    "name": "Watermelon Wonder",
+    "hex": "#EB6D73",
+    "rgb": [
+      235,
+      109,
+      115
+    ],
+    "family": "legacy",
+    "colorFamily": "red",
+    "status": "retired",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  },
+  "peaceful-pine": {
+    "id": "peaceful-pine",
+    "name": "Peaceful Pine",
+    "hex": "#5B7E70",
+    "rgb": [
+      91,
+      126,
+      112
+    ],
+    "family": "green",
+    "colorFamily": "teal",
+    "status": "active",
+    "aliases": [],
+    "products": {
+      "cardstock": null,
+      "ink": null,
+      "dsp": null,
+      "marker": null,
+      "blend": null
+    }
+  }
+}
