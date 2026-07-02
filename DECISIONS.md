@@ -12,7 +12,7 @@ Availability + Backup Supply
 replaced quantity.
 
 # Decision 2:
-Use four large pattern thumbnails on every DSP card.
+Use large pattern thumbnails on every DSP card to display all the patterns for that paper pack.
 
 Reason
 Users recognize DSP packs visually. Large previews make browsing faster and more enjoyable than text-heavy cards.
