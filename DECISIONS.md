@@ -30,3 +30,12 @@ Impact
 Availability is simplified to:
 - Available
 - Used Up
+
+# Decision 4
+Cards are always opened by clicking the card.
+
+Reason
+This makes it easy to see larger images of the paper and get more detailed metadata about the paper pack
+
+Impact
+Makes it easy to compare paper packs, but also to get details about an individual pack
