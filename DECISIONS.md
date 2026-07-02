@@ -68,3 +68,13 @@ Nothing stores colors by name. Everything stores a color ID. The color ID will b
 
 # Decision 8
 We want to show all the colors on the catalog cards, with the colors represented by a dot showing the color, followed by the color id. These should be presented in columns. The cards should adapt to the available space. Let CSS decide how many cards per column on the page, and how many columns of colors to display based on the card width.
+
+# Decision 9
+The left nav should be very simple. It should only include Library and Settings. 
+
+Settings would allow the user to add a color or add a new paper pack. 
+
+Library shows the overall catalog. 
+
+# Decision 10
+Clicking a pattern pack from the Library will display a larger, detailed view of the pack, and will provide a feature to allow edits to the pack.
