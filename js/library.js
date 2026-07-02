@@ -258,6 +258,9 @@ function createDetailContent(paperPack, paperPacks, colorsById) {
   const preview = createPatternGrid(paperPack);
   preview.classList.add("detail-pattern-grid");
 
+  const metadata = document.createElement("div");
+  metadata.className = "detail-metadata";
+
   const keywordList = createKeywordList(paperPack);
   keywordList.classList.add("detail-keyword-list");
 
@@ -299,7 +302,8 @@ function createDetailContent(paperPack, paperPacks, colorsById) {
   coordinationResults.append(prompt);
 
   coordinationSection.append(coordinationHeading, coordinationResults);
-  content.append(preview, colorSection, tagSection, createDetailMeta(paperPack), coordinationSection);
+  metadata.append(colorSection, tagSection, createDetailMeta(paperPack), coordinationSection);
+  content.append(preview, metadata);
 
   return content;
 }
@@ -348,11 +352,40 @@ function createDetailColorItem(color) {
 }
 
 function createDetailMeta(paperPack) {
-  const meta = document.createElement("p");
-  meta.className = "detail-meta";
-  meta.textContent = `${paperPack.owner} - ${paperPack.releaseYear} Release - ${paperPack.patternCount} patterns`;
+  const meta = document.createElement("section");
+  meta.className = "detail-section";
+  meta.setAttribute("aria-labelledby", "detail-meta-title");
+
+  const heading = document.createElement("h4");
+  heading.id = "detail-meta-title";
+  heading.textContent = "Pack Info";
+
+  const list = document.createElement("dl");
+  list.className = "detail-meta-list";
+
+  list.append(
+    createDetailMetaItem("Owner", paperPack.owner),
+    createDetailMetaItem("Release", `${paperPack.releaseYear}`),
+    createDetailMetaItem("Patterns", `${paperPack.patternCount}`)
+  );
+
+  meta.append(heading, list);
 
   return meta;
+}
+
+function createDetailMetaItem(label, value) {
+  const wrapper = document.createElement("div");
+
+  const term = document.createElement("dt");
+  term.textContent = label;
+
+  const description = document.createElement("dd");
+  description.textContent = value;
+
+  wrapper.append(term, description);
+
+  return wrapper;
 }
 
 function renderCoordinatingPacks(container, selectedPack, color, paperPacks) {
