@@ -136,7 +136,7 @@ function createPaperPackCard(paperPack, colorsById) {
   meta.className = "card-meta";
   meta.textContent = `${paperPack.owner} - ${paperPack.releaseYear} Release - ${paperPack.patternCount} patterns`;
 
-  cardBody.append(titleRow, keywords, colorList, meta);
+  cardBody.append(titleRow, colorList, keywords, meta);
   card.append(patternGrid, cardBody);
 
   return card;
