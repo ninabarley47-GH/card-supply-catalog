@@ -39,3 +39,23 @@ This makes it easy to see larger images of the paper and get more detailed metad
 
 Impact
 Makes it easy to compare paper packs, but also to get details about an individual pack
+
+# Decision 5
+Keywords are the following:
+Background
+Floral
+Foliage
+Ocean
+Mammals
+Winged Creatures
+Hobbies
+Specialty
+Textures
+Holiday
+Geometric
+
+Reason
+This provides a basic set of categories that users will commonly want to search or filter by, without being overwhelming.
+
+Impact
+Makes it easy to label paper for filtering
