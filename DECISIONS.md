@@ -1,6 +1,6 @@
 2026-07-01
 
-Decision:
+# Decision 1:
 Remove Quantity Tracking
 
 Reason:
@@ -10,3 +10,23 @@ not how many packs they own.
 Result:
 Availability + Backup Supply
 replaced quantity.
+
+# Decision 2:
+Use four large pattern thumbnails on every DSP card.
+
+Reason
+Users recognize DSP packs visually. Large previews make browsing faster and more enjoyable than text-heavy cards.
+
+Impact
+This became the standard layout for the Library screen.
+
+# Decision 3
+Do not implement a "Low" availability state.
+
+Reason
+The application is intended to support real crafting habits, not detailed inventory management. The user is unlikely to maintain a granular status.
+
+Impact
+Availability is simplified to:
+- Available
+- Used Up

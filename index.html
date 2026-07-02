@@ -36,6 +36,7 @@
             <div>
               <p class="eyebrow">Library</p>
               <h2 id="library-title">Designer Series Paper</h2>
+              <p class="screen-summary">Browse your paper by sight, with just enough detail to recognize what belongs to whom.</p>
             </div>
 
             <form class="search-form" role="search" aria-label="Search catalog">
@@ -51,21 +52,89 @@
             </form>
           </section>
 
-          <section class="empty-library" aria-labelledby="empty-library-title">
-            <div class="empty-preview" aria-hidden="true">
-              <div class="paper-placeholder"></div>
-              <div class="paper-placeholder"></div>
-              <div class="paper-placeholder"></div>
-              <div class="paper-placeholder"></div>
-            </div>
+          <section class="library-section" aria-labelledby="library-grid-title">
+            <h3 class="visually-hidden" id="library-grid-title">DSP Packs</h3>
+            <div class="dsp-grid dsp-grid-balanced">
+              <article class="dsp-card">
+                <div class="pattern-grid" aria-label="Four sample patterns for Garden Walk">
+                  <span class="pattern pattern-sage"></span>
+                  <span class="pattern pattern-blush"></span>
+                  <span class="pattern pattern-sky"></span>
+                  <span class="pattern pattern-honey"></span>
+                </div>
+                <div class="card-body">
+                  <div class="card-title-row">
+                    <h4>Garden Walk</h4>
+                  </div>
+                  <p class="card-meta">Nina &middot; 2024</p>
+                  <p class="keywords">floral, soft, spring</p>
+                </div>
+              </article>
 
-            <div class="empty-copy">
-              <h3 id="empty-library-title">Your DSP library is ready.</h3>
-              <p>Add your first paper pack when the catalog workflow is implemented.</p>
-              <button class="button button-primary" type="button" disabled>
-                <span aria-hidden="true">+</span>
-                Add DSP
-              </button>
+              <article class="dsp-card">
+                <div class="pattern-grid" aria-label="Four sample patterns for Midnight Orchard">
+                  <span class="pattern pattern-navy"></span>
+                  <span class="pattern pattern-cream"></span>
+                  <span class="pattern pattern-rose"></span>
+                  <span class="pattern pattern-moss"></span>
+                </div>
+                <div class="card-body">
+                  <div class="card-title-row">
+                    <h4>Midnight Orchard</h4>
+                    <span class="availability used-up">Used Up</span>
+                  </div>
+                  <p class="card-meta">Mom &middot; 2023</p>
+                  <p class="keywords">botanical, dark, elegant</p>
+                </div>
+              </article>
+
+              <article class="dsp-card">
+                <div class="pattern-grid" aria-label="Four sample patterns for Coastal Linen">
+                  <span class="pattern pattern-sea"></span>
+                  <span class="pattern pattern-sand"></span>
+                  <span class="pattern pattern-coral"></span>
+                  <span class="pattern pattern-fog"></span>
+                </div>
+                <div class="card-body">
+                  <div class="card-title-row">
+                    <h4>Coastal Linen</h4>
+                  </div>
+                  <p class="card-meta">Shared &middot; 2022</p>
+                  <p class="keywords">stripe, beach, neutral</p>
+                </div>
+              </article>
+
+              <article class="dsp-card">
+                <div class="pattern-grid" aria-label="Four sample patterns for Fresh Freesia Field">
+                  <span class="pattern pattern-lilac"></span>
+                  <span class="pattern pattern-mint"></span>
+                  <span class="pattern pattern-ivory"></span>
+                  <span class="pattern pattern-berry"></span>
+                </div>
+                <div class="card-body">
+                  <div class="card-title-row">
+                    <h4>Fresh Freesia Field</h4>
+                  </div>
+                  <p class="card-meta">Jo &middot; 2024</p>
+                  <p class="keywords">pastel, soft, floral</p>
+                </div>
+              </article>
+
+              <article class="dsp-card">
+                <div class="pattern-grid" aria-label="Four sample patterns for Market Florals">
+                  <span class="pattern pattern-blush"></span>
+                  <span class="pattern pattern-honey"></span>
+                  <span class="pattern pattern-moss"></span>
+                  <span class="pattern pattern-cream"></span>
+                </div>
+                <div class="card-body">
+                  <div class="card-title-row">
+                    <h4>Market Florals</h4>
+                  </div>
+                  <p class="card-meta">Nina &middot; 2021</p>
+                  <p class="keywords">bright, floral, cheerful</p>
+                </div>
+              </article>
             </div>
           </section>
         </main>
