@@ -65,6 +65,7 @@ export async function initializeLibraryShell() {
 
     if (paperPackLibrary) {
       renderPaperPackLibrary(paperPackLibrary, paperPacks, colorsById);
+      initializeDetailPanel(paperPackLibrary, paperPacks, colorsById);
     }
 
     if (colorLibrary) {
@@ -150,6 +151,8 @@ function createPaperPackCard(paperPack, colorsById) {
   const card = document.createElement("a");
   card.className = "dsp-card";
   card.href = `#${paperPack.id}`;
+  card.dataset.paperPackCard = "";
+  card.dataset.packId = paperPack.id;
   card.setAttribute("aria-label", `Open ${paperPack.name}`);
 
   const patternGrid = createPatternGrid(paperPack);
@@ -178,6 +181,220 @@ function createPaperPackCard(paperPack, colorsById) {
 
   cardBody.append(titleRow, colorList, keywords, meta);
   card.append(patternGrid, cardBody);
+
+  return card;
+}
+
+function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById) {
+  const detailPanel = document.querySelector("[data-detail-panel]");
+  const detailTitle = document.querySelector("[data-detail-title]");
+  const detailBody = document.querySelector("[data-detail-body]");
+  const detailClose = document.querySelector("[data-detail-close]");
+
+  if (!detailPanel || !detailTitle || !detailBody) {
+    return;
+  }
+
+  paperPackLibrary.addEventListener("click", (event) => {
+    const card = event.target.closest("[data-paper-pack-card]");
+
+    if (!card) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const paperPack = paperPacks.find((pack) => pack.id === card.dataset.packId);
+
+    if (paperPack) {
+      openDetailPanel(detailPanel, detailTitle, detailBody, paperPack, paperPacks, colorsById);
+    }
+  });
+
+  detailBody.addEventListener("click", (event) => {
+    const colorButton = event.target.closest("[data-coordinate-color]");
+
+    if (!colorButton) {
+      return;
+    }
+
+    const selectedPack = paperPacks.find((pack) => pack.id === detailPanel.dataset.selectedPackId);
+    const color = colorsById[colorButton.dataset.coordinateColor];
+    const resultsContainer = detailBody.querySelector("[data-coordination-results]");
+
+    if (!selectedPack || !color || !resultsContainer) {
+      return;
+    }
+
+    renderCoordinatingPacks(resultsContainer, selectedPack, color, paperPacks);
+  });
+
+  detailClose?.addEventListener("click", () => closeDetailPanel(detailPanel));
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !detailPanel.hidden) {
+      closeDetailPanel(detailPanel);
+    }
+  });
+}
+
+function openDetailPanel(detailPanel, detailTitle, detailBody, paperPack, paperPacks, colorsById) {
+  detailPanel.hidden = false;
+  detailPanel.dataset.selectedPackId = paperPack.id;
+  detailTitle.textContent = paperPack.name;
+  detailBody.replaceChildren(createDetailContent(paperPack, paperPacks, colorsById));
+  detailPanel.querySelector("[data-detail-close]")?.focus();
+}
+
+function closeDetailPanel(detailPanel) {
+  detailPanel.hidden = true;
+  delete detailPanel.dataset.selectedPackId;
+}
+
+function createDetailContent(paperPack, paperPacks, colorsById) {
+  const content = document.createElement("div");
+  content.className = "detail-content";
+
+  const preview = createPatternGrid(paperPack);
+  preview.classList.add("detail-pattern-grid");
+
+  const keywordList = createKeywordList(paperPack);
+  keywordList.classList.add("detail-keyword-list");
+
+  const colorSection = document.createElement("section");
+  colorSection.className = "detail-section";
+  colorSection.setAttribute("aria-labelledby", "detail-colors-title");
+
+  const colorHeading = document.createElement("h4");
+  colorHeading.id = "detail-colors-title";
+  colorHeading.textContent = "Colors";
+
+  const colorList = createDetailColorList(paperPack, colorsById);
+  colorSection.append(colorHeading, colorList);
+
+  const tagSection = document.createElement("section");
+  tagSection.className = "detail-section";
+  tagSection.setAttribute("aria-labelledby", "detail-tags-title");
+
+  const tagHeading = document.createElement("h4");
+  tagHeading.id = "detail-tags-title";
+  tagHeading.textContent = "Tags";
+  tagSection.append(tagHeading, keywordList);
+
+  const coordinationSection = document.createElement("section");
+  coordinationSection.className = "detail-section coordination-section";
+  coordinationSection.setAttribute("aria-labelledby", "coordination-title");
+
+  const coordinationHeading = document.createElement("h4");
+  coordinationHeading.id = "coordination-title";
+  coordinationHeading.textContent = "Color Coordination";
+
+  const coordinationResults = document.createElement("div");
+  coordinationResults.className = "coordination-results";
+  coordinationResults.dataset.coordinationResults = "";
+
+  const prompt = document.createElement("p");
+  prompt.className = "coordination-empty";
+  prompt.textContent = "Choose a color above to find other paper packs that coordinate.";
+  coordinationResults.append(prompt);
+
+  coordinationSection.append(coordinationHeading, coordinationResults);
+  content.append(preview, colorSection, tagSection, createDetailMeta(paperPack), coordinationSection);
+
+  return content;
+}
+
+function createDetailColorList(paperPack, colorsById) {
+  const colorList = document.createElement("ul");
+  colorList.className = "detail-color-list";
+  colorList.setAttribute("aria-label", `${paperPack.name} coordinating colors`);
+
+  const packColors = (paperPack.colors || []).map((colorId) => ({
+    id: colorId,
+    color: colorsById[colorId]
+  }));
+
+  packColors.sort(comparePackColorReferences);
+  colorList.append(
+    ...packColors.map(({ id, color }) =>
+      color ? createDetailColorItem(color) : createMissingColorItem(id)
+    )
+  );
+
+  return colorList;
+}
+
+function createDetailColorItem(color) {
+  const item = document.createElement("li");
+
+  const button = document.createElement("button");
+  button.className = "detail-color-chip";
+  button.type = "button";
+  button.dataset.coordinateColor = color.id;
+
+  const swatch = document.createElement("span");
+  swatch.className = "pack-color-dot";
+  swatch.style.backgroundColor = color.hex;
+  swatch.setAttribute("aria-hidden", "true");
+
+  const name = document.createElement("span");
+  name.className = "pack-color-name";
+  name.textContent = color.name;
+
+  button.append(swatch, name);
+  item.append(button);
+
+  return item;
+}
+
+function createDetailMeta(paperPack) {
+  const meta = document.createElement("p");
+  meta.className = "detail-meta";
+  meta.textContent = `${paperPack.owner} - ${paperPack.releaseYear} Release - ${paperPack.patternCount} patterns`;
+
+  return meta;
+}
+
+function renderCoordinatingPacks(container, selectedPack, color, paperPacks) {
+  const coordinatingPacks = paperPacks.filter(
+    (paperPack) => paperPack.id !== selectedPack.id && paperPack.colors?.includes(color.id)
+  );
+
+  const heading = document.createElement("h5");
+  heading.textContent = `Other packs using ${color.name}.`;
+
+  if (coordinatingPacks.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "coordination-empty";
+    empty.textContent = `No other sample packs use ${color.name} yet.`;
+    container.replaceChildren(heading, empty);
+    return;
+  }
+
+  const list = document.createElement("div");
+  list.className = "coordination-pack-list";
+
+  list.append(...coordinatingPacks.map(createCoordinatingPackCard));
+  container.replaceChildren(heading, list);
+}
+
+function createCoordinatingPackCard(paperPack) {
+  const card = document.createElement("article");
+  card.className = "coordination-pack-card";
+
+  const preview = createPatternGrid({
+    ...paperPack,
+    patterns: paperPack.patterns?.slice(0, 4) || []
+  });
+  preview.classList.add("coordination-pattern-grid");
+
+  const title = document.createElement("h6");
+  title.textContent = paperPack.name;
+
+  const meta = document.createElement("p");
+  meta.textContent = `${paperPack.owner} - ${paperPack.releaseYear} Release`;
+
+  card.append(preview, title, meta);
 
   return card;
 }
