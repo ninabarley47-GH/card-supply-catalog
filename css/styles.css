@@ -123,6 +123,10 @@ h3 {
   line-height: 1.2;
 }
 
+h4 {
+  margin-top: 0;
+}
+
 .button {
   display: inline-flex;
   align-items: center;
@@ -614,7 +618,10 @@ h3 {
 }
 
 .color-reference-section {
-  margin-bottom: var(--space-7);
+  margin-top: var(--space-6);
+  margin-bottom: 0;
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-5);
 }
 
 .settings-section {
@@ -633,6 +640,12 @@ h3 {
   border-color: var(--color-border);
   background: var(--color-surface);
   color: var(--color-muted);
+}
+
+.color-reference-section h4 {
+  margin-bottom: 0;
+  font-size: 1.05rem;
+  line-height: 1.2;
 }
 
 .color-library-grid {
