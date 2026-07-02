@@ -59,3 +59,12 @@ This provides a basic set of categories that users will commonly want to search 
 
 Impact
 Makes it easy to label paper for filtering
+
+# Decision 6
+The catalog view is for visual recognition and creative inspiration. Every card should prioritize pattern thumbnails and the complete color palette. Secondary metadata should never reduce the visibility of those two elements.
+
+# Decision 7
+Nothing stores colors by name. Everything stores a color ID. The color ID will be based on the color name. For example, if the color is "Basic Beige", the color ID is "basic-beige".
+
+# Decision 8
+We want to show all the colors on the catalog cards, with the colors represented by a dot showing the color, followed by the color id. These should be presented in columns. The cards should adapt to the available space. Let CSS decide how many cards per column on the page, and how many columns of colors to display based on the card width.

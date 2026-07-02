@@ -80,6 +80,7 @@ Each DSP contains:
 unique ID
 name
 owner
+colors
 release year
 pattern count
 availability
@@ -106,6 +107,11 @@ replaceable
 individually managed
 imported by folder or by file
 
+# Colors
+Treat colors as first-class data entities. Every product in the catalog references colors by ID. The colors.json file is the authoritative source for all color metadata.
+
+Each color's JSON entry will include a color id (derived from the color name), name, hex value, rgb, family, status, aliases, and the products it could appear in (cardstock, ink, DSP, marker, blend)
+   
 # Backups
 
 Very simple.
