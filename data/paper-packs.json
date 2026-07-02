@@ -29,7 +29,11 @@
         "sprig",
         "dots",
         "meadow",
-        "stripe"
+        "stripe",
+        "sage",
+        "honey",
+        "sky",
+        "rose"
       ]
     },
     {
@@ -60,7 +64,11 @@
         "meadow",
         "dots",
         "confetti",
-        "speckle"
+        "speckle",
+        "sage",
+        "honey",
+        "sky",
+        "rose"
       ]
     },
     {
@@ -89,7 +97,11 @@
         "linen",
         "meadow",
         "dots",
-        "speckle"
+        "speckle",
+        "navy",
+        "rose",
+        "moss",
+        "sage"
       ]
     },
     {
@@ -118,7 +130,13 @@
         "speckle",
         "dots",
         "confetti",
-        "sprig"
+        "sprig",
+        "sky",
+        "sage",
+        "honey",
+        "meadow",
+        "floral",
+        "rose"
       ]
     },
     {
@@ -147,7 +165,13 @@
         "sprig",
         "dots",
         "meadow",
-        "speckle"
+        "speckle",
+        "rose",
+        "sage",
+        "sky",
+        "confetti",
+        "stripe",
+        "honey"
       ]
     },
     {
@@ -177,7 +201,13 @@
         "floral",
         "dots",
         "linen",
-        "meadow"
+        "meadow",
+        "honey",
+        "sky",
+        "speckle",
+        "sprig",
+        "sage",
+        "rose"
       ]
     }
   ]

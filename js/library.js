@@ -36,10 +36,16 @@ const PATTERN_CLASS_MAP = {
   confetti: "pattern-confetti",
   dots: "pattern-dots",
   floral: "pattern-floral",
+  honey: "pattern-honey",
   linen: "pattern-linen",
   meadow: "pattern-meadow",
+  moss: "pattern-moss",
+  navy: "pattern-navy",
+  rose: "pattern-rose",
+  sage: "pattern-sage",
   speckle: "pattern-speckle",
   sprig: "pattern-sprig",
+  sky: "pattern-sky",
   stripe: "pattern-stripe"
 };
 
@@ -145,9 +151,9 @@ function createPaperPackCard(paperPack, colorsById) {
 function createPatternGrid(paperPack) {
   const patternGrid = document.createElement("div");
   patternGrid.className = "pattern-grid";
-  patternGrid.setAttribute("aria-label", `Sample patterns for ${paperPack.name}`);
+  patternGrid.setAttribute("aria-label", `All sample patterns for ${paperPack.name}`);
 
-  const patterns = paperPack.patterns?.slice(0, 4) || [];
+  const patterns = paperPack.patterns || [];
 
   patternGrid.append(
     ...patterns.map((patternName) => {
