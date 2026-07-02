@@ -78,3 +78,8 @@ Library shows the overall catalog.
 
 # Decision 10
 Clicking a pattern pack from the Library will display a larger, detailed view of the pack, and will provide a feature to allow edits to the pack.
+
+# Decision 11
+"Recently Added" is not a primary navigation destination. It is a collapsible section at the top of the Library view that can be expanded or hidden as desired. 
+
+"Recently Added" shows the most recent cataloging session. Those packs remain in "Recently Added" until the next time the user catalogs more paper packs.
