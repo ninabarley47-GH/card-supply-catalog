@@ -118,3 +118,7 @@ Metadata, navigation, and new features should exist only if they help users:
 - or efficiently maintain the catalog.
 
 Administrative features should remain in maintenance workflows rather than the primary browsing experience.
+
+# Decision 13
+## Carrying Coordinating Colors Into Detail Pages
+When a user clicks a pack from the coordinating color, the pack clicked should display in the details page, and the packs that match the previously selected coordinating color should display in the color coordination section.

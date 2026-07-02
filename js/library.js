@@ -216,9 +216,18 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById) {
 
     if (coordinatingPack) {
       const paperPack = paperPacks.find((pack) => pack.id === coordinatingPack.dataset.coordinatePack);
+      const coordinatingColor = colorsById[coordinatingPack.dataset.coordinateColor];
 
       if (paperPack) {
-        openDetailPanel(detailPanel, detailTitle, detailBody, paperPack, paperPacks, colorsById);
+        openDetailPanel(
+          detailPanel,
+          detailTitle,
+          detailBody,
+          paperPack,
+          paperPacks,
+          colorsById,
+          coordinatingColor
+        );
       }
 
       return;
@@ -250,12 +259,29 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById) {
   });
 }
 
-function openDetailPanel(detailPanel, detailTitle, detailBody, paperPack, paperPacks, colorsById) {
+function openDetailPanel(
+  detailPanel,
+  detailTitle,
+  detailBody,
+  paperPack,
+  paperPacks,
+  colorsById,
+  coordinatingColor = null
+) {
   detailPanel.hidden = false;
   detailPanel.dataset.selectedPackId = paperPack.id;
   detailTitle.textContent = paperPack.name;
   detailBody.replaceChildren(createDetailContent(paperPack, paperPacks, colorsById));
   detailBody.scrollTop = 0;
+
+  if (coordinatingColor) {
+    const resultsContainer = detailBody.querySelector("[data-coordination-results]");
+
+    if (resultsContainer) {
+      renderCoordinatingPacks(resultsContainer, paperPack, coordinatingColor, paperPacks);
+    }
+  }
+
   detailPanel.querySelector("[data-detail-close]")?.focus();
 }
 
@@ -420,15 +446,18 @@ function renderCoordinatingPacks(container, selectedPack, color, paperPacks) {
   const list = document.createElement("div");
   list.className = "coordination-pack-list";
 
-  list.append(...coordinatingPacks.map(createCoordinatingPackCard));
+  list.append(
+    ...coordinatingPacks.map((paperPack) => createCoordinatingPackCard(paperPack, color))
+  );
   container.replaceChildren(heading, list);
 }
 
-function createCoordinatingPackCard(paperPack) {
+function createCoordinatingPackCard(paperPack, color) {
   const card = document.createElement("button");
   card.className = "coordination-pack-card";
   card.type = "button";
   card.dataset.coordinatePack = paperPack.id;
+  card.dataset.coordinateColor = color.id;
   card.setAttribute("aria-label", `Open ${paperPack.name}`);
 
   const preview = createPatternGrid({
