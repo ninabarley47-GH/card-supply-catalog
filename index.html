@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Card Supply Catalog</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script type="module" src="js/app.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">CSC</span>
+          <div>
+            <p class="eyebrow">Visual DSP Library</p>
+            <h1>Card Supply Catalog</h1>
+          </div>
+        </div>
+
+        <button class="button button-primary" type="button" disabled>
+          <span aria-hidden="true">+</span>
+          Add DSP
+        </button>
+      </header>
+
+      <div class="app-layout">
+        <nav class="side-nav" aria-label="Primary">
+          <a class="nav-link nav-link-active" href="#library" aria-current="page">Library</a>
+          <a class="nav-link" href="#recent">Recently Added</a>
+          <a class="nav-link" href="#settings">Settings</a>
+        </nav>
+
+        <main class="main-content" id="library" tabindex="-1">
+          <section class="library-toolbar" aria-labelledby="library-title">
+            <div>
+              <p class="eyebrow">Library</p>
+              <h2 id="library-title">Designer Series Paper</h2>
+            </div>
+
+            <form class="search-form" role="search" aria-label="Search catalog">
+              <label class="search-label" for="catalog-search">Search</label>
+              <input
+                id="catalog-search"
+                name="catalog-search"
+                type="search"
+                placeholder="Name, keyword, owner, or year"
+                autocomplete="off"
+                disabled
+              >
+            </form>
+          </section>
+
+          <section class="empty-library" aria-labelledby="empty-library-title">
+            <div class="empty-preview" aria-hidden="true">
+              <div class="paper-placeholder"></div>
+              <div class="paper-placeholder"></div>
+              <div class="paper-placeholder"></div>
+              <div class="paper-placeholder"></div>
+            </div>
+
+            <div class="empty-copy">
+              <h3 id="empty-library-title">Your DSP library is ready.</h3>
+              <p>Add your first paper pack when the catalog workflow is implemented.</p>
+              <button class="button button-primary" type="button" disabled>
+                <span aria-hidden="true">+</span>
+                Add DSP
+              </button>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

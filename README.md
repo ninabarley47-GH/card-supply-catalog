@@ -139,6 +139,18 @@ The project intentionally avoids unnecessary frameworks and dependencies in favo
 
 ---
 
+## Running the application locally
+
+The application uses JavaScript ES modules and should be served from a local HTTP server during development.
+
+Example using Python:
+
+    python -m http.server 8000
+
+Then open:
+
+    http://localhost:8000
+
 ## Project Status
 
 **Current Milestone:** Foundation
