@@ -553,10 +553,20 @@ h6 {
 }
 
 .coordination-pack-card {
+  width: 100%;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-medium);
   padding: var(--space-3);
   background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.coordination-pack-card:hover,
+.coordination-pack-card:focus-visible {
+  border-color: rgba(82, 120, 109, 0.62);
+  box-shadow: 0 8px 22px rgba(47, 44, 40, 0.09);
 }
 
 .coordination-pattern-grid {
@@ -570,9 +580,11 @@ h6 {
   aspect-ratio: 1.4;
 }
 
-.coordination-pack-card h6 {
+.coordination-pack-title {
+  display: block;
   margin-bottom: var(--space-1);
   font-size: 0.95rem;
+  font-weight: 800;
   line-height: 1.2;
 }
 

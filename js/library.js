@@ -212,6 +212,18 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById) {
   });
 
   detailBody.addEventListener("click", (event) => {
+    const coordinatingPack = event.target.closest("[data-coordinate-pack]");
+
+    if (coordinatingPack) {
+      const paperPack = paperPacks.find((pack) => pack.id === coordinatingPack.dataset.coordinatePack);
+
+      if (paperPack) {
+        openDetailPanel(detailPanel, detailTitle, detailBody, paperPack, paperPacks, colorsById);
+      }
+
+      return;
+    }
+
     const colorButton = event.target.closest("[data-coordinate-color]");
 
     if (!colorButton) {
@@ -243,6 +255,7 @@ function openDetailPanel(detailPanel, detailTitle, detailBody, paperPack, paperP
   detailPanel.dataset.selectedPackId = paperPack.id;
   detailTitle.textContent = paperPack.name;
   detailBody.replaceChildren(createDetailContent(paperPack, paperPacks, colorsById));
+  detailBody.scrollTop = 0;
   detailPanel.querySelector("[data-detail-close]")?.focus();
 }
 
@@ -412,8 +425,11 @@ function renderCoordinatingPacks(container, selectedPack, color, paperPacks) {
 }
 
 function createCoordinatingPackCard(paperPack) {
-  const card = document.createElement("article");
+  const card = document.createElement("button");
   card.className = "coordination-pack-card";
+  card.type = "button";
+  card.dataset.coordinatePack = paperPack.id;
+  card.setAttribute("aria-label", `Open ${paperPack.name}`);
 
   const preview = createPatternGrid({
     ...paperPack,
@@ -421,7 +437,8 @@ function createCoordinatingPackCard(paperPack) {
   });
   preview.classList.add("coordination-pattern-grid");
 
-  const title = document.createElement("h6");
+  const title = document.createElement("span");
+  title.className = "coordination-pack-title";
   title.textContent = paperPack.name;
 
   const meta = document.createElement("p");
