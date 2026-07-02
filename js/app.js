@@ -1,1 +1,3 @@
-// Application startup belongs here.
+import { initializeLibraryShell } from "./library.js";
+
+initializeLibraryShell();
