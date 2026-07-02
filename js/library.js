@@ -50,6 +50,8 @@ const PATTERN_CLASS_MAP = {
 };
 
 export async function initializeLibraryShell() {
+  initializeScreenNavigation();
+
   const paperPackLibrary = document.querySelector("[data-paper-pack-library]");
   const colorLibrary = document.querySelector("[data-color-library]");
 
@@ -77,6 +79,38 @@ export async function initializeLibraryShell() {
       renderError(colorLibrary, "Colors could not be loaded.");
     }
   }
+}
+
+function initializeScreenNavigation() {
+  const screens = [...document.querySelectorAll("[data-screen]")];
+  const navLinks = [...document.querySelectorAll("[data-nav-link]")];
+
+  if (screens.length === 0) {
+    return;
+  }
+
+  function showCurrentScreen() {
+    const requestedScreenId = window.location.hash.slice(1) || "library";
+    const activeScreen = screens.find((screen) => screen.id === requestedScreenId) || screens[0];
+
+    for (const screen of screens) {
+      screen.hidden = screen !== activeScreen;
+    }
+
+    for (const link of navLinks) {
+      const isActive = link.hash === `#${activeScreen.id}`;
+      link.classList.toggle("nav-link-active", isActive);
+
+      if (isActive) {
+        link.setAttribute("aria-current", "page");
+      } else {
+        link.removeAttribute("aria-current");
+      }
+    }
+  }
+
+  showCurrentScreen();
+  window.addEventListener("hashchange", showCurrentScreen);
 }
 
 async function loadColors() {
