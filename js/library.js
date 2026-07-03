@@ -234,13 +234,13 @@ function createPaperPackCard(paperPack, colorsById) {
   meta.textContent = `${paperPack.owner} - ${paperPack.releaseYear} Release - ${paperPack.patternCount} patterns`;
   const editButton = createEditPaperPackButton(paperPack);
 
-  cardBody.append(titleRow, colorList, keywords, availability, meta);
+  cardBody.append(colorList, keywords, availability, meta);
 
   if (contextBar) {
     card.append(contextBar);
   }
 
-  card.append(patternGrid, cardBody, editButton);
+  card.append(titleRow, patternGrid, cardBody, editButton);
 
   return card;
 }
