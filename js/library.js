@@ -639,8 +639,8 @@ function createDetailMeta(paperPack) {
 
   list.append(
     createDetailMetaItem("Owner", paperPack.owner),
-    createDetailMetaItem("Release", `${paperPack.releaseYear}`),
-    createDetailMetaItem("Status", formatAvailabilityLabel(paperPack.availability))
+    createDetailMetaItem("Status", formatAvailabilityLabel(paperPack.availability)),
+    createDetailMetaItem("Release", `${paperPack.releaseYear}`)
   );
 
   meta.append(heading, list);
