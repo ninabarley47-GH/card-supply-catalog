@@ -142,9 +142,9 @@ async function loadPaperPacks() {
 
   const data = await response.json();
   const basePaperPacks = data.paperPacks || [];
-  const savedPaperPacks = loadSavedPaperPacks();
+  const savedPaperPacks = await loadSavedPaperPacks();
 
-  return mergePaperPacks(basePaperPacks, savedPaperPacks);
+  return await mergePaperPacks(basePaperPacks, savedPaperPacks);
 }
 
 function renderPaperPackLibrary(container, paperPacks, colorsById) {
@@ -180,19 +180,16 @@ function initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById) {
 
     renderPaperPackLibrary(paperPackLibrary, paperPacks, colorsById);
 
-    try {
-      savePaperPack(packToSave);
-      event.detail.result = {
+    event.detail.saveComplete = savePaperPack(packToSave)
+      .then(() => ({
         ok: true
-      };
-    } catch (error) {
-      event.detail.result = {
+      }))
+      .catch(() => ({
         ok: false,
         displayed: true,
         message:
-          "The paper pack is visible for this session, but the browser could not save it permanently. The selected images may be too large for browser storage."
-      };
-    }
+          "The paper pack is visible for this session, but the browser could not save it permanently. The selected images may be too large for the browser database."
+      }));
   });
 }
 
@@ -653,7 +650,9 @@ function deleteSelectedPaperPack(selectedPack, paperPacks, paperPackLibrary, col
     return;
   }
 
-  deletePaperPack(selectedPack.id);
+  deletePaperPack(selectedPack.id).catch(() => {
+    window.alert("The paper pack was removed from this session, but the browser could not save the deletion permanently.");
+  });
 
   const selectedPackIndex = paperPacks.findIndex((paperPack) => paperPack.id === selectedPack.id);
 

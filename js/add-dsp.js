@@ -107,10 +107,7 @@ export function initializeAddDspWorkflow(colorsById) {
 
     const saveDetail = {
       paperPack: result.paperPack,
-      mode: formState.editingPaperPack ? "edit" : "add",
-      result: {
-        ok: true
-      }
+      mode: formState.editingPaperPack ? "edit" : "add"
     };
 
     document.dispatchEvent(
@@ -118,10 +115,6 @@ export function initializeAddDspWorkflow(colorsById) {
         detail: saveDetail
       })
     );
-
-    if (!saveDetail.result.ok) {
-      window.alert(saveDetail.result.message);
-    }
 
     renderFormMessage(message, `${result.paperPack.name} was saved.`, "success");
     form.reset();
@@ -132,6 +125,12 @@ export function initializeAddDspWorkflow(colorsById) {
       formState
     });
     window.location.hash = "library";
+
+    saveDetail.saveComplete?.then((saveResult) => {
+      if (!saveResult.ok) {
+        window.alert(saveResult.message);
+      }
+    });
   });
 }
 

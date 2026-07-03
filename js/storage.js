@@ -1,55 +1,49 @@
-const PAPER_PACKS_STORAGE_KEY = "card-supply-catalog.paperPacks";
-const DELETED_PAPER_PACK_IDS_STORAGE_KEY = "card-supply-catalog.deletedPaperPackIds";
+const DATABASE_NAME = "card-supply-catalog";
+const DATABASE_VERSION = 1;
+const PAPER_PACKS_STORE = "paperPacks";
+const DELETED_PAPER_PACK_IDS_STORE = "deletedPaperPackIds";
+const LEGACY_PAPER_PACKS_STORAGE_KEY = "card-supply-catalog.paperPacks";
+const LEGACY_DELETED_PAPER_PACK_IDS_STORAGE_KEY = "card-supply-catalog.deletedPaperPackIds";
+const LEGACY_MIGRATION_STORAGE_KEY = "card-supply-catalog.indexedDbMigrationComplete";
 
-export function loadSavedPaperPacks() {
-  try {
-    const rawPaperPacks = window.localStorage.getItem(PAPER_PACKS_STORAGE_KEY);
+let databasePromise;
+let legacyMigrationAttempted = false;
 
-    if (!rawPaperPacks) {
-      return [];
-    }
+export async function loadSavedPaperPacks() {
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
+  const paperPacks = await getAllFromStore(database, PAPER_PACKS_STORE);
 
-    const paperPacks = JSON.parse(rawPaperPacks);
-
-    return Array.isArray(paperPacks) ? paperPacks.filter(isPaperPack) : [];
-  } catch (error) {
-    return [];
-  }
+  return paperPacks.filter(isPaperPack);
 }
 
-export function savePaperPack(paperPack) {
-  const savedPaperPacks = loadSavedPaperPacks().filter(
-    (savedPaperPack) => savedPaperPack.id !== paperPack.id
-  );
-  const deletedPaperPackIds = loadDeletedPaperPackIds().filter(
-    (paperPackId) => paperPackId !== paperPack.id
-  );
-  const nextPaperPacks = [paperPack, ...savedPaperPacks];
+export async function savePaperPack(paperPack) {
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
 
-  window.localStorage.setItem(PAPER_PACKS_STORAGE_KEY, JSON.stringify(nextPaperPacks, null, 2));
-  window.localStorage.setItem(
-    DELETED_PAPER_PACK_IDS_STORAGE_KEY,
-    JSON.stringify(deletedPaperPackIds, null, 2)
-  );
-
-  return nextPaperPacks;
+  await writeTransaction(database, [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE], (transaction) => {
+    transaction.objectStore(PAPER_PACKS_STORE).put(paperPack);
+    transaction.objectStore(DELETED_PAPER_PACK_IDS_STORE).delete(paperPack.id);
+  });
 }
 
-export function deletePaperPack(paperPackId) {
-  const savedPaperPacks = loadSavedPaperPacks().filter((paperPack) => paperPack.id !== paperPackId);
-  const deletedPaperPackIds = new Set(loadDeletedPaperPackIds());
-  deletedPaperPackIds.add(paperPackId);
+export async function deletePaperPack(paperPackId) {
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
 
-  window.localStorage.setItem(PAPER_PACKS_STORAGE_KEY, JSON.stringify(savedPaperPacks, null, 2));
-  window.localStorage.setItem(
-    DELETED_PAPER_PACK_IDS_STORAGE_KEY,
-    JSON.stringify([...deletedPaperPackIds], null, 2)
-  );
+  await writeTransaction(database, [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE], (transaction) => {
+    transaction.objectStore(PAPER_PACKS_STORE).delete(paperPackId);
+    transaction.objectStore(DELETED_PAPER_PACK_IDS_STORE).put({ id: paperPackId });
+  });
 }
 
-export function mergePaperPacks(basePaperPacks, savedPaperPacks) {
+export async function mergePaperPacks(basePaperPacks, savedPaperPacks) {
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
   const savedPaperPackIds = new Set(savedPaperPacks.map((paperPack) => paperPack.id));
-  const deletedPaperPackIds = new Set(loadDeletedPaperPackIds());
+  const deletedPaperPackIds = new Set(
+    (await getAllFromStore(database, DELETED_PAPER_PACK_IDS_STORE)).map((entry) => entry.id)
+  );
 
   return [
     ...savedPaperPacks.filter((paperPack) => !deletedPaperPackIds.has(paperPack.id)),
@@ -59,22 +53,124 @@ export function mergePaperPacks(basePaperPacks, savedPaperPacks) {
   ];
 }
 
-function loadDeletedPaperPackIds() {
-  try {
-    const rawPaperPackIds = window.localStorage.getItem(DELETED_PAPER_PACK_IDS_STORAGE_KEY);
+function openCatalogDatabase() {
+  if (databasePromise) {
+    return databasePromise;
+  }
 
-    if (!rawPaperPackIds) {
+  databasePromise = new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
+
+    request.addEventListener("upgradeneeded", () => {
+      const database = request.result;
+
+      if (!database.objectStoreNames.contains(PAPER_PACKS_STORE)) {
+        database.createObjectStore(PAPER_PACKS_STORE, { keyPath: "id" });
+      }
+
+      if (!database.objectStoreNames.contains(DELETED_PAPER_PACK_IDS_STORE)) {
+        database.createObjectStore(DELETED_PAPER_PACK_IDS_STORE, { keyPath: "id" });
+      }
+    });
+
+    request.addEventListener("success", () => resolve(request.result));
+    request.addEventListener("error", () => reject(request.error));
+  });
+
+  return databasePromise;
+}
+
+async function migrateLegacyLocalStorage(database) {
+  if (legacyMigrationAttempted) {
+    return;
+  }
+
+  if (isLegacyMigrationComplete()) {
+    legacyMigrationAttempted = true;
+    return;
+  }
+
+  const legacyPaperPacks = readLegacyJsonArray(LEGACY_PAPER_PACKS_STORAGE_KEY).filter(isPaperPack);
+  const legacyDeletedPaperPackIds = readLegacyJsonArray(LEGACY_DELETED_PAPER_PACK_IDS_STORAGE_KEY).filter(
+    (paperPackId) => typeof paperPackId === "string"
+  );
+
+  if (legacyPaperPacks.length === 0 && legacyDeletedPaperPackIds.length === 0) {
+    markLegacyMigrationComplete();
+    legacyMigrationAttempted = true;
+    return;
+  }
+
+  await writeTransaction(database, [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE], (transaction) => {
+    const paperPackStore = transaction.objectStore(PAPER_PACKS_STORE);
+    const deletedPaperPackIdStore = transaction.objectStore(DELETED_PAPER_PACK_IDS_STORE);
+
+    for (const paperPack of legacyPaperPacks) {
+      paperPackStore.put(paperPack);
+    }
+
+    for (const paperPackId of legacyDeletedPaperPackIds) {
+      deletedPaperPackIdStore.put({ id: paperPackId });
+    }
+  });
+
+  markLegacyMigrationComplete();
+  legacyMigrationAttempted = true;
+}
+
+function isLegacyMigrationComplete() {
+  try {
+    return window.localStorage.getItem(LEGACY_MIGRATION_STORAGE_KEY) === "true";
+  } catch (error) {
+    return false;
+  }
+}
+
+function readLegacyJsonArray(storageKey) {
+  try {
+    const rawValue = window.localStorage.getItem(storageKey);
+
+    if (!rawValue) {
       return [];
     }
 
-    const paperPackIds = JSON.parse(rawPaperPackIds);
+    const value = JSON.parse(rawValue);
 
-    return Array.isArray(paperPackIds)
-      ? paperPackIds.filter((paperPackId) => typeof paperPackId === "string")
-      : [];
+    return Array.isArray(value) ? value : [];
   } catch (error) {
     return [];
   }
+}
+
+function markLegacyMigrationComplete() {
+  try {
+    window.localStorage.setItem(LEGACY_MIGRATION_STORAGE_KEY, "true");
+  } catch (error) {
+    // If legacy storage is full, it is still safe to continue using IndexedDB.
+  }
+}
+
+function getAllFromStore(database, storeName) {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(storeName, "readonly");
+    const request = transaction.objectStore(storeName).getAll();
+
+    request.addEventListener("success", () => resolve(request.result || []));
+    request.addEventListener("error", () => reject(request.error));
+    transaction.addEventListener("error", () => reject(transaction.error));
+  });
+}
+
+function writeTransaction(database, storeNames, writeCallback) {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(storeNames, "readwrite");
+
+    transaction.addEventListener("complete", () => resolve());
+    transaction.addEventListener("error", () => reject(transaction.error));
+    transaction.addEventListener("abort", () => reject(transaction.error));
+
+    writeCallback(transaction);
+  });
 }
 
 function isPaperPack(paperPack) {
