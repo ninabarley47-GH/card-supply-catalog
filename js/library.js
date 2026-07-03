@@ -329,7 +329,7 @@ function createDetailContent(paperPack, paperPacks, colorsById) {
 
   const coordinationHeading = document.createElement("h4");
   coordinationHeading.id = "coordination-title";
-  coordinationHeading.textContent = "Color Coordination";
+  coordinationHeading.textContent = "Similar Packs";
 
   const coordinationResults = document.createElement("div");
   coordinationResults.className = "coordination-results";
@@ -432,14 +432,15 @@ function renderCoordinatingPacks(container, selectedPack, color, paperPacks) {
     (paperPack) => paperPack.id !== selectedPack.id && paperPack.colors?.includes(color.id)
   );
 
-  const heading = document.createElement("h5");
-  heading.textContent = `Other packs using ${color.name}.`;
+  const subtitle = document.createElement("p");
+  subtitle.className = "coordination-subtitle";
+  subtitle.textContent = `Based on ${color.name}`;
 
   if (coordinatingPacks.length === 0) {
     const empty = document.createElement("p");
     empty.className = "coordination-empty";
     empty.textContent = `No other sample packs use ${color.name} yet.`;
-    container.replaceChildren(heading, empty);
+    container.replaceChildren(subtitle, empty);
     return;
   }
 
@@ -449,7 +450,7 @@ function renderCoordinatingPacks(container, selectedPack, color, paperPacks) {
   list.append(
     ...coordinatingPacks.map((paperPack) => createCoordinatingPackCard(paperPack, color))
   );
-  container.replaceChildren(heading, list);
+  container.replaceChildren(subtitle, list);
 }
 
 function createCoordinatingPackCard(paperPack, color) {

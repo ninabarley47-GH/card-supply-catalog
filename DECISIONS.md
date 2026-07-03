@@ -122,3 +122,10 @@ Administrative features should remain in maintenance workflows rather than the p
 # Decision 13
 ## Carrying Coordinating Colors Into Detail Pages
 When a user clicks a pack from the coordinating color, the pack clicked should display in the details page, and the packs that match the previously selected coordinating color should display in the color coordination section.
+
+# Decision 14
+## Discovery over Search
+
+Whenever practical, the application should encourage visual discovery rather than requiring users to remember names, collections, or metadata.
+
+Relationships between paper packs should be exposed naturally through colors, tags, themes, and other shared characteristics.

@@ -541,6 +541,14 @@ h6 {
   line-height: 1.25;
 }
 
+.coordination-subtitle {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
 .coordination-empty {
   margin: 0;
   color: var(--color-muted);
