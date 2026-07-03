@@ -574,20 +574,36 @@ function createPatternGrid(paperPack) {
 
   const patterns = paperPack.patterns || [];
 
-  patternGrid.append(
-    ...patterns.map((patternName, index) => {
-      const pattern = document.createElement("span");
-      const patternClass =
-        PATTERN_CLASS_MAP[patternName] || PATTERN_CLASS_SEQUENCE[index % PATTERN_CLASS_SEQUENCE.length];
-
-      pattern.className = `pattern ${patternClass}`;
-      pattern.setAttribute("aria-hidden", "true");
-
-      return pattern;
-    })
-  );
+  patternGrid.append(...patterns.map(createPatternPreview));
 
   return patternGrid;
+}
+
+function createPatternPreview(patternEntry, index) {
+  const pattern = document.createElement("span");
+  const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
+  const imageSrc = patternObject?.imageSrc || "";
+  const imageName = patternObject?.imageName || "";
+
+  if (imageSrc) {
+    const image = document.createElement("img");
+    image.src = imageSrc;
+    image.alt = imageName || `Pattern ${index + 1}`;
+
+    pattern.className = "pattern pattern-image";
+    pattern.append(image);
+
+    return pattern;
+  }
+
+  const patternName = typeof patternEntry === "string" ? patternEntry : patternObject?.id;
+  const patternClass =
+    PATTERN_CLASS_MAP[patternName] || PATTERN_CLASS_SEQUENCE[index % PATTERN_CLASS_SEQUENCE.length];
+
+  pattern.className = `pattern ${patternClass}`;
+  pattern.setAttribute("aria-hidden", "true");
+
+  return pattern;
 }
 
 function createKeywordList(paperPack) {

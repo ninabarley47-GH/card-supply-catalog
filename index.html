@@ -145,6 +145,23 @@
             </div>
 
             <div class="form-field">
+              <span class="form-label">Pattern Images</span>
+              <div class="image-intake-actions">
+                <label class="button file-button" for="dsp-pattern-images">Add Images</label>
+                <input id="dsp-pattern-images" class="visually-hidden" type="file" accept="image/*" multiple data-pattern-image-input>
+
+                <label class="button file-button" for="dsp-pattern-image">Add One</label>
+                <input id="dsp-pattern-image" class="visually-hidden" type="file" accept="image/*" data-pattern-image-input>
+
+                <label class="button file-button" for="dsp-pattern-folder">Add Folder</label>
+                <input id="dsp-pattern-folder" class="visually-hidden" type="file" accept="image/*" multiple webkitdirectory data-pattern-folder-input>
+              </div>
+              <p class="field-help">Images stay in the order shown below. Use the arrows to adjust the paper pack preview.</p>
+              <ol class="image-preview-list" data-image-preview-list aria-label="Selected pattern images"></ol>
+              <p class="field-help" data-image-preview-count>No pattern images selected.</p>
+            </div>
+
+            <div class="form-field">
               <label for="dsp-colors">Colors</label>
               <textarea id="dsp-colors" name="colors" rows="3" placeholder="e.g., berry-burst, Lost Lagoon, basic-beige" required></textarea>
               <p class="field-help">Use official color names or color IDs. HEX values still come from colors.json.</p>

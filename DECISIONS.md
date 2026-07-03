@@ -143,3 +143,12 @@ Temporary or user-specific states are displayed as a single context bar above th
 The context bar communicates the current browsing context (such as Recently Added or Favorite) without obscuring the paper artwork or adding decorative badges to the card.
 
 Only one context bar is displayed on a card at any time.
+
+# Decision 17 
+## Prototype Image Storage
+
+During the prototype cataloging workflow, selected DSP images may be stored as data URLs in browser localStorage.
+
+This is acceptable only for early testing because it keeps the Add DSP workflow simple.
+
+A future storage milestone should replace this with a durable local image-file strategy so larger paper pack collections do not overload localStorage.
