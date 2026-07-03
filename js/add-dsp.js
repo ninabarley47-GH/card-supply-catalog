@@ -57,14 +57,15 @@ function buildPaperPackFromForm(formData, colorsById) {
   const name = cleanText(formData.get("name"));
   const owner = cleanText(formData.get("owner"));
   const releaseYear = Number.parseInt(formData.get("releaseYear"), 10);
-  const patterns = parseList(formData.get("patterns"));
+  const patternCount = Number.parseInt(formData.get("patternCount"), 10);
+  const patterns = createPatternSlots(patternCount);
   const colorResult = resolveColorIds(parseList(formData.get("colors")), colorsById);
   const keywords = formData.getAll("keywords").map(cleanText).filter(Boolean);
 
-  if (!name || !owner || Number.isNaN(releaseYear) || patterns.length === 0) {
+  if (!name || !owner || Number.isNaN(releaseYear) || !Number.isInteger(patternCount) || patternCount < 1) {
     return {
       ok: false,
-      message: "Name, owner, release year, and at least one pattern are required."
+      message: "Name, owner, release year, and pattern count are required."
     };
   }
 
@@ -89,7 +90,7 @@ function buildPaperPackFromForm(formData, colorsById) {
       name,
       owner,
       releaseYear,
-      patternCount: patterns.length,
+      patternCount,
       availability: formData.get("availability") || "available",
       refillAvailable: parseOptionalBoolean(formData.get("refillAvailable")),
       keywords,
@@ -97,6 +98,10 @@ function buildPaperPackFromForm(formData, colorsById) {
       patterns
     }
   };
+}
+
+function createPatternSlots(patternCount) {
+  return Array.from({ length: patternCount }, (_, index) => `pattern-${index + 1}`);
 }
 
 function resolveColorIds(colorInputs, colorsById) {
