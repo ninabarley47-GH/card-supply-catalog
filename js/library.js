@@ -1,5 +1,5 @@
 import { initializeAddDspWorkflow } from "./add-dsp.js";
-import { loadSavedPaperPacks, mergePaperPacks, savePaperPack } from "./storage.js";
+import { deletePaperPack, loadSavedPaperPacks, mergePaperPacks, savePaperPack } from "./storage.js";
 
 const COLOR_FAMILY_ORDER = [
   "red",
@@ -216,20 +216,14 @@ function createPaperPackCard(paperPack, colorsById) {
   title.textContent = paperPack.name;
   titleRow.append(title);
 
-  if (paperPack.availability === "used-up") {
-    const badge = document.createElement("span");
-    badge.className = "availability used-up";
-    badge.textContent = "Used Up";
-    titleRow.append(badge);
-  }
-
   const keywords = createKeywordList(paperPack);
   const colorList = createPackColorList(paperPack, colorsById);
+  const availability = createAvailabilityIndicator(paperPack.availability);
   const meta = document.createElement("p");
   meta.className = "card-meta";
   meta.textContent = `${paperPack.owner} - ${paperPack.releaseYear} Release - ${paperPack.patternCount} patterns`;
 
-  cardBody.append(titleRow, colorList, keywords, meta);
+  cardBody.append(titleRow, colorList, keywords, availability, meta);
 
   if (contextBar) {
     card.append(contextBar);
@@ -292,6 +286,18 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById) {
   });
 
   detailBody.addEventListener("click", (event) => {
+    const deleteButton = event.target.closest("[data-delete-pack]");
+
+    if (deleteButton) {
+      const selectedPack = paperPacks.find((pack) => pack.id === detailPanel.dataset.selectedPackId);
+
+      if (selectedPack) {
+        deleteSelectedPaperPack(selectedPack, paperPacks, paperPackLibrary, colorsById, detailPanel);
+      }
+
+      return;
+    }
+
     const coordinatingPack = event.target.closest("[data-coordinate-pack]");
 
     if (coordinatingPack) {
@@ -429,7 +435,7 @@ function createDetailContent(paperPack, paperPacks, colorsById) {
   coordinationResults.append(prompt);
 
   coordinationSection.append(coordinationHeading, coordinationResults);
-  metadata.append(colorSection, tagSection, createDetailMeta(paperPack), coordinationSection);
+  metadata.append(colorSection, tagSection, createDetailMeta(paperPack), coordinationSection, createDetailActions(paperPack));
   content.append(preview, metadata);
 
   return content;
@@ -493,7 +499,8 @@ function createDetailMeta(paperPack) {
   list.append(
     createDetailMetaItem("Owner", paperPack.owner),
     createDetailMetaItem("Release", `${paperPack.releaseYear}`),
-    createDetailMetaItem("Patterns", `${paperPack.patternCount}`)
+    createDetailMetaItem("Patterns", `${paperPack.patternCount}`),
+    createDetailMetaItem("Status", formatAvailabilityLabel(paperPack.availability))
   );
 
   meta.append(heading, list);
@@ -513,6 +520,64 @@ function createDetailMetaItem(label, value) {
   wrapper.append(term, description);
 
   return wrapper;
+}
+
+function createDetailActions(paperPack) {
+  const actions = document.createElement("section");
+  actions.className = "detail-section detail-actions";
+  actions.setAttribute("aria-labelledby", "detail-actions-title");
+
+  const heading = document.createElement("h4");
+  heading.id = "detail-actions-title";
+  heading.textContent = "Actions";
+
+  const deleteButton = document.createElement("button");
+  deleteButton.className = "button button-danger";
+  deleteButton.type = "button";
+  deleteButton.dataset.deletePack = paperPack.id;
+  deleteButton.textContent = "Delete Paper Pack";
+
+  actions.append(heading, deleteButton);
+
+  return actions;
+}
+
+function deleteSelectedPaperPack(selectedPack, paperPacks, paperPackLibrary, colorsById, detailPanel) {
+  const shouldDelete = window.confirm(`Delete ${selectedPack.name} from the catalog?`);
+
+  if (!shouldDelete) {
+    return;
+  }
+
+  deletePaperPack(selectedPack.id);
+
+  const selectedPackIndex = paperPacks.findIndex((paperPack) => paperPack.id === selectedPack.id);
+
+  if (selectedPackIndex !== -1) {
+    paperPacks.splice(selectedPackIndex, 1);
+  }
+
+  LATEST_CATALOG_SESSION_PACK_IDS.delete(selectedPack.id);
+  renderPaperPackLibrary(paperPackLibrary, paperPacks, colorsById);
+  closeDetailPanel(detailPanel);
+}
+
+function createAvailabilityIndicator(availability) {
+  const indicator = document.createElement("p");
+  const normalizedAvailability = normalizeAvailability(availability);
+
+  indicator.className = `availability-indicator availability-${normalizedAvailability}`;
+  indicator.textContent = formatAvailabilityLabel(normalizedAvailability);
+
+  return indicator;
+}
+
+function normalizeAvailability(availability) {
+  return availability === "used-up" ? "used-up" : "available";
+}
+
+function formatAvailabilityLabel(availability) {
+  return normalizeAvailability(availability) === "used-up" ? "Used Up" : "Available";
 }
 
 function renderCoordinatingPacks(container, selectedPack, color, paperPacks) {

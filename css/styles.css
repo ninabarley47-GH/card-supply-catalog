@@ -154,6 +154,17 @@ h6 {
   background: var(--color-accent-dark);
 }
 
+.button-danger {
+  border-color: #d8a59b;
+  background: #fff3ef;
+  color: #8a3f32;
+}
+
+.button-danger:not(:disabled):hover {
+  border-color: #c67f72;
+  background: #ffe8e0;
+}
+
 .button:disabled {
   cursor: default;
   opacity: 0.82;
@@ -669,7 +680,7 @@ h6 {
 
 .detail-meta-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
   gap: var(--space-2);
   margin: 0;
 }
@@ -697,6 +708,10 @@ h6 {
   font-size: 0.95rem;
   font-weight: 800;
   line-height: 1.2;
+}
+
+.detail-actions .button {
+  justify-self: start;
 }
 
 .coordination-section {
@@ -1032,20 +1047,32 @@ h6 {
   line-height: 1.2;
 }
 
-.availability {
+.availability-indicator {
   display: inline-flex;
   align-items: center;
-  min-height: 1.7rem;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  padding: 0.25rem 0.65rem;
-  font-size: 0.78rem;
-  font-weight: 700;
-  white-space: nowrap;
+  gap: var(--space-2);
+  width: max-content;
+  margin: var(--space-3) 0 0;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
-.availability.used-up {
-  background: #f3eee8;
+.availability-indicator::before {
+  content: "";
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--color-accent);
+}
+
+.availability-used-up::before {
+  background: #a06d53;
+}
+
+.availability-used-up {
   color: #765b45;
 }
 
