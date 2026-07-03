@@ -245,7 +245,7 @@ function createPaperPackCard(paperPack, colorsById) {
   const availability = createAvailabilityIndicator(paperPack.availability);
   const meta = document.createElement("p");
   meta.className = "card-meta";
-  meta.textContent = `${paperPack.owner} - ${paperPack.releaseYear} Release - ${paperPack.patternCount} patterns`;
+  meta.textContent = paperPack.owner;
   const editButton = createEditPaperPackButton(paperPack);
 
   cardBody.append(colorList, keywords, availability, meta);
