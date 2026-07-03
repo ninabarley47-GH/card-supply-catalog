@@ -203,6 +203,7 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById) {
     }
 
     event.preventDefault();
+    event.stopPropagation();
 
     const paperPack = paperPacks.find((pack) => pack.id === card.dataset.packId);
 
@@ -251,6 +252,14 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById) {
   });
 
   detailClose?.addEventListener("click", () => closeDetailPanel(detailPanel));
+
+  document.addEventListener("click", (event) => {
+    if (detailPanel.hidden || detailPanel.contains(event.target)) {
+      return;
+    }
+
+    closeDetailPanel(detailPanel);
+  });
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !detailPanel.hidden) {

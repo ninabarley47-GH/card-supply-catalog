@@ -129,3 +129,8 @@ When a user clicks a pack from the coordinating color, the pack clicked should d
 Whenever practical, the application should encourage visual discovery rather than requiring users to remember names, collections, or metadata.
 
 Relationships between paper packs should be exposed naturally through colors, tags, themes, and other shared characteristics.
+
+# Decision 15
+## Closing the Detail Page
+
+The user's natural behavior is to click off the detail screen rather than to click the close button. Clicking outside the detail panel should close the details screen as an alternate behavior to clicking the X to close it.
