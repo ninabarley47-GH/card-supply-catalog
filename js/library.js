@@ -206,11 +206,12 @@ function ensureUniquePaperPackId(paperPack, paperPacks) {
 }
 
 function createPaperPackCard(paperPack, colorsById) {
-  const card = document.createElement("a");
+  const card = document.createElement("article");
   card.className = "dsp-card";
-  card.href = `#${paperPack.id}`;
   card.dataset.paperPackCard = "";
   card.dataset.packId = paperPack.id;
+  card.tabIndex = 0;
+  card.setAttribute("role", "button");
   card.setAttribute("aria-label", `Open ${paperPack.name}`);
 
   const patternGrid = createPatternGrid(paperPack);
@@ -231,6 +232,7 @@ function createPaperPackCard(paperPack, colorsById) {
   const meta = document.createElement("p");
   meta.className = "card-meta";
   meta.textContent = `${paperPack.owner} - ${paperPack.releaseYear} Release - ${paperPack.patternCount} patterns`;
+  const editButton = createEditPaperPackButton(paperPack);
 
   cardBody.append(titleRow, colorList, keywords, availability, meta);
 
@@ -238,9 +240,20 @@ function createPaperPackCard(paperPack, colorsById) {
     card.append(contextBar);
   }
 
-  card.append(patternGrid, cardBody);
+  card.append(patternGrid, cardBody, editButton);
 
   return card;
+}
+
+function createEditPaperPackButton(paperPack) {
+  const editButton = document.createElement("button");
+  editButton.className = "card-edit-button";
+  editButton.type = "button";
+  editButton.dataset.editPack = paperPack.id;
+  editButton.textContent = "Edit";
+  editButton.setAttribute("aria-label", `Edit ${paperPack.name}`);
+
+  return editButton;
 }
 
 function createCardContextBar(paperPack) {
@@ -278,6 +291,15 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById) {
   }
 
   paperPackLibrary.addEventListener("click", (event) => {
+    const editButton = event.target.closest("[data-edit-pack]");
+
+    if (editButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      openPaperPackEditor(editButton.dataset.editPack, paperPacks);
+      return;
+    }
+
     const card = event.target.closest("[data-paper-pack-card]");
 
     if (!card) {
@@ -294,6 +316,26 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById) {
     }
   });
 
+  paperPackLibrary.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    const card = event.target.closest("[data-paper-pack-card]");
+
+    if (!card || event.target.closest("[data-edit-pack]")) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const paperPack = paperPacks.find((pack) => pack.id === card.dataset.packId);
+
+    if (paperPack) {
+      openDetailPanel(detailPanel, detailTitle, detailBody, paperPack, paperPacks, colorsById);
+    }
+  });
+
   detailBody.addEventListener("click", (event) => {
     const editButton = event.target.closest("[data-edit-pack]");
 
@@ -301,13 +343,7 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById) {
       const selectedPack = paperPacks.find((pack) => pack.id === detailPanel.dataset.selectedPackId);
 
       if (selectedPack) {
-        document.dispatchEvent(
-          new CustomEvent("paper-pack:edit-request", {
-            detail: {
-              paperPack: selectedPack
-            }
-          })
-        );
+        requestPaperPackEdit(selectedPack);
         closeDetailPanel(detailPanel);
       }
 
@@ -379,6 +415,24 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById) {
       closeDetailPanel(detailPanel);
     }
   });
+}
+
+function openPaperPackEditor(paperPackId, paperPacks) {
+  const paperPack = paperPacks.find((pack) => pack.id === paperPackId);
+
+  if (paperPack) {
+    requestPaperPackEdit(paperPack);
+  }
+}
+
+function requestPaperPackEdit(paperPack) {
+  document.dispatchEvent(
+    new CustomEvent("paper-pack:edit-request", {
+      detail: {
+        paperPack
+      }
+    })
+  );
 }
 
 function openDetailPanel(
