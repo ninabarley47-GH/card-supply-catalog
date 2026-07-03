@@ -134,3 +134,12 @@ Relationships between paper packs should be exposed naturally through colors, ta
 ## Closing the Detail Page
 
 The user's natural behavior is to click off the detail screen rather than to click the close button. Clicking outside the detail panel should close the details screen as an alternate behavior to clicking the X to close it.
+
+# Decision 16
+## Card Context Bar
+
+Temporary or user-specific states are displayed as a single context bar above the paper pack card.
+
+The context bar communicates the current browsing context (such as Recently Added or Favorite) without obscuring the paper artwork or adding decorative badges to the card.
+
+Only one context bar is displayed on a card at any time.

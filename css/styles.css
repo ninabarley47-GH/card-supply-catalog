@@ -196,26 +196,6 @@ h6 {
   display: none;
 }
 
-.recently-added {
-  margin-bottom: var(--space-5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-medium);
-  background: rgba(255, 255, 255, 0.72);
-}
-
-.recently-added summary {
-  cursor: pointer;
-  padding: 0.85rem var(--space-4);
-  color: var(--color-text);
-  font-weight: 800;
-}
-
-.recently-added p {
-  margin: 0;
-  padding: 0 var(--space-4) var(--space-4);
-  color: var(--color-muted);
-}
-
 .library-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(18rem, 28rem);
@@ -363,6 +343,18 @@ h6 {
   border-color: rgba(82, 120, 109, 0.55);
   box-shadow: 0 14px 34px rgba(47, 44, 40, 0.1);
   transform: translateY(-1px);
+}
+
+.card-context-bar {
+  min-height: 2rem;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: var(--radius-medium) var(--radius-medium) 0 0;
+  padding: 0.45rem var(--space-4);
+  background: #f2f0eb;
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
 .detail-panel {

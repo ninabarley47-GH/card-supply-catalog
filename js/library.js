@@ -49,6 +49,8 @@ const PATTERN_CLASS_MAP = {
   stripe: "pattern-stripe"
 };
 
+const LATEST_CATALOG_SESSION_PACK_IDS = new Set(["velvet-meadow", "sunlit-market"]);
+
 export async function initializeLibraryShell() {
   initializeScreenNavigation();
 
@@ -156,6 +158,7 @@ function createPaperPackCard(paperPack, colorsById) {
   card.setAttribute("aria-label", `Open ${paperPack.name}`);
 
   const patternGrid = createPatternGrid(paperPack);
+  const contextBar = createCardContextBar(paperPack);
   const cardBody = document.createElement("div");
   cardBody.className = "card-body";
 
@@ -180,9 +183,38 @@ function createPaperPackCard(paperPack, colorsById) {
   meta.textContent = `${paperPack.owner} - ${paperPack.releaseYear} Release - ${paperPack.patternCount} patterns`;
 
   cardBody.append(titleRow, colorList, keywords, meta);
+
+  if (contextBar) {
+    card.append(contextBar);
+  }
+
   card.append(patternGrid, cardBody);
 
   return card;
+}
+
+function createCardContextBar(paperPack) {
+  const context = getCardContext(paperPack);
+
+  if (!context) {
+    return null;
+  }
+
+  const contextBar = document.createElement("div");
+  contextBar.className = "card-context-bar";
+  contextBar.textContent = context.label;
+
+  return contextBar;
+}
+
+function getCardContext(paperPack) {
+  if (LATEST_CATALOG_SESSION_PACK_IDS.has(paperPack.id)) {
+    return {
+      label: "Recently Added"
+    };
+  }
+
+  return null;
 }
 
 function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById) {
