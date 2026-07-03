@@ -394,6 +394,8 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById) {
   });
 
   detailBody.addEventListener("click", (event) => {
+    event.stopPropagation();
+
     const editButton = event.target.closest("[data-edit-pack]");
 
     if (editButton) {
