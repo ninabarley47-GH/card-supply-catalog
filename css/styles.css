@@ -714,6 +714,12 @@ h6 {
   justify-self: start;
 }
 
+.detail-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
 .coordination-section {
   border-top: 1px solid var(--color-border);
   padding-top: var(--space-5);
@@ -816,6 +822,24 @@ h6 {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.pattern-placeholder {
+  display: grid;
+  place-items: center;
+  padding: var(--space-2);
+  background:
+    linear-gradient(135deg, transparent 0 48%, rgba(109, 103, 95, 0.16) 48% 52%, transparent 52%),
+    var(--color-page);
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.coordination-pattern-grid .pattern-placeholder {
+  font-size: 0.68rem;
 }
 
 .pattern-sage {

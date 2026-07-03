@@ -2,6 +2,9 @@ export function initializeAddDspWorkflow(colorsById) {
   const panel = document.querySelector("[data-add-dsp-panel]");
   const form = document.querySelector("[data-add-dsp-form]");
   const message = document.querySelector("[data-add-dsp-message]");
+  const title = document.querySelector("[data-add-dsp-title]");
+  const summary = document.querySelector("[data-add-dsp-summary]");
+  const submitButton = document.querySelector("[data-add-dsp-submit]");
   const openButtons = [...document.querySelectorAll("[data-add-dsp-open]")];
   const closeButtons = [...document.querySelectorAll("[data-add-dsp-close]")];
   const imageInputs = [...document.querySelectorAll("[data-pattern-image-input]")];
@@ -9,18 +12,33 @@ export function initializeAddDspWorkflow(colorsById) {
   const imagePreviewList = document.querySelector("[data-image-preview-list]");
   const imagePreviewCount = document.querySelector("[data-image-preview-count]");
   const selectedImages = [];
+  const formState = {
+    editingPaperPack: null
+  };
 
   if (!panel || !form) {
     return;
   }
 
   for (const button of openButtons) {
-    button.addEventListener("click", () => openAddDspPanel(panel));
+    button.addEventListener("click", () =>
+      openAddDspPanel(panel, form, selectedImages, imagePreviewList, imagePreviewCount, {
+        title,
+        summary,
+        submitButton,
+        formState
+      })
+    );
   }
 
   for (const button of closeButtons) {
     button.addEventListener("click", () =>
-      closeAddDspPanel(panel, form, message, selectedImages, imagePreviewList, imagePreviewCount)
+      closeAddDspPanel(panel, form, message, selectedImages, imagePreviewList, imagePreviewCount, {
+        title,
+        summary,
+        submitButton,
+        formState
+      })
     );
   }
 
@@ -57,10 +75,30 @@ export function initializeAddDspWorkflow(colorsById) {
     });
   }
 
+  document.addEventListener("paper-pack:edit-request", (event) => {
+    const paperPack = event.detail?.paperPack;
+
+    if (!paperPack) {
+      return;
+    }
+
+    openEditDspPanel(panel, form, paperPack, colorsById, selectedImages, imagePreviewList, imagePreviewCount, {
+      title,
+      summary,
+      submitButton,
+      formState
+    });
+  });
+
   form.addEventListener("submit", (event) => {
     event.preventDefault();
 
-    const result = buildPaperPackFromForm(new FormData(form), colorsById, selectedImages);
+    const result = buildPaperPackFromForm(
+      new FormData(form),
+      colorsById,
+      selectedImages,
+      formState.editingPaperPack
+    );
 
     if (!result.ok) {
       renderFormMessage(message, result.message, "error");
@@ -68,34 +106,64 @@ export function initializeAddDspWorkflow(colorsById) {
     }
 
     document.dispatchEvent(
-      new CustomEvent("paper-pack:add", {
+      new CustomEvent("paper-pack:save", {
         detail: {
-          paperPack: result.paperPack
+          paperPack: result.paperPack,
+          mode: formState.editingPaperPack ? "edit" : "add"
         }
       })
     );
 
     renderFormMessage(message, `${result.paperPack.name} was saved.`, "success");
     form.reset();
-    closeAddDspPanel(panel, form, message, selectedImages, imagePreviewList, imagePreviewCount);
+    closeAddDspPanel(panel, form, message, selectedImages, imagePreviewList, imagePreviewCount, {
+      title,
+      summary,
+      submitButton,
+      formState
+    });
     window.location.hash = "library";
   });
 }
 
-function openAddDspPanel(panel) {
+function openAddDspPanel(panel, form, selectedImages, imagePreviewList, imagePreviewCount, controls) {
+  resetAddDspForm(form, selectedImages, imagePreviewList, imagePreviewCount, controls);
   panel.hidden = false;
   panel.querySelector("input, select, textarea, button")?.focus();
 }
 
-function closeAddDspPanel(panel, form, message, selectedImages, imagePreviewList, imagePreviewCount) {
-  panel.hidden = true;
-  form?.reset();
-  selectedImages.splice(0, selectedImages.length);
+function openEditDspPanel(panel, form, paperPack, colorsById, selectedImages, imagePreviewList, imagePreviewCount, controls) {
+  resetAddDspForm(form, selectedImages, imagePreviewList, imagePreviewCount, controls);
+  controls.formState.editingPaperPack = paperPack;
+  controls.title.textContent = "Edit DSP";
+  controls.summary.textContent = "Update this Designer Series Paper pack.";
+  controls.submitButton.textContent = "Save Changes";
+
+  fillPaperPackForm(form, paperPack, colorsById);
+  selectedImages.push(...getImageEntriesFromPatterns(paperPack.patterns));
   renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount);
+
+  panel.hidden = false;
+  panel.querySelector("input, select, textarea, button")?.focus();
+}
+
+function closeAddDspPanel(panel, form, message, selectedImages, imagePreviewList, imagePreviewCount, controls) {
+  panel.hidden = true;
+  resetAddDspForm(form, selectedImages, imagePreviewList, imagePreviewCount, controls);
   renderFormMessage(message, "", "");
 }
 
-function buildPaperPackFromForm(formData, colorsById, selectedImages = []) {
+function resetAddDspForm(form, selectedImages, imagePreviewList, imagePreviewCount, controls) {
+  form?.reset();
+  selectedImages.splice(0, selectedImages.length);
+  renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount);
+  controls.formState.editingPaperPack = null;
+  controls.title.textContent = "Add DSP";
+  controls.summary.textContent = "Save a new Designer Series Paper pack to this catalog.";
+  controls.submitButton.textContent = "Save Paper Pack";
+}
+
+function buildPaperPackFromForm(formData, colorsById, selectedImages = [], editingPaperPack = null) {
   const name = cleanText(formData.get("name"));
   const owner = cleanText(formData.get("owner"));
   const releaseYear = Number.parseInt(formData.get("releaseYear"), 10);
@@ -131,12 +199,12 @@ function buildPaperPackFromForm(formData, colorsById, selectedImages = []) {
     };
   }
 
-  const patterns = createPatternSlots(patternCount, selectedImages);
+  const patterns = createPatternSlots(patternCount, selectedImages, editingPaperPack?.patterns);
 
   return {
     ok: true,
     paperPack: {
-      id: createId(name),
+      id: editingPaperPack?.id || createId(name),
       name,
       owner,
       releaseYear,
@@ -148,6 +216,24 @@ function buildPaperPackFromForm(formData, colorsById, selectedImages = []) {
       patterns
     }
   };
+}
+
+function fillPaperPackForm(form, paperPack, colorsById) {
+  form.elements.name.value = paperPack.name || "";
+  form.elements.owner.value = paperPack.owner || "";
+  form.elements.releaseYear.value = paperPack.releaseYear || "";
+  form.elements.patternCount.value = paperPack.patternCount || 1;
+  form.elements.availability.value = paperPack.availability || "available";
+  form.elements.refillAvailable.value = formatOptionalBoolean(paperPack.refillAvailable);
+  form.elements.colors.value = (paperPack.colors || [])
+    .map((colorId) => colorsById[colorId]?.name || colorId)
+    .join(", ");
+
+  const keywords = new Set(paperPack.keywords || []);
+
+  for (const option of form.elements.keywords.options) {
+    option.selected = keywords.has(option.value) || keywords.has(option.textContent);
+  }
 }
 
 async function addSelectedImageFiles(files, selectedImages) {
@@ -255,20 +341,36 @@ function createImageActionButton(action, index, label, disabled) {
   return button;
 }
 
-function createPatternSlots(patternCount, selectedImages = []) {
+function createPatternSlots(patternCount, selectedImages = [], existingPatterns = []) {
   return Array.from({ length: patternCount }, (_, index) => {
     const selectedImage = selectedImages[index];
 
-    if (!selectedImage) {
-      return `pattern-${index + 1}`;
+    if (selectedImage) {
+      return {
+        id: `pattern-${index + 1}`,
+        imageName: selectedImage.name,
+        imageSrc: selectedImage.src
+      };
     }
 
-    return {
-      id: `pattern-${index + 1}`,
-      imageName: selectedImage.name,
-      imageSrc: selectedImage.src
-    };
+    const existingPattern = existingPatterns[index];
+
+    if (existingPattern && (typeof existingPattern !== "object" || !existingPattern.imageSrc)) {
+      return existingPattern;
+    }
+
+    return `pattern-${index + 1}`;
   });
+}
+
+function getImageEntriesFromPatterns(patterns = []) {
+  return patterns
+    .filter((pattern) => pattern && typeof pattern === "object" && pattern.imageSrc)
+    .map((pattern) => ({
+      id: pattern.id,
+      name: pattern.imageName || pattern.id || "Pattern image",
+      src: pattern.imageSrc
+    }));
 }
 
 function resolveColorIds(colorInputs, colorsById) {
@@ -330,6 +432,18 @@ function parseOptionalBoolean(value) {
   }
 
   return null;
+}
+
+function formatOptionalBoolean(value) {
+  if (value === true) {
+    return "true";
+  }
+
+  if (value === false) {
+    return "false";
+  }
+
+  return "";
 }
 
 function renderFormMessage(message, text, tone) {

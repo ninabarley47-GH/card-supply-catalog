@@ -74,7 +74,7 @@ export async function initializeLibraryShell() {
     if (paperPackLibrary) {
       renderPaperPackLibrary(paperPackLibrary, paperPacks, colorsById);
       initializeDetailPanel(paperPackLibrary, paperPacks, colorsById);
-      initializeSessionPaperPackAdds(paperPackLibrary, paperPacks, colorsById);
+      initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById);
     }
 
     if (colorLibrary) {
@@ -158,19 +158,28 @@ function renderPaperPackLibrary(container, paperPacks, colorsById) {
   );
 }
 
-function initializeSessionPaperPackAdds(paperPackLibrary, paperPacks, colorsById) {
-  document.addEventListener("paper-pack:add", (event) => {
+function initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById) {
+  document.addEventListener("paper-pack:save", (event) => {
     const paperPack = event.detail?.paperPack;
+    const mode = event.detail?.mode || "add";
 
     if (!paperPack) {
       return;
     }
 
-    const uniquePaperPack = ensureUniquePaperPackId(paperPack, paperPacks);
-    savePaperPack(uniquePaperPack);
-    paperPacks.unshift(uniquePaperPack);
-    LATEST_CATALOG_SESSION_PACK_IDS.clear();
-    LATEST_CATALOG_SESSION_PACK_IDS.add(uniquePaperPack.id);
+    const packToSave = mode === "edit" ? paperPack : ensureUniquePaperPackId(paperPack, paperPacks);
+    const existingIndex = paperPacks.findIndex((existingPack) => existingPack.id === packToSave.id);
+
+    savePaperPack(packToSave);
+
+    if (existingIndex === -1) {
+      paperPacks.unshift(packToSave);
+      LATEST_CATALOG_SESSION_PACK_IDS.clear();
+      LATEST_CATALOG_SESSION_PACK_IDS.add(packToSave.id);
+    } else {
+      paperPacks.splice(existingIndex, 1, packToSave);
+    }
+
     renderPaperPackLibrary(paperPackLibrary, paperPacks, colorsById);
   });
 }
@@ -286,6 +295,25 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById) {
   });
 
   detailBody.addEventListener("click", (event) => {
+    const editButton = event.target.closest("[data-edit-pack]");
+
+    if (editButton) {
+      const selectedPack = paperPacks.find((pack) => pack.id === detailPanel.dataset.selectedPackId);
+
+      if (selectedPack) {
+        document.dispatchEvent(
+          new CustomEvent("paper-pack:edit-request", {
+            detail: {
+              paperPack: selectedPack
+            }
+          })
+        );
+        closeDetailPanel(detailPanel);
+      }
+
+      return;
+    }
+
     const deleteButton = event.target.closest("[data-delete-pack]");
 
     if (deleteButton) {
@@ -537,7 +565,17 @@ function createDetailActions(paperPack) {
   deleteButton.dataset.deletePack = paperPack.id;
   deleteButton.textContent = "Delete Paper Pack";
 
-  actions.append(heading, deleteButton);
+  const buttonRow = document.createElement("div");
+  buttonRow.className = "detail-action-row";
+
+  const editButton = document.createElement("button");
+  editButton.className = "button";
+  editButton.type = "button";
+  editButton.dataset.editPack = paperPack.id;
+  editButton.textContent = "Edit Paper Pack";
+
+  buttonRow.append(editButton, deleteButton);
+  actions.append(heading, buttonRow);
 
   return actions;
 }
@@ -661,12 +699,9 @@ function createPatternPreview(patternEntry, index) {
     return pattern;
   }
 
-  const patternName = typeof patternEntry === "string" ? patternEntry : patternObject?.id;
-  const patternClass =
-    PATTERN_CLASS_MAP[patternName] || PATTERN_CLASS_SEQUENCE[index % PATTERN_CLASS_SEQUENCE.length];
-
-  pattern.className = `pattern ${patternClass}`;
-  pattern.setAttribute("aria-hidden", "true");
+  pattern.className = "pattern pattern-placeholder";
+  pattern.setAttribute("aria-label", `No image available for pattern ${index + 1}`);
+  pattern.textContent = "No image available";
 
   return pattern;
 }
