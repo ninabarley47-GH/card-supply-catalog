@@ -105,3 +105,41 @@ The "Recently Added" section represents the most recent cataloging session, not 
 - It does not expire simply because time passes.
 - "Recently Updated" is intentionally omitted, as edits are considered maintenance rather than a primary browsing workflow.
 - "Recently Added" is presented as a collapsible section at the top of the Library view rather than as a permanent item in the left navigation.
+
+# Decision 12
+## Every Feature Must Support a Crafting Decision
+
+The primary purpose of the application is to help users choose supplies for a project.
+
+Metadata, navigation, and new features should exist only if they help users:
+- discover suitable paper,
+- compare options,
+- coordinate supplies,
+- or efficiently maintain the catalog.
+
+Administrative features should remain in maintenance workflows rather than the primary browsing experience.
+
+# Decision 13
+## Carrying Coordinating Colors Into Detail Pages
+When a user clicks a pack from the coordinating color, the pack clicked should display in the details page, and the packs that match the previously selected coordinating color should display in the color coordination section.
+
+# Decision 14
+## Discovery over Search
+
+Whenever practical, the application should encourage visual discovery rather than requiring users to remember names, collections, or metadata.
+
+Relationships between paper packs should be exposed naturally through colors, tags, themes, and other shared characteristics.
+
+# Decision 15
+## Closing the Detail Page
+
+The user's natural behavior is to click off the detail screen rather than to click the close button. Clicking outside the detail panel should close the details screen as an alternate behavior to clicking the X to close it.
+
+# Decision 16
+## Card Context Bar
+
+Temporary or user-specific states are displayed as a single context bar above the paper pack card.
+
+The context bar communicates the current browsing context (such as Recently Added or Favorite) without obscuring the paper artwork or adding decorative badges to the card.
+
+Only one context bar is displayed on a card at any time.

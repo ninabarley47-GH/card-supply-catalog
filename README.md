@@ -6,7 +6,7 @@ Card Supply Catalog is an offline-first web application designed to help paper c
 
 Unlike traditional inventory software, Card Supply Catalog is built around a simple idea:
 
-> **Find the paper that's perfect for the card you're making.**
+> **Explore your paper collection visually.**
 
 The application emphasizes visual browsing over data entry, making it easy to locate the perfect paper for a project without remembering product names or searching through storage cabinets.
 

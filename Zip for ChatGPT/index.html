@@ -26,58 +26,52 @@
 
       <div class="app-layout">
         <nav class="side-nav" aria-label="Primary">
-          <a class="nav-link nav-link-active" href="#library" aria-current="page">Library</a>
-          <a class="nav-link" href="#settings">Settings</a>
+          <a class="nav-link nav-link-active" href="#library" aria-current="page" data-nav-link>Library</a>
+          <a class="nav-link" href="#settings" data-nav-link>Settings</a>
         </nav>
 
-        <main class="main-content" id="library" tabindex="-1">
-          <details class="recently-added" id="recent">
-            <summary>Recently Added</summary>
-            <p>No recent cataloging session is shown in this shell yet.</p>
-          </details>
-
-          <section class="library-toolbar" aria-labelledby="library-title">
-            <div>
-              <p class="eyebrow">Library</p>
-              <h2 id="library-title">Designer Series Paper</h2>
-              <p class="screen-summary">Browse your paper by sight, with just enough detail to recognize what belongs to whom.</p>
-            </div>
-
-            <form class="search-form" role="search" aria-label="Search catalog">
-              <label class="search-label" for="catalog-search">Search</label>
-              <input
-                id="catalog-search"
-                name="catalog-search"
-                type="search"
-                placeholder="Name, keyword, owner, or year"
-                autocomplete="off"
-                disabled
-              >
-            </form>
-          </section>
-
-          <section class="library-section" aria-labelledby="library-grid-title">
-            <h3 class="visually-hidden" id="library-grid-title">DSP Packs</h3>
-            <div class="dsp-grid dsp-grid-balanced" data-paper-pack-library aria-live="polite">
-              <p class="loading-message">Loading paper packs...</p>
-            </div>
-          </section>
-
-          <section class="color-reference-section" id="colors" aria-labelledby="color-library-title">
-            <div class="section-heading">
+        <main class="main-content">
+          <section class="app-screen library-screen" id="library" tabindex="-1" data-screen>
+            <section class="library-toolbar" aria-labelledby="library-title">
               <div>
-                <p class="eyebrow">Reference</p>
-                <h3 id="color-library-title">Color Reference</h3>
+                <p class="eyebrow">Library</p>
+                <h2 id="library-title">Designer Series Paper</h2>
               </div>
-              <p>Official colors remain here as a lightweight lookup; paper pack cards are the primary catalog.</p>
-            </div>
 
-            <div class="color-library-grid" data-color-library aria-live="polite">
-              <p class="loading-message">Loading colors...</p>
-            </div>
+              <form class="search-form" role="search" aria-label="Search catalog">
+                <label class="search-label" for="catalog-search">Search</label>
+                <input
+                  id="catalog-search"
+                  name="catalog-search"
+                  type="search"
+                  placeholder="Name, keyword, owner, or year"
+                  autocomplete="off"
+                  disabled
+                >
+              </form>
+            </section>
+
+            <section class="library-section" aria-labelledby="library-grid-title">
+              <h3 class="visually-hidden" id="library-grid-title">DSP Packs</h3>
+              <div class="dsp-grid dsp-grid-balanced" data-paper-pack-library aria-live="polite">
+                <p class="loading-message">Loading paper packs...</p>
+              </div>
+            </section>
+
+            <aside class="detail-panel" aria-labelledby="detail-pack-title" data-detail-panel hidden>
+              <div class="detail-panel-header">
+                <div>
+                  <p class="eyebrow">Paper Pack</p>
+                  <h3 id="detail-pack-title" data-detail-title>Pack details</h3>
+                </div>
+                <button class="detail-close" type="button" aria-label="Close pack details" data-detail-close>&times;</button>
+              </div>
+
+              <div class="detail-panel-body" data-detail-body></div>
+            </aside>
           </section>
 
-          <section class="settings-section" id="settings" aria-labelledby="settings-title">
+          <section class="app-screen settings-section" id="settings" aria-labelledby="settings-title" tabindex="-1" data-screen hidden>
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Settings</p>
@@ -90,6 +84,20 @@
               <button class="button" type="button" disabled>Add Paper Pack</button>
               <button class="button" type="button" disabled>Add Color</button>
             </div>
+
+            <section class="color-reference-section" aria-labelledby="color-library-title">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Reference</p>
+                  <h4 id="color-library-title">Color Reference</h4>
+                </div>
+                <p>Official color names and HEX values for pack metadata.</p>
+              </div>
+
+              <div class="color-library-grid" data-color-library aria-live="polite">
+                <p class="loading-message">Loading colors...</p>
+              </div>
+            </section>
           </section>
         </main>
       </div>

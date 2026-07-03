@@ -1,3 +1,5 @@
+import { initializeAddDspWorkflow } from "./add-dsp.js";
+
 const COLOR_FAMILY_ORDER = [
   "red",
   "orange",
@@ -49,6 +51,8 @@ const PATTERN_CLASS_MAP = {
   stripe: "pattern-stripe"
 };
 
+const PATTERN_CLASS_SEQUENCE = Object.values(PATTERN_CLASS_MAP);
+
 const LATEST_CATALOG_SESSION_PACK_IDS = new Set(["velvet-meadow", "sunlit-market"]);
 
 export async function initializeLibraryShell() {
@@ -64,10 +68,12 @@ export async function initializeLibraryShell() {
   try {
     const [colorsById, paperPacks] = await Promise.all([loadColors(), loadPaperPacks()]);
     const colors = Object.values(colorsById);
+    initializeAddDspWorkflow(colorsById);
 
     if (paperPackLibrary) {
       renderPaperPackLibrary(paperPackLibrary, paperPacks, colorsById);
       initializeDetailPanel(paperPackLibrary, paperPacks, colorsById);
+      initializeSessionPaperPackAdds(paperPackLibrary, paperPacks, colorsById);
     }
 
     if (colorLibrary) {
@@ -147,6 +153,43 @@ function renderPaperPackLibrary(container, paperPacks, colorsById) {
   container.replaceChildren(
     ...paperPacks.map((paperPack) => createPaperPackCard(paperPack, colorsById))
   );
+}
+
+function initializeSessionPaperPackAdds(paperPackLibrary, paperPacks, colorsById) {
+  document.addEventListener("paper-pack:add", (event) => {
+    const paperPack = event.detail?.paperPack;
+
+    if (!paperPack) {
+      return;
+    }
+
+    const uniquePaperPack = ensureUniquePaperPackId(paperPack, paperPacks);
+    paperPacks.unshift(uniquePaperPack);
+    LATEST_CATALOG_SESSION_PACK_IDS.clear();
+    LATEST_CATALOG_SESSION_PACK_IDS.add(uniquePaperPack.id);
+    renderPaperPackLibrary(paperPackLibrary, paperPacks, colorsById);
+  });
+}
+
+function ensureUniquePaperPackId(paperPack, paperPacks) {
+  const existingIds = new Set(paperPacks.map((existingPack) => existingPack.id));
+
+  if (!existingIds.has(paperPack.id)) {
+    return paperPack;
+  }
+
+  let suffix = 2;
+  let id = `${paperPack.id}-${suffix}`;
+
+  while (existingIds.has(id)) {
+    suffix += 1;
+    id = `${paperPack.id}-${suffix}`;
+  }
+
+  return {
+    ...paperPack,
+    id
+  };
 }
 
 function createPaperPackCard(paperPack, colorsById) {
@@ -528,9 +571,10 @@ function createPatternGrid(paperPack) {
   const patterns = paperPack.patterns || [];
 
   patternGrid.append(
-    ...patterns.map((patternName) => {
+    ...patterns.map((patternName, index) => {
       const pattern = document.createElement("span");
-      const patternClass = PATTERN_CLASS_MAP[patternName] || "pattern-linen";
+      const patternClass =
+        PATTERN_CLASS_MAP[patternName] || PATTERN_CLASS_SEQUENCE[index % PATTERN_CLASS_SEQUENCE.length];
 
       pattern.className = `pattern ${patternClass}`;
       pattern.setAttribute("aria-hidden", "true");
