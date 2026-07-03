@@ -360,11 +360,11 @@ h6 {
 
 .card-context-bar {
   min-height: 2rem;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid rgba(47, 44, 40, 0.28);
   border-radius: var(--radius-medium) var(--radius-medium) 0 0;
   padding: 0.45rem var(--space-4);
-  background: #f2f0eb;
-  color: var(--color-muted);
+  background: var(--color-text);
+  color: #ffffff;
   font-size: 0.78rem;
   font-weight: 800;
   line-height: 1.2;
