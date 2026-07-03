@@ -152,3 +152,19 @@ During the prototype cataloging workflow, selected DSP images may be stored as d
 This is acceptable only for early testing because it keeps the Add DSP workflow simple.
 
 A future storage milestone should replace this with a durable local image-file strategy so larger paper pack collections do not overload localStorage.
+
+# Decision 18
+## Image Storage Solutions
+We need to establish a place to store paper images that is accessible to all the users using this app, even if they don't live together. 
+
+Instead of storing image data inside the browser database, the catalog would store image references like:
+{
+  "id": "pattern-1",
+  "imageName": "velvet-meadow-01.jpg",
+  "imagePath": "Images/Velvet Meadow/velvet-meadow-01.jpg"
+}
+Then the app displays the image from that path.
+
+Ultimately, we want to move toward using an app-managed shared image folder in OneDrive, but store stable image URLs or relative cloud paths in the catalog. 
+
+Then the app resolves that path against a configured shared OneDrive folder.

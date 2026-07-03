@@ -54,7 +54,10 @@ const PATTERN_CLASS_MAP = {
 
 const PATTERN_CLASS_SEQUENCE = Object.values(PATTERN_CLASS_MAP);
 
-const LATEST_CATALOG_SESSION_PACK_IDS = new Set(["velvet-meadow", "sunlit-market"]);
+const DEFAULT_CATALOG_SESSION_PACK_IDS = ["velvet-meadow", "sunlit-market"];
+const CATALOG_SESSION_STORAGE_KEY = "card-supply-catalog.latestCatalogSessionPackIds";
+const LATEST_CATALOG_SESSION_PACK_IDS = new Set(loadCatalogSessionPackIds());
+let hasUserCatalogSession = hasSavedCatalogSession();
 
 export async function initializeLibraryShell() {
   initializeScreenNavigation();
@@ -172,8 +175,10 @@ function initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById) {
 
     if (existingIndex === -1) {
       paperPacks.unshift(packToSave);
-      LATEST_CATALOG_SESSION_PACK_IDS.clear();
-      LATEST_CATALOG_SESSION_PACK_IDS.add(packToSave.id);
+
+      if (mode === "add") {
+        addPackToLatestCatalogSession(packToSave.id);
+      }
     } else {
       paperPacks.splice(existingIndex, 1, packToSave);
     }
@@ -287,6 +292,49 @@ function getCardContext(paperPack) {
   }
 
   return null;
+}
+
+function addPackToLatestCatalogSession(paperPackId) {
+  if (!hasUserCatalogSession) {
+    LATEST_CATALOG_SESSION_PACK_IDS.clear();
+    hasUserCatalogSession = true;
+  }
+
+  LATEST_CATALOG_SESSION_PACK_IDS.add(paperPackId);
+  saveCatalogSessionPackIds();
+}
+
+function loadCatalogSessionPackIds() {
+  try {
+    const savedPackIds = JSON.parse(window.sessionStorage.getItem(CATALOG_SESSION_STORAGE_KEY));
+
+    if (Array.isArray(savedPackIds) && savedPackIds.every((packId) => typeof packId === "string")) {
+      return savedPackIds;
+    }
+  } catch (error) {
+    // Fall back to the prototype sample context if session storage is unavailable.
+  }
+
+  return DEFAULT_CATALOG_SESSION_PACK_IDS;
+}
+
+function hasSavedCatalogSession() {
+  try {
+    return window.sessionStorage.getItem(CATALOG_SESSION_STORAGE_KEY) !== null;
+  } catch (error) {
+    return false;
+  }
+}
+
+function saveCatalogSessionPackIds() {
+  try {
+    window.sessionStorage.setItem(
+      CATALOG_SESSION_STORAGE_KEY,
+      JSON.stringify([...LATEST_CATALOG_SESSION_PACK_IDS])
+    );
+  } catch (error) {
+    // The in-memory context still works for the current page even if session storage is unavailable.
+  }
 }
 
 function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById) {
