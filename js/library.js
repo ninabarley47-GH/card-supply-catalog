@@ -640,7 +640,6 @@ function createDetailMeta(paperPack) {
   list.append(
     createDetailMetaItem("Owner", paperPack.owner),
     createDetailMetaItem("Release", `${paperPack.releaseYear}`),
-    createDetailMetaItem("Patterns", `${paperPack.patternCount}`),
     createDetailMetaItem("Status", formatAvailabilityLabel(paperPack.availability))
   );
 
