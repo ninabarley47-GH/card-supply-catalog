@@ -1,19 +1,5 @@
 # Product Backlog
 
-## Image Storage
-
-### Durable Local Image Storage
-Current prototype uses IndexedDB.
-
-Future version should evaluate storing images as local files with database references.
-
-Reason:
-- Better scalability
-- Easier backup
-- Less database bloat
-
----
-
 ## Discovery
 
 ### Similar Packs Based on Multiple Attributes
@@ -38,6 +24,8 @@ Consider remembering:
 - Status
 
 to speed repetitive data entry.
+
+# Technical Backlog
 
 ## Ownership Model
 
@@ -85,3 +73,17 @@ Owner-specific data would include:
 ### Notes
 
 Current implementation continues to use a single owner per paper pack. This item should only be revisited if multiple-owner support becomes a project goal.
+
+## Image Storage
+
+### Durable Local Image Storage
+Current prototype uses IndexedDB.
+
+Future version should evaluate storing images as local files with database references.
+
+Reason:
+- Better scalability
+- Easier backup
+- Less database bloat
+
+---
