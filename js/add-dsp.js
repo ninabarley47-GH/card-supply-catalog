@@ -105,14 +105,23 @@ export function initializeAddDspWorkflow(colorsById) {
       return;
     }
 
+    const saveDetail = {
+      paperPack: result.paperPack,
+      mode: formState.editingPaperPack ? "edit" : "add",
+      result: {
+        ok: true
+      }
+    };
+
     document.dispatchEvent(
       new CustomEvent("paper-pack:save", {
-        detail: {
-          paperPack: result.paperPack,
-          mode: formState.editingPaperPack ? "edit" : "add"
-        }
+        detail: saveDetail
       })
     );
+
+    if (!saveDetail.result.ok) {
+      window.alert(saveDetail.result.message);
+    }
 
     renderFormMessage(message, `${result.paperPack.name} was saved.`, "success");
     form.reset();

@@ -170,8 +170,6 @@ function initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById) {
     const packToSave = mode === "edit" ? paperPack : ensureUniquePaperPackId(paperPack, paperPacks);
     const existingIndex = paperPacks.findIndex((existingPack) => existingPack.id === packToSave.id);
 
-    savePaperPack(packToSave);
-
     if (existingIndex === -1) {
       paperPacks.unshift(packToSave);
       LATEST_CATALOG_SESSION_PACK_IDS.clear();
@@ -181,6 +179,20 @@ function initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById) {
     }
 
     renderPaperPackLibrary(paperPackLibrary, paperPacks, colorsById);
+
+    try {
+      savePaperPack(packToSave);
+      event.detail.result = {
+        ok: true
+      };
+    } catch (error) {
+      event.detail.result = {
+        ok: false,
+        displayed: true,
+        message:
+          "The paper pack is visible for this session, but the browser could not save it permanently. The selected images may be too large for browser storage."
+      };
+    }
   });
 }
 
