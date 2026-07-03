@@ -35,7 +35,7 @@ export function initializeAddDspWorkflow(colorsById) {
       })
     );
 
-    renderFormMessage(message, `${result.paperPack.name} was added to this session.`, "success");
+    renderFormMessage(message, `${result.paperPack.name} was saved.`, "success");
     form.reset();
     closeAddDspPanel(panel, form, message);
     window.location.hash = "library";

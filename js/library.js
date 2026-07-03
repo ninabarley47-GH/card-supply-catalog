@@ -1,4 +1,5 @@
 import { initializeAddDspWorkflow } from "./add-dsp.js";
+import { loadSavedPaperPacks, mergePaperPacks, savePaperPack } from "./storage.js";
 
 const COLOR_FAMILY_ORDER = [
   "red",
@@ -140,8 +141,10 @@ async function loadPaperPacks() {
   }
 
   const data = await response.json();
+  const basePaperPacks = data.paperPacks || [];
+  const savedPaperPacks = loadSavedPaperPacks();
 
-  return data.paperPacks || [];
+  return mergePaperPacks(basePaperPacks, savedPaperPacks);
 }
 
 function renderPaperPackLibrary(container, paperPacks, colorsById) {
@@ -164,6 +167,7 @@ function initializeSessionPaperPackAdds(paperPackLibrary, paperPacks, colorsById
     }
 
     const uniquePaperPack = ensureUniquePaperPackId(paperPack, paperPacks);
+    savePaperPack(uniquePaperPack);
     paperPacks.unshift(uniquePaperPack);
     LATEST_CATALOG_SESSION_PACK_IDS.clear();
     LATEST_CATALOG_SESSION_PACK_IDS.add(uniquePaperPack.id);
