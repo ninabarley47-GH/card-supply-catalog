@@ -336,7 +336,8 @@ h6 {
 }
 
 .dsp-grid-balanced {
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 26rem));
+  justify-content: center;
 }
 
 .dsp-card {
