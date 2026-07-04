@@ -158,13 +158,8 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
   const tagFilter = document.querySelector("[data-library-tag-filters]");
 
   function renderCurrent() {
-    const filterState = {
-      query: input?.value.trim() || "",
-      selectedTags: getSelectedLibraryTags(tagFilter)
-    };
-    const filteredPaperPacks = paperPacks.filter((paperPack) =>
-      matchesPaperPackFilters(paperPack, filterState, colorsById)
-    );
+    const filterState = getLibraryFilterState(input, tagFilter);
+    const filteredPaperPacks = applyPaperPackFilters(paperPacks, filterState, colorsById);
 
     renderPaperPackLibrary(paperPackLibrary, filteredPaperPacks, colorsById, {
       query: filterState.query,
@@ -198,6 +193,19 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
   };
 }
 
+function getLibraryFilterState(input, tagFilter) {
+  return {
+    query: input?.value || "",
+    selectedTags: getSelectedLibraryTags(tagFilter)
+  };
+}
+
+function applyPaperPackFilters(paperPacks, filterState, colorsById) {
+  return paperPacks.filter((paperPack) =>
+    matchesPaperPackFilters(paperPack, filterState, colorsById)
+  );
+}
+
 function renderLibraryTagFilters(container, tags) {
   if (!container || tags.length === 0) {
     return;
@@ -229,15 +237,21 @@ function renderLibraryTagFilters(container, tags) {
 }
 
 function getAvailableTags(paperPacks) {
-  const tags = new Set();
+  const tagsByNormalizedName = new Map();
 
   for (const paperPack of paperPacks) {
     for (const keyword of paperPack.keywords || []) {
-      tags.add(keyword);
+      const normalizedKeyword = normalizeFilterText(keyword);
+
+      if (normalizedKeyword && !tagsByNormalizedName.has(normalizedKeyword)) {
+        tagsByNormalizedName.set(normalizedKeyword, keyword);
+      }
     }
   }
 
-  return [...tags].sort((firstTag, secondTag) => firstTag.localeCompare(secondTag));
+  return [...tagsByNormalizedName.values()].sort((firstTag, secondTag) =>
+    firstTag.localeCompare(secondTag)
+  );
 }
 
 function getSelectedLibraryTags(container) {
@@ -251,10 +265,11 @@ function getSelectedLibraryTags(container) {
 }
 
 function matchesPaperPackFilters(paperPack, filterState, colorsById) {
-  const normalizedQuery = filterState.query.trim().toLocaleLowerCase();
-  const selectedTags = filterState.selectedTags || [];
+  const normalizedQuery = normalizeFilterText(filterState.query);
+  const selectedTags = (filterState.selectedTags || []).map(normalizeFilterText).filter(Boolean);
   const packKeywords = paperPack.keywords || [];
-  const matchesSelectedTags = selectedTags.every((tag) => packKeywords.includes(tag));
+  const normalizedPackKeywords = packKeywords.map(normalizeFilterText);
+  const matchesSelectedTags = selectedTags.every((tag) => normalizedPackKeywords.includes(tag));
 
   if (!matchesSelectedTags) {
     return false;
@@ -272,7 +287,9 @@ function matchesPaperPackFilters(paperPack, filterState, colorsById) {
     ...getSearchableColorText(paperPack, colorsById)
   ]
     .join(" ")
-    .toLocaleLowerCase();
+    .split(/\s+/)
+    .map(normalizeFilterText)
+    .join(" ");
 
   return searchableText.includes(normalizedQuery);
 }
@@ -288,8 +305,23 @@ function getSearchableColorText(paperPack, colorsById) {
     const colorFamilyLabel =
       COLOR_FAMILY_LABELS[color.colorFamily] || formatColorFamily(color.colorFamily || "");
 
-    return [color.name, color.colorFamily, colorFamilyLabel];
+    return [
+      color.name,
+      color.id,
+      color.family,
+      color.colorFamily,
+      colorFamilyLabel,
+      ...(color.aliases || [])
+    ];
   });
+}
+
+function normalizeFilterText(value) {
+  return String(value || "")
+    .trim()
+    .toLocaleLowerCase()
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ");
 }
 
 function renderPaperPackLibrary(container, paperPacks, colorsById, options = {}) {
