@@ -815,7 +815,6 @@ function createPatternPreview(patternEntry, index) {
 
   pattern.className = "pattern pattern-placeholder";
   pattern.setAttribute("aria-label", `No image available for pattern ${index + 1}`);
-  pattern.textContent = "No image available";
 
   return pattern;
 }
