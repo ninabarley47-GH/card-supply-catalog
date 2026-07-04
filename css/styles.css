@@ -217,6 +217,13 @@ h6 {
   color: var(--color-muted);
 }
 
+.result-count {
+  margin: var(--space-2) 0 0;
+  color: var(--color-muted);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

@@ -176,3 +176,21 @@ The catalog gets more room. Moving the filters out of the content area lets your
 2. It scales naturally. It allows filters to expand beyond search and tags to Owner, Color family, Individual colors, Release year, Retired/current and Favorites. The sidebar can grow without making the main page feel crowded.
 
 3. It matches how people expect catalog apps to work.
+
+# Decision 20
+## Filtering Architecture
+
+The catalog uses a unified filtering pipeline.
+
+All user constraints (search text, tags, owner, color family, release year, etc.) are evaluated together to determine the visible pack list.
+
+Search is treated as a free-text filter rather than a separate search mechanism.
+
+Each change to the filter state re-evaluates the full catalog rather than filtering an already filtered subset.
+
+# Decision 21
+## Catalog State Behavior
+
+Opening a pack detail view does not reset the catalog.
+
+Users can search, filter, open a detail view, compare matching packs by color, and return to the catalog with the same filtered results still active.

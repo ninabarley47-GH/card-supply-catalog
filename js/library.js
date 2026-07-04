@@ -325,6 +325,8 @@ function normalizeFilterText(value) {
 }
 
 function renderPaperPackLibrary(container, paperPacks, colorsById, options = {}) {
+  updateLibraryResultCount(paperPacks.length, options.totalCount ?? paperPacks.length);
+
   if (paperPacks.length === 0) {
     renderEmptyPaperPackLibrary(
       container,
@@ -338,6 +340,20 @@ function renderPaperPackLibrary(container, paperPacks, colorsById, options = {})
   container.replaceChildren(
     ...paperPacks.map((paperPack) => createPaperPackCard(paperPack, colorsById))
   );
+}
+
+function updateLibraryResultCount(visibleCount, totalCount) {
+  const resultCount = document.querySelector("[data-library-result-count]");
+
+  if (!resultCount) {
+    return;
+  }
+
+  const visibleLabel = `${visibleCount}`;
+  const totalLabel = `${totalCount}`;
+  const packLabel = totalCount === 1 ? "pack" : "packs";
+
+  resultCount.textContent = `Showing ${visibleLabel} of ${totalLabel} ${packLabel}`;
 }
 
 function renderEmptyPaperPackLibrary(container, query, selectedTags = [], totalCount = 0) {
