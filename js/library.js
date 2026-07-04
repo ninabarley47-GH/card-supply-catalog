@@ -202,9 +202,20 @@ function filterPaperPacksBySearchText(paperPacks, query, colorsById) {
     const keywordMatches = (paperPack.keywords || []).some((keyword) =>
       keyword.toLocaleLowerCase().includes(normalizedQuery)
     );
-    const colorMatches = (paperPack.colors || []).some((colorId) =>
-      colorsById[colorId]?.name.toLocaleLowerCase().includes(normalizedQuery)
-    );
+    const colorMatches = (paperPack.colors || []).some((colorId) => {
+      const color = colorsById[colorId];
+
+      if (!color) {
+        return false;
+      }
+
+      const colorFamilyLabel = COLOR_FAMILY_LABELS[color.colorFamily] || formatColorFamily(color.colorFamily || "");
+      const searchableColorText = [color.name, color.colorFamily, colorFamilyLabel]
+        .join(" ")
+        .toLocaleLowerCase();
+
+      return searchableColorText.includes(normalizedQuery);
+    });
 
     return nameMatches || keywordMatches || colorMatches;
   });
