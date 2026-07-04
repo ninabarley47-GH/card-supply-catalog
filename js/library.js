@@ -779,7 +779,7 @@ function createCoordinatingPackCard(paperPack, color) {
   const meta = document.createElement("p");
   meta.textContent = `${paperPack.owner} - ${paperPack.releaseYear} Release`;
 
-  card.append(preview, title, meta);
+  card.append(title, preview, meta);
 
   return card;
 }
