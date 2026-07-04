@@ -158,7 +158,7 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
 
   function renderCurrent() {
     const query = input?.value.trim() || "";
-    const filteredPaperPacks = filterPaperPacksByNameOrKeyword(paperPacks, query);
+    const filteredPaperPacks = filterPaperPacksBySearchText(paperPacks, query, colorsById);
 
     renderPaperPackLibrary(paperPackLibrary, filteredPaperPacks, colorsById, {
       query,
@@ -190,7 +190,7 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
   };
 }
 
-function filterPaperPacksByNameOrKeyword(paperPacks, query) {
+function filterPaperPacksBySearchText(paperPacks, query, colorsById) {
   const normalizedQuery = query.trim().toLocaleLowerCase();
 
   if (!normalizedQuery) {
@@ -202,8 +202,11 @@ function filterPaperPacksByNameOrKeyword(paperPacks, query) {
     const keywordMatches = (paperPack.keywords || []).some((keyword) =>
       keyword.toLocaleLowerCase().includes(normalizedQuery)
     );
+    const colorMatches = (paperPack.colors || []).some((colorId) =>
+      colorsById[colorId]?.name.toLocaleLowerCase().includes(normalizedQuery)
+    );
 
-    return nameMatches || keywordMatches;
+    return nameMatches || keywordMatches || colorMatches;
   });
 }
 
