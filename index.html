@@ -167,22 +167,55 @@
               <p class="field-help">Use official color names or color IDs. HEX values still come from colors.json.</p>
             </div>
 
-            <div class="form-field">
-              <label for="dsp-keywords">Keywords</label>
-              <select id="dsp-keywords" name="keywords" multiple size="6">
-                <option>Background</option>
-                <option>Floral</option>
-                <option>Foliage</option>
-                <option>Ocean</option>
-                <option>Mammals</option>
-                <option>Winged Creatures</option>
-                <option>Hobbies</option>
-                <option>Specialty</option>
-                <option>Textures</option>
-                <option>Holiday</option>
-                <option>Geometric</option>
-              </select>
-            </div>
+            <fieldset class="form-field keyword-picker">
+              <legend class="form-label">Keywords</legend>
+              <div class="keyword-picker-options">
+                <label class="keyword-option">
+                  <input type="checkbox" name="keywords" value="Background">
+                  <span>Background</span>
+                </label>
+                <label class="keyword-option">
+                  <input type="checkbox" name="keywords" value="Floral">
+                  <span>Floral</span>
+                </label>
+                <label class="keyword-option">
+                  <input type="checkbox" name="keywords" value="Foliage">
+                  <span>Foliage</span>
+                </label>
+                <label class="keyword-option">
+                  <input type="checkbox" name="keywords" value="Ocean">
+                  <span>Ocean</span>
+                </label>
+                <label class="keyword-option">
+                  <input type="checkbox" name="keywords" value="Mammals">
+                  <span>Mammals</span>
+                </label>
+                <label class="keyword-option">
+                  <input type="checkbox" name="keywords" value="Winged Creatures">
+                  <span>Winged Creatures</span>
+                </label>
+                <label class="keyword-option">
+                  <input type="checkbox" name="keywords" value="Hobbies">
+                  <span>Hobbies</span>
+                </label>
+                <label class="keyword-option">
+                  <input type="checkbox" name="keywords" value="Specialty">
+                  <span>Specialty</span>
+                </label>
+                <label class="keyword-option">
+                  <input type="checkbox" name="keywords" value="Textures">
+                  <span>Textures</span>
+                </label>
+                <label class="keyword-option">
+                  <input type="checkbox" name="keywords" value="Holiday">
+                  <span>Holiday</span>
+                </label>
+                <label class="keyword-option">
+                  <input type="checkbox" name="keywords" value="Geometric">
+                  <span>Geometric</span>
+                </label>
+              </div>
+            </fieldset>
 
             <div class="form-field">
               <label for="dsp-refill">Backup Supply</label>

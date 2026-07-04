@@ -239,8 +239,8 @@ function fillPaperPackForm(form, paperPack, colorsById) {
 
   const keywords = new Set(paperPack.keywords || []);
 
-  for (const option of form.elements.keywords.options) {
-    option.selected = keywords.has(option.value) || keywords.has(option.textContent);
+  for (const keywordInput of form.querySelectorAll('input[name="keywords"]')) {
+    keywordInput.checked = keywords.has(keywordInput.value);
   }
 }
 
