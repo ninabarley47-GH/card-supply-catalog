@@ -431,7 +431,7 @@ h6 {
   border-bottom: 1px solid rgba(47, 44, 40, 0.28);
   border-radius: var(--radius-medium) var(--radius-medium) 0 0;
   padding: 0.45rem var(--space-4);
-  background: var(--color-text);
+  background: var(--color-accent);
   color: #ffffff;
   font-size: 0.78rem;
   font-weight: 800;
