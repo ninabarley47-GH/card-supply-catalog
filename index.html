@@ -32,6 +32,10 @@
           </div>
 
           <form class="search-form nav-search" role="search" aria-label="Search catalog" data-library-search-form>
+            <div class="filter-heading-row">
+              <h3>Filter</h3>
+              <button class="filter-clear-button" type="button" data-library-clear-all hidden>Clear all</button>
+            </div>
             <label class="search-label" for="catalog-search">Search</label>
             <div class="search-control">
               <input
@@ -42,10 +46,10 @@
                 autocomplete="off"
                 data-library-search-input
               >
-              <button class="search-clear" type="button" data-library-search-clear hidden>Clear</button>
             </div>
             <fieldset class="library-tag-filter" data-library-tag-filters>
               <legend class="search-label">Tags</legend>
+              <button class="filter-clear-button filter-clear-tags" type="button" data-library-clear-tags hidden>Clear tags</button>
             </fieldset>
           </form>
         </nav>

@@ -154,7 +154,8 @@ async function loadPaperPacks() {
 function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
   const form = document.querySelector("[data-library-search-form]");
   const input = document.querySelector("[data-library-search-input]");
-  const clearButton = document.querySelector("[data-library-search-clear]");
+  const clearAllButton = document.querySelector("[data-library-clear-all]");
+  const clearTagsButton = document.querySelector("[data-library-clear-tags]");
   const tagFilter = document.querySelector("[data-library-tag-filters]");
 
   function renderCurrent() {
@@ -167,8 +168,12 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
       totalCount: paperPacks.length
     });
 
-    if (clearButton) {
-      clearButton.hidden = filterState.query.length === 0;
+    if (clearAllButton) {
+      clearAllButton.hidden = filterState.query.length === 0 && filterState.selectedTags.length === 0;
+    }
+
+    if (clearTagsButton) {
+      clearTagsButton.hidden = filterState.selectedTags.length === 0;
     }
   }
 
@@ -180,10 +185,15 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
 
   renderLibraryTagFilters(tagFilter, getAvailableTags(paperPacks));
   input.addEventListener("input", renderCurrent);
-  clearButton?.addEventListener("click", () => {
+  clearAllButton?.addEventListener("click", () => {
     input.value = "";
+    clearSelectedLibraryTags(tagFilter);
     renderCurrent();
     input.focus();
+  });
+  clearTagsButton?.addEventListener("click", () => {
+    clearSelectedLibraryTags(tagFilter);
+    renderCurrent();
   });
   tagFilter?.addEventListener("change", renderCurrent);
   form.addEventListener("submit", (event) => event.preventDefault());
@@ -262,6 +272,16 @@ function getSelectedLibraryTags(container) {
   return [...container.querySelectorAll('input[name="library-tags"]:checked')].map(
     (input) => input.value
   );
+}
+
+function clearSelectedLibraryTags(container) {
+  if (!container) {
+    return;
+  }
+
+  for (const input of container.querySelectorAll('input[name="library-tags"]:checked')) {
+    input.checked = false;
+  }
 }
 
 function matchesPaperPackFilters(paperPack, filterState, colorsById) {

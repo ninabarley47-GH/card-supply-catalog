@@ -244,6 +244,36 @@ h6 {
   border-top: 1px solid var(--color-border);
 }
 
+.filter-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.filter-heading-row h3 {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.filter-clear-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 0.16rem;
+}
+
+.filter-clear-button:not([hidden]):hover {
+  color: var(--color-accent-dark);
+}
+
 .search-label {
   color: var(--color-muted);
   font-size: 0.9rem;
@@ -271,29 +301,22 @@ h6 {
   color: var(--color-muted);
 }
 
-.search-clear {
-  min-height: 2.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-small);
-  padding: 0.7rem 0.85rem;
-  background: var(--color-surface);
-  color: var(--color-muted);
-  font-weight: 700;
-}
-
-.search-clear:not([hidden]):hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent-dark);
-}
-
 .library-tag-filter {
+  position: relative;
   margin: var(--space-2) 0 0;
   border: 0;
   padding: 0;
 }
 
+.filter-clear-tags {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
 .library-tag-filter-options {
   gap: 0.4rem;
+  margin-top: var(--space-2);
 }
 
 .library-tag-option span {
