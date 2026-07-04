@@ -155,18 +155,25 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
   const form = document.querySelector("[data-library-search-form]");
   const input = document.querySelector("[data-library-search-input]");
   const clearButton = document.querySelector("[data-library-search-clear]");
+  const tagFilter = document.querySelector("[data-library-tag-filters]");
 
   function renderCurrent() {
-    const query = input?.value.trim() || "";
-    const filteredPaperPacks = filterPaperPacksBySearchText(paperPacks, query, colorsById);
+    const filterState = {
+      query: input?.value.trim() || "",
+      selectedTags: getSelectedLibraryTags(tagFilter)
+    };
+    const filteredPaperPacks = paperPacks.filter((paperPack) =>
+      matchesPaperPackFilters(paperPack, filterState, colorsById)
+    );
 
     renderPaperPackLibrary(paperPackLibrary, filteredPaperPacks, colorsById, {
-      query,
+      query: filterState.query,
+      selectedTags: filterState.selectedTags,
       totalCount: paperPacks.length
     });
 
     if (clearButton) {
-      clearButton.hidden = query.length === 0;
+      clearButton.hidden = filterState.query.length === 0 && filterState.selectedTags.length === 0;
     }
   }
 
@@ -176,7 +183,9 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
     };
   }
 
+  renderLibraryTagFilters(tagFilter, getAvailableTags(paperPacks));
   input.addEventListener("input", renderCurrent);
+  tagFilter?.addEventListener("change", renderCurrent);
   form.addEventListener("submit", (event) => event.preventDefault());
   form.addEventListener("reset", () => {
     window.requestAnimationFrame(() => {
@@ -190,42 +199,108 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
   };
 }
 
-function filterPaperPacksBySearchText(paperPacks, query, colorsById) {
-  const normalizedQuery = query.trim().toLocaleLowerCase();
-
-  if (!normalizedQuery) {
-    return paperPacks;
+function renderLibraryTagFilters(container, tags) {
+  if (!container || tags.length === 0) {
+    return;
   }
 
-  return paperPacks.filter((paperPack) => {
-    const nameMatches = paperPack.name.toLocaleLowerCase().includes(normalizedQuery);
-    const ownerMatches = paperPack.owner.toLocaleLowerCase().includes(normalizedQuery);
-    const yearMatches = String(paperPack.releaseYear).includes(normalizedQuery);
-    const keywordMatches = (paperPack.keywords || []).some((keyword) =>
-      keyword.toLocaleLowerCase().includes(normalizedQuery)
-    );
-    const colorMatches = (paperPack.colors || []).some((colorId) => {
-      const color = colorsById[colorId];
+  const options = document.createElement("div");
+  options.className = "keyword-picker-options library-tag-filter-options";
 
-      if (!color) {
-        return false;
-      }
+  options.append(
+    ...tags.map((tag) => {
+      const label = document.createElement("label");
+      label.className = "keyword-option library-tag-option";
 
-      const colorFamilyLabel = COLOR_FAMILY_LABELS[color.colorFamily] || formatColorFamily(color.colorFamily || "");
-      const searchableColorText = [color.name, color.colorFamily, colorFamilyLabel]
-        .join(" ")
-        .toLocaleLowerCase();
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.name = "library-tags";
+      input.value = tag;
 
-      return searchableColorText.includes(normalizedQuery);
-    });
+      const text = document.createElement("span");
+      text.textContent = tag;
 
-    return nameMatches || ownerMatches || yearMatches || keywordMatches || colorMatches;
+      label.append(input, text);
+
+      return label;
+    })
+  );
+
+  container.append(options);
+}
+
+function getAvailableTags(paperPacks) {
+  const tags = new Set();
+
+  for (const paperPack of paperPacks) {
+    for (const keyword of paperPack.keywords || []) {
+      tags.add(keyword);
+    }
+  }
+
+  return [...tags].sort((firstTag, secondTag) => firstTag.localeCompare(secondTag));
+}
+
+function getSelectedLibraryTags(container) {
+  if (!container) {
+    return [];
+  }
+
+  return [...container.querySelectorAll('input[name="library-tags"]:checked')].map(
+    (input) => input.value
+  );
+}
+
+function matchesPaperPackFilters(paperPack, filterState, colorsById) {
+  const normalizedQuery = filterState.query.trim().toLocaleLowerCase();
+  const selectedTags = filterState.selectedTags || [];
+  const packKeywords = paperPack.keywords || [];
+  const matchesSelectedTags = selectedTags.every((tag) => packKeywords.includes(tag));
+
+  if (!matchesSelectedTags) {
+    return false;
+  }
+
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  const searchableText = [
+    paperPack.name,
+    paperPack.owner,
+    paperPack.releaseYear,
+    ...packKeywords,
+    ...getSearchableColorText(paperPack, colorsById)
+  ]
+    .join(" ")
+    .toLocaleLowerCase();
+
+  return searchableText.includes(normalizedQuery);
+}
+
+function getSearchableColorText(paperPack, colorsById) {
+  return (paperPack.colors || []).flatMap((colorId) => {
+    const color = colorsById[colorId];
+
+    if (!color) {
+      return [];
+    }
+
+    const colorFamilyLabel =
+      COLOR_FAMILY_LABELS[color.colorFamily] || formatColorFamily(color.colorFamily || "");
+
+    return [color.name, color.colorFamily, colorFamilyLabel];
   });
 }
 
 function renderPaperPackLibrary(container, paperPacks, colorsById, options = {}) {
   if (paperPacks.length === 0) {
-    renderEmptyPaperPackLibrary(container, options.query, options.totalCount);
+    renderEmptyPaperPackLibrary(
+      container,
+      options.query,
+      options.selectedTags || [],
+      options.totalCount
+    );
     return;
   }
 
@@ -234,13 +309,19 @@ function renderPaperPackLibrary(container, paperPacks, colorsById, options = {})
   );
 }
 
-function renderEmptyPaperPackLibrary(container, query, totalCount = 0) {
+function renderEmptyPaperPackLibrary(container, query, selectedTags = [], totalCount = 0) {
   const message = document.createElement("p");
+  const hasFilters = query || selectedTags.length > 0;
+
   message.className = "loading-message";
-  message.textContent =
-    query && totalCount > 0
+
+  if (hasFilters && totalCount > 0) {
+    message.textContent = query
       ? `No paper packs match "${query}".`
-      : "No paper packs to display yet.";
+      : "No paper packs match the selected tags.";
+  } else {
+    message.textContent = "No paper packs to display yet.";
+  }
 
   container.replaceChildren(message);
 }

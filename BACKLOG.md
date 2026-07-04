@@ -25,6 +25,26 @@ Consider remembering:
 
 to speed repetitive data entry.
 
+### Follow-up: Multi-tag search/filter
+Status: Backlog
+
+Current behavior:
+- The search bar uses free-text search across fields.
+- Tags are searchable as text, but there is no dedicated multi-tag filter yet.
+
+Desired behavior:
+- User can select more than one tag.
+- Catalog shows packs matching the selected tag logic.
+- Decide whether multi-tag matching means:
+  - AND: pack must have all selected tags
+  - OR: pack can have any selected tag
+
+Initial recommendation:
+- Use AND logic first, because it helps narrow results.
+- Add a visible selected-tag list with a way to remove individual tags.
+
+---
+
 # Technical Backlog
 
 ## Ownership Model

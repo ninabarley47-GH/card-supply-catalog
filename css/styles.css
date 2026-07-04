@@ -272,6 +272,22 @@ h6 {
   color: var(--color-accent-dark);
 }
 
+.library-tag-filter {
+  margin: var(--space-2) 0 0;
+  border: 0;
+  padding: 0;
+}
+
+.library-tag-filter-options {
+  gap: 0.4rem;
+}
+
+.library-tag-option span {
+  min-height: 1.9rem;
+  padding: 0.32rem 0.6rem;
+  font-size: 0.78rem;
+}
+
 .empty-library {
   display: grid;
   grid-template-columns: minmax(14rem, 24rem) minmax(16rem, 28rem);
