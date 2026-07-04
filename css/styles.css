@@ -236,6 +236,12 @@ h6 {
   font-weight: 700;
 }
 
+.search-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+}
+
 .search-form input {
   width: 100%;
   min-height: 2.75rem;
@@ -249,6 +255,21 @@ h6 {
 .search-form input:disabled {
   opacity: 1;
   color: var(--color-muted);
+}
+
+.search-clear {
+  min-height: 2.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  padding: 0.7rem 0.85rem;
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-weight: 700;
+}
+
+.search-clear:not([hidden]):hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent-dark);
 }
 
 .empty-library {

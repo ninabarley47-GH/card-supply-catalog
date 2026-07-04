@@ -76,8 +76,9 @@ export async function initializeLibraryShell() {
 
     if (paperPackLibrary) {
       renderPaperPackLibrary(paperPackLibrary, paperPacks, colorsById);
-      initializeDetailPanel(paperPackLibrary, paperPacks, colorsById);
-      initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById);
+      const librarySearch = initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById);
+      initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, librarySearch.renderCurrent);
+      initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById, librarySearch.renderCurrent);
     }
 
     if (colorLibrary) {
@@ -150,9 +151,60 @@ async function loadPaperPacks() {
   return await mergePaperPacks(basePaperPacks, savedPaperPacks);
 }
 
-function renderPaperPackLibrary(container, paperPacks, colorsById) {
+function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
+  const form = document.querySelector("[data-library-search-form]");
+  const input = document.querySelector("[data-library-search-input]");
+  const clearButton = document.querySelector("[data-library-search-clear]");
+
+  function renderCurrent() {
+    const query = input?.value.trim() || "";
+    const filteredPaperPacks = filterPaperPacksByName(paperPacks, query);
+
+    renderPaperPackLibrary(paperPackLibrary, filteredPaperPacks, colorsById, {
+      query,
+      totalCount: paperPacks.length
+    });
+
+    if (clearButton) {
+      clearButton.hidden = query.length === 0;
+    }
+  }
+
+  if (!form || !input) {
+    return {
+      renderCurrent: () => renderPaperPackLibrary(paperPackLibrary, paperPacks, colorsById)
+    };
+  }
+
+  input.addEventListener("input", renderCurrent);
+  form.addEventListener("submit", (event) => event.preventDefault());
+  form.addEventListener("reset", () => {
+    window.requestAnimationFrame(() => {
+      renderCurrent();
+      input.focus();
+    });
+  });
+
+  return {
+    renderCurrent
+  };
+}
+
+function filterPaperPacksByName(paperPacks, query) {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+
+  if (!normalizedQuery) {
+    return paperPacks;
+  }
+
+  return paperPacks.filter((paperPack) =>
+    paperPack.name.toLocaleLowerCase().includes(normalizedQuery)
+  );
+}
+
+function renderPaperPackLibrary(container, paperPacks, colorsById, options = {}) {
   if (paperPacks.length === 0) {
-    renderError(container, "No paper packs to display yet.");
+    renderEmptyPaperPackLibrary(container, options.query, options.totalCount);
     return;
   }
 
@@ -161,7 +213,18 @@ function renderPaperPackLibrary(container, paperPacks, colorsById) {
   );
 }
 
-function initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById) {
+function renderEmptyPaperPackLibrary(container, query, totalCount = 0) {
+  const message = document.createElement("p");
+  message.className = "loading-message";
+  message.textContent =
+    query && totalCount > 0
+      ? `No paper packs match "${query}".`
+      : "No paper packs to display yet.";
+
+  container.replaceChildren(message);
+}
+
+function initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById, renderCurrentLibrary) {
   document.addEventListener("paper-pack:save", (event) => {
     const paperPack = event.detail?.paperPack;
     const mode = event.detail?.mode || "add";
@@ -183,7 +246,7 @@ function initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById) {
       paperPacks.splice(existingIndex, 1, packToSave);
     }
 
-    renderPaperPackLibrary(paperPackLibrary, paperPacks, colorsById);
+    renderCurrentLibrary();
 
     event.detail.saveComplete = savePaperPack(packToSave)
       .then(() => ({
@@ -337,7 +400,7 @@ function saveCatalogSessionPackIds() {
   }
 }
 
-function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById) {
+function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderCurrentLibrary) {
   const detailPanel = document.querySelector("[data-detail-panel]");
   const detailTitle = document.querySelector("[data-detail-title]");
   const detailBody = document.querySelector("[data-detail-body]");
@@ -415,7 +478,7 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById) {
       const selectedPack = paperPacks.find((pack) => pack.id === detailPanel.dataset.selectedPackId);
 
       if (selectedPack) {
-        deleteSelectedPaperPack(selectedPack, paperPacks, paperPackLibrary, colorsById, detailPanel);
+        deleteSelectedPaperPack(selectedPack, paperPacks, renderCurrentLibrary, detailPanel);
       }
 
       return;
@@ -692,7 +755,7 @@ function createDetailActions(paperPack) {
   return actions;
 }
 
-function deleteSelectedPaperPack(selectedPack, paperPacks, paperPackLibrary, colorsById, detailPanel) {
+function deleteSelectedPaperPack(selectedPack, paperPacks, renderCurrentLibrary, detailPanel) {
   const shouldDelete = window.confirm(`Delete ${selectedPack.name} from the catalog?`);
 
   if (!shouldDelete) {
@@ -710,7 +773,7 @@ function deleteSelectedPaperPack(selectedPack, paperPacks, paperPackLibrary, col
   }
 
   LATEST_CATALOG_SESSION_PACK_IDS.delete(selectedPack.id);
-  renderPaperPackLibrary(paperPackLibrary, paperPacks, colorsById);
+  renderCurrentLibrary();
   closeDetailPanel(detailPanel);
 }
 

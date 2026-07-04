@@ -38,16 +38,19 @@
                 <h2 id="library-title">Designer Series Paper</h2>
               </div>
 
-              <form class="search-form" role="search" aria-label="Search catalog">
+              <form class="search-form" role="search" aria-label="Search catalog" data-library-search-form>
                 <label class="search-label" for="catalog-search">Search</label>
-                <input
-                  id="catalog-search"
-                  name="catalog-search"
-                  type="search"
-                  placeholder="Name, keyword, owner, or year"
-                  autocomplete="off"
-                  disabled
-                >
+                <div class="search-control">
+                  <input
+                    id="catalog-search"
+                    name="catalog-search"
+                    type="search"
+                    placeholder="Search paper pack names"
+                    autocomplete="off"
+                    data-library-search-input
+                  >
+                  <button class="search-clear" type="reset" data-library-search-clear hidden>Clear</button>
+                </div>
               </form>
             </section>
 
