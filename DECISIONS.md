@@ -168,3 +168,11 @@ Then the app displays the image from that path.
 Ultimately, we want to move toward using an app-managed shared image folder in OneDrive, but store stable image URLs or relative cloud paths in the catalog. 
 
 Then the app resolves that path against a configured shared OneDrive folder.
+
+# Decision 19
+## Search and Filter Location
+The catalog gets more room. Moving the filters out of the content area lets your featured pack and "Recently Added" section breathe. Right now the filter controls consume the upper-right corner, forcing the content down.
+
+2. It scales naturally. It allows filters to expand beyond search and tags to Owner, Color family, Individual colors, Release year, Retired/current and Favorites. The sidebar can grow without making the main page feel crowded.
+
+3. It matches how people expect catalog apps to work.

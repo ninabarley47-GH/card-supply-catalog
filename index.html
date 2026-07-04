@@ -26,8 +26,28 @@
 
       <div class="app-layout">
         <nav class="side-nav" aria-label="Primary">
-          <a class="nav-link nav-link-active" href="#library" aria-current="page" data-nav-link>Library</a>
-          <a class="nav-link" href="#settings" data-nav-link>Settings</a>
+          <div class="nav-links">
+            <a class="nav-link nav-link-active" href="#library" aria-current="page" data-nav-link>Library</a>
+            <a class="nav-link" href="#settings" data-nav-link>Settings</a>
+          </div>
+
+          <form class="search-form nav-search" role="search" aria-label="Search catalog" data-library-search-form>
+            <label class="search-label" for="catalog-search">Search</label>
+            <div class="search-control">
+              <input
+                id="catalog-search"
+                name="catalog-search"
+                type="search"
+                placeholder="Search names, tags, colors, owners, or years"
+                autocomplete="off"
+                data-library-search-input
+              >
+              <button class="search-clear" type="button" data-library-search-clear hidden>Clear</button>
+            </div>
+            <fieldset class="library-tag-filter" data-library-tag-filters>
+              <legend class="search-label">Tags</legend>
+            </fieldset>
+          </form>
         </nav>
 
         <main class="main-content">
@@ -37,24 +57,6 @@
                 <p class="eyebrow">Library</p>
                 <h2 id="library-title">Designer Series Paper</h2>
               </div>
-
-              <form class="search-form" role="search" aria-label="Search catalog" data-library-search-form>
-                <label class="search-label" for="catalog-search">Search</label>
-                <div class="search-control">
-                  <input
-                    id="catalog-search"
-                    name="catalog-search"
-                    type="search"
-                    placeholder="Search names, tags, colors, owners, or years"
-                    autocomplete="off"
-                    data-library-search-input
-                  >
-                  <button class="search-clear" type="reset" data-library-search-clear hidden>Clear</button>
-                </div>
-                <fieldset class="library-tag-filter" data-library-tag-filters>
-                  <legend class="search-label">Tags</legend>
-                </fieldset>
-              </form>
             </section>
 
             <section class="library-section" aria-labelledby="library-grid-title">

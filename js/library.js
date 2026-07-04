@@ -173,7 +173,7 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
     });
 
     if (clearButton) {
-      clearButton.hidden = filterState.query.length === 0 && filterState.selectedTags.length === 0;
+      clearButton.hidden = filterState.query.length === 0;
     }
   }
 
@@ -185,14 +185,13 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
 
   renderLibraryTagFilters(tagFilter, getAvailableTags(paperPacks));
   input.addEventListener("input", renderCurrent);
+  clearButton?.addEventListener("click", () => {
+    input.value = "";
+    renderCurrent();
+    input.focus();
+  });
   tagFilter?.addEventListener("change", renderCurrent);
   form.addEventListener("submit", (event) => event.preventDefault());
-  form.addEventListener("reset", () => {
-    window.requestAnimationFrame(() => {
-      renderCurrent();
-      input.focus();
-    });
-  });
 
   return {
     renderCurrent
