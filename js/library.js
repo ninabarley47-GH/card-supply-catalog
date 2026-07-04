@@ -199,6 +199,8 @@ function filterPaperPacksBySearchText(paperPacks, query, colorsById) {
 
   return paperPacks.filter((paperPack) => {
     const nameMatches = paperPack.name.toLocaleLowerCase().includes(normalizedQuery);
+    const ownerMatches = paperPack.owner.toLocaleLowerCase().includes(normalizedQuery);
+    const yearMatches = String(paperPack.releaseYear).includes(normalizedQuery);
     const keywordMatches = (paperPack.keywords || []).some((keyword) =>
       keyword.toLocaleLowerCase().includes(normalizedQuery)
     );
@@ -217,7 +219,7 @@ function filterPaperPacksBySearchText(paperPacks, query, colorsById) {
       return searchableColorText.includes(normalizedQuery);
     });
 
-    return nameMatches || keywordMatches || colorMatches;
+    return nameMatches || ownerMatches || yearMatches || keywordMatches || colorMatches;
   });
 }
 
