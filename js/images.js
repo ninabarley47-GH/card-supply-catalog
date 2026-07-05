@@ -180,6 +180,59 @@ export async function migratePaperPackImagesToLocalFolder(paperPack) {
   };
 }
 
+export async function checkImageLibraryHealth(paperPacks) {
+  const directoryHandle = await getReadableImageLibraryDirectoryHandle();
+  const summary = {
+    folderName: directoryHandle?.name || "",
+    packsChecked: paperPacks.length,
+    folderImages: 0,
+    imagesFound: 0,
+    imagesMissing: 0,
+    embeddedImages: 0,
+    missingImages: []
+  };
+
+  for (const paperPack of paperPacks) {
+    for (const [index, patternEntry] of (paperPack.patterns || []).entries()) {
+      const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
+
+      if (!patternObject) {
+        continue;
+      }
+
+      if (patternObject.imagePath) {
+        summary.folderImages += 1;
+
+        if (!directoryHandle) {
+          summary.imagesMissing += 1;
+          summary.missingImages.push(createMissingImageEntry(paperPack, patternObject, index));
+          continue;
+        }
+
+        try {
+          await getFileFromImagePath(directoryHandle, patternObject.imagePath);
+          summary.imagesFound += 1;
+        } catch (error) {
+          summary.imagesMissing += 1;
+          summary.missingImages.push(createMissingImageEntry(paperPack, patternObject, index));
+        }
+
+        continue;
+      }
+
+      if (patternObject.imageSrc || patternObject.imagePreviewSrc) {
+        summary.embeddedImages += 1;
+      }
+    }
+  }
+
+  return {
+    ok: Boolean(directoryHandle) || summary.folderImages === 0,
+    needsFolder: !directoryHandle && summary.folderImages > 0,
+    summary
+  };
+}
+
 export async function deletePaperPackImages(paperPack) {
   const directoryHandle = await getWritableImageLibraryDirectoryHandle();
 
@@ -188,6 +241,14 @@ export async function deletePaperPackImages(paperPack) {
   }
 
   await deleteLocalPaperPackImageFolder(directoryHandle, paperPack);
+}
+
+function createMissingImageEntry(paperPack, patternObject, index) {
+  return {
+    packName: paperPack.name || "Untitled pack",
+    patternName: patternObject.imageName || `Pattern ${index + 1}`,
+    imagePath: patternObject.imagePath || ""
+  };
 }
 
 async function preparePaperPackWithLocalFolderImages(paperPack, directoryHandle) {

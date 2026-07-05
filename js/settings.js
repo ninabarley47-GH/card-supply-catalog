@@ -1,4 +1,4 @@
-import { migratePaperPackImagesToLocalFolder } from "./images.js";
+import { checkImageLibraryHealth, migratePaperPackImagesToLocalFolder } from "./images.js";
 import { loadCatalogSetting, saveCatalogSetting, savePaperPack } from "./storage.js";
 
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
@@ -9,8 +9,10 @@ export function initializeSettings(options = {}) {
 
 async function initializeImageLibrarySettings({ paperPacks = [], onImagesMigrated } = {}) {
   const chooseButton = document.querySelector("[data-choose-image-library]");
+  const checkButton = document.querySelector("[data-check-image-library]");
   const migrateButton = document.querySelector("[data-migrate-image-library]");
   const status = document.querySelector("[data-image-library-status]");
+  const health = document.querySelector("[data-image-library-health]");
 
   if (!chooseButton || !status) {
     return;
@@ -18,6 +20,9 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImagesMigrate
 
   if (!isDirectoryPickerSupported()) {
     chooseButton.disabled = true;
+    if (checkButton) {
+      checkButton.disabled = true;
+    }
     if (migrateButton) {
       migrateButton.disabled = true;
     }
@@ -49,6 +54,7 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImagesMigrate
         getSelectedImageLibraryMessage(directoryHandle),
         "success"
       );
+      renderImageLibraryHealth(health, null);
     } catch (error) {
       if (error?.name === "AbortError") {
         renderImageLibraryStatus(status, "Image folder selection was cancelled.", "");
@@ -56,6 +62,26 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImagesMigrate
       }
 
       renderImageLibraryStatus(status, getFolderSelectionErrorMessage(error), "error");
+    }
+  });
+
+  checkButton?.addEventListener("click", async () => {
+    checkButton.disabled = true;
+    renderImageLibraryStatus(status, "Checking image library references...", "");
+
+    try {
+      const result = await checkImageLibraryHealth(paperPacks);
+
+      renderImageLibraryStatus(
+        status,
+        formatHealthStatus(result),
+        result.summary.imagesMissing > 0 || result.needsFolder ? "error" : "success"
+      );
+      renderImageLibraryHealth(health, result.summary);
+    } catch (error) {
+      renderImageLibraryStatus(status, "Image library references could not be checked.", "error");
+    } finally {
+      checkButton.disabled = false;
     }
   });
 
@@ -74,6 +100,88 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImagesMigrate
       migrateButton.disabled = false;
     }
   });
+}
+
+function formatHealthStatus(result) {
+  const { summary } = result;
+
+  if (result.needsFolder) {
+    return "Image folder permission is needed before folder-backed images can be checked.";
+  }
+
+  if (summary.folderImages === 0) {
+    return "No folder-backed images found yet. Current images are still using fallback storage or placeholders.";
+  }
+
+  if (summary.imagesMissing > 0) {
+    return `${summary.imagesFound} of ${summary.folderImages} folder image${summary.folderImages === 1 ? "" : "s"} found.`;
+  }
+
+  return `${summary.imagesFound} folder image${summary.imagesFound === 1 ? "" : "s"} found. No missing folder images.`;
+}
+
+function renderImageLibraryHealth(container, summary) {
+  if (!container) {
+    return;
+  }
+
+  if (!summary) {
+    container.replaceChildren();
+    return;
+  }
+
+  const overview = document.createElement("ul");
+  overview.className = "image-library-health-list";
+
+  overview.append(
+    createHealthItem("Packs checked", summary.packsChecked),
+    createHealthItem("Folder images", summary.folderImages),
+    createHealthItem("Images found", summary.imagesFound),
+    createHealthItem("Missing images", summary.imagesMissing),
+    createHealthItem("Fallback images", summary.embeddedImages)
+  );
+
+  const children = [overview];
+
+  if (summary.missingImages.length > 0) {
+    const missing = document.createElement("div");
+    missing.className = "image-library-missing";
+
+    const title = document.createElement("p");
+    title.textContent = "Missing references";
+
+    const list = document.createElement("ul");
+    list.className = "image-library-missing-list";
+
+    for (const missingImage of summary.missingImages.slice(0, 5)) {
+      const item = document.createElement("li");
+      item.textContent = `${missingImage.packName}: ${missingImage.imagePath || missingImage.patternName}`;
+      list.append(item);
+    }
+
+    if (summary.missingImages.length > 5) {
+      const item = document.createElement("li");
+      item.textContent = `${summary.missingImages.length - 5} more missing image reference${summary.missingImages.length - 5 === 1 ? "" : "s"}.`;
+      list.append(item);
+    }
+
+    missing.append(title, list);
+    children.push(missing);
+  }
+
+  container.replaceChildren(...children);
+}
+
+function createHealthItem(label, value) {
+  const item = document.createElement("li");
+  const labelElement = document.createElement("span");
+  const valueElement = document.createElement("strong");
+
+  labelElement.textContent = label;
+  valueElement.textContent = value;
+  item.append(labelElement, valueElement);
+
+  return item;
 }
 
 async function migrateEmbeddedImages(paperPacks) {
