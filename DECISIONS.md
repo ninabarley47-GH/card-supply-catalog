@@ -228,3 +228,58 @@ When adding a new paper pack if the app finds a color that doesn't exist in the 
 Once the color is added, the user should return to the Add or Edit DSP screen and be allowed to continue with their edits there.
 
 This functionality should be able to be reused in the "Add Color" section of the Settings tab.
+
+# Decision 25
+## Add Backup/Export Feature
+Add export/import so users can back up:
+catalog JSON
+colors
+paper pack metadata
+optionally embedded image data for now
+
+This gives a safety net before changing storage. IndexedDB is useful, but browser storage limits and eviction policies vary by browser and origin, so it should not be the permanent home for the image library. MDN notes that quotas and eviction differ by browser, and IndexedDB/File System API storage is managed per origin by the browser. Sources: MDN Storage Quotas, MDN File System API.
+
+# Decision 26
+## Add User-Selected Image Library Folder
+On supported desktop browsers, let the user choose an image library folder using the File System Access API. This is the most natural fit for local-first image storage.
+
+Pros:
+Works offline.
+Images are real files.
+Easy to back up.
+Easy to inspect manually.
+Can live inside OneDrive/Dropbox/iCloud/Google Drive desktop sync folders.
+Catalog stores stable relative paths instead of huge image blobs.
+
+Important limitation:
+The File System Access API is not universally supported. Can I Use currently shows support mainly in Chromium desktop browsers, with no support in Safari/iOS Safari or Firefox. showDirectoryPicker() is also marked by MDN as limited availability and experimental. Sources: Can I Use File System Access API, MDN showDirectoryPicker().
+
+# Decision 27
+## Cloud-Synced Local Folder
+
+For future sharing, the best practical route is not direct OneDrive API integration yet. Instead:
+User chooses a folder that happens to live inside OneDrive.
+App writes/reads normal local files.
+OneDrive syncs the folder for sharing.
+Another user opens the same synced folder on their own computer.
+This keeps the app local-first and avoids requiring internet at runtime. The app works offline against the local synced copy; OneDrive only handles background synchronization.
+Caveat:
+This depends on each user having the shared folder synced locally. A browser cannot reliably read arbitrary remote OneDrive URLs as a folder.
+
+# Decision 28
+## IndexedDB as Cache/Fallback
+
+Keep IndexedDB for:
+1. browsers without File System Access
+2. temporary image cache
+3. thumbnails
+4. offline fallback when folder permissions need to be re-granted
+But treat it as a cache or compatibility mode, not the canonical image library.
+
+Permission Notes
+The File System Access API requires:
+secure context, generally HTTPS or localhost
+explicit user action to open folder picker
+user-selected folder access
+possible re-permission later
+MDN notes that directory picker calls require user interaction and can throw security/permission errors if blocked or denied. Chrome documentation also notes that powerful file APIs require user permission and feature detection. Sources: MDN showDirectoryPicker(), Chrome File System Access docs.
