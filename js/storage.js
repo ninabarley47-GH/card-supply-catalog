@@ -1,8 +1,9 @@
 const DATABASE_NAME = "card-supply-catalog";
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 3;
 const PAPER_PACKS_STORE = "paperPacks";
 const DELETED_PAPER_PACK_IDS_STORE = "deletedPaperPackIds";
 const COLORS_STORE = "colors";
+const SETTINGS_STORE = "settings";
 const LEGACY_PAPER_PACKS_STORAGE_KEY = "card-supply-catalog.paperPacks";
 const LEGACY_DELETED_PAPER_PACK_IDS_STORAGE_KEY = "card-supply-catalog.deletedPaperPackIds";
 const LEGACY_MIGRATION_STORAGE_KEY = "card-supply-catalog.indexedDbMigrationComplete";
@@ -58,6 +59,26 @@ export function mergeColors(baseColorsById, savedColors) {
   };
 }
 
+export async function loadCatalogSetting(settingId) {
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
+  const setting = await getFromStore(database, SETTINGS_STORE, settingId);
+
+  return setting?.value ?? null;
+}
+
+export async function saveCatalogSetting(settingId, value) {
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
+
+  await writeTransaction(database, [SETTINGS_STORE], (transaction) => {
+    transaction.objectStore(SETTINGS_STORE).put({
+      id: settingId,
+      value
+    });
+  });
+}
+
 export async function deletePaperPack(paperPackId) {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
@@ -107,6 +128,10 @@ function openCatalogDatabase() {
 
       if (!database.objectStoreNames.contains(COLORS_STORE)) {
         database.createObjectStore(COLORS_STORE, { keyPath: "id" });
+      }
+
+      if (!database.objectStoreNames.contains(SETTINGS_STORE)) {
+        database.createObjectStore(SETTINGS_STORE, { keyPath: "id" });
       }
     });
 
@@ -223,6 +248,17 @@ function getAllFromStore(database, storeName) {
     const request = transaction.objectStore(storeName).getAll();
 
     request.addEventListener("success", () => resolve(request.result || []));
+    request.addEventListener("error", () => reject(request.error));
+    transaction.addEventListener("error", () => reject(transaction.error));
+  });
+}
+
+function getFromStore(database, storeName, key) {
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(storeName, "readonly");
+    const request = transaction.objectStore(storeName).get(key);
+
+    request.addEventListener("success", () => resolve(request.result || null));
     request.addEventListener("error", () => reject(request.error));
     transaction.addEventListener("error", () => reject(transaction.error));
   });

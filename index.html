@@ -107,8 +107,25 @@
               <button class="button" type="button" data-add-dsp-open>Add Paper Pack</button>
               <button class="button" type="button" data-add-color-open>Add Color</button>
               <button class="button" type="button" data-export-catalog>Export Backup</button>
+              <label class="button file-button" for="catalog-backup-import">Import Backup</label>
+              <input id="catalog-backup-import" class="visually-hidden" type="file" accept="application/json,.json" data-import-catalog>
             </div>
             <p class="settings-message" data-backup-message aria-live="polite"></p>
+
+            <section class="settings-subsection" aria-labelledby="image-library-title">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Image Storage</p>
+                  <h4 id="image-library-title">Image Library Folder</h4>
+                </div>
+                <p>Choose a local or cloud-synced folder for future image-file storage.</p>
+              </div>
+
+              <div class="settings-actions" aria-label="Image library actions">
+                <button class="button" type="button" data-choose-image-library>Choose Image Folder</button>
+              </div>
+              <p class="settings-message" data-image-library-status aria-live="polite">Checking image folder support...</p>
+            </section>
 
             <section class="color-reference-section" aria-labelledby="color-library-title">
               <div class="section-heading">

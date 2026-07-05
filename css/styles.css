@@ -1393,6 +1393,7 @@ h6 {
   color: #765b45;
 }
 
+.settings-subsection,
 .color-reference-section {
   margin-top: var(--space-6);
   margin-bottom: 0;
@@ -1432,6 +1433,12 @@ h6 {
   color: var(--color-accent-dark);
 }
 
+.restore-summary-list {
+  margin: var(--space-1) 0 var(--space-2);
+  padding-left: var(--space-4);
+}
+
+.settings-subsection h4,
 .color-reference-section h4 {
   margin-bottom: 0;
   font-size: 1.05rem;

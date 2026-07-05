@@ -106,4 +106,37 @@ Reason:
 - Easier backup
 - Less database bloat
 
+### Backup / Restore Verification Checklist
+Status: Required before backup/import is considered complete.
+
+Use a test browser profile or a browser where app data can be safely cleared.
+
+Round-trip restore steps:
+
+1. Start with known sample catalog data.
+2. Export a backup.
+3. Save a copy of the export file outside the app.
+4. Clear the app data in the test browser/profile.
+5. Import the backup.
+6. Confirm all restored catalog data:
+   - all packs return
+   - pack names are correct
+   - colors are correct
+   - tags are correct
+   - owners are correct
+   - release years are correct
+   - notes/status fields return
+   - images return if embedded image export was selected
+7. Confirm restored app behavior:
+   - search still works
+   - tag filters still work
+   - color matching/similar packs still works
+   - detail view opens correctly
+8. Re-export after restore.
+9. Compare the restored export with the original export.
+
+Expected result:
+- The second export should preserve the same catalog content as the original export.
+- Differences should be limited to expected metadata such as export timestamp.
+
 ---

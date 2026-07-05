@@ -3,6 +3,7 @@ import { initializeCatalogBackup } from "./backup.js";
 import { initializeAddColorWorkflow } from "./color-form.js";
 import { createCoverSheetForPack } from "./cover-sheet.js";
 import { deletePaperPackImages, getPatternImageSource, preparePaperPackImagesForSave } from "./images.js";
+import { initializeSettings } from "./settings.js";
 import {
   deletePaperPack,
   loadSavedColors,
@@ -83,7 +84,7 @@ export async function initializeLibraryShell() {
   try {
     const [colorsById, paperPacks] = await Promise.all([loadColors(), loadPaperPacks()]);
     const colors = Object.values(colorsById);
-    initializeCatalogBackup({ paperPacks, colorsById });
+    initializeSettings();
     initializeAddColorWorkflow(colorsById);
     initializeAddDspWorkflow(colorsById);
 
@@ -92,6 +93,17 @@ export async function initializeLibraryShell() {
       const librarySearch = initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById);
       initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, librarySearch.renderCurrent);
       initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById, librarySearch.renderCurrent);
+      initializeCatalogBackup({
+        paperPacks,
+        colorsById,
+        onRestore: () => {
+          librarySearch.renderCurrent();
+
+          if (colorLibrary) {
+            renderColorLibrary(colorLibrary, Object.values(colorsById));
+          }
+        }
+      });
     }
 
     if (colorLibrary) {
