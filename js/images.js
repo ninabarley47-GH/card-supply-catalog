@@ -95,6 +95,29 @@ export async function preparePaperPackImagesForSave(paperPack) {
   }
 }
 
+export async function migratePaperPackImagesToLocalFolder(paperPack) {
+  const directoryHandle = await getWritableImageLibraryDirectoryHandle();
+
+  if (!directoryHandle) {
+    return {
+      ok: false,
+      paperPack,
+      imagesMigrated: 0,
+      warning: "Choose an image folder before migrating existing images."
+    };
+  }
+
+  const imagesToMigrate = countEmbeddedPatternImages(paperPack);
+  const migratedPaperPack = await preparePaperPackWithLocalFolderImages(paperPack, directoryHandle);
+
+  return {
+    ok: true,
+    paperPack: migratedPaperPack,
+    imagesMigrated: imagesToMigrate,
+    warning: ""
+  };
+}
+
 export async function deletePaperPackImages(paperPack) {
   const directoryHandle = await getWritableImageLibraryDirectoryHandle();
 
@@ -134,12 +157,13 @@ async function preparePatternForLocalFolderStorage(directoryHandle, paperPack, p
     return patternEntry;
   }
 
-  if (!patternObject.__imageFile) {
+  if (!patternObject.__imageFile && !patternObject.imageSrc) {
     return removeTransientImageFields(patternObject);
   }
 
   const imageName = createStoredImageFileName(patternObject, index);
-  const imagePath = await writePatternImageFile(directoryHandle, paperPack, patternObject.__imageFile, imageName);
+  const imageBlob = patternObject.__imageFile || (await getBlobFromImageSource(patternObject.imageSrc));
+  const imagePath = await writePatternImageFile(directoryHandle, paperPack, imageBlob, imageName);
 
   return {
     id: patternObject.id || `pattern-${index + 1}`,
@@ -279,6 +303,21 @@ async function writePatternImageFile(directoryHandle, paperPack, imageFile, imag
   await writable.close();
 
   return `${packFolderName}/${imageName}`;
+}
+
+async function getBlobFromImageSource(imageSrc) {
+  const response = await fetch(imageSrc);
+
+  if (!response.ok) {
+    throw new Error("Image source could not be read.");
+  }
+
+  return await response.blob();
+}
+
+function countEmbeddedPatternImages(paperPack) {
+  return (paperPack.patterns || []).filter((pattern) => pattern && typeof pattern === "object" && pattern.imageSrc)
+    .length;
 }
 
 async function deleteLocalPaperPackImageFolder(directoryHandle, paperPack) {

@@ -89,7 +89,6 @@ export async function initializeLibraryShell() {
   try {
     const [colorsById, paperPacks] = await Promise.all([loadColors(), loadPaperPacks()]);
     const colors = Object.values(colorsById);
-    initializeSettings();
     initializeAddColorWorkflow(colorsById);
     initializeAddDspWorkflow(colorsById);
 
@@ -98,6 +97,12 @@ export async function initializeLibraryShell() {
       const librarySearch = initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById);
       initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, librarySearch.renderCurrent);
       initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById, librarySearch.renderCurrent);
+      initializeSettings({
+        paperPacks,
+        onImagesMigrated: () => {
+          hydratePaperPackImageSources(paperPacks).then(librarySearch.renderCurrent);
+        }
+      });
       initializeCatalogBackup({
         paperPacks,
         colorsById,
