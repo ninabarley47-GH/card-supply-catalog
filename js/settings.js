@@ -41,7 +41,7 @@ async function initializeImageLibrarySettings() {
 
       renderImageLibraryStatus(
         status,
-        `Image folder selected: ${directoryHandle.name}. Newly saved DSP images will be stored there.`,
+        getSelectedImageLibraryMessage(directoryHandle),
         "success"
       );
     } catch (error) {
@@ -69,7 +69,7 @@ async function renderSavedImageLibraryStatus(status) {
   if (permissionState === "granted") {
     renderImageLibraryStatus(
       status,
-      `Image folder selected: ${directoryHandle.name}. Newly saved DSP images will be stored there.`,
+      getSelectedImageLibraryMessage(directoryHandle),
       "success"
     );
     return;
@@ -92,6 +92,10 @@ function getFolderSelectionErrorMessage(error) {
   }
 
   return `The image folder could not be selected${error?.name ? ` (${error.name})` : ""}.`;
+}
+
+function getSelectedImageLibraryMessage(directoryHandle) {
+  return `Image folder selected: ${directoryHandle.name}. Full local paths are hidden by the browser, but newly saved DSP images will be stored in this folder.`;
 }
 
 function isDirectoryPickerSupported() {
