@@ -1,3 +1,5 @@
+import { addPatternImageFiles, createPatternSlots, getImageEntriesFromPatterns } from "./images.js";
+
 export function initializeAddDspWorkflow(colorsById) {
   const panel = document.querySelector("[data-add-dsp-panel]");
   const form = document.querySelector("[data-add-dsp-form]");
@@ -284,8 +286,7 @@ function fillPaperPackForm(form, paperPack, colorsById) {
 }
 
 async function addSelectedImageFiles(files, selectedImages) {
-  const imageFiles = files.filter((file) => file.type.startsWith("image/"));
-  const imageEntries = await Promise.all(imageFiles.map(readImageFile));
+  const imageEntries = await addPatternImageFiles(files);
 
   selectedImages.push(...imageEntries);
 }
@@ -297,23 +298,6 @@ async function addImagesFromInput(files, selectedImages, message) {
   } catch (error) {
     renderFormMessage(message, "One or more images could not be loaded.", "error");
   }
-}
-
-function readImageFile(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.addEventListener("load", () => {
-      resolve({
-        id: createId(file.name.replace(/\.[^.]+$/, "")) || `image-${Date.now()}`,
-        name: file.name,
-        src: reader.result
-      });
-    });
-
-    reader.addEventListener("error", () => reject(reader.error));
-    reader.readAsDataURL(file);
-  });
 }
 
 function updateSelectedImageOrder(selectedImages, action, index) {
@@ -386,38 +370,6 @@ function createImageActionButton(action, index, label, disabled) {
   button.disabled = disabled;
 
   return button;
-}
-
-function createPatternSlots(patternCount, selectedImages = [], existingPatterns = []) {
-  return Array.from({ length: patternCount }, (_, index) => {
-    const selectedImage = selectedImages[index];
-
-    if (selectedImage) {
-      return {
-        id: `pattern-${index + 1}`,
-        imageName: selectedImage.name,
-        imageSrc: selectedImage.src
-      };
-    }
-
-    const existingPattern = existingPatterns[index];
-
-    if (existingPattern && (typeof existingPattern !== "object" || !existingPattern.imageSrc)) {
-      return existingPattern;
-    }
-
-    return `pattern-${index + 1}`;
-  });
-}
-
-function getImageEntriesFromPatterns(patterns = []) {
-  return patterns
-    .filter((pattern) => pattern && typeof pattern === "object" && pattern.imageSrc)
-    .map((pattern) => ({
-      id: pattern.id,
-      name: pattern.imageName || pattern.id || "Pattern image",
-      src: pattern.imageSrc
-    }));
 }
 
 function resolveColorIds(colorInputs, colorsById) {

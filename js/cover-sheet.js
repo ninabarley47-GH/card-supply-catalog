@@ -1,3 +1,5 @@
+import { getAvailablePatternImages } from "./images.js";
+
 const COVER_SHEET_SIZE = 1800;
 const OUTER_BORDER = 12;
 const INNER_BORDER = 6;
@@ -45,20 +47,6 @@ export async function createCoverSheetForPack(paperPack, colorsById) {
   }
 
   await saveCoverSheet(blob, paperPack, fileHandle);
-}
-
-function getAvailablePatternImages(paperPack) {
-  return (paperPack.patterns || [])
-    .map((patternEntry, index) => {
-      const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
-      const imageSrc = patternObject?.imageSrc || patternObject?.imagePath || "";
-
-      return {
-        imageSrc,
-        imageName: patternObject?.imageName || `Pattern ${index + 1}`
-      };
-    })
-    .filter((patternEntry) => patternEntry.imageSrc);
 }
 
 async function loadPatternImages(imageEntries) {

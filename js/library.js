@@ -1,6 +1,7 @@
 import { initializeAddDspWorkflow } from "./add-dsp.js";
 import { initializeAddColorWorkflow } from "./color-form.js";
 import { createCoverSheetForPack } from "./cover-sheet.js";
+import { deletePaperPackImages, getPatternImageSource, preparePaperPackImagesForSave } from "./images.js";
 import {
   deletePaperPack,
   loadSavedColors,
@@ -582,7 +583,8 @@ function initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById, rend
 
     renderCurrentLibrary();
 
-    event.detail.saveComplete = savePaperPack(packToSave)
+    event.detail.saveComplete = preparePaperPackImagesForSave(packToSave)
+      .then(savePaperPack)
       .then(() => ({
         ok: true
       }))
@@ -1116,7 +1118,7 @@ function deleteSelectedPaperPack(selectedPack, paperPacks, renderCurrentLibrary,
     return;
   }
 
-  deletePaperPack(selectedPack.id).catch(() => {
+  Promise.all([deletePaperPackImages(selectedPack), deletePaperPack(selectedPack.id)]).catch(() => {
     window.alert("The paper pack was removed from this session, but the browser could not save the deletion permanently.");
   });
 
@@ -1216,7 +1218,7 @@ function createPatternGrid(paperPack) {
 function createPatternPreview(patternEntry, index) {
   const pattern = document.createElement("span");
   const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
-  const imageSrc = patternObject?.imageSrc || "";
+  const imageSrc = getPatternImageSource(patternEntry);
   const imageName = patternObject?.imageName || "";
 
   if (imageSrc) {
