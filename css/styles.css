@@ -815,6 +815,12 @@ h6 {
   object-fit: cover;
 }
 
+.image-preview-details {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
+}
+
 .image-preview-name {
   min-width: 0;
   overflow: hidden;
@@ -823,6 +829,12 @@ h6 {
   font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.image-preview-storage {
+  color: var(--color-muted);
+  font-size: 0.72rem;
+  font-weight: 750;
 }
 
 .image-preview-controls {

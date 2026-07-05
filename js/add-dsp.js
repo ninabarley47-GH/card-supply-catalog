@@ -353,9 +353,18 @@ function renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount
       preview.src = image.src;
       preview.alt = image.name;
 
+      const details = document.createElement("div");
+      details.className = "image-preview-details";
+
       const name = document.createElement("span");
       name.className = "image-preview-name";
       name.textContent = image.name;
+
+      const storage = document.createElement("span");
+      storage.className = "image-preview-storage";
+      storage.textContent = image.imagePath ? "Library image" : "Upload fallback";
+
+      details.append(name, storage);
 
       const controls = document.createElement("div");
       controls.className = "image-preview-controls";
@@ -365,7 +374,7 @@ function renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount
       const remove = createImageActionButton("remove", index, "Remove", false);
 
       controls.append(moveUp, moveDown, remove);
-      item.append(preview, name, controls);
+      item.append(preview, details, controls);
 
       return item;
     })

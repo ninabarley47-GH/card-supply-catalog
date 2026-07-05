@@ -115,7 +115,9 @@ export function getImageEntriesFromPatterns(patterns = []) {
       return {
         id: pattern.id || `pattern-${index + 1}`,
         name: pattern.imageName || pattern.id || `Pattern ${index + 1}`,
-        src: imageSrc
+        imagePath: pattern.imagePath,
+        src: imageSrc,
+        storageStrategy: pattern.imageStorageStrategy
       };
     })
     .filter(Boolean);
