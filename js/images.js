@@ -9,6 +9,66 @@ export async function addPatternImageFiles(files) {
   return await Promise.all(imageFiles.map(readImageFileAsStoredImage));
 }
 
+export async function choosePatternImagesFromLibrary() {
+  if (!("showOpenFilePicker" in window)) {
+    return {
+      ok: false,
+      images: [],
+      message: "Choosing existing library images is not supported in this browser."
+    };
+  }
+
+  const directoryHandle = await getReadableImageLibraryDirectoryHandle();
+
+  if (!directoryHandle) {
+    return {
+      ok: false,
+      images: [],
+      message: "Choose an image library folder before adding existing library images."
+    };
+  }
+
+  try {
+    const fileHandles = await window.showOpenFilePicker({
+      id: "csc-existing-images",
+      multiple: true,
+      startIn: directoryHandle,
+      types: [
+        {
+          description: "Images",
+          accept: {
+            "image/*": [".jpg", ".jpeg", ".png", ".webp", ".gif"]
+          }
+        }
+      ]
+    });
+
+    const images = await Promise.all(
+      fileHandles.map((fileHandle) => createLibraryImageEntry(directoryHandle, fileHandle))
+    );
+
+    return {
+      ok: true,
+      images,
+      message: ""
+    };
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      return {
+        ok: true,
+        images: [],
+        message: ""
+      };
+    }
+
+    return {
+      ok: false,
+      images: [],
+      message: "Existing library images could not be selected."
+    };
+  }
+}
+
 export async function hydratePaperPackImageSources(paperPacks) {
   const directoryHandle = await getReadableImageLibraryDirectoryHandle();
 
@@ -212,6 +272,16 @@ function readImageFileAsStoredImage(file) {
 }
 
 function createStoredPatternReference(selectedImage, index) {
+  if (selectedImage.imagePath) {
+    return {
+      id: `pattern-${index + 1}`,
+      imageName: selectedImage.name,
+      imagePath: selectedImage.imagePath,
+      imagePreviewSrc: selectedImage.src,
+      imageStorageStrategy: LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY
+    };
+  }
+
   return {
     id: `pattern-${index + 1}`,
     imageName: selectedImage.name,
@@ -219,6 +289,52 @@ function createStoredPatternReference(selectedImage, index) {
     imageSrc: selectedImage.src,
     imageStorageStrategy: selectedImage.storageStrategy || EMBEDDED_IMAGE_STORAGE_STRATEGY
   };
+}
+
+async function createLibraryImageEntry(directoryHandle, fileHandle) {
+  const file = await fileHandle.getFile();
+  const imagePath = await findRelativePathForFileHandle(directoryHandle, fileHandle);
+
+  if (!imagePath) {
+    const embeddedImage = await readImageFileAsStoredImage(file);
+
+    return {
+      ...embeddedImage,
+      message: "Selected image was outside the image library folder and will be copied on save."
+    };
+  }
+
+  return {
+    id: createId(file.name.replace(/\.[^.]+$/, "")) || `image-${Date.now()}`,
+    name: file.name,
+    imagePath,
+    src: URL.createObjectURL(file),
+    storageStrategy: LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY
+  };
+}
+
+async function findRelativePathForFileHandle(directoryHandle, targetFileHandle, pathPrefix = "") {
+  if (!directoryHandle.entries) {
+    return "";
+  }
+
+  for await (const [entryName, entryHandle] of directoryHandle.entries()) {
+    const entryPath = pathPrefix ? `${pathPrefix}/${entryName}` : entryName;
+
+    if (entryHandle.kind === "file" && entryHandle.isSameEntry && (await entryHandle.isSameEntry(targetFileHandle))) {
+      return entryPath;
+    }
+
+    if (entryHandle.kind === "directory") {
+      const nestedPath = await findRelativePathForFileHandle(entryHandle, targetFileHandle, entryPath);
+
+      if (nestedPath) {
+        return nestedPath;
+      }
+    }
+  }
+
+  return "";
 }
 
 async function getReadableImageLibraryDirectoryHandle() {

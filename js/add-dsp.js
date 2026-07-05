@@ -1,4 +1,9 @@
-import { addPatternImageFiles, createPatternSlots, getImageEntriesFromPatterns } from "./images.js";
+import {
+  addPatternImageFiles,
+  choosePatternImagesFromLibrary,
+  createPatternSlots,
+  getImageEntriesFromPatterns
+} from "./images.js";
 
 export function initializeAddDspWorkflow(colorsById) {
   const panel = document.querySelector("[data-add-dsp-panel]");
@@ -11,6 +16,7 @@ export function initializeAddDspWorkflow(colorsById) {
   const closeButtons = [...document.querySelectorAll("[data-add-dsp-close]")];
   const imageInputs = [...document.querySelectorAll("[data-pattern-image-input]")];
   const folderInputs = [...document.querySelectorAll("[data-pattern-folder-input]")];
+  const libraryPickerButton = document.querySelector("[data-pattern-library-picker]");
   const imagePreviewList = document.querySelector("[data-image-preview-list]");
   const imagePreviewCount = document.querySelector("[data-image-preview-count]");
   const selectedImages = [];
@@ -95,6 +101,19 @@ export function initializeAddDspWorkflow(colorsById) {
       renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount);
     });
   }
+
+  libraryPickerButton?.addEventListener("click", async () => {
+    const result = await choosePatternImagesFromLibrary();
+
+    if (!result.ok) {
+      renderFormMessage(message, result.message, "error");
+      return;
+    }
+
+    selectedImages.push(...result.images);
+    renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount);
+    renderFormMessage(message, getLibraryImageSelectionMessage(result.images), result.images.length > 0 ? "success" : "");
+  });
 
   if (imagePreviewList) {
     imagePreviewList.addEventListener("click", (event) => {
@@ -358,6 +377,20 @@ function renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount
         ? "No pattern images selected."
         : `${selectedImages.length} pattern image${selectedImages.length === 1 ? "" : "s"} selected.`;
   }
+}
+
+function getLibraryImageSelectionMessage(images) {
+  if (images.length === 0) {
+    return "";
+  }
+
+  const fallbackCount = images.filter((image) => image.message).length;
+
+  if (fallbackCount > 0) {
+    return `${images.length} image${images.length === 1 ? "" : "s"} selected. ${fallbackCount} will be copied on save because they were outside the image library folder.`;
+  }
+
+  return `${images.length} library image${images.length === 1 ? "" : "s"} selected.`;
 }
 
 function createImageActionButton(action, index, label, disabled) {
