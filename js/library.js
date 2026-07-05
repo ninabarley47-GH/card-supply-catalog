@@ -2,7 +2,12 @@ import { initializeAddDspWorkflow } from "./add-dsp.js";
 import { initializeCatalogBackup } from "./backup.js";
 import { initializeAddColorWorkflow } from "./color-form.js";
 import { createCoverSheetForPack } from "./cover-sheet.js";
-import { deletePaperPackImages, getPatternImageSource, preparePaperPackImagesForSave } from "./images.js";
+import {
+  deletePaperPackImages,
+  getPatternImageSource,
+  hydratePaperPackImageSources,
+  preparePaperPackImagesForSave
+} from "./images.js";
 import { initializeSettings } from "./settings.js";
 import {
   deletePaperPack,
@@ -179,7 +184,7 @@ async function loadPaperPacks() {
   const basePaperPacks = data.paperPacks || [];
   const savedPaperPacks = await loadSavedPaperPacks();
 
-  return await mergePaperPacks(basePaperPacks, savedPaperPacks);
+  return await hydratePaperPackImageSources(await mergePaperPacks(basePaperPacks, savedPaperPacks));
 }
 
 function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
@@ -598,7 +603,12 @@ function initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById, rend
     renderCurrentLibrary();
 
     event.detail.saveComplete = preparePaperPackImagesForSave(packToSave)
-      .then(savePaperPack)
+      .then(async (preparedPack) => {
+        await savePaperPack(preparedPack);
+        await hydratePaperPackImageSources([preparedPack]);
+        replacePaperPack(paperPacks, preparedPack);
+        renderCurrentLibrary();
+      })
       .then(() => ({
         ok: true
       }))
@@ -609,6 +619,14 @@ function initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById, rend
           "The paper pack is visible for this session, but the browser could not save it permanently. The selected images may be too large for the browser database."
       }));
   });
+}
+
+function replacePaperPack(paperPacks, paperPack) {
+  const existingIndex = paperPacks.findIndex((existingPack) => existingPack.id === paperPack.id);
+
+  if (existingIndex !== -1) {
+    paperPacks.splice(existingIndex, 1, paperPack);
+  }
 }
 
 function ensureUniquePaperPackId(paperPack, paperPacks) {

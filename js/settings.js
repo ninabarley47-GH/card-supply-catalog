@@ -39,7 +39,11 @@ async function initializeImageLibrarySettings() {
         selectedAt: new Date().toISOString()
       });
 
-      renderImageLibraryStatus(status, `Image folder selected: ${directoryHandle.name}`, "success");
+      renderImageLibraryStatus(
+        status,
+        `Image folder selected: ${directoryHandle.name}. Newly saved DSP images will be stored there.`,
+        "success"
+      );
     } catch (error) {
       if (error?.name === "AbortError") {
         renderImageLibraryStatus(status, "Image folder selection was cancelled.", "");
@@ -63,7 +67,11 @@ async function renderSavedImageLibraryStatus(status) {
   const permissionState = await getDirectoryPermissionState(directoryHandle);
 
   if (permissionState === "granted") {
-    renderImageLibraryStatus(status, `Image folder selected: ${directoryHandle.name}`, "success");
+    renderImageLibraryStatus(
+      status,
+      `Image folder selected: ${directoryHandle.name}. Newly saved DSP images will be stored there.`,
+      "success"
+    );
     return;
   }
 

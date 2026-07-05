@@ -70,7 +70,7 @@ async function createCatalogBackup({ paperPacks, colorsById }) {
       note: "Prototype backup includes embedded image data when present. Future backups should support local image folder references."
     },
     colors: sortObjectByKey(colorsById),
-    paperPacks: paperPacks.map(cloneJsonSafe)
+    paperPacks: paperPacks.map(createSerializablePaperPack)
   };
 }
 
@@ -197,6 +197,25 @@ function sortObjectByKey(valueByKey) {
       .sort(([firstKey], [secondKey]) => firstKey.localeCompare(secondKey))
       .map(([key, value]) => [key, cloneJsonSafe(value)])
   );
+}
+
+function createSerializablePaperPack(paperPack) {
+  return {
+    ...cloneJsonSafe(paperPack),
+    patterns: (paperPack.patterns || []).map(createSerializablePattern)
+  };
+}
+
+function createSerializablePattern(patternEntry) {
+  const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
+
+  if (!patternObject) {
+    return patternEntry;
+  }
+
+  const { __imageFile, imagePreviewSrc, ...serializablePattern } = patternObject;
+
+  return cloneJsonSafe(serializablePattern);
 }
 
 function cloneJsonSafe(value) {
