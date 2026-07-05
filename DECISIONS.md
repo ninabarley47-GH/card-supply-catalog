@@ -194,3 +194,28 @@ Each change to the filter state re-evaluates the full catalog rather than filter
 Opening a pack detail view does not reset the catalog.
 
 Users can search, filter, open a detail view, compare matching packs by color, and return to the catalog with the same filtered results still active.
+
+# Decision 22
+## Unified Filtering
+
+The catalog uses a single filtering pipeline.
+
+Search is treated as a free-text filter.
+Tags, colors, owners, release year, and future filters are evaluated together.
+
+Whenever any filter changes, the visible catalog is recalculated from the complete catalog rather than from an already-filtered subset.
+
+Reason:
+Keeps filter behavior predictable and makes future filters easy to add.
+
+Impact:
+All filtering logic lives in one place.
+
+# Decision 23
+## Similar Packs as Detail-Level Filtering
+
+The “Similar Packs” area in the detail view functions as a focused, contextual mini-filter.
+
+It does not replace the main catalog filters. Instead, it helps users pivot from one open pack to other packs that share a selected color or related attribute.
+
+This supports the crafting workflow: start with one pack, then quickly discover coordinating packs.

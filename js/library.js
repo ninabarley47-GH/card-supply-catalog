@@ -156,24 +156,35 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
   const input = document.querySelector("[data-library-search-input]");
   const clearAllButton = document.querySelector("[data-library-clear-all]");
   const clearTagsButton = document.querySelector("[data-library-clear-tags]");
+  const clearColorsButton = document.querySelector("[data-library-clear-colors]");
   const tagFilter = document.querySelector("[data-library-tag-filters]");
+  const colorFilter = document.querySelector("[data-library-color-filters]");
 
   function renderCurrent() {
-    const filterState = getLibraryFilterState(input, tagFilter);
+    refreshLibraryColorFilters(colorFilter, getAvailableColors(paperPacks, colorsById));
+    const filterState = getLibraryFilterState(input, tagFilter, colorFilter);
     const filteredPaperPacks = applyPaperPackFilters(paperPacks, filterState, colorsById);
 
     renderPaperPackLibrary(paperPackLibrary, filteredPaperPacks, colorsById, {
       query: filterState.query,
       selectedTags: filterState.selectedTags,
+      selectedColors: filterState.selectedColors,
       totalCount: paperPacks.length
     });
 
     if (clearAllButton) {
-      clearAllButton.hidden = filterState.query.length === 0 && filterState.selectedTags.length === 0;
+      clearAllButton.hidden =
+        filterState.query.length === 0 &&
+        filterState.selectedTags.length === 0 &&
+        filterState.selectedColors.length === 0;
     }
 
     if (clearTagsButton) {
       clearTagsButton.hidden = filterState.selectedTags.length === 0;
+    }
+
+    if (clearColorsButton) {
+      clearColorsButton.hidden = filterState.selectedColors.length === 0;
     }
   }
 
@@ -184,10 +195,12 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
   }
 
   renderLibraryTagFilters(tagFilter, getAvailableTags(paperPacks));
+  refreshLibraryColorFilters(colorFilter, getAvailableColors(paperPacks, colorsById));
   input.addEventListener("input", renderCurrent);
   clearAllButton?.addEventListener("click", () => {
     input.value = "";
     clearSelectedLibraryTags(tagFilter);
+    clearSelectedLibraryColors(colorFilter);
     renderCurrent();
     input.focus();
   });
@@ -195,7 +208,12 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
     clearSelectedLibraryTags(tagFilter);
     renderCurrent();
   });
+  clearColorsButton?.addEventListener("click", () => {
+    clearSelectedLibraryColors(colorFilter);
+    renderCurrent();
+  });
   tagFilter?.addEventListener("change", renderCurrent);
+  colorFilter?.addEventListener("change", renderCurrent);
   form.addEventListener("submit", (event) => event.preventDefault());
 
   return {
@@ -203,10 +221,11 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
   };
 }
 
-function getLibraryFilterState(input, tagFilter) {
+function getLibraryFilterState(input, tagFilter, colorFilter) {
   return {
     query: input?.value || "",
-    selectedTags: getSelectedLibraryTags(tagFilter)
+    selectedTags: getSelectedLibraryTags(tagFilter),
+    selectedColors: getSelectedLibraryColors(colorFilter)
   };
 }
 
@@ -246,6 +265,57 @@ function renderLibraryTagFilters(container, tags) {
   container.append(options);
 }
 
+function renderLibraryColorFilters(container, colors) {
+  if (!container || colors.length === 0) {
+    return;
+  }
+
+  const options = document.createElement("div");
+  options.className = "library-color-filter-options";
+
+  options.append(...colors.map(createLibraryColorOption));
+  container.append(options);
+}
+
+function refreshLibraryColorFilters(container, colors) {
+  if (!container) {
+    return;
+  }
+
+  const selectedColors = new Set(getSelectedLibraryColors(container));
+  container.querySelector(".library-color-filter-options")?.remove();
+  renderLibraryColorFilters(container, colors);
+
+  for (const input of container.querySelectorAll('input[name="library-colors"]')) {
+    input.checked = selectedColors.has(input.value);
+  }
+}
+
+function createLibraryColorOption(color) {
+  const label = document.createElement("label");
+  label.className = "library-color-option";
+
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.name = "library-colors";
+  input.value = color.id;
+
+  const marker = document.createElement("span");
+
+  const swatch = document.createElement("span");
+  swatch.className = "pack-color-dot";
+  swatch.style.backgroundColor = color.hex;
+  swatch.setAttribute("aria-hidden", "true");
+
+  const name = document.createElement("span");
+  name.textContent = color.name;
+
+  marker.append(swatch, name);
+  label.append(input, marker);
+
+  return label;
+}
+
 function getAvailableTags(paperPacks) {
   const tagsByNormalizedName = new Map();
 
@@ -262,6 +332,22 @@ function getAvailableTags(paperPacks) {
   return [...tagsByNormalizedName.values()].sort((firstTag, secondTag) =>
     firstTag.localeCompare(secondTag)
   );
+}
+
+function getAvailableColors(paperPacks, colorsById) {
+  const colorsByPackReference = new Map();
+
+  for (const paperPack of paperPacks) {
+    for (const colorId of paperPack.colors || []) {
+      const color = colorsById[colorId];
+
+      if (color) {
+        colorsByPackReference.set(color.id, color);
+      }
+    }
+  }
+
+  return [...colorsByPackReference.values()].sort(compareColors);
 }
 
 function getSelectedLibraryTags(container) {
@@ -284,14 +370,42 @@ function clearSelectedLibraryTags(container) {
   }
 }
 
+function getSelectedLibraryColors(container) {
+  if (!container) {
+    return [];
+  }
+
+  return [...container.querySelectorAll('input[name="library-colors"]:checked')].map(
+    (input) => input.value
+  );
+}
+
+function clearSelectedLibraryColors(container) {
+  if (!container) {
+    return;
+  }
+
+  for (const input of container.querySelectorAll('input[name="library-colors"]:checked')) {
+    input.checked = false;
+  }
+}
+
 function matchesPaperPackFilters(paperPack, filterState, colorsById) {
   const normalizedQuery = normalizeFilterText(filterState.query);
   const selectedTags = (filterState.selectedTags || []).map(normalizeFilterText).filter(Boolean);
+  const selectedColors = filterState.selectedColors || [];
   const packKeywords = paperPack.keywords || [];
   const normalizedPackKeywords = packKeywords.map(normalizeFilterText);
   const matchesSelectedTags = selectedTags.every((tag) => normalizedPackKeywords.includes(tag));
+  const matchesSelectedColors =
+    selectedColors.length === 0 ||
+    selectedColors.some((colorId) => (paperPack.colors || []).includes(colorId));
 
   if (!matchesSelectedTags) {
+    return false;
+  }
+
+  if (!matchesSelectedColors) {
     return false;
   }
 
@@ -352,6 +466,7 @@ function renderPaperPackLibrary(container, paperPacks, colorsById, options = {})
       container,
       options.query,
       options.selectedTags || [],
+      options.selectedColors || [],
       options.totalCount
     );
     return;
@@ -376,16 +491,22 @@ function updateLibraryResultCount(visibleCount, totalCount) {
   resultCount.textContent = `Showing ${visibleLabel} of ${totalLabel} ${packLabel}`;
 }
 
-function renderEmptyPaperPackLibrary(container, query, selectedTags = [], totalCount = 0) {
+function renderEmptyPaperPackLibrary(
+  container,
+  query,
+  selectedTags = [],
+  selectedColors = [],
+  totalCount = 0
+) {
   const message = document.createElement("p");
-  const hasFilters = query || selectedTags.length > 0;
+  const hasFilters = query || selectedTags.length > 0 || selectedColors.length > 0;
 
   message.className = "loading-message";
 
   if (hasFilters && totalCount > 0) {
     message.textContent = query
       ? `No paper packs match "${query}".`
-      : "No paper packs match the selected tags.";
+      : "No paper packs match the selected filters.";
   } else {
     message.textContent = "No paper packs to display yet.";
   }
