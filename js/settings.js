@@ -29,7 +29,7 @@ async function initializeImageLibrarySettings() {
   chooseButton.addEventListener("click", async () => {
     try {
       const directoryHandle = await window.showDirectoryPicker({
-        id: "card-supply-catalog-image-library",
+        id: "csc-image-library",
         mode: "readwrite"
       });
 
@@ -50,7 +50,7 @@ async function initializeImageLibrarySettings() {
         return;
       }
 
-      renderImageLibraryStatus(status, "The image folder could not be selected.", "error");
+      renderImageLibraryStatus(status, getFolderSelectionErrorMessage(error), "error");
     }
   });
 }
@@ -80,6 +80,18 @@ async function renderSavedImageLibraryStatus(status) {
     `Image folder saved: ${directoryHandle.name}. Permission may need to be granted again before use.`,
     ""
   );
+}
+
+function getFolderSelectionErrorMessage(error) {
+  if (error?.name === "SecurityError") {
+    return "The browser blocked folder selection. Try again from the Settings button.";
+  }
+
+  if (error?.name === "NotAllowedError") {
+    return "Folder permission was not granted. Choose the folder again and allow access.";
+  }
+
+  return `The image folder could not be selected${error?.name ? ` (${error.name})` : ""}.`;
 }
 
 function isDirectoryPickerSupported() {
