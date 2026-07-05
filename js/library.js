@@ -212,6 +212,9 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
     clearSelectedLibraryColors(colorFilter);
     renderCurrent();
   });
+  form.querySelectorAll("[data-library-toggle-filter]").forEach((toggle) => {
+    toggle.addEventListener("click", () => toggleFilterSection(toggle));
+  });
   tagFilter?.addEventListener("change", renderCurrent);
   colorFilter?.addEventListener("change", renderCurrent);
   form.addEventListener("submit", (event) => event.preventDefault());
@@ -242,6 +245,7 @@ function renderLibraryTagFilters(container, tags) {
 
   const options = document.createElement("div");
   options.className = "keyword-picker-options library-tag-filter-options";
+  options.dataset.libraryFilterOptions = "";
 
   options.append(
     ...tags.map((tag) => {
@@ -272,6 +276,7 @@ function renderLibraryColorFilters(container, colors) {
 
   const options = document.createElement("div");
   options.className = "library-color-filter-options";
+  options.dataset.libraryFilterOptions = "";
 
   options.append(...colors.map(createLibraryColorOption));
   container.append(options);
@@ -283,12 +288,35 @@ function refreshLibraryColorFilters(container, colors) {
   }
 
   const selectedColors = new Set(getSelectedLibraryColors(container));
-  container.querySelector(".library-color-filter-options")?.remove();
+  const existingOptions = container.querySelector("[data-library-filter-options]");
+  const optionsWereHidden = existingOptions?.hidden || false;
+
+  existingOptions?.remove();
   renderLibraryColorFilters(container, colors);
+
+  const refreshedOptions = container.querySelector("[data-library-filter-options]");
+
+  if (refreshedOptions) {
+    refreshedOptions.hidden = optionsWereHidden;
+  }
 
   for (const input of container.querySelectorAll('input[name="library-colors"]')) {
     input.checked = selectedColors.has(input.value);
   }
+}
+
+function toggleFilterSection(toggle) {
+  const filterSection = toggle.closest("fieldset");
+  const filterOptions = filterSection?.querySelector("[data-library-filter-options]");
+
+  if (!filterOptions) {
+    return;
+  }
+
+  const isExpanded = toggle.getAttribute("aria-expanded") === "true";
+
+  toggle.setAttribute("aria-expanded", `${!isExpanded}`);
+  filterOptions.hidden = isExpanded;
 }
 
 function createLibraryColorOption(color) {

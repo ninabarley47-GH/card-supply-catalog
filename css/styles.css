@@ -315,6 +315,59 @@ h6 {
   gap: var(--space-2);
 }
 
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  gap: var(--space-2);
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.filter-toggle::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-top: 0.28rem solid transparent;
+  border-bottom: 0.28rem solid transparent;
+  border-left: 0.38rem solid currentColor;
+  transform: rotate(90deg);
+  transition: transform 140ms ease;
+}
+
+.filter-toggle[aria-expanded="false"]::before {
+  transform: rotate(0deg);
+}
+
+.filter-toggle:hover,
+.filter-clear-icon:hover {
+  color: var(--color-accent-dark);
+}
+
+.filter-clear-icon {
+  display: inline-grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.filter-clear-icon[hidden],
+[data-library-filter-options][hidden] {
+  display: none;
+}
+
 .library-tag-filter-options {
   gap: 0.4rem;
   margin-top: var(--space-2);

@@ -50,15 +50,15 @@
             <fieldset class="library-tag-filter" data-library-tag-filters>
               <legend class="visually-hidden">Tags</legend>
               <div class="library-tag-filter-header">
-                <span class="search-label">Tags</span>
-                <button class="filter-clear-button filter-clear-tags" type="button" data-library-clear-tags hidden>Clear tags</button>
+                <button class="filter-toggle" type="button" aria-expanded="true" data-library-toggle-filter>Tags</button>
+                <button class="filter-clear-icon" type="button" data-library-clear-tags aria-label="Clear tag filters" hidden>&times;</button>
               </div>
             </fieldset>
             <fieldset class="library-filter-section" data-library-color-filters>
               <legend class="visually-hidden">Colors</legend>
               <div class="library-tag-filter-header">
-                <span class="search-label">Colors</span>
-                <button class="filter-clear-button" type="button" data-library-clear-colors hidden>Clear colors</button>
+                <button class="filter-toggle" type="button" aria-expanded="true" data-library-toggle-filter>Colors</button>
+                <button class="filter-clear-icon" type="button" data-library-clear-colors aria-label="Clear color filters" hidden>&times;</button>
               </div>
             </fieldset>
           </form>
