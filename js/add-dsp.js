@@ -501,8 +501,8 @@ function renderMissingColorMessage(message, missingColors) {
   const intro = document.createElement("p");
   intro.textContent =
     missingColors.length === 1
-      ? "This color is not in the catalog yet."
-      : "These colors are not in the catalog yet.";
+      ? `${missingColors[0]} is not in the color catalog yet. Would you like to add it now?`
+      : "Some colors are not in the color catalog yet. Would you like to add them now?";
 
   const actions = document.createElement("div");
   actions.className = "missing-color-actions";
