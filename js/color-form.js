@@ -54,7 +54,7 @@ export function initializeAddColorWorkflow(colorsById) {
 
   for (const button of closeButtons) {
     button.addEventListener("click", () => {
-      closeColorPanel(panel, form, message, idPreview, swatchPreview, formState);
+      closeColorPanel(panel, form, message, idPreview, swatchPreview, formState, { cancelled: true });
     });
   }
 
@@ -132,12 +132,24 @@ function openColorPanel(panel, form, message, idPreview, swatchPreview, title, s
   panel.querySelector("input, select, textarea, button")?.focus();
 }
 
-function closeColorPanel(panel, form, message, idPreview, swatchPreview, formState) {
+function closeColorPanel(panel, form, message, idPreview, swatchPreview, formState, options = {}) {
+  const source = formState.source;
+
   panel.hidden = true;
   form.reset();
   formState.source = "settings";
   renderColorMessage(message, "", "");
   updateColorPreview(form, idPreview, swatchPreview);
+
+  if (options.cancelled) {
+    document.dispatchEvent(
+      new CustomEvent("color:add-cancelled", {
+        detail: {
+          source
+        }
+      })
+    );
+  }
 }
 
 function buildColorFromForm(formData, colorsById) {

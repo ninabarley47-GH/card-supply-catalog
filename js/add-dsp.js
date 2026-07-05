@@ -27,6 +27,8 @@ export function initializeAddDspWorkflow(colorsById) {
       return;
     }
 
+    panel.hidden = true;
+
     document.dispatchEvent(
       new CustomEvent("color:add-request", {
         detail: {
@@ -39,7 +41,14 @@ export function initializeAddDspWorkflow(colorsById) {
 
   document.addEventListener("color:saved", (event) => {
     if (event.detail?.source === "add-dsp") {
+      panel.hidden = false;
       renderFormMessage(message, `${event.detail.color.name} was added. You can continue saving this DSP.`, "success");
+    }
+  });
+
+  document.addEventListener("color:add-cancelled", (event) => {
+    if (event.detail?.source === "add-dsp") {
+      panel.hidden = false;
     }
   });
 
