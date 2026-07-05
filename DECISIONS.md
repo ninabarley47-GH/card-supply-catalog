@@ -51,12 +51,13 @@ Makes it easy to compare paper packs, but also to get details about an individua
 ## Keywords
 
 Keywords are the following:
-Background
+Scenery
 Floral
 Foliage
-Ocean
-Mammals
-Winged Creatures
+Water
+Land Animals
+Flying Animals
+Ocean Animals
 Hobbies
 Specialty
 Textures

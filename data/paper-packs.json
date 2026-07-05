@@ -45,8 +45,7 @@
       "availability": "available",
       "refillAvailable": null,
       "keywords": [
-        "Floral",
-        "Background"
+        "Floral"
       ],
       "colors": [
         "garden-green",
@@ -113,7 +112,7 @@
       "availability": "available",
       "refillAvailable": null,
       "keywords": [
-        "Ocean",
+        "Water",
         "Textures"
       ],
       "colors": [
@@ -184,8 +183,7 @@
       "refillAvailable": true,
       "keywords": [
         "Floral",
-        "Geometric",
-        "Background"
+        "Geometric"
       ],
       "colors": [
         "timid-tiger",
