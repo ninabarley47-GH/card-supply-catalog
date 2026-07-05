@@ -1416,6 +1416,22 @@ h6 {
   color: var(--color-muted);
 }
 
+.settings-message {
+  min-height: 1.2rem;
+  margin: var(--space-3) 0 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.settings-message[data-tone="error"] {
+  color: #8a3f32;
+}
+
+.settings-message[data-tone="success"] {
+  color: var(--color-accent-dark);
+}
+
 .color-reference-section h4 {
   margin-bottom: 0;
   font-size: 1.05rem;

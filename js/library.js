@@ -1,4 +1,5 @@
 import { initializeAddDspWorkflow } from "./add-dsp.js";
+import { initializeCatalogBackup } from "./backup.js";
 import { initializeAddColorWorkflow } from "./color-form.js";
 import { createCoverSheetForPack } from "./cover-sheet.js";
 import { deletePaperPackImages, getPatternImageSource, preparePaperPackImagesForSave } from "./images.js";
@@ -82,6 +83,7 @@ export async function initializeLibraryShell() {
   try {
     const [colorsById, paperPacks] = await Promise.all([loadColors(), loadPaperPacks()]);
     const colors = Object.values(colorsById);
+    initializeCatalogBackup({ paperPacks, colorsById });
     initializeAddColorWorkflow(colorsById);
     initializeAddDspWorkflow(colorsById);
 
