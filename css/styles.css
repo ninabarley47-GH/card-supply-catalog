@@ -559,7 +559,8 @@ h6 {
   box-shadow: -18px 0 45px rgba(47, 44, 40, 0.18);
 }
 
-.add-dsp-panel {
+.add-dsp-panel,
+.add-color-panel {
   position: fixed;
   top: 0;
   right: 0;
@@ -577,7 +578,8 @@ h6 {
   display: none;
 }
 
-.add-dsp-panel[hidden] {
+.add-dsp-panel[hidden],
+.add-color-panel[hidden] {
   display: none;
 }
 
@@ -675,6 +677,48 @@ h6 {
 
 .form-field select[multiple] {
   min-height: 9.5rem;
+}
+
+.color-form-swatch {
+  display: grid;
+  min-height: 2.75rem;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.product-availability {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.product-grid label {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.product-grid select {
+  width: 100%;
+  min-height: 2.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  padding: 0.62rem 0.75rem;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .keyword-picker {
@@ -825,6 +869,13 @@ h6 {
 
 .form-message[data-tone="success"] {
   color: var(--color-accent-dark);
+}
+
+.missing-color-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 
 .form-actions {

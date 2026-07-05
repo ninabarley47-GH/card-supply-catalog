@@ -1,7 +1,8 @@
 const DATABASE_NAME = "card-supply-catalog";
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const PAPER_PACKS_STORE = "paperPacks";
 const DELETED_PAPER_PACK_IDS_STORE = "deletedPaperPackIds";
+const COLORS_STORE = "colors";
 const LEGACY_PAPER_PACKS_STORAGE_KEY = "card-supply-catalog.paperPacks";
 const LEGACY_DELETED_PAPER_PACK_IDS_STORAGE_KEY = "card-supply-catalog.deletedPaperPackIds";
 const LEGACY_MIGRATION_STORAGE_KEY = "card-supply-catalog.indexedDbMigrationComplete";
@@ -31,6 +32,30 @@ export async function savePaperPack(paperPack) {
     transaction.objectStore(PAPER_PACKS_STORE).put(normalizePaperPackKeywords(paperPack));
     transaction.objectStore(DELETED_PAPER_PACK_IDS_STORE).delete(paperPack.id);
   });
+}
+
+export async function loadSavedColors() {
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
+  const colors = await getAllFromStore(database, COLORS_STORE);
+
+  return colors.filter(isColor);
+}
+
+export async function saveColor(color) {
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
+
+  await writeTransaction(database, [COLORS_STORE], (transaction) => {
+    transaction.objectStore(COLORS_STORE).put(color);
+  });
+}
+
+export function mergeColors(baseColorsById, savedColors) {
+  return {
+    ...baseColorsById,
+    ...Object.fromEntries(savedColors.filter(isColor).map((color) => [color.id, color]))
+  };
 }
 
 export async function deletePaperPack(paperPackId) {
@@ -78,6 +103,10 @@ function openCatalogDatabase() {
 
       if (!database.objectStoreNames.contains(DELETED_PAPER_PACK_IDS_STORE)) {
         database.createObjectStore(DELETED_PAPER_PACK_IDS_STORE, { keyPath: "id" });
+      }
+
+      if (!database.objectStoreNames.contains(COLORS_STORE)) {
+        database.createObjectStore(COLORS_STORE, { keyPath: "id" });
       }
     });
 
@@ -222,5 +251,21 @@ function isPaperPack(paperPack) {
     Array.isArray(paperPack.colors) &&
     Array.isArray(paperPack.keywords) &&
     Array.isArray(paperPack.patterns)
+  );
+}
+
+function isColor(color) {
+  return (
+    color &&
+    typeof color.id === "string" &&
+    typeof color.name === "string" &&
+    typeof color.hex === "string" &&
+    Array.isArray(color.rgb) &&
+    typeof color.family === "string" &&
+    typeof color.colorFamily === "string" &&
+    typeof color.status === "string" &&
+    Array.isArray(color.aliases) &&
+    color.products &&
+    typeof color.products === "object"
   );
 }

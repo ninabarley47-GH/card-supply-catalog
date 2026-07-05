@@ -20,6 +20,29 @@ export function initializeAddDspWorkflow(colorsById) {
     return;
   }
 
+  message?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-add-missing-color]");
+
+    if (!button) {
+      return;
+    }
+
+    document.dispatchEvent(
+      new CustomEvent("color:add-request", {
+        detail: {
+          colorName: button.dataset.addMissingColor,
+          source: "add-dsp"
+        }
+      })
+    );
+  });
+
+  document.addEventListener("color:saved", (event) => {
+    if (event.detail?.source === "add-dsp") {
+      renderFormMessage(message, `${event.detail.color.name} was added. You can continue saving this DSP.`, "success");
+    }
+  });
+
   for (const button of openButtons) {
     button.addEventListener("click", () =>
       openAddDspPanel(panel, form, selectedImages, imagePreviewList, imagePreviewCount, {
@@ -101,7 +124,12 @@ export function initializeAddDspWorkflow(colorsById) {
     );
 
     if (!result.ok) {
-      renderFormMessage(message, result.message, "error");
+      if (result.code === "missing-colors") {
+        renderMissingColorMessage(message, result.missing);
+      } else {
+        renderFormMessage(message, result.message, "error");
+      }
+
       return;
     }
 
@@ -189,7 +217,9 @@ function buildPaperPackFromForm(formData, colorsById, selectedImages = [], editi
   if (colorResult.missing.length > 0) {
     return {
       ok: false,
-      message: `Unknown color: ${colorResult.missing.join(", ")}`
+      code: "missing-colors",
+      missing: colorResult.missing,
+      message: "One or more colors are missing from the catalog."
     };
   }
 
@@ -461,4 +491,34 @@ function renderFormMessage(message, text, tone) {
 
   message.textContent = text;
   message.dataset.tone = tone;
+}
+
+function renderMissingColorMessage(message, missingColors) {
+  if (!message) {
+    return;
+  }
+
+  const intro = document.createElement("p");
+  intro.textContent =
+    missingColors.length === 1
+      ? "This color is not in the catalog yet."
+      : "These colors are not in the catalog yet.";
+
+  const actions = document.createElement("div");
+  actions.className = "missing-color-actions";
+
+  actions.append(
+    ...missingColors.map((colorName) => {
+      const button = document.createElement("button");
+      button.className = "button";
+      button.type = "button";
+      button.dataset.addMissingColor = colorName;
+      button.textContent = `Add ${colorName}`;
+
+      return button;
+    })
+  );
+
+  message.replaceChildren(intro, actions);
+  message.dataset.tone = "error";
 }

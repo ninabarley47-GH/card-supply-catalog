@@ -100,12 +100,12 @@
                 <p class="eyebrow">Settings</p>
                 <h3 id="settings-title">Catalog Setup</h3>
               </div>
-              <p>Add and maintain paper packs and official colors here in a future workflow.</p>
+              <p>Add and maintain paper packs and official colors here.</p>
             </div>
 
             <div class="settings-actions" aria-label="Settings actions">
               <button class="button" type="button" data-add-dsp-open>Add Paper Pack</button>
-              <button class="button" type="button" disabled>Add Color</button>
+              <button class="button" type="button" data-add-color-open>Add Color</button>
             </div>
 
             <section class="color-reference-section" aria-labelledby="color-library-title">
@@ -258,6 +258,148 @@
             <div class="form-actions">
               <button class="button button-primary" type="submit" data-add-dsp-submit>Save Paper Pack</button>
               <button class="button" type="button" data-add-dsp-close>Cancel</button>
+            </div>
+          </form>
+        </aside>
+
+        <aside class="add-color-panel" aria-labelledby="add-color-title" data-add-color-panel hidden>
+          <div class="detail-panel-header">
+            <div>
+              <p class="eyebrow">Catalog Setup</p>
+              <h3 id="add-color-title" data-add-color-title>Add Color</h3>
+            </div>
+            <button class="detail-close" type="button" aria-label="Close Add Color" data-add-color-close>&times;</button>
+          </div>
+
+          <form class="add-dsp-form" data-add-color-form>
+            <p class="form-summary" data-add-color-summary>Add an official color for paper pack metadata.</p>
+
+            <div class="form-field">
+              <label for="color-name">Color Name</label>
+              <input id="color-name" name="name" type="text" placeholder="e.g., Lost Lagoon" required>
+              <p class="field-help" data-color-id-preview>Color ID will be generated from the name.</p>
+            </div>
+
+            <div class="form-grid-two">
+              <div class="form-field">
+                <label for="color-hex">HEX</label>
+                <input id="color-hex" name="hex" type="text" placeholder="#6EA39F" pattern="#?[0-9A-Fa-f]{6}" required>
+              </div>
+
+              <div class="form-field">
+                <span class="form-label">Preview</span>
+                <div class="color-form-swatch" data-color-swatch-preview>Preview</div>
+              </div>
+            </div>
+
+            <div class="form-grid-two">
+              <div class="form-field">
+                <label for="color-family">Collection</label>
+                <select id="color-family" name="family" required>
+                  <option value="in-color">In Color</option>
+                  <option value="neutrals">Neutrals</option>
+                  <option value="brights">Brights</option>
+                  <option value="subtles">Subtles</option>
+                  <option value="regals">Regals</option>
+                  <option value="basics">Basics</option>
+                  <option value="retired">Retired</option>
+                  <option value="unknown">Unknown</option>
+                </select>
+              </div>
+
+              <div class="form-field">
+                <label for="color-color-family">Color Family</label>
+                <select id="color-color-family" name="colorFamily" required>
+                  <option value="red">Red</option>
+                  <option value="orange">Orange</option>
+                  <option value="yellow">Yellow</option>
+                  <option value="yellow-green">Yellow-Green</option>
+                  <option value="green">Green</option>
+                  <option value="teal">Teal</option>
+                  <option value="blue">Blue</option>
+                  <option value="purple">Purple</option>
+                  <option value="pink">Pink</option>
+                  <option value="brown">Brown</option>
+                  <option value="neutral">Neutral</option>
+                  <option value="gray">Gray</option>
+                  <option value="white">White</option>
+                  <option value="black">Black</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-grid-two">
+              <div class="form-field">
+                <label for="color-collection-years">Collection Years</label>
+                <input id="color-collection-years" name="collectionYears" type="text" placeholder="e.g., 2025-2027">
+              </div>
+
+              <div class="form-field">
+                <label for="color-status">Status</label>
+                <select id="color-status" name="status" required>
+                  <option value="active">Active</option>
+                  <option value="retired">Retired</option>
+                  <option value="unknown">Unknown</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-field">
+              <label for="color-aliases">Aliases</label>
+              <textarea id="color-aliases" name="aliases" rows="2" placeholder="Optional comma-separated alternate names"></textarea>
+            </div>
+
+            <fieldset class="form-field product-availability">
+              <legend class="form-label">Products</legend>
+              <div class="product-grid">
+                <label>
+                  Cardstock
+                  <select name="productCardstock">
+                    <option value="">Unknown</option>
+                    <option value="true">I have it</option>
+                    <option value="false">I do not have it</option>
+                  </select>
+                </label>
+                <label>
+                  Ink
+                  <select name="productInk">
+                    <option value="">Unknown</option>
+                    <option value="true">I have it</option>
+                    <option value="false">I do not have it</option>
+                  </select>
+                </label>
+                <label>
+                  DSP
+                  <select name="productDsp">
+                    <option value="">Unknown</option>
+                    <option value="true">I have it</option>
+                    <option value="false">I do not have it</option>
+                  </select>
+                </label>
+                <label>
+                  Marker
+                  <select name="productMarker">
+                    <option value="">Unknown</option>
+                    <option value="true">I have it</option>
+                    <option value="false">I do not have it</option>
+                  </select>
+                </label>
+                <label>
+                  Blend
+                  <select name="productBlend">
+                    <option value="">Unknown</option>
+                    <option value="true">I have it</option>
+                    <option value="false">I do not have it</option>
+                  </select>
+                </label>
+              </div>
+            </fieldset>
+
+            <div class="form-message" data-add-color-message aria-live="polite"></div>
+
+            <div class="form-actions">
+              <button class="button button-primary" type="submit">Save Color</button>
+              <button class="button" type="button" data-add-color-close>Cancel</button>
             </div>
           </form>
         </aside>

@@ -1,6 +1,14 @@
 import { initializeAddDspWorkflow } from "./add-dsp.js";
+import { initializeAddColorWorkflow } from "./color-form.js";
 import { createCoverSheetForPack } from "./cover-sheet.js";
-import { deletePaperPack, loadSavedPaperPacks, mergePaperPacks, savePaperPack } from "./storage.js";
+import {
+  deletePaperPack,
+  loadSavedColors,
+  loadSavedPaperPacks,
+  mergeColors,
+  mergePaperPacks,
+  savePaperPack
+} from "./storage.js";
 
 const COLOR_FAMILY_ORDER = [
   "red",
@@ -73,6 +81,7 @@ export async function initializeLibraryShell() {
   try {
     const [colorsById, paperPacks] = await Promise.all([loadColors(), loadPaperPacks()]);
     const colors = Object.values(colorsById);
+    initializeAddColorWorkflow(colorsById);
     initializeAddDspWorkflow(colorsById);
 
     if (paperPackLibrary) {
@@ -84,6 +93,9 @@ export async function initializeLibraryShell() {
 
     if (colorLibrary) {
       renderColorLibrary(colorLibrary, colors);
+      document.addEventListener("color:saved", () => {
+        renderColorLibrary(colorLibrary, Object.values(colorsById));
+      });
     }
   } catch (error) {
     if (paperPackLibrary) {
@@ -135,7 +147,10 @@ async function loadColors() {
     throw new Error("Unable to load colors.json");
   }
 
-  return response.json();
+  const baseColorsById = await response.json();
+  const savedColors = await loadSavedColors();
+
+  return mergeColors(baseColorsById, savedColors);
 }
 
 async function loadPaperPacks() {

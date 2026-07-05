@@ -220,3 +220,11 @@ The “Similar Packs” area in the detail view functions as a focused, contextu
 It does not replace the main catalog filters. Instead, it helps users pivot from one open pack to other packs that share a selected color or related attribute.
 
 This supports the crafting workflow: start with one pack, then quickly discover coordinating packs.
+
+# Decision 24
+## Adding Colors
+When adding a new paper pack if the app finds a color that doesn't exist in the catalog, the user should be prompted to add the missing color.
+
+Once the color is added, the user should return to the Add or Edit DSP screen and be allowed to continue with their edits there.
+
+This functionality should be able to be reused in the "Add Color" section of the Settings tab.
