@@ -1,4 +1,5 @@
 import { initializeAddDspWorkflow } from "./add-dsp.js";
+import { createCoverSheetForPack } from "./cover-sheet.js";
 import { deletePaperPack, loadSavedPaperPacks, mergePaperPacks, savePaperPack } from "./storage.js";
 
 const COLOR_FAMILY_ORDER = [
@@ -802,6 +803,20 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
       return;
     }
 
+    const coverSheetButton = event.target.closest("[data-create-cover-sheet]");
+
+    if (coverSheetButton) {
+      const selectedPack = paperPacks.find((pack) => pack.id === detailPanel.dataset.selectedPackId);
+
+      if (selectedPack) {
+        createCoverSheetForPack(selectedPack, colorsById).catch(() => {
+          window.alert("The cover sheet could not be created.");
+        });
+      }
+
+      return;
+    }
+
     const coordinatingPack = event.target.closest("[data-coordinate-pack]");
 
     if (coordinatingPack) {
@@ -1067,7 +1082,13 @@ function createDetailActions(paperPack) {
   editButton.dataset.editPack = paperPack.id;
   editButton.textContent = "Edit Paper Pack";
 
-  buttonRow.append(editButton, deleteButton);
+  const coverSheetButton = document.createElement("button");
+  coverSheetButton.className = "button";
+  coverSheetButton.type = "button";
+  coverSheetButton.dataset.createCoverSheet = paperPack.id;
+  coverSheetButton.textContent = "Create Cover Sheet";
+
+  buttonRow.append(coverSheetButton, editButton, deleteButton);
   actions.append(heading, buttonRow);
 
   return actions;
