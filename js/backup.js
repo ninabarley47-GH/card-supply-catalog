@@ -1,4 +1,4 @@
-import { loadCatalogSetting, saveColor, savePaperPack } from "./storage.js";
+import { loadCatalogSetting, saveCatalogSetting, saveColor, savePaperPack } from "./storage.js";
 import {
   BACKUP_SCHEMA_VERSION,
   CATALOG_SCHEMA_VERSION,
@@ -7,6 +7,8 @@ import {
 } from "./schema.js";
 
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
+const LAST_BACKUP_EXPORT_SETTING_ID = "lastBackupExportedAt";
+const LAST_BACKUP_IMPORT_SETTING_ID = "lastBackupImportedAt";
 
 export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
   const exportButton = document.querySelector("[data-export-catalog]");
@@ -22,6 +24,8 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
         });
 
         downloadJsonBackup(backup);
+        await saveCatalogSetting(LAST_BACKUP_EXPORT_SETTING_ID, backup.exportedAt);
+        document.dispatchEvent(new CustomEvent("catalog:backup-exported"));
         renderBackupMessage(message, formatExportSummary(backup), "success");
       } catch (error) {
         renderBackupMessage(message, "The catalog backup could not be created.", "error");
@@ -53,6 +57,12 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
         });
 
         renderRestoreSummary(message, restoreSummary);
+
+        if (restoreSummary.errors.length === 0) {
+          await saveCatalogSetting(LAST_BACKUP_IMPORT_SETTING_ID, new Date().toISOString());
+          document.dispatchEvent(new CustomEvent("catalog:backup-imported"));
+        }
+
         onRestore?.();
       } catch (error) {
         renderRestoreSummary(message, {

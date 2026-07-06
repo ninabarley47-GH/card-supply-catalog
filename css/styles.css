@@ -1462,6 +1462,54 @@ h6 {
   color: var(--color-accent-dark);
 }
 
+.setup-status-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.setup-status-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  padding: var(--space-3);
+  background: var(--color-surface);
+}
+
+.setup-status-item strong {
+  display: block;
+  margin-bottom: 0.15rem;
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+.setup-status-item span {
+  color: var(--color-muted);
+  font-size: 0.82rem;
+}
+
+.setup-status-badge {
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  background: rgba(82, 120, 109, 0.12);
+  color: var(--color-accent-dark);
+  font-size: 0.74rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.setup-status-item[data-status="attention"] .setup-status-badge {
+  background: rgba(154, 75, 61, 0.1);
+  color: #8a3f32;
+}
+
+.setup-status-item[data-status="neutral"] .setup-status-badge {
+  background: rgba(95, 91, 84, 0.1);
+  color: var(--color-muted);
+}
+
 .image-library-health {
   margin-top: var(--space-3);
 }

@@ -2,9 +2,25 @@ import { checkImageLibraryHealth, migratePaperPackImagesToLocalFolder } from "./
 import { loadCatalogSetting, saveCatalogSetting, savePaperPack } from "./storage.js";
 
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
+const LAST_BACKUP_EXPORT_SETTING_ID = "lastBackupExportedAt";
+const LAST_BACKUP_IMPORT_SETTING_ID = "lastBackupImportedAt";
 
 export function initializeSettings(options = {}) {
+  initializeSetupStatus(options);
   initializeImageLibrarySettings(options);
+}
+
+function initializeSetupStatus({ paperPacks = [] } = {}) {
+  const container = document.querySelector("[data-setup-status]");
+
+  if (!container) {
+    return;
+  }
+
+  renderSetupStatus(container, paperPacks);
+
+  document.addEventListener("catalog:backup-exported", () => renderSetupStatus(container, paperPacks));
+  document.addEventListener("catalog:backup-imported", () => renderSetupStatus(container, paperPacks));
 }
 
 async function initializeImageLibrarySettings({ paperPacks = [], onImageLibrarySelected, onImagesMigrated } = {}) {
@@ -42,6 +58,7 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
 
   chooseButton.addEventListener("click", async () => {
     await selectImageLibraryFolder({
+      paperPacks,
       status,
       health,
       onImageLibrarySelected,
@@ -51,6 +68,7 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
 
   reconnectButton?.addEventListener("click", async () => {
     const selected = await selectImageLibraryFolder({
+      paperPacks,
       status,
       health,
       onImageLibrarySelected,
@@ -65,6 +83,7 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
         status,
         checkingMessage: "Checking image library after reconnect..."
       });
+      renderSetupStatus(document.querySelector("[data-setup-status]"), paperPacks);
     }
   });
 
@@ -76,6 +95,7 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
       status,
       checkingMessage: "Checking image library references..."
     });
+    renderSetupStatus(document.querySelector("[data-setup-status]"), paperPacks);
   });
 
   migrateButton?.addEventListener("click", async () => {
@@ -87,6 +107,7 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
 
       onImagesMigrated?.();
       renderImageLibraryStatus(status, formatMigrationSummary(summary), summary.errors.length > 0 ? "error" : "success");
+      renderSetupStatus(document.querySelector("[data-setup-status]"), paperPacks);
     } catch (error) {
       renderImageLibraryStatus(status, "Existing images could not be migrated.", "error");
     } finally {
@@ -95,7 +116,7 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
   });
 }
 
-async function selectImageLibraryFolder({ status, health, onImageLibrarySelected, successPrefix }) {
+async function selectImageLibraryFolder({ paperPacks = [], status, health, onImageLibrarySelected, successPrefix }) {
   try {
     const directoryHandle = await window.showDirectoryPicker({
       id: "csc-image-library",
@@ -111,6 +132,7 @@ async function selectImageLibraryFolder({ status, health, onImageLibrarySelected
     await onImageLibrarySelected?.();
     renderImageLibraryStatus(status, getSelectedImageLibraryMessage(directoryHandle, successPrefix), "success");
     renderImageLibraryHealth(health, null);
+    renderSetupStatus(document.querySelector("[data-setup-status]"), paperPacks);
 
     return true;
   } catch (error) {
@@ -122,6 +144,183 @@ async function selectImageLibraryFolder({ status, health, onImageLibrarySelected
     renderImageLibraryStatus(status, getFolderSelectionErrorMessage(error), "error");
     return false;
   }
+}
+
+async function renderSetupStatus(container, paperPacks = []) {
+  if (!container) {
+    return;
+  }
+
+  const [imageLibrary, lastBackupExportedAt, lastBackupImportedAt] = await Promise.all([
+    loadCatalogSetting(IMAGE_LIBRARY_SETTING_ID),
+    loadCatalogSetting(LAST_BACKUP_EXPORT_SETTING_ID),
+    loadCatalogSetting(LAST_BACKUP_IMPORT_SETTING_ID)
+  ]);
+  const directoryHandle = imageLibrary?.directoryHandle;
+  const folderPermission = directoryHandle ? await getDirectoryPermissionState(directoryHandle) : "";
+  const imageHealth =
+    directoryHandle && folderPermission === "granted" ? await checkImageLibraryHealth(paperPacks).catch(() => null) : null;
+  const folderImages = imageHealth?.summary.folderImages ?? countFolderImageReferences(paperPacks);
+  const missingImages = imageHealth?.summary.imagesMissing ?? 0;
+  const imageReferencesChecked = Boolean(imageHealth);
+
+  container.replaceChildren(
+    createSetupStatusItem({
+      title: "Catalog data",
+      detail: paperPacks.length > 0 ? `${paperPacks.length} paper pack${paperPacks.length === 1 ? "" : "s"} loaded.` : "No paper packs are loaded yet.",
+      badge: paperPacks.length > 0 ? "Ready" : "Needs data",
+      status: paperPacks.length > 0 ? "ready" : "attention"
+    }),
+    createSetupStatusItem({
+      title: "Catalog backup",
+      detail: getBackupStatusDetail(lastBackupExportedAt, lastBackupImportedAt),
+      badge: lastBackupExportedAt ? "Exported" : "Reminder",
+      status: lastBackupExportedAt ? "ready" : "neutral"
+    }),
+    createSetupStatusItem({
+      title: "Image folder",
+      detail: getImageFolderStatusDetail(directoryHandle, folderPermission),
+      badge: getImageFolderStatusBadge(directoryHandle, folderPermission),
+      status: getImageFolderStatusTone(directoryHandle, folderPermission)
+    }),
+    createSetupStatusItem({
+      title: "Image references",
+      detail: getImageReferenceStatusDetail(folderImages, missingImages, imageReferencesChecked, Boolean(directoryHandle)),
+      badge: getImageReferenceStatusBadge(folderImages, missingImages, imageReferencesChecked),
+      status: getImageReferenceStatusTone(missingImages, imageReferencesChecked)
+    })
+  );
+}
+
+function createSetupStatusItem({ title, detail, badge, status }) {
+  const item = document.createElement("div");
+  const text = document.createElement("div");
+  const titleElement = document.createElement("strong");
+  const detailElement = document.createElement("span");
+  const badgeElement = document.createElement("span");
+
+  item.className = "setup-status-item";
+  item.dataset.status = status;
+  titleElement.textContent = title;
+  detailElement.textContent = detail;
+  badgeElement.className = "setup-status-badge";
+  badgeElement.textContent = badge;
+  text.append(titleElement, detailElement);
+  item.append(text, badgeElement);
+
+  return item;
+}
+
+function getBackupStatusDetail(lastBackupExportedAt, lastBackupImportedAt) {
+  if (lastBackupExportedAt) {
+    return `Last export: ${formatDateTime(lastBackupExportedAt)}.`;
+  }
+
+  if (lastBackupImportedAt) {
+    return `Last import: ${formatDateTime(lastBackupImportedAt)}. Export a fresh backup after making changes.`;
+  }
+
+  return "Export a backup after setup or after cataloging several packs.";
+}
+
+function getImageFolderStatusDetail(directoryHandle, permissionState) {
+  if (!isDirectoryPickerSupported()) {
+    return "This browser does not support choosing an image library folder.";
+  }
+
+  if (!directoryHandle) {
+    return "No image folder selected. Images will use fallback browser storage.";
+  }
+
+  if (permissionState === "granted") {
+    return `Selected folder: ${directoryHandle.name}.`;
+  }
+
+  return `Saved folder: ${directoryHandle.name}. Reconnect may be needed before images can be read.`;
+}
+
+function getImageFolderStatusBadge(directoryHandle, permissionState) {
+  if (!isDirectoryPickerSupported()) {
+    return "Unsupported";
+  }
+
+  if (!directoryHandle) {
+    return "Optional";
+  }
+
+  return permissionState === "granted" ? "Ready" : "Reconnect";
+}
+
+function getImageFolderStatusTone(directoryHandle, permissionState) {
+  if (!isDirectoryPickerSupported()) {
+    return "attention";
+  }
+
+  if (!directoryHandle) {
+    return "neutral";
+  }
+
+  return permissionState === "granted" ? "ready" : "attention";
+}
+
+function getImageReferenceStatusDetail(folderImages, missingImages, wasChecked, hasDirectoryHandle) {
+  if (folderImages === 0) {
+    return "No folder-backed image references found yet.";
+  }
+
+  if (!wasChecked) {
+    return hasDirectoryHandle
+      ? `Reconnect or check the image folder to verify ${folderImages} folder image reference${folderImages === 1 ? "" : "s"}.`
+      : `${folderImages} folder image reference${folderImages === 1 ? "" : "s"} need an image folder connection.`;
+  }
+
+  if (missingImages > 0) {
+    return `${missingImages} of ${folderImages} folder image reference${folderImages === 1 ? "" : "s"} need attention.`;
+  }
+
+  return `${folderImages} folder image reference${folderImages === 1 ? "" : "s"} found.`;
+}
+
+function getImageReferenceStatusBadge(folderImages, missingImages, wasChecked) {
+  if (folderImages === 0) {
+    return "OK";
+  }
+
+  if (!wasChecked) {
+    return "Verify";
+  }
+
+  return missingImages > 0 ? "Check needed" : "OK";
+}
+
+function getImageReferenceStatusTone(missingImages, wasChecked) {
+  if (!wasChecked) {
+    return "neutral";
+  }
+
+  return missingImages > 0 ? "attention" : "ready";
+}
+
+function countFolderImageReferences(paperPacks) {
+  return paperPacks.reduce(
+    (total, paperPack) =>
+      total +
+      (paperPack.patterns || []).filter((pattern) => pattern && typeof pattern === "object" && pattern.imagePath).length,
+    0
+  );
+}
+
+function formatDateTime(value) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "unknown";
+  }
+
+  return date.toLocaleString([], {
+    dateStyle: "medium",
+    timeStyle: "short"
+  });
 }
 
 async function checkImageLibraryReferences({ button, health, paperPacks, status, checkingMessage }) {
