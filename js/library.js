@@ -531,7 +531,14 @@ function normalizeFilterText(value) {
 }
 
 function renderPaperPackLibrary(container, paperPacks, colorsById, options = {}) {
-  updateLibraryResultCount(paperPacks.length, options.totalCount ?? paperPacks.length);
+  const availablePaperPacks = paperPacks.filter((paperPack) => !isPaperPackUsedUp(paperPack));
+  const usedUpPaperPacks = paperPacks.filter(isPaperPackUsedUp);
+
+  updateLibraryResultCount({
+    availableCount: availablePaperPacks.length,
+    totalCount: options.totalCount ?? paperPacks.length,
+    usedUpCount: usedUpPaperPacks.length
+  });
 
   if (paperPacks.length === 0) {
     renderEmptyPaperPackLibrary(
@@ -544,23 +551,76 @@ function renderPaperPackLibrary(container, paperPacks, colorsById, options = {})
     return;
   }
 
-  container.replaceChildren(
-    ...paperPacks.map((paperPack) => createPaperPackCard(paperPack, colorsById))
-  );
+  const sections = [];
+
+  if (availablePaperPacks.length > 0) {
+    sections.push(createPaperPackGridSection(availablePaperPacks, colorsById));
+  } else {
+    sections.push(createAvailablePaperPackEmptyMessage(options));
+  }
+
+  if (usedUpPaperPacks.length > 0) {
+    sections.push(createUsedUpPaperPackSection(usedUpPaperPacks, colorsById));
+  }
+
+  container.replaceChildren(...sections);
 }
 
-function updateLibraryResultCount(visibleCount, totalCount) {
+function updateLibraryResultCount({ availableCount, totalCount, usedUpCount }) {
   const resultCount = document.querySelector("[data-library-result-count]");
 
   if (!resultCount) {
     return;
   }
 
-  const visibleLabel = `${visibleCount}`;
+  const visibleLabel = `${availableCount}`;
   const totalLabel = `${totalCount}`;
   const packLabel = totalCount === 1 ? "pack" : "packs";
+  const usedUpLabel =
+    usedUpCount > 0 ? ` ${usedUpCount} used-up ${usedUpCount === 1 ? "pack is" : "packs are"} collapsed below.` : "";
 
-  resultCount.textContent = `Showing ${visibleLabel} of ${totalLabel} ${packLabel}`;
+  resultCount.textContent = `Showing ${visibleLabel} available of ${totalLabel} ${packLabel}.${usedUpLabel}`;
+}
+
+function createPaperPackGridSection(paperPacks, colorsById) {
+  const section = document.createElement("div");
+
+  section.className = "library-pack-section library-pack-grid";
+  section.append(...paperPacks.map((paperPack) => createPaperPackCard(paperPack, colorsById)));
+
+  return section;
+}
+
+function createAvailablePaperPackEmptyMessage(options = {}) {
+  const message = document.createElement("p");
+  const hasFilters =
+    options.query || (options.selectedTags || []).length > 0 || (options.selectedColors || []).length > 0;
+
+  message.className = "loading-message library-pack-section";
+  message.textContent = hasFilters
+    ? "No available paper packs match the current filters."
+    : "No available paper packs to display.";
+
+  return message;
+}
+
+function createUsedUpPaperPackSection(paperPacks, colorsById) {
+  const section = document.createElement("details");
+  const summary = document.createElement("summary");
+  const title = document.createElement("span");
+  const hint = document.createElement("span");
+  const grid = document.createElement("div");
+
+  section.className = "used-up-pack-section library-pack-section";
+  summary.className = "used-up-pack-summary";
+  title.textContent = `Used Up (${paperPacks.length})`;
+  hint.textContent = "Hidden below available packs";
+  grid.className = "library-pack-grid used-up-pack-grid";
+  grid.append(...paperPacks.map((paperPack) => createPaperPackCard(paperPack, colorsById)));
+  summary.append(title, hint);
+  section.append(summary, grid);
+
+  return section;
 }
 
 function renderEmptyPaperPackLibrary(
@@ -667,7 +727,7 @@ function ensureUniquePaperPackId(paperPack, paperPacks) {
 
 function createPaperPackCard(paperPack, colorsById) {
   const card = document.createElement("article");
-  card.className = "dsp-card";
+  card.className = isPaperPackUsedUp(paperPack) ? "dsp-card dsp-card-used-up" : "dsp-card";
   card.dataset.paperPackCard = "";
   card.dataset.packId = paperPack.id;
   card.tabIndex = 0;
@@ -1192,6 +1252,10 @@ function createAvailabilityIndicator(availability) {
 
 function normalizeAvailability(availability) {
   return availability === "used-up" ? "used-up" : "available";
+}
+
+function isPaperPackUsedUp(paperPack) {
+  return normalizeAvailability(paperPack.availability) === "used-up";
 }
 
 function formatAvailabilityLabel(availability) {

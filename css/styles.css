@@ -514,6 +514,46 @@ h6 {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
 }
 
+.library-pack-section {
+  grid-column: 1 / -1;
+}
+
+.library-pack-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  gap: var(--space-5);
+}
+
+.used-up-pack-section {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-4);
+}
+
+.used-up-pack-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 3rem;
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  padding: 0.75rem var(--space-4);
+  background: #f2f0eb;
+  color: var(--color-text);
+  font-weight: 850;
+}
+
+.used-up-pack-summary span:last-child {
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.used-up-pack-grid {
+  margin-top: var(--space-4);
+}
+
 .dsp-card {
   position: relative;
   border: 1px solid var(--color-border);
@@ -524,6 +564,22 @@ h6 {
   cursor: pointer;
   text-decoration: none;
   transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.dsp-card-used-up {
+  border-color: rgba(118, 91, 69, 0.34);
+  background: #f4f1eb;
+}
+
+.dsp-card-used-up .pattern,
+.dsp-card-used-up .pack-color {
+  filter: grayscale(0.35);
+}
+
+.dsp-card-used-up .card-title-row h4,
+.dsp-card-used-up .keyword-list,
+.dsp-card-used-up .pack-color-list {
+  opacity: 0.78;
 }
 
 .dsp-card:hover,
