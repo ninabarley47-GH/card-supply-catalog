@@ -7,8 +7,9 @@ export function initializeSettings(options = {}) {
   initializeImageLibrarySettings(options);
 }
 
-async function initializeImageLibrarySettings({ paperPacks = [], onImagesMigrated } = {}) {
+async function initializeImageLibrarySettings({ paperPacks = [], onImageLibrarySelected, onImagesMigrated } = {}) {
   const chooseButton = document.querySelector("[data-choose-image-library]");
+  const reconnectButton = document.querySelector("[data-reconnect-image-library]");
   const checkButton = document.querySelector("[data-check-image-library]");
   const migrateButton = document.querySelector("[data-migrate-image-library]");
   const status = document.querySelector("[data-image-library-status]");
@@ -20,6 +21,9 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImagesMigrate
 
   if (!isDirectoryPickerSupported()) {
     chooseButton.disabled = true;
+    if (reconnectButton) {
+      reconnectButton.disabled = true;
+    }
     if (checkButton) {
       checkButton.disabled = true;
     }
@@ -37,52 +41,41 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImagesMigrate
   await renderSavedImageLibraryStatus(status);
 
   chooseButton.addEventListener("click", async () => {
-    try {
-      const directoryHandle = await window.showDirectoryPicker({
-        id: "csc-image-library",
-        mode: "readwrite"
-      });
+    await selectImageLibraryFolder({
+      status,
+      health,
+      onImageLibrarySelected,
+      successPrefix: "Image folder selected"
+    });
+  });
 
-      await saveCatalogSetting(IMAGE_LIBRARY_SETTING_ID, {
-        strategy: "local-folder",
-        directoryHandle,
-        selectedAt: new Date().toISOString()
-      });
+  reconnectButton?.addEventListener("click", async () => {
+    const selected = await selectImageLibraryFolder({
+      status,
+      health,
+      onImageLibrarySelected,
+      successPrefix: "Image folder reconnected"
+    });
 
-      renderImageLibraryStatus(
+    if (selected) {
+      await checkImageLibraryReferences({
+        button: reconnectButton,
+        health,
+        paperPacks,
         status,
-        getSelectedImageLibraryMessage(directoryHandle),
-        "success"
-      );
-      renderImageLibraryHealth(health, null);
-    } catch (error) {
-      if (error?.name === "AbortError") {
-        renderImageLibraryStatus(status, "Image folder selection was cancelled.", "");
-        return;
-      }
-
-      renderImageLibraryStatus(status, getFolderSelectionErrorMessage(error), "error");
+        checkingMessage: "Checking image library after reconnect..."
+      });
     }
   });
 
   checkButton?.addEventListener("click", async () => {
-    checkButton.disabled = true;
-    renderImageLibraryStatus(status, "Checking image library references...", "");
-
-    try {
-      const result = await checkImageLibraryHealth(paperPacks);
-
-      renderImageLibraryStatus(
-        status,
-        formatHealthStatus(result),
-        result.summary.imagesMissing > 0 || result.needsFolder ? "error" : "success"
-      );
-      renderImageLibraryHealth(health, result.summary);
-    } catch (error) {
-      renderImageLibraryStatus(status, "Image library references could not be checked.", "error");
-    } finally {
-      checkButton.disabled = false;
-    }
+    await checkImageLibraryReferences({
+      button: checkButton,
+      health,
+      paperPacks,
+      status,
+      checkingMessage: "Checking image library references..."
+    });
   });
 
   migrateButton?.addEventListener("click", async () => {
@@ -100,6 +93,60 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImagesMigrate
       migrateButton.disabled = false;
     }
   });
+}
+
+async function selectImageLibraryFolder({ status, health, onImageLibrarySelected, successPrefix }) {
+  try {
+    const directoryHandle = await window.showDirectoryPicker({
+      id: "csc-image-library",
+      mode: "readwrite"
+    });
+
+    await saveCatalogSetting(IMAGE_LIBRARY_SETTING_ID, {
+      strategy: "local-folder",
+      directoryHandle,
+      selectedAt: new Date().toISOString()
+    });
+
+    await onImageLibrarySelected?.();
+    renderImageLibraryStatus(status, getSelectedImageLibraryMessage(directoryHandle, successPrefix), "success");
+    renderImageLibraryHealth(health, null);
+
+    return true;
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      renderImageLibraryStatus(status, "Image folder selection was cancelled.", "");
+      return false;
+    }
+
+    renderImageLibraryStatus(status, getFolderSelectionErrorMessage(error), "error");
+    return false;
+  }
+}
+
+async function checkImageLibraryReferences({ button, health, paperPacks, status, checkingMessage }) {
+  if (button) {
+    button.disabled = true;
+  }
+
+  renderImageLibraryStatus(status, checkingMessage, "");
+
+  try {
+    const result = await checkImageLibraryHealth(paperPacks);
+
+    renderImageLibraryStatus(
+      status,
+      formatHealthStatus(result),
+      result.summary.imagesMissing > 0 || result.needsFolder ? "error" : "success"
+    );
+    renderImageLibraryHealth(health, result.summary);
+  } catch (error) {
+    renderImageLibraryStatus(status, "Image library references could not be checked.", "error");
+  } finally {
+    if (button) {
+      button.disabled = false;
+    }
+  }
 }
 
 function formatHealthStatus(result) {
@@ -281,8 +328,8 @@ function getFolderSelectionErrorMessage(error) {
   return `The image folder could not be selected${error?.name ? ` (${error.name})` : ""}.`;
 }
 
-function getSelectedImageLibraryMessage(directoryHandle) {
-  return `Image folder selected: ${directoryHandle.name}. Full local paths are hidden by the browser, but newly saved DSP images will be stored in this folder.`;
+function getSelectedImageLibraryMessage(directoryHandle, prefix = "Image folder selected") {
+  return `${prefix}: ${directoryHandle.name}. Full local paths are hidden by the browser, but DSP images can be read from this folder.`;
 }
 
 function isDirectoryPickerSupported() {

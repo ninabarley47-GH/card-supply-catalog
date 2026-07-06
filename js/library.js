@@ -99,6 +99,9 @@ export async function initializeLibraryShell() {
       initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById, librarySearch.renderCurrent);
       initializeSettings({
         paperPacks,
+        onImageLibrarySelected: () => {
+          hydratePaperPackImageSources(paperPacks).then(librarySearch.renderCurrent);
+        },
         onImagesMigrated: () => {
           hydratePaperPackImageSources(paperPacks).then(librarySearch.renderCurrent);
         }
