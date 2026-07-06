@@ -22,20 +22,44 @@ On Windows:
 1. Open the `card-supply-catalog` folder in File Explorer.
 2. Click the address bar at the top of File Explorer.
 3. Type `powershell` and press Enter.
-4. In the PowerShell window, run:
+4. In the PowerShell window, confirm the prompt ends with `card-supply-catalog>`.
+5. Check whether Python is already installed:
+
+```text
+python --version
+```
+
+If PowerShell shows a Python version, start the local server:
 
 ```text
 python -m http.server 8000
 ```
 
-5. Leave that PowerShell window open while using the app.
-6. Open this address in Chrome, Edge, or Brave:
+If Windows opens the Microsoft Store instead, install Python:
+
+1. In the Microsoft Store, choose Get or Install.
+2. After Python installs, close PowerShell.
+3. Open PowerShell from the `card-supply-catalog` folder again.
+4. Run:
+
+```text
+python --version
+```
+
+5. If it shows a Python version, start the local server:
+
+```text
+python -m http.server 8000
+```
+
+6. Leave that PowerShell window open while using the app.
+7. Open this address in Chrome, Edge, or Brave:
 
 ```text
 http://localhost:8000
 ```
 
-If Windows opens the Microsoft Store instead of starting the server, install Python from python.org or ask the person who shared the app to help set up the local server.
+If Python still does not work after installing it, ask the person who shared the app to help set up the local server.
 
 ## First-Time Setup
 
