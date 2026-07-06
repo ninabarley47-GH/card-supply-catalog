@@ -151,6 +151,10 @@ Then open:
 
     http://localhost:8000
 
+## User Setup
+
+For first-time setup and sharing the app with other users, see `USER_SETUP.md`.
+
 ## Backup / Restore Verification
 
 Before using the app for real catalog data, run the backup/restore round-trip in `BACKUP_RESTORE_VERIFICATION.md`.

@@ -47,6 +47,12 @@ Initial recommendation:
 
 # Technical Backlog
 
+## Share-Ready Setup
+
+User setup instructions: `USER_SETUP.md`
+
+This guide covers recommended browsers, first-time setup, shared image folders, moving to another computer, and current limitations.
+
 ## Ownership Model
 
 ### Separate Paper Packs from Ownership
