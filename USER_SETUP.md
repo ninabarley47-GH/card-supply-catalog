@@ -17,11 +17,25 @@ During local development:
 1. Start a local web server from the project folder.
 2. Open the local URL in the browser.
 
-Example:
+On Windows:
+
+1. Open the `card-supply-catalog` folder in File Explorer.
+2. Click the address bar at the top of File Explorer.
+3. Type `powershell` and press Enter.
+4. In the PowerShell window, run:
+
+```text
+python -m http.server 8000
+```
+
+5. Leave that PowerShell window open while using the app.
+6. Open this address in Chrome, Edge, or Brave:
 
 ```text
 http://localhost:8000
 ```
+
+If Windows opens the Microsoft Store instead of starting the server, install Python from python.org or ask the person who shared the app to help set up the local server.
 
 ## First-Time Setup
 
