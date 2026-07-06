@@ -531,8 +531,10 @@ function normalizeFilterText(value) {
 }
 
 function renderPaperPackLibrary(container, paperPacks, colorsById, options = {}) {
-  const availablePaperPacks = paperPacks.filter((paperPack) => !isPaperPackUsedUp(paperPack));
-  const usedUpPaperPacks = paperPacks.filter(isPaperPackUsedUp);
+  const availablePaperPacks = sortPaperPacksForLibrary(
+    paperPacks.filter((paperPack) => !isPaperPackUsedUp(paperPack))
+  );
+  const usedUpPaperPacks = sortPaperPacksAlphabetically(paperPacks.filter(isPaperPackUsedUp));
 
   updateLibraryResultCount({
     availableCount: availablePaperPacks.length,
@@ -621,6 +623,29 @@ function createUsedUpPaperPackSection(paperPacks, colorsById) {
   section.append(summary, grid);
 
   return section;
+}
+
+function sortPaperPacksForLibrary(paperPacks) {
+  const recentlyAdded = [];
+  const remaining = [];
+
+  for (const paperPack of paperPacks) {
+    if (isRecentlyAddedPaperPack(paperPack)) {
+      recentlyAdded.push(paperPack);
+    } else {
+      remaining.push(paperPack);
+    }
+  }
+
+  return [...sortPaperPacksAlphabetically(recentlyAdded), ...sortPaperPacksAlphabetically(remaining)];
+}
+
+function sortPaperPacksAlphabetically(paperPacks) {
+  return [...paperPacks].sort((firstPack, secondPack) =>
+    String(firstPack.name || "").localeCompare(String(secondPack.name || ""), undefined, {
+      sensitivity: "base"
+    })
+  );
 }
 
 function renderEmptyPaperPackLibrary(
@@ -791,13 +816,17 @@ function createCardContextBar(paperPack) {
 }
 
 function getCardContext(paperPack) {
-  if (LATEST_CATALOG_SESSION_PACK_IDS.has(paperPack.id)) {
+  if (isRecentlyAddedPaperPack(paperPack)) {
     return {
       label: "Recently Added"
     };
   }
 
   return null;
+}
+
+function isRecentlyAddedPaperPack(paperPack) {
+  return LATEST_CATALOG_SESSION_PACK_IDS.has(paperPack.id);
 }
 
 function addPackToLatestCatalogSession(paperPackId) {
