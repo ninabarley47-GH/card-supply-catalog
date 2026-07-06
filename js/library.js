@@ -71,8 +71,8 @@ const PATTERN_CLASS_MAP = {
 
 const PATTERN_CLASS_SEQUENCE = Object.values(PATTERN_CLASS_MAP);
 
-const DEFAULT_CATALOG_SESSION_PACK_IDS = ["velvet-meadow", "sunlit-market"];
-const CATALOG_SESSION_STORAGE_KEY = "card-supply-catalog.latestCatalogSessionPackIds";
+const DEFAULT_CATALOG_SESSION_PACK_IDS = ["moonlit-flora", "velvet-meadow"];
+const CATALOG_SESSION_STORAGE_KEY = "card-supply-catalog.latestCatalogSessionPackIds.v2";
 const LATEST_CATALOG_SESSION_PACK_IDS = new Set(loadCatalogSessionPackIds());
 let hasUserCatalogSession = hasSavedCatalogSession();
 
