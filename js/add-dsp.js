@@ -212,6 +212,11 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
     saveDetail.saveComplete?.then((saveResult) => {
       if (!saveResult.ok) {
         window.alert(saveResult.message);
+        return;
+      }
+
+      if (saveResult.warning) {
+        window.alert(saveResult.warning);
       }
     });
   });

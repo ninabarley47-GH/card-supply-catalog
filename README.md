@@ -155,6 +155,10 @@ Then open:
 
 Before using the app for real catalog data, run the backup/restore round-trip in `BACKUP_RESTORE_VERIFICATION.md`.
 
+## Image Library Verification
+
+Before relying on folder-backed image storage, run the image folder checks in `IMAGE_LIBRARY_VERIFICATION.md`.
+
 ## Project Status
 
 **Current Milestone:** Foundation

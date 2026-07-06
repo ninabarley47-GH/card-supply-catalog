@@ -611,14 +611,21 @@ function initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById, rend
     renderCurrentLibrary();
 
     event.detail.saveComplete = preparePaperPackImagesForSave(packToSave)
-      .then(async (preparedPack) => {
+      .then(async (saveResult) => {
+        const preparedPack = saveResult.paperPack;
+
         await savePaperPack(preparedPack);
         await hydratePaperPackImageSources([preparedPack]);
         replacePaperPack(paperPacks, preparedPack);
         renderCurrentLibrary();
+
+        return {
+          warning: saveResult.warning
+        };
       })
-      .then(() => ({
-        ok: true
+      .then((saveResult) => ({
+        ok: true,
+        warning: saveResult.warning
       }))
       .catch(() => ({
         ok: false,

@@ -101,6 +101,8 @@ Current prototype uses IndexedDB.
 
 Future version should evaluate storing images as local files with database references.
 
+Verification checklist: `IMAGE_LIBRARY_VERIFICATION.md`
+
 Reason:
 - Better scalability
 - Easier backup

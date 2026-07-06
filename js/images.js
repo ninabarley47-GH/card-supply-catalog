@@ -153,13 +153,23 @@ export async function preparePaperPackImagesForSave(paperPack) {
   const directoryHandle = await getWritableImageLibraryDirectoryHandle();
 
   if (!directoryHandle) {
-    return preparePaperPackWithEmbeddedImages(paperPack);
+    return {
+      paperPack: preparePaperPackWithEmbeddedImages(paperPack),
+      warning: ""
+    };
   }
 
   try {
-    return await preparePaperPackWithLocalFolderImages(paperPack, directoryHandle);
+    return {
+      paperPack: await preparePaperPackWithLocalFolderImages(paperPack, directoryHandle),
+      warning: ""
+    };
   } catch (error) {
-    return preparePaperPackWithEmbeddedImages(paperPack);
+    return {
+      paperPack: preparePaperPackWithEmbeddedImages(paperPack),
+      warning:
+        "The paper pack was saved, but images could not be written to the selected image folder. They were kept in fallback browser storage for now."
+    };
   }
 }
 
