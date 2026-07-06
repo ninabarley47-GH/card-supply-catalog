@@ -109,6 +109,8 @@ Reason:
 ### Backup / Restore Verification Checklist
 Status: Required before backup/import is considered complete.
 
+Canonical checklist: `BACKUP_RESTORE_VERIFICATION.md`
+
 Use a test browser profile or a browser where app data can be safely cleared.
 
 Round-trip restore steps:

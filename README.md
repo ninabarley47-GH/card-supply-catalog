@@ -151,6 +151,10 @@ Then open:
 
     http://localhost:8000
 
+## Backup / Restore Verification
+
+Before using the app for real catalog data, run the backup/restore round-trip in `BACKUP_RESTORE_VERIFICATION.md`.
+
 ## Project Status
 
 **Current Milestone:** Foundation

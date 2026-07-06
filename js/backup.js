@@ -60,6 +60,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
           colorsImported: 0,
           imagesImported: 0,
           folderImageReferencesImported: 0,
+          notes: [],
           warnings: [],
           errors: ["The backup file could not be imported."]
         });
@@ -180,6 +181,7 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
     colorsImported: 0,
     imagesImported: 0,
     folderImageReferencesImported: 0,
+    notes: [],
     warnings: [],
     errors: []
   };
@@ -239,7 +241,7 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
   }
 
   if (summary.errors.length === 0 && summary.warnings.length === 0) {
-    summary.warnings.push("Import completed. Re-export and compare with the original backup as the verification checklist describes.");
+    summary.notes.push("Import completed. Re-export and compare with the original backup as the verification checklist describes.");
   }
 
   return summary;
@@ -354,9 +356,10 @@ function renderRestoreSummary(message, summary) {
   );
 
   const warnings = createSummaryList("Warnings", summary.warnings);
+  const notes = createSummaryList("Notes", summary.notes || []);
   const errors = createSummaryList("Errors", summary.errors);
 
-  message.replaceChildren(title, counts, warnings, errors);
+  message.replaceChildren(title, counts, notes, warnings, errors);
   message.dataset.tone = summary.errors.length > 0 ? "error" : "success";
 }
 
