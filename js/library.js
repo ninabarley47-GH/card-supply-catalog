@@ -931,6 +931,24 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
   detailBody.addEventListener("click", (event) => {
     event.stopPropagation();
 
+    const patternPreviewButton = event.target.closest("[data-detail-pattern-preview]");
+
+    if (patternPreviewButton) {
+      const selectedPack = paperPacks.find((pack) => pack.id === detailPanel.dataset.selectedPackId);
+      const patternIndex = Number(patternPreviewButton.dataset.detailPatternPreview);
+
+      if (selectedPack && Number.isInteger(patternIndex)) {
+        openPatternPreview(detailBody, selectedPack, patternIndex);
+      }
+
+      return;
+    }
+
+    if (event.target.closest("[data-pattern-viewer-close]")) {
+      closePatternPreview(detailBody);
+      return;
+    }
+
     const editButton = event.target.closest("[data-edit-pack]");
 
     if (editButton) {
@@ -1020,6 +1038,13 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !detailPanel.hidden) {
+      const patternViewer = detailBody.querySelector("[data-pattern-viewer]");
+
+      if (patternViewer && !patternViewer.hidden) {
+        closePatternPreview(detailBody);
+        return;
+      }
+
       closeDetailPanel(detailPanel);
     }
   });
@@ -1078,7 +1103,10 @@ function createDetailContent(paperPack, paperPacks, colorsById) {
   const content = document.createElement("div");
   content.className = "detail-content";
 
-  const preview = createPatternGrid(paperPack);
+  const preview = createPatternGrid(paperPack, {
+    interactive: true,
+    paperPackName: paperPack.name
+  });
   preview.classList.add("detail-pattern-grid");
 
   const metadata = document.createElement("div");
@@ -1126,9 +1154,101 @@ function createDetailContent(paperPack, paperPacks, colorsById) {
 
   coordinationSection.append(coordinationHeading, coordinationResults);
   metadata.append(colorSection, tagSection, createDetailMeta(paperPack), coordinationSection, createDetailActions(paperPack));
-  content.append(preview, metadata);
+  content.append(preview, metadata, createPatternViewer());
 
   return content;
+}
+
+function createPatternViewer() {
+  const viewer = document.createElement("div");
+  const backdrop = document.createElement("button");
+  const dialog = document.createElement("div");
+  const header = document.createElement("div");
+  const title = document.createElement("h4");
+  const closeButton = document.createElement("button");
+  const imageFrame = document.createElement("div");
+
+  viewer.className = "pattern-viewer";
+  viewer.dataset.patternViewer = "";
+  viewer.hidden = true;
+  backdrop.className = "pattern-viewer-backdrop";
+  backdrop.type = "button";
+  backdrop.dataset.patternViewerClose = "";
+  backdrop.setAttribute("aria-label", "Close pattern preview");
+  dialog.className = "pattern-viewer-dialog";
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
+  dialog.setAttribute("aria-labelledby", "pattern-viewer-title");
+  header.className = "pattern-viewer-header";
+  title.id = "pattern-viewer-title";
+  title.dataset.patternViewerTitle = "";
+  closeButton.className = "detail-close";
+  closeButton.type = "button";
+  closeButton.dataset.patternViewerClose = "";
+  closeButton.setAttribute("aria-label", "Close pattern preview");
+  closeButton.textContent = "\u00d7";
+  imageFrame.className = "pattern-viewer-image";
+  imageFrame.dataset.patternViewerImage = "";
+
+  header.append(title, closeButton);
+  dialog.append(header, imageFrame);
+  viewer.append(backdrop, dialog);
+
+  return viewer;
+}
+
+function openPatternPreview(detailBody, paperPack, patternIndex) {
+  const viewer = detailBody.querySelector("[data-pattern-viewer]");
+  const title = viewer?.querySelector("[data-pattern-viewer-title]");
+  const imageFrame = viewer?.querySelector("[data-pattern-viewer-image]");
+  const patternEntry = paperPack.patterns?.[patternIndex];
+
+  if (!viewer || !title || !imageFrame || patternEntry === undefined) {
+    return;
+  }
+
+  title.textContent = getPatternPreviewTitle(paperPack, patternEntry, patternIndex);
+  imageFrame.replaceChildren(createEnlargedPatternPreview(patternEntry, patternIndex));
+  viewer.hidden = false;
+  viewer.querySelector("[data-pattern-viewer-close]")?.focus();
+}
+
+function closePatternPreview(detailBody) {
+  const viewer = detailBody.querySelector("[data-pattern-viewer]");
+
+  if (!viewer) {
+    return;
+  }
+
+  viewer.hidden = true;
+  viewer.querySelector("[data-pattern-viewer-image]")?.replaceChildren();
+}
+
+function createEnlargedPatternPreview(patternEntry, index) {
+  const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
+  const imageSrc = getPatternImageSource(patternEntry);
+
+  if (imageSrc) {
+    const image = document.createElement("img");
+
+    image.src = imageSrc;
+    image.alt = patternObject?.imageName || `Pattern ${index + 1}`;
+
+    return image;
+  }
+
+  const pattern = document.createElement("span");
+
+  pattern.className = getPatternPreviewClassName(patternEntry, "pattern-viewer-placeholder");
+  pattern.setAttribute("aria-label", `No image available for pattern ${index + 1}`);
+
+  return pattern;
+}
+
+function getPatternPreviewTitle(paperPack, patternEntry, index) {
+  const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
+
+  return patternObject?.imageName || `${paperPack.name} pattern ${index + 1}`;
 }
 
 function createDetailColorList(paperPack, colorsById) {
@@ -1343,39 +1463,58 @@ function createCoordinatingPackCard(paperPack, color) {
   return card;
 }
 
-function createPatternGrid(paperPack) {
+function createPatternGrid(paperPack, options = {}) {
   const patternGrid = document.createElement("div");
   patternGrid.className = "pattern-grid";
   patternGrid.setAttribute("aria-label", `All sample patterns for ${paperPack.name}`);
 
   const patterns = paperPack.patterns || [];
 
-  patternGrid.append(...patterns.map(createPatternPreview));
+  patternGrid.append(...patterns.map((patternEntry, index) => createPatternPreview(patternEntry, index, options)));
 
   return patternGrid;
 }
 
-function createPatternPreview(patternEntry, index) {
-  const pattern = document.createElement("span");
+function createPatternPreview(patternEntry, index, options = {}) {
+  const pattern = options.interactive ? document.createElement("button") : document.createElement("span");
   const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
   const imageSrc = getPatternImageSource(patternEntry);
   const imageName = patternObject?.imageName || "";
+
+  if (options.interactive) {
+    pattern.type = "button";
+    pattern.dataset.detailPatternPreview = `${index}`;
+    pattern.setAttribute(
+      "aria-label",
+      `View larger ${imageName || `${options.paperPackName || "paper pack"} pattern ${index + 1}`}`
+    );
+  }
 
   if (imageSrc) {
     const image = document.createElement("img");
     image.src = imageSrc;
     image.alt = imageName || `Pattern ${index + 1}`;
 
-    pattern.className = "pattern pattern-image";
+    pattern.className = getPatternPreviewClassName(patternEntry, "pattern-image", options.interactive);
     pattern.append(image);
 
     return pattern;
   }
 
-  pattern.className = "pattern pattern-placeholder";
-  pattern.setAttribute("aria-label", `No image available for pattern ${index + 1}`);
+  pattern.className = getPatternPreviewClassName(patternEntry, "pattern-placeholder", options.interactive);
+
+  if (!options.interactive) {
+    pattern.setAttribute("aria-label", `No image available for pattern ${index + 1}`);
+  }
 
   return pattern;
+}
+
+function getPatternPreviewClassName(patternEntry, baseClassName, isInteractive = false) {
+  const patternClass = typeof patternEntry === "string" ? PATTERN_CLASS_MAP[patternEntry] : "";
+  const interactiveClass = isInteractive ? " pattern-preview-button" : "";
+
+  return `pattern ${baseClassName}${patternClass ? ` ${patternClass}` : ""}${interactiveClass}`;
 }
 
 function createKeywordList(paperPack) {
