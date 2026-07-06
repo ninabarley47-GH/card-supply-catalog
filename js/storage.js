@@ -1,6 +1,7 @@
+import { addCatalogSchemaVersion } from "./schema.js";
+
 const DATABASE_NAME = "card-supply-catalog";
 const DATABASE_VERSION = 3;
-const CATALOG_SCHEMA_VERSION = 1;
 const PAPER_PACKS_STORE = "paperPacks";
 const DELETED_PAPER_PACK_IDS_STORE = "deletedPaperPackIds";
 const COLORS_STORE = "colors";
@@ -171,7 +172,7 @@ async function migrateLegacyLocalStorage(database) {
     const deletedPaperPackIdStore = transaction.objectStore(DELETED_PAPER_PACK_IDS_STORE);
 
     for (const paperPack of legacyPaperPacks) {
-      paperPackStore.put(paperPack);
+      paperPackStore.put(normalizePaperPackForStorage(paperPack));
     }
 
     for (const paperPackId of legacyDeletedPaperPackIds) {
@@ -216,11 +217,9 @@ function markLegacyMigrationComplete() {
 }
 
 function normalizePaperPackForStorage(paperPack) {
-  return {
-    ...normalizePaperPackKeywords(paperPack),
-    schemaVersion: CATALOG_SCHEMA_VERSION
-  };
+  return addCatalogSchemaVersion(normalizePaperPackKeywords(paperPack));
 }
+
 function normalizePaperPackKeywords(paperPack) {
   const keywords = [];
   const seenKeywords = new Set();

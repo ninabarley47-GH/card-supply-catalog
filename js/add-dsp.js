@@ -4,8 +4,7 @@ import {
   createPatternSlots,
   getImageEntriesFromPatterns
 } from "./images.js";
-
-const CATALOG_SCHEMA_VERSION = 1;
+import { addCatalogSchemaVersion } from "./schema.js";
 
 export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
   const panel = document.querySelector("[data-add-dsp-panel]");
@@ -297,8 +296,7 @@ function buildPaperPackFromForm(formData, colorsById, selectedImages = [], editi
 
   return {
     ok: true,
-    paperPack: {
-      schemaVersion: CATALOG_SCHEMA_VERSION,
+    paperPack: addCatalogSchemaVersion({
       id: editingPaperPack?.id || createId(name),
       name,
       owner,
@@ -309,7 +307,7 @@ function buildPaperPackFromForm(formData, colorsById, selectedImages = [], editi
       keywords,
       colors: colorResult.colorIds,
       patterns
-    }
+    })
   };
 }
 

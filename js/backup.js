@@ -1,7 +1,11 @@
 import { loadCatalogSetting, saveColor, savePaperPack } from "./storage.js";
+import {
+  BACKUP_SCHEMA_VERSION,
+  CATALOG_SCHEMA_VERSION,
+  addCatalogSchemaVersion,
+  getCatalogSchemaVersion
+} from "./schema.js";
 
-const BACKUP_SCHEMA_VERSION = 1;
-const CATALOG_SCHEMA_VERSION = 1;
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
 
 export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
@@ -101,6 +105,7 @@ async function createCatalogBackup({ paperPacks, colorsById }) {
 
   return {
     schemaVersion: BACKUP_SCHEMA_VERSION,
+    catalogSchemaVersion: CATALOG_SCHEMA_VERSION,
     app: "card-supply-catalog",
     exportedAt: new Date().toISOString(),
     imageStorage: {
@@ -192,6 +197,14 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
     );
   }
 
+  const catalogSchemaVersion = getCatalogSchemaVersion(backup);
+
+  if (catalogSchemaVersion !== CATALOG_SCHEMA_VERSION) {
+    summary.warnings.push(
+      `Imported catalog schema version ${catalogSchemaVersion || "unknown"}; current catalog schema version is ${CATALOG_SCHEMA_VERSION}.`
+    );
+  }
+
   const importedColorsById = backup.colors || {};
   const importedPaperPacks = backup.paperPacks || [];
 
@@ -207,11 +220,13 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
 
   for (const paperPack of importedPaperPacks) {
     try {
-      await savePaperPack(paperPack);
-      upsertPaperPack(paperPacks, paperPack);
+      const versionedPaperPack = addCatalogSchemaVersion(paperPack);
+
+      await savePaperPack(versionedPaperPack);
+      upsertPaperPack(paperPacks, versionedPaperPack);
       summary.packsImported += 1;
-      summary.imagesImported += countEmbeddedPatternImages(paperPack);
-      summary.folderImageReferencesImported += countFolderImageReferences(paperPack);
+      summary.imagesImported += countEmbeddedPatternImages(versionedPaperPack);
+      summary.folderImageReferencesImported += countFolderImageReferences(versionedPaperPack);
     } catch (error) {
       summary.errors.push(`Paper pack could not be imported: ${paperPack?.name || paperPack?.id || "Unknown pack"}`);
     }
@@ -281,11 +296,10 @@ function sortObjectByKey(valueByKey) {
 }
 
 function createSerializablePaperPack(paperPack) {
-  return {
+  return addCatalogSchemaVersion({
     ...cloneJsonSafe(paperPack),
-    schemaVersion: CATALOG_SCHEMA_VERSION,
     patterns: (paperPack.patterns || []).map(createSerializablePattern)
-  };
+  });
 }
 
 function createSerializablePattern(patternEntry) {
