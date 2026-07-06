@@ -127,6 +127,8 @@ Round-trip restore steps:
    - release years are correct
    - notes/status fields return
    - images return if embedded image export was selected
+   - folder-backed image references return as relative `imagePath` values
+   - folder-backed images display after the image library folder is reconnected
 7. Confirm restored app behavior:
    - search still works
    - tag filters still work
@@ -138,5 +140,6 @@ Round-trip restore steps:
 Expected result:
 - The second export should preserve the same catalog content as the original export.
 - Differences should be limited to expected metadata such as export timestamp.
+- Folder-backed image files are not embedded in the JSON backup; the image folder must be backed up or shared separately.
 
 ---

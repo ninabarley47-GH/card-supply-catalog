@@ -17,7 +17,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
         });
 
         downloadJsonBackup(backup);
-        renderBackupMessage(message, "Catalog backup downloaded.", "success");
+        renderBackupMessage(message, formatExportSummary(backup), "success");
       } catch (error) {
         renderBackupMessage(message, "The catalog backup could not be created.", "error");
       }
@@ -47,6 +47,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
           packsImported: 0,
           colorsImported: 0,
           imagesImported: 0,
+          folderImageReferencesImported: 0,
           warnings: [],
           errors: ["The backup file could not be imported."]
         });
@@ -59,19 +60,47 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
 
 async function createCatalogBackup({ paperPacks, colorsById }) {
   const imageLibrary = await loadCatalogSetting(IMAGE_LIBRARY_SETTING_ID);
+  const imageSummary = summarizeImageStorage(paperPacks);
 
   return {
     schemaVersion: BACKUP_SCHEMA_VERSION,
     app: "card-supply-catalog",
     exportedAt: new Date().toISOString(),
     imageStorage: {
-      strategy: "embedded-indexed-db",
+      strategy: imageSummary.folderImageReferences > 0 ? "local-folder-with-fallback" : "embedded-indexed-db",
       configuredLibrary: createSerializableImageLibrarySetting(imageLibrary),
-      note: "Prototype backup includes embedded image data when present. Future backups should support local image folder references."
+      embeddedImages: imageSummary.embeddedImages,
+      folderImageReferences: imageSummary.folderImageReferences,
+      note:
+        "Backup stores folder-backed images as relative imagePath references. Back up or share the image folder separately, then reconnect it after import."
     },
     colors: sortObjectByKey(colorsById),
     paperPacks: paperPacks.map(createSerializablePaperPack)
   };
+}
+
+function summarizeImageStorage(paperPacks) {
+  return paperPacks.reduce(
+    (summary, paperPack) => {
+      summary.embeddedImages += countEmbeddedPatternImages(paperPack);
+      summary.folderImageReferences += countFolderImageReferences(paperPack);
+      return summary;
+    },
+    {
+      embeddedImages: 0,
+      folderImageReferences: 0
+    }
+  );
+}
+
+function formatExportSummary(backup) {
+  const folderImageReferences = backup.imageStorage?.folderImageReferences || 0;
+
+  if (folderImageReferences === 0) {
+    return "Catalog backup downloaded.";
+  }
+
+  return `Catalog backup downloaded. ${folderImageReferences} folder image reference${folderImageReferences === 1 ? "" : "s"} included; back up or share the image folder separately.`;
 }
 
 function createSerializableImageLibrarySetting(imageLibrary) {
@@ -108,6 +137,7 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
     packsImported: 0,
     colorsImported: 0,
     imagesImported: 0,
+    folderImageReferencesImported: 0,
     warnings: [],
     errors: []
   };
@@ -138,13 +168,16 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
       upsertPaperPack(paperPacks, paperPack);
       summary.packsImported += 1;
       summary.imagesImported += countEmbeddedPatternImages(paperPack);
+      summary.folderImageReferencesImported += countFolderImageReferences(paperPack);
     } catch (error) {
       summary.errors.push(`Paper pack could not be imported: ${paperPack?.name || paperPack?.id || "Unknown pack"}`);
     }
   }
 
-  if (backup.imageStorage?.configuredLibrary) {
-    summary.warnings.push("Image library folder permission is not restored by backup import. Choose the folder again if needed.");
+  if (summary.folderImageReferencesImported > 0 || backup.imageStorage?.configuredLibrary) {
+    summary.warnings.push(
+      "Folder-backed image files are not inside the backup JSON. Choose or reconnect the image folder after import."
+    );
   }
 
   if (summary.errors.length === 0 && summary.warnings.length === 0) {
@@ -188,6 +221,11 @@ function upsertPaperPack(paperPacks, paperPack) {
 
 function countEmbeddedPatternImages(paperPack) {
   return (paperPack.patterns || []).filter((pattern) => pattern && typeof pattern === "object" && pattern.imageSrc)
+    .length;
+}
+
+function countFolderImageReferences(paperPack) {
+  return (paperPack.patterns || []).filter((pattern) => pattern && typeof pattern === "object" && pattern.imagePath)
     .length;
 }
 
@@ -253,7 +291,8 @@ function renderRestoreSummary(message, summary) {
   counts.append(
     createSummaryItem("Packs imported", summary.packsImported),
     createSummaryItem("Colors imported", summary.colorsImported),
-    createSummaryItem("Images imported", summary.imagesImported)
+    createSummaryItem("Embedded images imported", summary.imagesImported),
+    createSummaryItem("Folder image references imported", summary.folderImageReferencesImported || 0)
   );
 
   const warnings = createSummaryList("Warnings", summary.warnings);
