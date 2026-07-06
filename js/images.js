@@ -106,18 +106,24 @@ export function createPatternSlots(patternCount, selectedImages = [], existingPa
 export function getImageEntriesFromPatterns(patterns = []) {
   return patterns
     .map((pattern, index) => {
+      const patternObject = pattern && typeof pattern === "object" ? pattern : null;
       const imageSrc = getPatternImageSource(pattern);
 
-      if (!imageSrc) {
+      if (!patternObject && !imageSrc) {
+        return null;
+      }
+
+      if (!imageSrc && !patternObject?.imagePath) {
         return null;
       }
 
       return {
-        id: pattern.id || `pattern-${index + 1}`,
-        name: pattern.imageName || pattern.id || `Pattern ${index + 1}`,
-        imagePath: pattern.imagePath,
+        id: patternObject?.id || `pattern-${index + 1}`,
+        name: patternObject?.imageName || patternObject?.id || `Pattern ${index + 1}`,
+        imagePath: patternObject?.imagePath,
         src: imageSrc,
-        storageStrategy: pattern.imageStorageStrategy
+        storageStrategy: patternObject?.imageStorageStrategy,
+        missing: Boolean(patternObject?.imagePath && !imageSrc)
       };
     })
     .filter(Boolean);

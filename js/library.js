@@ -90,7 +90,7 @@ export async function initializeLibraryShell() {
     const [colorsById, paperPacks] = await Promise.all([loadColors(), loadPaperPacks()]);
     const colors = Object.values(colorsById);
     initializeAddColorWorkflow(colorsById);
-    initializeAddDspWorkflow(colorsById);
+    initializeAddDspWorkflow(colorsById, paperPacks);
 
     if (paperPackLibrary) {
       renderPaperPackLibrary(paperPackLibrary, paperPacks, colorsById);

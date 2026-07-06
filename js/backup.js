@@ -1,6 +1,7 @@
 import { loadCatalogSetting, saveColor, savePaperPack } from "./storage.js";
 
 const BACKUP_SCHEMA_VERSION = 1;
+const CATALOG_SCHEMA_VERSION = 1;
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
 
 export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
@@ -34,6 +35,13 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
 
       try {
         const backup = await readBackupFile(backupFile);
+        const overwriteSummary = summarizeBackupOverwrites(backup, paperPacks, colorsById);
+
+        if (overwriteSummary.requiresConfirmation && !window.confirm(overwriteSummary.message)) {
+          renderBackupMessage(message, "Import cancelled. No catalog changes were made.", "");
+          return;
+        }
+
         const restoreSummary = await restoreCatalogBackup({
           backup,
           paperPacks,
@@ -58,6 +66,35 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
   }
 }
 
+function summarizeBackupOverwrites(backup, paperPacks, colorsById) {
+  const importedPaperPacks = Array.isArray(backup?.paperPacks) ? backup.paperPacks : [];
+  const importedColors = backup?.colors && typeof backup.colors === "object" ? Object.values(backup.colors) : [];
+  const existingPackIds = new Set(paperPacks.map((paperPack) => paperPack.id));
+  const existingColorIds = new Set(Object.keys(colorsById));
+  const packOverwriteCount = importedPaperPacks.filter((paperPack) => existingPackIds.has(paperPack?.id)).length;
+  const colorOverwriteCount = importedColors.filter((color) => existingColorIds.has(color?.id)).length;
+  const overwriteParts = [];
+
+  if (packOverwriteCount > 0) {
+    overwriteParts.push(`${packOverwriteCount} paper pack${packOverwriteCount === 1 ? "" : "s"}`);
+  }
+
+  if (colorOverwriteCount > 0) {
+    overwriteParts.push(`${colorOverwriteCount} color${colorOverwriteCount === 1 ? "" : "s"}`);
+  }
+
+  if (overwriteParts.length === 0) {
+    return {
+      requiresConfirmation: false,
+      message: ""
+    };
+  }
+
+  return {
+    requiresConfirmation: true,
+    message: `This backup will overwrite ${overwriteParts.join(" and ")} already in the catalog. Continue with import?`
+  };
+}
 async function createCatalogBackup({ paperPacks, colorsById }) {
   const imageLibrary = await loadCatalogSetting(IMAGE_LIBRARY_SETTING_ID);
   const imageSummary = summarizeImageStorage(paperPacks);
@@ -147,6 +184,12 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
   if (!validation.ok) {
     summary.errors.push(validation.message);
     return summary;
+  }
+
+  if (backup.schemaVersion !== BACKUP_SCHEMA_VERSION) {
+    summary.warnings.push(
+      `Imported backup schema version ${backup.schemaVersion || "unknown"}; current schema version is ${BACKUP_SCHEMA_VERSION}.`
+    );
   }
 
   const importedColorsById = backup.colors || {};
@@ -240,6 +283,7 @@ function sortObjectByKey(valueByKey) {
 function createSerializablePaperPack(paperPack) {
   return {
     ...cloneJsonSafe(paperPack),
+    schemaVersion: CATALOG_SCHEMA_VERSION,
     patterns: (paperPack.patterns || []).map(createSerializablePattern)
   };
 }

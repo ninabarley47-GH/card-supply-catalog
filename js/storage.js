@@ -1,5 +1,6 @@
 const DATABASE_NAME = "card-supply-catalog";
 const DATABASE_VERSION = 3;
+const CATALOG_SCHEMA_VERSION = 1;
 const PAPER_PACKS_STORE = "paperPacks";
 const DELETED_PAPER_PACK_IDS_STORE = "deletedPaperPackIds";
 const COLORS_STORE = "colors";
@@ -30,7 +31,7 @@ export async function savePaperPack(paperPack) {
   await migrateLegacyLocalStorage(database);
 
   await writeTransaction(database, [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE], (transaction) => {
-    transaction.objectStore(PAPER_PACKS_STORE).put(normalizePaperPackKeywords(paperPack));
+    transaction.objectStore(PAPER_PACKS_STORE).put(normalizePaperPackForStorage(paperPack));
     transaction.objectStore(DELETED_PAPER_PACK_IDS_STORE).delete(paperPack.id);
   });
 }
@@ -214,6 +215,12 @@ function markLegacyMigrationComplete() {
   }
 }
 
+function normalizePaperPackForStorage(paperPack) {
+  return {
+    ...normalizePaperPackKeywords(paperPack),
+    schemaVersion: CATALOG_SCHEMA_VERSION
+  };
+}
 function normalizePaperPackKeywords(paperPack) {
   const keywords = [];
   const seenKeywords = new Set();

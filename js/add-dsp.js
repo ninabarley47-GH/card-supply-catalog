@@ -5,7 +5,9 @@ import {
   getImageEntriesFromPatterns
 } from "./images.js";
 
-export function initializeAddDspWorkflow(colorsById) {
+const CATALOG_SCHEMA_VERSION = 1;
+
+export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
   const panel = document.querySelector("[data-add-dsp-panel]");
   const form = document.querySelector("[data-add-dsp-form]");
   const message = document.querySelector("[data-add-dsp-message]");
@@ -126,6 +128,18 @@ export function initializeAddDspWorkflow(colorsById) {
       updateSelectedImageOrder(selectedImages, button.dataset.imageAction, Number(button.dataset.imageIndex));
       renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount);
     });
+
+    imagePreviewList.addEventListener("change", async (event) => {
+      const input = event.target.closest("[data-image-replace-input]");
+
+      if (!input) {
+        return;
+      }
+
+      await replaceSelectedImageFile([...input.files], selectedImages, Number(input.dataset.imageIndex), message);
+      input.value = "";
+      renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount);
+    });
   }
 
   document.addEventListener("paper-pack:edit-request", (event) => {
@@ -160,6 +174,18 @@ export function initializeAddDspWorkflow(colorsById) {
         renderFormMessage(message, result.message, "error");
       }
 
+      return;
+    }
+
+    const duplicateResult = validatePaperPackDuplicate(result.paperPack, paperPacks, formState.editingPaperPack);
+
+    if (!duplicateResult.ok) {
+      renderFormMessage(message, duplicateResult.message, "error");
+      return;
+    }
+
+    if (duplicateResult.requiresConfirmation && !window.confirm(duplicateResult.message)) {
+      renderFormMessage(message, "Save cancelled. No catalog changes were made.", "");
       return;
     }
 
@@ -272,6 +298,7 @@ function buildPaperPackFromForm(formData, colorsById, selectedImages = [], editi
   return {
     ok: true,
     paperPack: {
+      schemaVersion: CATALOG_SCHEMA_VERSION,
       id: editingPaperPack?.id || createId(name),
       name,
       owner,
@@ -286,6 +313,45 @@ function buildPaperPackFromForm(formData, colorsById, selectedImages = [], editi
   };
 }
 
+function validatePaperPackDuplicate(paperPack, paperPacks, editingPaperPack = null) {
+  const normalizedName = normalizeLookupValue(paperPack.name);
+  const existingById = paperPacks.find((existingPack) => existingPack.id === paperPack.id);
+  const existingByName = paperPacks.find(
+    (existingPack) => normalizeLookupValue(existingPack.name) === normalizedName
+  );
+  const isEditingSamePack = editingPaperPack && existingById?.id === editingPaperPack.id;
+  const nameBelongsToSamePack = editingPaperPack && existingByName?.id === editingPaperPack.id;
+
+  if (existingById && !isEditingSamePack) {
+    return {
+      ok: false,
+      requiresConfirmation: false,
+      message: `A paper pack with the ID "${paperPack.id}" already exists. Change the DSP name before saving.`
+    };
+  }
+
+  if (existingByName && !nameBelongsToSamePack) {
+    return {
+      ok: false,
+      requiresConfirmation: false,
+      message: `A paper pack named "${paperPack.name}" already exists. Use a unique DSP name before saving.`
+    };
+  }
+
+  if (editingPaperPack && paperPack.name !== editingPaperPack.name) {
+    return {
+      ok: true,
+      requiresConfirmation: true,
+      message: `Save changes to "${editingPaperPack.name}" as "${paperPack.name}"? This updates the existing catalog record.`
+    };
+  }
+
+  return {
+    ok: true,
+    requiresConfirmation: false,
+    message: ""
+  };
+}
 function fillPaperPackForm(form, paperPack, colorsById) {
   form.elements.name.value = paperPack.name || "";
   form.elements.owner.value = paperPack.owner || "";
@@ -339,6 +405,25 @@ function updateSelectedImageOrder(selectedImages, action, index) {
   }
 }
 
+async function replaceSelectedImageFile(files, selectedImages, index, message) {
+  if (!Number.isInteger(index) || index < 0 || index >= selectedImages.length || files.length === 0) {
+    return;
+  }
+
+  try {
+    const [replacement] = await addPatternImageFiles(files);
+
+    if (!replacement) {
+      renderFormMessage(message, "Choose an image file to replace this pattern.", "error");
+      return;
+    }
+
+    selectedImages.splice(index, 1, replacement);
+    renderFormMessage(message, "Pattern image replaced. Save changes to update the catalog.", "success");
+  } catch (error) {
+    renderFormMessage(message, "The replacement image could not be loaded.", "error");
+  }
+}
 function renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount) {
   if (!imagePreviewList) {
     return;
@@ -349,9 +434,7 @@ function renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount
       const item = document.createElement("li");
       item.className = "image-preview-item";
 
-      const preview = document.createElement("img");
-      preview.src = image.src;
-      preview.alt = image.name;
+      const preview = createImagePreviewMedia(image, index);
 
       const details = document.createElement("div");
       details.className = "image-preview-details";
@@ -362,7 +445,7 @@ function renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount
 
       const storage = document.createElement("span");
       storage.className = "image-preview-storage";
-      storage.textContent = image.imagePath ? "Library image" : "Upload fallback";
+      storage.textContent = getImageStorageLabel(image);
 
       details.append(name, storage);
 
@@ -371,9 +454,10 @@ function renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount
 
       const moveUp = createImageActionButton("move-up", index, "Up", index === 0);
       const moveDown = createImageActionButton("move-down", index, "Down", index === selectedImages.length - 1);
+      const replace = createImageReplaceControl(index, image.missing);
       const remove = createImageActionButton("remove", index, "Remove", false);
 
-      controls.append(moveUp, moveDown, remove);
+      controls.append(moveUp, moveDown, replace, remove);
       item.append(preview, details, controls);
 
       return item;
@@ -388,6 +472,53 @@ function renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount
   }
 }
 
+function createImagePreviewMedia(image, index) {
+  if (image.src) {
+    const preview = document.createElement("img");
+    preview.src = image.src;
+    preview.alt = image.name;
+
+    return preview;
+  }
+
+  const placeholder = document.createElement("span");
+  placeholder.className = "image-preview-placeholder";
+  placeholder.textContent = `${index + 1}`;
+  placeholder.setAttribute("aria-label", `${image.name} is missing`);
+
+  return placeholder;
+}
+
+function getImageStorageLabel(image) {
+  if (image.missing) {
+    return image.imagePath ? `Missing library image: ${image.imagePath}` : "Missing image";
+  }
+
+  return image.imagePath ? "Library image" : "Upload fallback";
+}
+
+function createImageReplaceControl(index, isMissing = false) {
+  const inputId = `dsp-pattern-replace-${index}`;
+  const wrapper = document.createElement("span");
+  wrapper.className = "image-replace-control";
+
+  const label = document.createElement("label");
+  label.className = `image-preview-button${isMissing ? " image-preview-button-urgent" : ""}`;
+  label.htmlFor = inputId;
+  label.textContent = isMissing ? "Replace Missing" : "Replace";
+
+  const input = document.createElement("input");
+  input.id = inputId;
+  input.className = "visually-hidden";
+  input.type = "file";
+  input.accept = "image/*";
+  input.dataset.imageReplaceInput = "";
+  input.dataset.imageIndex = `${index}`;
+
+  wrapper.append(label, input);
+
+  return wrapper;
+}
 function getLibraryImageSelectionMessage(images) {
   if (images.length === 0) {
     return "";
