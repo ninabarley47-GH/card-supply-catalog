@@ -277,7 +277,7 @@ export async function checkImageLibraryHealth(paperPacks) {
         }
 
         try {
-          await getFileFromImagePath(directoryHandle, patternObject.imagePath);
+          await findFileFromImagePath(directoryHandle, patternObject.imagePath);
           summary.imagesFound += 1;
         } catch (error) {
           summary.imagesMissing += 1;
@@ -581,10 +581,24 @@ async function hydratePatternImageSource(patternEntry, directoryHandle) {
   }
 
   try {
-    const file = await getFileFromImagePath(directoryHandle, patternObject.imagePath);
+    const file = await findFileFromImagePath(directoryHandle, patternObject.imagePath);
     patternObject.imagePreviewSrc = URL.createObjectURL(file);
   } catch (error) {
     // The placeholder remains visible if the local image cannot be read.
+  }
+}
+
+async function findFileFromImagePath(directoryHandle, imagePath) {
+  try {
+    return await getFileFromImagePath(directoryHandle, imagePath);
+  } catch (error) {
+    const fallbackImagePath = getUnprefixedImagePath(imagePath);
+
+    if (!fallbackImagePath || fallbackImagePath === imagePath) {
+      throw error;
+    }
+
+    return await getFileFromImagePath(directoryHandle, fallbackImagePath);
   }
 }
 
@@ -599,6 +613,18 @@ async function getFileFromImagePath(directoryHandle, imagePath) {
 
   const fileHandle = await currentDirectory.getFileHandle(fileName);
   return await fileHandle.getFile();
+}
+
+function getUnprefixedImagePath(imagePath) {
+  const pathParts = String(imagePath || "").split("/").filter(Boolean);
+  const fileName = pathParts.pop();
+  const unprefixedFileName = fileName?.replace(/^\d{2}-/, "");
+
+  if (!fileName || !unprefixedFileName || unprefixedFileName === fileName) {
+    return "";
+  }
+
+  return [...pathParts, unprefixedFileName].join("/");
 }
 
 async function writePatternImageFile(directoryHandle, paperPack, imageFile, imageName) {
