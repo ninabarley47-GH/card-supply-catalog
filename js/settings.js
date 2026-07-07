@@ -162,6 +162,7 @@ async function renderSetupStatus(container, paperPacks = []) {
     directoryHandle && folderPermission === "granted" ? await checkImageLibraryHealth(paperPacks).catch(() => null) : null;
   const folderImages = imageHealth?.summary.folderImages ?? countFolderImageReferences(paperPacks);
   const missingImages = imageHealth?.summary.imagesMissing ?? 0;
+  const missingImageFolders = getMissingImageFolders(imageHealth?.summary.missingImages);
   const imageReferencesChecked = Boolean(imageHealth);
 
   container.replaceChildren(
@@ -185,7 +186,13 @@ async function renderSetupStatus(container, paperPacks = []) {
     }),
     createSetupStatusItem({
       title: "Image references",
-      detail: getImageReferenceStatusDetail(folderImages, missingImages, imageReferencesChecked, Boolean(directoryHandle)),
+      detail: getImageReferenceStatusDetail(
+        folderImages,
+        missingImages,
+        imageReferencesChecked,
+        Boolean(directoryHandle),
+        missingImageFolders
+      ),
       badge: getImageReferenceStatusBadge(folderImages, missingImages, imageReferencesChecked),
       status: getImageReferenceStatusTone(missingImages, imageReferencesChecked)
     })
@@ -263,7 +270,7 @@ function getImageFolderStatusTone(directoryHandle, permissionState) {
   return permissionState === "granted" ? "ready" : "attention";
 }
 
-function getImageReferenceStatusDetail(folderImages, missingImages, wasChecked, hasDirectoryHandle) {
+function getImageReferenceStatusDetail(folderImages, missingImages, wasChecked, hasDirectoryHandle, missingImageFolders = []) {
   if (folderImages === 0) {
     return "No folder-backed image references found yet.";
   }
@@ -275,7 +282,12 @@ function getImageReferenceStatusDetail(folderImages, missingImages, wasChecked, 
   }
 
   if (missingImages > 0) {
-    return `${missingImages} of ${folderImages} folder image reference${folderImages === 1 ? "" : "s"} need attention.`;
+    const folderSummary =
+      missingImageFolders.length > 0
+        ? ` Folders: ${formatLimitedList(missingImageFolders, 4)}.`
+        : "";
+
+    return `${missingImages} of ${folderImages} folder image reference${folderImages === 1 ? "" : "s"} need attention.${folderSummary}`;
   }
 
   return `${folderImages} folder image reference${folderImages === 1 ? "" : "s"} found.`;
@@ -396,6 +408,10 @@ function renderImageLibraryHealth(container, summary) {
     const title = document.createElement("p");
     title.textContent = "Missing references";
 
+    const folderSummary = document.createElement("p");
+    const missingImageFolders = getMissingImageFolders(summary.missingImages);
+    folderSummary.textContent = `Folders needing attention: ${formatLimitedList(missingImageFolders, 8)}.`;
+
     const list = document.createElement("ul");
     list.className = "image-library-missing-list";
 
@@ -411,7 +427,7 @@ function renderImageLibraryHealth(container, summary) {
       list.append(item);
     }
 
-    missing.append(title, list);
+    missing.append(title, folderSummary, list);
     children.push(missing);
   }
 
@@ -428,6 +444,40 @@ function createHealthItem(label, value) {
   item.append(labelElement, valueElement);
 
   return item;
+}
+
+function getMissingImageFolders(missingImages = []) {
+  return [
+    ...new Set(
+      missingImages
+        .map((missingImage) => getFolderNameFromImagePath(missingImage.imagePath))
+        .filter(Boolean)
+    )
+  ].sort((firstFolder, secondFolder) =>
+    firstFolder.localeCompare(secondFolder, undefined, {
+      numeric: true,
+      sensitivity: "base"
+    })
+  );
+}
+
+function getFolderNameFromImagePath(imagePath) {
+  return String(imagePath || "").split("/").filter(Boolean)[0] || "";
+}
+
+function formatLimitedList(values, limit) {
+  const visibleValues = values.slice(0, limit);
+  const hiddenCount = values.length - visibleValues.length;
+
+  if (values.length === 0) {
+    return "unknown";
+  }
+
+  if (hiddenCount === 0) {
+    return visibleValues.join(", ");
+  }
+
+  return `${visibleValues.join(", ")}, and ${hiddenCount} more`;
 }
 
 async function migrateEmbeddedImages(paperPacks) {
