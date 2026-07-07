@@ -69,6 +69,57 @@ export async function choosePatternImagesFromLibrary() {
   }
 }
 
+export async function loadPatternImagesForPaperPackName(paperPackName) {
+  const paperPackId = createId(paperPackName);
+
+  if (!paperPackId) {
+    return {
+      ok: true,
+      images: [],
+      message: ""
+    };
+  }
+
+  const directoryHandle = await getReadableImageLibraryDirectoryHandle({ requestPermission: false });
+
+  if (!directoryHandle) {
+    return {
+      ok: false,
+      images: [],
+      message: "Image folder permission is needed before images can be loaded automatically. Reconnect the image folder in Settings."
+    };
+  }
+
+  try {
+    const packDirectory = await findPaperPackImageDirectory(directoryHandle, paperPackId);
+
+    if (!packDirectory) {
+      return {
+        ok: true,
+        images: [],
+        message: `No image folder found for ${paperPackName}.`
+      };
+    }
+
+    const images = await getImagesFromDirectory(packDirectory.handle, packDirectory.path);
+
+    return {
+      ok: true,
+      images,
+      message:
+        images.length > 0
+          ? `${images.length} image${images.length === 1 ? "" : "s"} loaded from the image library.`
+          : `No image files found in ${packDirectory.path}.`
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      images: [],
+      message: `Images for ${paperPackName} could not be loaded automatically.`
+    };
+  }
+}
+
 export async function hydratePaperPackImageSources(paperPacks) {
   const directoryHandle = await getReadableImageLibraryDirectoryHandle();
 
@@ -416,11 +467,11 @@ async function findRelativePathForFileHandle(directoryHandle, targetFileHandle, 
   return "";
 }
 
-async function getReadableImageLibraryDirectoryHandle() {
+async function getReadableImageLibraryDirectoryHandle(options = {}) {
   const imageLibrary = await loadCatalogSetting(IMAGE_LIBRARY_SETTING_ID);
   const directoryHandle = imageLibrary?.directoryHandle;
 
-  if (!directoryHandle || !(await hasDirectoryPermission(directoryHandle, "read"))) {
+  if (!directoryHandle || !(await hasDirectoryPermission(directoryHandle, "read", options))) {
     return null;
   }
 
@@ -438,7 +489,7 @@ async function getWritableImageLibraryDirectoryHandle() {
   return directoryHandle;
 }
 
-async function hasDirectoryPermission(directoryHandle, mode) {
+async function hasDirectoryPermission(directoryHandle, mode, options = {}) {
   if (!directoryHandle?.queryPermission) {
     return false;
   }
@@ -450,7 +501,7 @@ async function hasDirectoryPermission(directoryHandle, mode) {
       return true;
     }
 
-    if (!directoryHandle.requestPermission) {
+    if (options.requestPermission === false || !directoryHandle.requestPermission) {
       return false;
     }
 
@@ -458,6 +509,68 @@ async function hasDirectoryPermission(directoryHandle, mode) {
   } catch (error) {
     return false;
   }
+}
+
+async function findPaperPackImageDirectory(directoryHandle, paperPackId) {
+  try {
+    return {
+      handle: await directoryHandle.getDirectoryHandle(paperPackId),
+      path: paperPackId
+    };
+  } catch (error) {
+    // Fall through to a normalized folder-name search below.
+  }
+
+  if (!directoryHandle.entries) {
+    return null;
+  }
+
+  for await (const [entryName, entryHandle] of directoryHandle.entries()) {
+    if (entryHandle.kind === "directory" && createId(entryName) === paperPackId) {
+      return {
+        handle: entryHandle,
+        path: entryName
+      };
+    }
+  }
+
+  return null;
+}
+
+async function getImagesFromDirectory(directoryHandle, directoryPath) {
+  if (!directoryHandle.entries) {
+    return [];
+  }
+
+  const imageEntries = [];
+
+  for await (const [entryName, entryHandle] of directoryHandle.entries()) {
+    if (entryHandle.kind !== "file" || !isSupportedImageFileName(entryName)) {
+      continue;
+    }
+
+    const file = await entryHandle.getFile();
+    const imagePath = `${directoryPath}/${entryName}`;
+
+    imageEntries.push({
+      id: createId(entryName.replace(/\.[^.]+$/, "")) || `image-${imageEntries.length + 1}`,
+      name: entryName,
+      imagePath,
+      src: URL.createObjectURL(file),
+      storageStrategy: LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY
+    });
+  }
+
+  return imageEntries.sort((firstImage, secondImage) =>
+    firstImage.imagePath.localeCompare(secondImage.imagePath, undefined, {
+      numeric: true,
+      sensitivity: "base"
+    })
+  );
+}
+
+function isSupportedImageFileName(fileName) {
+  return /\.(jpe?g|png|webp|gif)$/i.test(String(fileName || ""));
 }
 
 async function hydratePatternImageSource(patternEntry, directoryHandle) {

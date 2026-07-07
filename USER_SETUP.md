@@ -25,13 +25,13 @@ On Windows:
 4. In the PowerShell window, confirm the prompt ends with `card-supply-catalog>`.
 5. Check whether Python is already installed:
 
-```text
+```type:
 python --version
 ```
 
 If PowerShell shows a Python version, start the local server:
 
-```text
+```type:
 python -m http.server 8000
 ```
 
@@ -42,20 +42,20 @@ If Windows opens the Microsoft Store instead, install Python:
 3. Open PowerShell from the `card-supply-catalog` folder again.
 4. Run:
 
-```text
+```type:
 python --version
 ```
 
 5. If it shows a Python version, start the local server:
 
-```text
+```type:
 python -m http.server 8000
 ```
 
 6. Leave that PowerShell window open while using the app.
 7. Open this address in Chrome, Edge, or Brave:
 
-```text
+```type:
 http://localhost:8000
 ```
 

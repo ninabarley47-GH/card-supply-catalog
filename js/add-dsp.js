@@ -2,7 +2,8 @@ import {
   addPatternImageFiles,
   choosePatternImagesFromLibrary,
   createPatternSlots,
-  getImageEntriesFromPatterns
+  getImageEntriesFromPatterns,
+  loadPatternImagesForPaperPackName
 } from "./images.js";
 import { addCatalogSchemaVersion } from "./schema.js";
 
@@ -16,13 +17,14 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
   const openButtons = [...document.querySelectorAll("[data-add-dsp-open]")];
   const closeButtons = [...document.querySelectorAll("[data-add-dsp-close]")];
   const imageInputs = [...document.querySelectorAll("[data-pattern-image-input]")];
-  const folderInputs = [...document.querySelectorAll("[data-pattern-folder-input]")];
   const libraryPickerButton = document.querySelector("[data-pattern-library-picker]");
   const imagePreviewList = document.querySelector("[data-image-preview-list]");
   const imagePreviewCount = document.querySelector("[data-image-preview-count]");
   const selectedImages = [];
   const formState = {
-    editingPaperPack: null
+    editingPaperPack: null,
+    autoLoadedPaperPackId: "",
+    isLoadingLibraryImages: false
   };
 
   if (!panel || !form) {
@@ -91,17 +93,13 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
     });
   }
 
-  for (const input of folderInputs) {
-    input.addEventListener("change", async () => {
-      const files = [...input.files].sort((a, b) =>
-        (a.webkitRelativePath || a.name).localeCompare(b.webkitRelativePath || b.name)
-      );
+  form.elements.name?.addEventListener("change", () =>
+    autoLoadImagesForCurrentPaperPackName(form, selectedImages, imagePreviewList, imagePreviewCount, message, formState)
+  );
 
-      await addImagesFromInput(files, selectedImages, message);
-      input.value = "";
-      renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount);
-    });
-  }
+  form.elements.name?.addEventListener("blur", () =>
+    autoLoadImagesForCurrentPaperPackName(form, selectedImages, imagePreviewList, imagePreviewCount, message, formState)
+  );
 
   libraryPickerButton?.addEventListener("click", async () => {
     const result = await choosePatternImagesFromLibrary();
@@ -254,6 +252,8 @@ function resetAddDspForm(form, selectedImages, imagePreviewList, imagePreviewCou
   selectedImages.splice(0, selectedImages.length);
   renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount);
   controls.formState.editingPaperPack = null;
+  controls.formState.autoLoadedPaperPackId = "";
+  controls.formState.isLoadingLibraryImages = false;
   controls.title.textContent = "Add DSP";
   controls.summary.textContent = "Save a new Designer Series Paper pack to this catalog.";
   controls.submitButton.textContent = "Save Paper Pack";
@@ -377,6 +377,71 @@ async function addSelectedImageFiles(files, selectedImages) {
   const imageEntries = await addPatternImageFiles(files);
 
   selectedImages.push(...imageEntries);
+}
+
+async function autoLoadImagesForCurrentPaperPackName(
+  form,
+  selectedImages,
+  imagePreviewList,
+  imagePreviewCount,
+  message,
+  formState
+) {
+  const paperPackName = cleanText(form.elements.name?.value);
+  const paperPackId = createId(paperPackName);
+
+  if (
+    !paperPackName ||
+    !paperPackId ||
+    formState.editingPaperPack ||
+    formState.isLoadingLibraryImages ||
+    selectedImages.length > 0 ||
+    formState.autoLoadedPaperPackId === paperPackId
+  ) {
+    return;
+  }
+
+  formState.isLoadingLibraryImages = true;
+  renderFormMessage(message, `Looking for images in the image library for ${paperPackName}...`, "");
+
+  try {
+    const result = await loadPatternImagesForPaperPackName(paperPackName);
+
+    if (!result.ok) {
+      renderFormMessage(message, result.message, "error");
+      return;
+    }
+
+    formState.autoLoadedPaperPackId = paperPackId;
+
+    if (result.images.length === 0) {
+      renderFormMessage(message, result.message, "");
+      return;
+    }
+
+    selectedImages.push(...result.images);
+    updatePatternCountForAutoLoadedImages(form, selectedImages.length);
+    renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount);
+    renderFormMessage(message, result.message, "success");
+  } catch (error) {
+    renderFormMessage(message, `Images for ${paperPackName} could not be loaded automatically.`, "error");
+  } finally {
+    formState.isLoadingLibraryImages = false;
+  }
+}
+
+function updatePatternCountForAutoLoadedImages(form, imageCount) {
+  const patternCountControl = form.elements.patternCount;
+
+  if (!patternCountControl) {
+    return;
+  }
+
+  const currentPatternCount = Number.parseInt(patternCountControl?.value, 10);
+
+  if (Number.isNaN(currentPatternCount) || currentPatternCount < imageCount) {
+    patternCountControl.value = `${imageCount}`;
+  }
 }
 
 async function addImagesFromInput(files, selectedImages, message) {
