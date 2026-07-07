@@ -589,16 +589,21 @@ async function hydratePatternImageSource(patternEntry, directoryHandle) {
 }
 
 async function findFileFromImagePath(directoryHandle, imagePath) {
-  try {
-    return await getFileFromImagePath(directoryHandle, imagePath);
-  } catch (error) {
-    const fallbackImagePath = getUnprefixedImagePath(imagePath);
+  const candidatePaths = getImagePathCandidates(imagePath);
+  let lookupError = null;
 
-    if (!fallbackImagePath || fallbackImagePath === imagePath) {
-      throw error;
+  for (const candidatePath of candidatePaths) {
+    try {
+      return await getFileFromImagePath(directoryHandle, candidatePath);
+    } catch (error) {
+      lookupError = lookupError || error;
     }
+  }
 
-    return await getFileFromImagePath(directoryHandle, fallbackImagePath);
+  try {
+    return await findFileByFlexibleName(directoryHandle, imagePath);
+  } catch (error) {
+    throw lookupError || error;
   }
 }
 
@@ -608,23 +613,104 @@ async function getFileFromImagePath(directoryHandle, imagePath) {
   let currentDirectory = directoryHandle;
 
   for (const pathPart of pathParts) {
-    currentDirectory = await currentDirectory.getDirectoryHandle(pathPart);
+    currentDirectory = await getDirectoryHandleByName(currentDirectory, pathPart);
   }
 
   const fileHandle = await currentDirectory.getFileHandle(fileName);
   return await fileHandle.getFile();
 }
 
-function getUnprefixedImagePath(imagePath) {
+async function findFileByFlexibleName(directoryHandle, imagePath) {
   const pathParts = String(imagePath || "").split("/").filter(Boolean);
   const fileName = pathParts.pop();
-  const unprefixedFileName = fileName?.replace(/^\d{2}-/, "");
+  let currentDirectory = directoryHandle;
 
-  if (!fileName || !unprefixedFileName || unprefixedFileName === fileName) {
-    return "";
+  for (const pathPart of pathParts) {
+    currentDirectory = await getDirectoryHandleByName(currentDirectory, pathPart);
   }
 
-  return [...pathParts, unprefixedFileName].join("/");
+  if (!fileName || !currentDirectory.entries) {
+    throw new Error("Image file could not be found.");
+  }
+
+  const targetKey = getFlexibleImageFileKey(fileName);
+
+  for await (const [entryName, entryHandle] of currentDirectory.entries()) {
+    if (
+      entryHandle.kind === "file" &&
+      isSupportedImageFileName(entryName) &&
+      getFlexibleImageFileKey(entryName) === targetKey
+    ) {
+      return await entryHandle.getFile();
+    }
+  }
+
+  throw new Error("Image file could not be found.");
+}
+
+async function getDirectoryHandleByName(directoryHandle, directoryName) {
+  try {
+    return await directoryHandle.getDirectoryHandle(directoryName);
+  } catch (error) {
+    if (!directoryHandle.entries) {
+      throw error;
+    }
+  }
+
+  const normalizedDirectoryName = createId(directoryName);
+
+  for await (const [entryName, entryHandle] of directoryHandle.entries()) {
+    if (entryHandle.kind === "directory" && createId(entryName) === normalizedDirectoryName) {
+      return entryHandle;
+    }
+  }
+
+  throw new Error("Image directory could not be found.");
+}
+
+function getImagePathCandidates(imagePath) {
+  const pathParts = String(imagePath || "").split("/").filter(Boolean);
+  const fileName = pathParts.pop();
+
+  if (!fileName) {
+    return [];
+  }
+
+  return [...new Set(getImageFileNameCandidates(fileName).map((candidateName) => [...pathParts, candidateName].join("/")))];
+}
+
+function getImageFileNameCandidates(fileName) {
+  const candidates = [fileName];
+  const extension = getFileExtension(fileName);
+  const baseName = fileName.slice(0, -extension.length);
+  const prefixedName = baseName.match(/^(\d{2})-(.+)$/);
+
+  if (prefixedName) {
+    const [, prefix, unprefixedBaseName] = prefixedName;
+
+    candidates.push(`${unprefixedBaseName}${extension}`);
+    candidates.push(`${prefix}${extension}`);
+
+    if (/^\d+$/.test(unprefixedBaseName)) {
+      candidates.push(`${Number.parseInt(unprefixedBaseName, 10)}${extension}`);
+      candidates.push(`${unprefixedBaseName.padStart(2, "0")}${extension}`);
+    }
+  }
+
+  if (/^\d+$/.test(baseName)) {
+    candidates.push(`${Number.parseInt(baseName, 10)}${extension}`);
+    candidates.push(`${baseName.padStart(2, "0")}${extension}`);
+  }
+
+  return candidates;
+}
+
+function getFlexibleImageFileKey(fileName) {
+  const extension = getFileExtension(fileName);
+  const baseName = fileName.slice(0, -extension.length).replace(/^\d{2}-/, "");
+  const normalizedBaseName = /^\d+$/.test(baseName) ? `${Number.parseInt(baseName, 10)}` : createId(baseName);
+
+  return `${normalizedBaseName}${extension}`;
 }
 
 async function writePatternImageFile(directoryHandle, paperPack, imageFile, imageName) {
