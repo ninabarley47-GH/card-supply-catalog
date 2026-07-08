@@ -106,11 +106,7 @@
             <div class="settings-actions" aria-label="Settings actions">
               <button class="button" type="button" data-add-dsp-open>Add Paper Pack</button>
               <button class="button" type="button" data-add-color-open>Add Color</button>
-              <button class="button" type="button" data-export-catalog>Export Backup</button>
-              <label class="button file-button" for="catalog-backup-import">Import Backup</label>
-              <input id="catalog-backup-import" class="visually-hidden" type="file" accept="application/json,.json" data-import-catalog>
             </div>
-            <p class="settings-message" data-backup-message aria-live="polite"></p>
 
             <section class="settings-subsection" aria-labelledby="image-library-title">
               <div class="section-heading">
@@ -129,6 +125,23 @@
               </div>
               <p class="settings-message" data-image-library-status aria-live="polite">Checking image folder support...</p>
               <div class="image-library-health" data-image-library-health aria-live="polite"></div>
+            </section>
+
+            <section class="settings-subsection" aria-labelledby="backup-restore-title">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Backup & Restore</p>
+                  <h4 id="backup-restore-title">Catalog Backup</h4>
+                </div>
+                <p>Export or restore catalog data for sharing, safekeeping, or moving browsers.</p>
+              </div>
+
+              <div class="settings-actions" aria-label="Backup and restore actions">
+                <button class="button" type="button" data-export-catalog>Export Backup</button>
+                <label class="button file-button" for="catalog-backup-import">Import Backup</label>
+                <input id="catalog-backup-import" class="visually-hidden" type="file" accept="application/json,.json" data-import-catalog>
+              </div>
+              <p class="settings-message" data-backup-message aria-live="polite"></p>
             </section>
 
             <section class="settings-subsection" aria-labelledby="setup-status-title">
