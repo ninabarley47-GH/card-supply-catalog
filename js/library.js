@@ -431,19 +431,29 @@ function getLibraryColorFilterOptions(paperPacks, filteredPaperPacks, selectedCo
     return getAvailableColors(paperPacks, colorsById);
   }
 
-  const colorsByIdForOptions = new Map(
-    getAvailableColors(filteredPaperPacks, colorsById).map((color) => [color.id, color])
-  );
+  const selectedColorIds = new Set(selectedColors);
+  const filteredColors = getAvailableColors(filteredPaperPacks, colorsById);
+  const selectedColorOptions = [];
+  const remainingColorOptions = [];
 
   for (const selectedColorId of selectedColors) {
     const selectedColor = colorsById[selectedColorId];
 
     if (selectedColor) {
-      colorsByIdForOptions.set(selectedColor.id, selectedColor);
+      selectedColorOptions.push(selectedColor);
     }
   }
 
-  return [...colorsByIdForOptions.values()].sort(compareColorNames);
+  for (const color of filteredColors) {
+    if (!selectedColorIds.has(color.id)) {
+      remainingColorOptions.push(color);
+    }
+  }
+
+  return [
+    ...selectedColorOptions.sort(compareColorNames),
+    ...remainingColorOptions.sort(compareColorNames)
+  ];
 }
 
 function getSelectedLibraryTags(container) {
