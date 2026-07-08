@@ -1716,6 +1716,12 @@ function compareColorNames(firstColor, secondColor) {
   });
 }
 
+function compareTagNames(firstTag, secondTag) {
+  return firstTag.localeCompare(secondTag, undefined, {
+    sensitivity: "base"
+  });
+}
+
 function compareColorFamilies([firstFamily], [secondFamily]) {
   return getColorFamilyRank(firstFamily) - getColorFamilyRank(secondFamily);
 }
