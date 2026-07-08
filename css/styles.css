@@ -1588,6 +1588,25 @@ button.pattern {
   color: var(--color-muted);
 }
 
+.settings-help {
+  max-width: 44rem;
+  margin-top: var(--space-3);
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.settings-help summary {
+  display: inline-flex;
+  cursor: pointer;
+  color: var(--color-accent-dark);
+  font-weight: 700;
+}
+
+.settings-help p {
+  margin: var(--space-2) 0 0;
+  line-height: 1.45;
+}
+
 .settings-message {
   min-height: 1.2rem;
   margin: var(--space-3) 0 0;
