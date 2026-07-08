@@ -205,9 +205,13 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
   const colorFilter = document.querySelector("[data-library-color-filters]");
 
   function renderCurrent() {
-    refreshLibraryColorFilters(colorFilter, getAvailableColors(paperPacks, colorsById));
     const filterState = getLibraryFilterState(input, tagFilter, colorFilter);
     const filteredPaperPacks = applyPaperPackFilters(paperPacks, filterState, colorsById);
+
+    refreshLibraryColorFilters(
+      colorFilter,
+      getLibraryColorFilterOptions(paperPacks, filteredPaperPacks, filterState.selectedColors, colorsById)
+    );
 
     renderPaperPackLibrary(paperPackLibrary, filteredPaperPacks, colorsById, {
       query: filterState.query,
@@ -420,6 +424,26 @@ function getAvailableColors(paperPacks, colorsById) {
   }
 
   return [...colorsByPackReference.values()].sort(compareColors);
+}
+
+function getLibraryColorFilterOptions(paperPacks, filteredPaperPacks, selectedColors, colorsById) {
+  if ((selectedColors || []).length === 0) {
+    return getAvailableColors(paperPacks, colorsById);
+  }
+
+  const colorsByIdForOptions = new Map(
+    getAvailableColors(filteredPaperPacks, colorsById).map((color) => [color.id, color])
+  );
+
+  for (const selectedColorId of selectedColors) {
+    const selectedColor = colorsById[selectedColorId];
+
+    if (selectedColor) {
+      colorsByIdForOptions.set(selectedColor.id, selectedColor);
+    }
+  }
+
+  return [...colorsByIdForOptions.values()].sort(compareColors);
 }
 
 function getSelectedLibraryTags(container) {
