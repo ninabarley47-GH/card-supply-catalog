@@ -208,6 +208,10 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
     const filterState = getLibraryFilterState(input, tagFilter, colorFilter);
     const filteredPaperPacks = applyPaperPackFilters(paperPacks, filterState, colorsById);
 
+    refreshLibraryTagFilters(
+      tagFilter,
+      getLibraryTagFilterOptions(paperPacks, filteredPaperPacks, filterState.selectedTags)
+    );
     refreshLibraryColorFilters(
       colorFilter,
       getLibraryColorFilterOptions(paperPacks, filteredPaperPacks, filterState.selectedColors, colorsById)
@@ -242,7 +246,7 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
     };
   }
 
-  renderLibraryTagFilters(tagFilter, getAvailableTags(paperPacks));
+  refreshLibraryTagFilters(tagFilter, getAvailableTags(paperPacks));
   refreshLibraryColorFilters(colorFilter, getAvailableColors(paperPacks, colorsById));
   input.addEventListener("input", renderCurrent);
   clearAllButton?.addEventListener("click", () => {
@@ -315,6 +319,29 @@ function renderLibraryTagFilters(container, tags) {
   );
 
   container.append(options);
+}
+
+function refreshLibraryTagFilters(container, tags) {
+  if (!container) {
+    return;
+  }
+
+  const selectedTags = new Set(getSelectedLibraryTags(container));
+  const existingOptions = container.querySelector("[data-library-filter-options]");
+  const optionsWereHidden = existingOptions?.hidden || false;
+
+  existingOptions?.remove();
+  renderLibraryTagFilters(container, tags);
+
+  const refreshedOptions = container.querySelector("[data-library-filter-options]");
+
+  if (refreshedOptions) {
+    refreshedOptions.hidden = optionsWereHidden;
+  }
+
+  for (const input of container.querySelectorAll('input[name="library-tags"]')) {
+    input.checked = selectedTags.has(input.value);
+  }
 }
 
 function renderLibraryColorFilters(container, colors) {
@@ -408,6 +435,21 @@ function getAvailableTags(paperPacks) {
   return [...tagsByNormalizedName.values()].sort((firstTag, secondTag) =>
     firstTag.localeCompare(secondTag)
   );
+}
+
+function getLibraryTagFilterOptions(paperPacks, filteredPaperPacks, selectedTags) {
+  if ((selectedTags || []).length === 0) {
+    return getAvailableTags(paperPacks);
+  }
+
+  const selectedTagKeys = new Set(selectedTags.map(normalizeFilterText));
+  const filteredTags = getAvailableTags(filteredPaperPacks);
+  const remainingTags = filteredTags.filter((tag) => !selectedTagKeys.has(normalizeFilterText(tag)));
+
+  return [
+    ...[...selectedTags].sort(compareTagNames),
+    ...remainingTags.sort(compareTagNames)
+  ];
 }
 
 function getAvailableColors(paperPacks, colorsById) {
