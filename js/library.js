@@ -443,7 +443,7 @@ function getLibraryColorFilterOptions(paperPacks, filteredPaperPacks, selectedCo
     }
   }
 
-  return [...colorsByIdForOptions.values()].sort(compareColors);
+  return [...colorsByIdForOptions.values()].sort(compareColorNames);
 }
 
 function getSelectedLibraryTags(container) {
@@ -1656,6 +1656,12 @@ function compareColors(firstColor, secondColor) {
   }
 
   return firstColor.name.localeCompare(secondColor.name);
+}
+
+function compareColorNames(firstColor, secondColor) {
+  return firstColor.name.localeCompare(secondColor.name, undefined, {
+    sensitivity: "base"
+  });
 }
 
 function compareColorFamilies([firstFamily], [secondFamily]) {
