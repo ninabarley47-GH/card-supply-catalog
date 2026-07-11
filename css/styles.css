@@ -1749,6 +1749,39 @@ button.pattern {
   gap: var(--space-4);
 }
 
+.color-reference-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 16rem));
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.color-reference-control {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  color: var(--color-muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.color-reference-control select {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  padding: 0.65rem 0.75rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.color-reference-summary {
+  margin: 0 0 var(--space-3);
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .color-family-group {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-medium);
@@ -1883,6 +1916,10 @@ button.pattern {
   }
 
   .form-grid-two {
+    grid-template-columns: 1fr;
+  }
+
+  .color-reference-controls {
     grid-template-columns: 1fr;
   }
 }

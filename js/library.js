@@ -52,6 +52,26 @@ const COLOR_FAMILY_LABELS = {
   black: "Black"
 };
 
+const COLOR_COLLECTION_ORDER = [
+  "in-color",
+  "neutrals",
+  "brights",
+  "subtles",
+  "regals",
+  "basics",
+  "legacy"
+];
+
+const COLOR_COLLECTION_LABELS = {
+  "in-color": "In Color",
+  neutrals: "Neutrals",
+  brights: "Brights",
+  subtles: "Subtles",
+  regals: "Regals",
+  basics: "Basics",
+  legacy: "Legacy"
+};
+
 const PATTERN_CLASS_MAP = {
   confetti: "pattern-confetti",
   dots: "pattern-dots",
@@ -113,16 +133,16 @@ export async function initializeLibraryShell() {
           librarySearch.renderCurrent();
 
           if (colorLibrary) {
-            renderColorLibrary(colorLibrary, Object.values(colorsById));
+            renderColorReference(colorLibrary, Object.values(colorsById));
           }
         }
       });
     }
 
     if (colorLibrary) {
-      renderColorLibrary(colorLibrary, colors);
+      initializeColorReferenceControls(colorLibrary, colors);
       document.addEventListener("color:saved", () => {
-        renderColorLibrary(colorLibrary, Object.values(colorsById));
+        renderColorReference(colorLibrary, Object.values(colorsById));
       });
     }
   } catch (error) {
@@ -1674,29 +1694,135 @@ function createMissingColorItem(colorId) {
   return item;
 }
 
-function renderColorLibrary(container, colors) {
+function initializeColorReferenceControls(container, colors) {
+  const modeControl = document.querySelector("[data-color-reference-mode]");
+  const valueControl = document.querySelector("[data-color-reference-value]");
+  const getCurrentColors = () => container.colorReferenceColors || colors;
+
+  renderColorReference(container, colors);
+
+  modeControl?.addEventListener("change", () => {
+    if (valueControl) {
+      valueControl.value = "";
+    }
+
+    renderColorReference(container, getCurrentColors());
+  });
+  valueControl?.addEventListener("change", () => renderColorReference(container, getCurrentColors()));
+}
+
+function renderColorReference(container, colors) {
+  const modeControl = document.querySelector("[data-color-reference-mode]");
+  const valueControl = document.querySelector("[data-color-reference-value]");
+  const summary = document.querySelector("[data-color-reference-summary]");
+  const groupMode = getColorReferenceGroupMode(modeControl?.value);
+  const selectedGroup = getValidColorReferenceGroupValue(colors, groupMode, valueControl?.value || "");
+  const filteredColors = getColorReferenceFilteredColors(colors, groupMode, selectedGroup);
+
+  container.colorReferenceColors = colors;
+  refreshColorReferenceGroupOptions(valueControl, colors, groupMode, selectedGroup);
+  renderColorLibrary(container, filteredColors, { groupMode });
+
+  if (summary) {
+    summary.textContent = getColorReferenceSummary(filteredColors, colors, groupMode, selectedGroup);
+  }
+}
+
+function renderColorLibrary(container, colors, options = {}) {
+  const groupMode = getColorReferenceGroupMode(options.groupMode);
+
   container.replaceChildren(
-    ...groupColorsByFamily(colors).map(([colorFamily, familyColors]) =>
-      createColorFamilyGroup(colorFamily, familyColors)
+    ...groupColors(colors, groupMode).map(([groupValue, groupColorsForSection]) =>
+      createColorFamilyGroup(groupValue, groupColorsForSection, groupMode)
     )
   );
 }
 
-function groupColorsByFamily(colors) {
-  const sortedColors = [...colors].sort(compareColors);
+function groupColors(colors, groupMode = "color-family") {
+  const sortedColors = [...colors].sort(
+    groupMode === "collection" ? compareColorsByCollection : compareColors
+  );
   const groups = new Map();
 
   for (const color of sortedColors) {
-    const colorFamily = color.colorFamily || "neutral";
+    const groupValue = getColorReferenceGroupValue(color, groupMode);
 
-    if (!groups.has(colorFamily)) {
-      groups.set(colorFamily, []);
+    if (!groups.has(groupValue)) {
+      groups.set(groupValue, []);
     }
 
-    groups.get(colorFamily).push(color);
+    groups.get(groupValue).push(color);
   }
 
-  return [...groups.entries()].sort(compareColorFamilies);
+  return [...groups.entries()].sort(
+    groupMode === "collection" ? compareColorCollections : compareColorFamilies
+  );
+}
+
+function getColorReferenceGroupMode(value) {
+  return value === "collection" ? "collection" : "color-family";
+}
+
+function getColorReferenceGroupValue(color, groupMode) {
+  if (groupMode === "collection") {
+    return color.family || "legacy";
+  }
+
+  return color.colorFamily || "neutral";
+}
+
+function getValidColorReferenceGroupValue(colors, groupMode, selectedGroup) {
+  if (!selectedGroup) {
+    return "";
+  }
+
+  return groupColors(colors, groupMode).some(([groupValue]) => groupValue === selectedGroup) ? selectedGroup : "";
+}
+
+function refreshColorReferenceGroupOptions(valueControl, colors, groupMode, selectedGroup) {
+  if (!valueControl) {
+    return;
+  }
+
+  const groups = groupColors(colors, groupMode).map(([groupValue]) => groupValue);
+  const allLabel = groupMode === "collection" ? "All Collections" : "All Color Families";
+
+  valueControl.replaceChildren(
+    createColorReferenceOption("", allLabel),
+    ...groups.map((groupValue) =>
+      createColorReferenceOption(groupValue, getColorReferenceGroupLabel(groupValue, groupMode))
+    )
+  );
+  valueControl.value = groups.includes(selectedGroup) ? selectedGroup : "";
+}
+
+function createColorReferenceOption(value, label) {
+  const option = document.createElement("option");
+
+  option.value = value;
+  option.textContent = label;
+
+  return option;
+}
+
+function getColorReferenceFilteredColors(colors, groupMode, selectedGroup) {
+  if (!selectedGroup) {
+    return colors;
+  }
+
+  return colors.filter((color) => getColorReferenceGroupValue(color, groupMode) === selectedGroup);
+}
+
+function getColorReferenceSummary(filteredColors, colors, groupMode, selectedGroup) {
+  const colorLabel = filteredColors.length === 1 ? "color" : "colors";
+
+  if (!selectedGroup) {
+    const groupLabel = groupMode === "collection" ? "collections" : "color families";
+
+    return `${filteredColors.length} ${colorLabel} across ${groupColors(colors, groupMode).length} ${groupLabel}.`;
+  }
+
+  return `${filteredColors.length} ${colorLabel} in ${getColorReferenceGroupLabel(selectedGroup, groupMode)}.`;
 }
 
 function compareColors(firstColor, secondColor) {
@@ -1708,6 +1834,17 @@ function compareColors(firstColor, secondColor) {
   }
 
   return firstColor.name.localeCompare(secondColor.name);
+}
+
+function compareColorsByCollection(firstColor, secondColor) {
+  const collectionComparison =
+    getColorCollectionRank(firstColor.family) - getColorCollectionRank(secondColor.family);
+
+  if (collectionComparison !== 0) {
+    return collectionComparison;
+  }
+
+  return compareColorNames(firstColor, secondColor);
 }
 
 function compareColorNames(firstColor, secondColor) {
@@ -1726,20 +1863,32 @@ function compareColorFamilies([firstFamily], [secondFamily]) {
   return getColorFamilyRank(firstFamily) - getColorFamilyRank(secondFamily);
 }
 
+function compareColorCollections([firstCollection], [secondCollection]) {
+  return getColorCollectionRank(firstCollection) - getColorCollectionRank(secondCollection);
+}
+
 function getColorFamilyRank(colorFamily) {
   const rank = COLOR_FAMILY_ORDER.indexOf(colorFamily);
 
   return rank === -1 ? COLOR_FAMILY_ORDER.length : rank;
 }
 
-function createColorFamilyGroup(colorFamily, colors) {
+function getColorCollectionRank(collection) {
+  const rank = COLOR_COLLECTION_ORDER.indexOf(collection);
+
+  return rank === -1 ? COLOR_COLLECTION_ORDER.length : rank;
+}
+
+function createColorFamilyGroup(groupValue, colors, groupMode = "color-family") {
   const section = document.createElement("section");
+  const headingId = `${groupMode}-${groupValue}-colors-title`;
+
   section.className = "color-family-group";
-  section.setAttribute("aria-labelledby", `${colorFamily}-colors-title`);
+  section.setAttribute("aria-labelledby", headingId);
 
   const heading = document.createElement("h4");
-  heading.id = `${colorFamily}-colors-title`;
-  heading.textContent = COLOR_FAMILY_LABELS[colorFamily] || formatColorFamily(colorFamily);
+  heading.id = headingId;
+  heading.textContent = getColorReferenceGroupLabel(groupValue, groupMode);
 
   const markerGrid = document.createElement("div");
   markerGrid.className = "color-marker-grid";
@@ -1748,6 +1897,14 @@ function createColorFamilyGroup(colorFamily, colors) {
   section.append(heading, markerGrid);
 
   return section;
+}
+
+function getColorReferenceGroupLabel(groupValue, groupMode = "color-family") {
+  if (groupMode === "collection") {
+    return COLOR_COLLECTION_LABELS[groupValue] || formatColorFamily(groupValue);
+  }
+
+  return COLOR_FAMILY_LABELS[groupValue] || formatColorFamily(groupValue);
 }
 
 function createColorMarker(color) {

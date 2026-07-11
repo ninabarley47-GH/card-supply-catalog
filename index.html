@@ -169,6 +169,23 @@
                 <p>Official color names and HEX values for pack metadata.</p>
               </div>
 
+              <div class="color-reference-controls" aria-label="Color reference filters">
+                <label class="color-reference-control" for="color-reference-mode">
+                  <span>Show by</span>
+                  <select id="color-reference-mode" data-color-reference-mode>
+                    <option value="color-family">Color Family</option>
+                    <option value="collection">Collection</option>
+                  </select>
+                </label>
+                <label class="color-reference-control" for="color-reference-value">
+                  <span>Group</span>
+                  <select id="color-reference-value" data-color-reference-value>
+                    <option value="">All Color Families</option>
+                  </select>
+                </label>
+              </div>
+              <p class="color-reference-summary" data-color-reference-summary aria-live="polite"></p>
+
               <div class="color-library-grid" data-color-library aria-live="polite">
                 <p class="loading-message">Loading colors...</p>
               </div>
