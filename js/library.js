@@ -1709,6 +1709,32 @@ function initializeColorReferenceControls(container, colors) {
     renderColorReference(container, getCurrentColors());
   });
   valueControl?.addEventListener("change", () => renderColorReference(container, getCurrentColors()));
+
+  container.addEventListener("click", (event) => {
+    const colorButton = event.target.closest("[data-color-detail]");
+
+    if (!colorButton) {
+      return;
+    }
+
+    const color = getCurrentColors().find((candidateColor) => candidateColor.id === colorButton.dataset.colorDetail);
+
+    if (color) {
+      openColorDetail(container, color);
+    }
+  });
+
+  container.addEventListener("click", (event) => {
+    if (event.target.closest("[data-color-detail-close]")) {
+      closeColorDetail(container);
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeColorDetail(container);
+    }
+  });
 }
 
 function renderColorReference(container, colors) {
@@ -1734,7 +1760,8 @@ function renderColorLibrary(container, colors, options = {}) {
   container.replaceChildren(
     ...groupColors(colors, groupMode).map(([groupValue, groupColorsForSection]) =>
       createColorFamilyGroup(groupValue, groupColorsForSection, groupMode)
-    )
+    ),
+    createColorDetailViewer()
   );
 }
 
@@ -1908,10 +1935,13 @@ function getColorReferenceGroupLabel(groupValue, groupMode = "color-family") {
 }
 
 function createColorMarker(color) {
-  const marker = document.createElement("article");
+  const marker = document.createElement("button");
   marker.className = "color-marker";
+  marker.type = "button";
   marker.dataset.colorId = color.id;
+  marker.dataset.colorDetail = color.id;
   marker.title = `${color.name} ${color.hex}`;
+  marker.setAttribute("aria-label", `View details for ${color.name}`);
 
   const swatch = document.createElement("span");
   swatch.className = "color-marker-dot";
@@ -1929,6 +1959,138 @@ function createColorMarker(color) {
   marker.append(swatch, name, hex);
 
   return marker;
+}
+
+function createColorDetailViewer() {
+  const viewer = document.createElement("div");
+  const backdrop = document.createElement("button");
+  const dialog = document.createElement("div");
+  const header = document.createElement("div");
+  const title = document.createElement("h4");
+  const closeButton = document.createElement("button");
+  const body = document.createElement("div");
+
+  viewer.className = "color-detail-viewer";
+  viewer.dataset.colorDetailViewer = "";
+  viewer.hidden = true;
+  backdrop.className = "pattern-viewer-backdrop";
+  backdrop.type = "button";
+  backdrop.dataset.colorDetailClose = "";
+  backdrop.setAttribute("aria-label", "Close color details");
+  dialog.className = "color-detail-dialog";
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
+  dialog.setAttribute("aria-labelledby", "color-detail-title");
+  header.className = "pattern-viewer-header";
+  title.id = "color-detail-title";
+  title.dataset.colorDetailTitle = "";
+  closeButton.className = "detail-close";
+  closeButton.type = "button";
+  closeButton.dataset.colorDetailClose = "";
+  closeButton.setAttribute("aria-label", "Close color details");
+  closeButton.textContent = "\u00d7";
+  body.className = "color-detail-body";
+  body.dataset.colorDetailBody = "";
+
+  header.append(title, closeButton);
+  dialog.append(header, body);
+  viewer.append(backdrop, dialog);
+
+  return viewer;
+}
+
+function openColorDetail(container, color) {
+  const viewer = container.querySelector("[data-color-detail-viewer]");
+  const title = viewer?.querySelector("[data-color-detail-title]");
+  const body = viewer?.querySelector("[data-color-detail-body]");
+
+  if (!viewer || !title || !body) {
+    return;
+  }
+
+  title.textContent = color.name;
+  body.replaceChildren(createColorDetailContent(color));
+  viewer.hidden = false;
+  viewer.querySelector("[data-color-detail-close]")?.focus();
+}
+
+function closeColorDetail(container) {
+  const viewer = container.querySelector("[data-color-detail-viewer]");
+
+  if (!viewer) {
+    return;
+  }
+
+  viewer.hidden = true;
+  viewer.querySelector("[data-color-detail-body]")?.replaceChildren();
+}
+
+function createColorDetailContent(color) {
+  const content = document.createElement("div");
+  const swatch = document.createElement("span");
+  const metadata = document.createElement("dl");
+
+  content.className = "color-detail-content";
+  swatch.className = "color-detail-swatch";
+  swatch.style.backgroundColor = color.hex;
+  swatch.setAttribute("aria-label", `${color.name} swatch`);
+  metadata.className = "color-detail-list";
+
+  metadata.append(
+    createColorDetailItem("Color ID", color.id),
+    createColorDetailItem("HEX", color.hex),
+    createColorDetailItem("RGB", formatRgbValue(color.rgb)),
+    createColorDetailItem("Collection", getColorReferenceGroupLabel(color.family || "legacy", "collection")),
+    createColorDetailItem("Color Family", getColorReferenceGroupLabel(color.colorFamily || "neutral")),
+    createColorDetailItem("Collection Years", color.collectionYears || "Not specified"),
+    createColorDetailItem("Status", formatColorStatus(color.status)),
+    createColorDetailItem("Aliases", (color.aliases || []).join(", ") || "None"),
+    createColorDetailItem("Cardstock", formatMetadataValue(color.products?.cardstock)),
+    createColorDetailItem("Ink", formatMetadataValue(color.products?.ink)),
+    createColorDetailItem("DSP", formatMetadataValue(color.products?.dsp)),
+    createColorDetailItem("Marker", formatMetadataValue(color.products?.marker)),
+    createColorDetailItem("Blend", formatMetadataValue(color.products?.blend))
+  );
+
+  content.append(swatch, metadata);
+
+  return content;
+}
+
+function createColorDetailItem(label, value) {
+  const wrapper = document.createElement("div");
+  const term = document.createElement("dt");
+  const description = document.createElement("dd");
+
+  term.textContent = label;
+  description.textContent = value;
+  wrapper.append(term, description);
+
+  return wrapper;
+}
+
+function formatRgbValue(rgb) {
+  return Array.isArray(rgb) && rgb.length === 3 ? rgb.join(", ") : "Not specified";
+}
+
+function formatColorStatus(status) {
+  return status ? formatColorFamily(status) : "Unknown";
+}
+
+function formatMetadataValue(value) {
+  if (value === null || value === undefined || value === "") {
+    return "Not specified";
+  }
+
+  if (value === true) {
+    return "Available";
+  }
+
+  if (value === false) {
+    return "Not available";
+  }
+
+  return `${value}`;
 }
 
 function formatColorFamily(colorFamily) {
