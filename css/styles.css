@@ -68,6 +68,13 @@ a {
   background: rgba(255, 255, 255, 0.82);
 }
 
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
 .brand {
   display: flex;
   align-items: center;
