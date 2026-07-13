@@ -141,13 +141,9 @@
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Settings</p>
-                <h3 id="settings-title">Catalog Setup</h3>
+                <h3 id="settings-title">Settings</h3>
               </div>
               <p>Manage storage, backups, and setup readiness here.</p>
-            </div>
-
-            <div class="settings-actions" aria-label="Settings actions">
-              <button class="button" type="button" data-add-dsp-open>Add Paper Pack</button>
             </div>
 
             <section class="settings-subsection" aria-labelledby="image-library-title">
@@ -188,6 +184,16 @@
                 <label class="button file-button" for="catalog-backup-import">Import Backup</label>
                 <input id="catalog-backup-import" class="visually-hidden" type="file" accept="application/json,.json" data-import-catalog>
               </div>
+              <details class="settings-help">
+                <summary>How do I share this catalog with an iPad or another computer?</summary>
+                <ol>
+                  <li>On the computer with the complete catalog, choose <strong>Export iPad Backup</strong> if the other person needs images included, or <strong>Export Backup</strong> if they will also connect to the same image folder.</li>
+                  <li>Send the downloaded backup file to the other person.</li>
+                  <li>Have them open the shared app URL: <a href="https://ninabarley47-gh.github.io/card-supply-catalog/">https://ninabarley47-gh.github.io/card-supply-catalog/</a>.</li>
+                  <li>In Settings, choose <strong>Import Backup</strong> and select the file.</li>
+                  <li>On iPad, open the app in Safari and use Share, then <strong>Add to Home Screen</strong>.</li>
+                </ol>
+              </details>
               <p class="settings-message" data-backup-message aria-live="polite"></p>
             </section>
 
