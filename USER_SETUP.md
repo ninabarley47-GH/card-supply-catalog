@@ -33,6 +33,15 @@ The Home Screen app opens without needing Python, GitHub, or a local server.
 
 If the iPad asks you to sign into GitHub, you are probably on the GitHub repository page instead of the app URL, or the GitHub Pages deployment is not public yet.
 
+If the app URL shows a 404 error, the GitHub Pages site has probably not deployed yet. The catalog maintainer should check the GitHub repository:
+
+1. Go to Settings, then Pages.
+2. Confirm Build and deployment is set to GitHub Actions.
+3. Go to Actions.
+4. Open Deploy GitHub Pages.
+5. Confirm the latest run completed successfully.
+6. If needed, run the Deploy GitHub Pages workflow manually.
+
 ## Open the App on Desktop
 
 Card Supply Catalog is a local-first web app. It should be opened from the shared app URL or from a local development server, not by double-clicking `index.html`.
