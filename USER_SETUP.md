@@ -12,16 +12,26 @@ The app can browse catalog data in other modern browsers, but choosing an image 
 
 ## Install on iPad
 
-Use the shared app URL from the person maintaining the catalog.
+Use the public app URL, not the GitHub repository page.
 
-1. Open the shared app URL in Safari.
-2. Tap the Share button.
+App URL:
+
+```text
+https://ninabarley47-gh.github.io/card-supply-catalog/
+```
+
+Do not open `github.com/ninabarley47-GH/card-supply-catalog` for normal use. That is the source-code page and may ask for a GitHub login.
+
+1. Open the app URL in Safari.
+2. Tap the Share button. In Safari this is the square icon with an up arrow, usually in the top or bottom toolbar.
 3. Tap Add to Home Screen.
 4. Keep the suggested name or rename it to Card Catalog.
 5. Tap Add.
 6. Open Card Catalog from the iPad Home Screen.
 
 The Home Screen app opens without needing Python, GitHub, or a local server.
+
+If the iPad asks you to sign into GitHub, you are probably on the GitHub repository page instead of the app URL, or the GitHub Pages deployment is not public yet.
 
 ## Open the App on Desktop
 
