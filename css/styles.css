@@ -1775,6 +1775,10 @@ button.pattern {
   font: inherit;
 }
 
+.color-reference-control select[multiple] {
+  min-height: 7rem;
+}
+
 .color-reference-summary {
   margin: 0 0 var(--space-3);
   color: var(--color-muted);

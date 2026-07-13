@@ -1703,7 +1703,7 @@ function initializeColorReferenceControls(container, colors) {
 
   modeControl?.addEventListener("change", () => {
     if (valueControl) {
-      valueControl.value = "";
+      clearSelectedOptions(valueControl);
     }
 
     renderColorReference(container, getCurrentColors());
@@ -1741,16 +1741,21 @@ function renderColorReference(container, colors) {
   const modeControl = document.querySelector("[data-color-reference-mode]");
   const valueControl = document.querySelector("[data-color-reference-value]");
   const summary = document.querySelector("[data-color-reference-summary]");
-  const groupMode = getColorReferenceGroupMode(modeControl?.value);
-  const selectedGroup = getValidColorReferenceGroupValue(colors, groupMode, valueControl?.value || "");
-  const filteredColors = getColorReferenceFilteredColors(colors, groupMode, selectedGroup);
+  const groupModes = getSelectedColorReferenceGroupModes(modeControl);
+  const selectedGroups = getValidColorReferenceGroupValues(
+    colors,
+    groupModes,
+    getSelectedOptionValues(valueControl)
+  );
+  const filteredColors = getColorReferenceFilteredColors(colors, groupModes, selectedGroups);
+  const renderGroupMode = groupModes[0] || "collection";
 
   container.colorReferenceColors = colors;
-  refreshColorReferenceGroupOptions(valueControl, colors, groupMode, selectedGroup);
-  renderColorLibrary(container, filteredColors, { groupMode });
+  refreshColorReferenceGroupOptions(valueControl, colors, groupModes, selectedGroups);
+  renderColorLibrary(container, filteredColors, { groupMode: renderGroupMode });
 
   if (summary) {
-    summary.textContent = getColorReferenceSummary(filteredColors, colors, groupMode, selectedGroup);
+    summary.textContent = getColorReferenceSummary(filteredColors, colors, groupModes, selectedGroups);
   }
 }
 
@@ -1790,6 +1795,12 @@ function getColorReferenceGroupMode(value) {
   return value === "collection" ? "collection" : "color-family";
 }
 
+function getSelectedColorReferenceGroupModes(modeControl) {
+  const selectedModes = getSelectedOptionValues(modeControl).map(getColorReferenceGroupMode);
+
+  return selectedModes.length > 0 ? selectedModes : ["collection"];
+}
+
 function getColorReferenceGroupValue(color, groupMode) {
   if (groupMode === "collection") {
     return color.family || "legacy";
@@ -1798,29 +1809,52 @@ function getColorReferenceGroupValue(color, groupMode) {
   return color.colorFamily || "neutral";
 }
 
-function getValidColorReferenceGroupValue(colors, groupMode, selectedGroup) {
-  if (!selectedGroup) {
-    return "";
-  }
-
-  return groupColors(colors, groupMode).some(([groupValue]) => groupValue === selectedGroup) ? selectedGroup : "";
+function getColorReferenceGroupOptionValue(groupMode, groupValue) {
+  return `${groupMode}:${groupValue}`;
 }
 
-function refreshColorReferenceGroupOptions(valueControl, colors, groupMode, selectedGroup) {
+function parseColorReferenceGroupOptionValue(optionValue) {
+  const [rawGroupMode, ...groupValueParts] = String(optionValue || "").split(":");
+  const groupMode = getColorReferenceGroupMode(rawGroupMode);
+  const groupValue = groupValueParts.join(":");
+
+  return groupValue ? { groupMode, groupValue } : null;
+}
+
+function getValidColorReferenceGroupValues(colors, groupModes, selectedGroups) {
+  if (!selectedGroups.length) {
+    return [];
+  }
+
+  const availableGroups = new Set(
+    groupModes.flatMap((groupMode) =>
+      groupColors(colors, groupMode).map(([groupValue]) =>
+        getColorReferenceGroupOptionValue(groupMode, groupValue)
+      )
+    )
+  );
+
+  return selectedGroups.filter((selectedGroup) => availableGroups.has(selectedGroup));
+}
+
+function refreshColorReferenceGroupOptions(valueControl, colors, groupModes, selectedGroups) {
   if (!valueControl) {
     return;
   }
 
-  const groups = groupColors(colors, groupMode).map(([groupValue]) => groupValue);
-  const allLabel = groupMode === "collection" ? "All Collections" : "All Color Families";
-
-  valueControl.replaceChildren(
-    createColorReferenceOption("", allLabel),
-    ...groups.map((groupValue) =>
-      createColorReferenceOption(groupValue, getColorReferenceGroupLabel(groupValue, groupMode))
-    )
+  const selectedGroupSet = new Set(selectedGroups);
+  const options = groupModes.flatMap((groupMode) =>
+    groupColors(colors, groupMode).map(([groupValue]) => ({
+      value: getColorReferenceGroupOptionValue(groupMode, groupValue),
+      label: getColorReferenceGroupOptionLabel(groupValue, groupMode)
+    }))
   );
-  valueControl.value = groups.includes(selectedGroup) ? selectedGroup : "";
+
+  valueControl.replaceChildren(...options.map(({ value, label }) => createColorReferenceOption(value, label)));
+
+  for (const option of valueControl.options) {
+    option.selected = selectedGroupSet.has(option.value);
+  }
 }
 
 function createColorReferenceOption(value, label) {
@@ -1832,24 +1866,33 @@ function createColorReferenceOption(value, label) {
   return option;
 }
 
-function getColorReferenceFilteredColors(colors, groupMode, selectedGroup) {
-  if (!selectedGroup) {
+function getColorReferenceFilteredColors(colors, groupModes, selectedGroups) {
+  if (!selectedGroups.length) {
     return colors;
   }
 
-  return colors.filter((color) => getColorReferenceGroupValue(color, groupMode) === selectedGroup);
+  const selectedGroupSet = new Set(selectedGroups);
+
+  return colors.filter((color) =>
+    groupModes.some((groupMode) =>
+      selectedGroupSet.has(getColorReferenceGroupOptionValue(groupMode, getColorReferenceGroupValue(color, groupMode)))
+    )
+  );
 }
 
-function getColorReferenceSummary(filteredColors, colors, groupMode, selectedGroup) {
+function getColorReferenceSummary(filteredColors, colors, groupModes, selectedGroups) {
   const colorLabel = filteredColors.length === 1 ? "color" : "colors";
 
-  if (!selectedGroup) {
-    const groupLabel = groupMode === "collection" ? "collections" : "color families";
+  if (!selectedGroups.length) {
+    const groupCount = groupModes.reduce((total, groupMode) => total + groupColors(colors, groupMode).length, 0);
+    const groupLabel = groupModes.length === 1
+      ? groupModes[0] === "collection" ? "collections" : "color families"
+      : "groups";
 
-    return `${filteredColors.length} ${colorLabel} across ${groupColors(colors, groupMode).length} ${groupLabel}.`;
+    return `${filteredColors.length} ${colorLabel} across ${groupCount} ${groupLabel}.`;
   }
 
-  return `${filteredColors.length} ${colorLabel} in ${getColorReferenceGroupLabel(selectedGroup, groupMode)}.`;
+  return `${filteredColors.length} ${colorLabel} in ${formatSelectedColorReferenceGroups(selectedGroups)}.`;
 }
 
 function compareColors(firstColor, secondColor) {
@@ -1932,6 +1975,38 @@ function getColorReferenceGroupLabel(groupValue, groupMode = "color-family") {
   }
 
   return COLOR_FAMILY_LABELS[groupValue] || formatColorFamily(groupValue);
+}
+
+function getColorReferenceGroupOptionLabel(groupValue, groupMode = "color-family") {
+  const prefix = groupMode === "collection" ? "Collection" : "Color Family";
+
+  return `${prefix}: ${getColorReferenceGroupLabel(groupValue, groupMode)}`;
+}
+
+function formatSelectedColorReferenceGroups(selectedGroups) {
+  return selectedGroups
+    .map(parseColorReferenceGroupOptionValue)
+    .filter(Boolean)
+    .map(({ groupMode, groupValue }) => getColorReferenceGroupOptionLabel(groupValue, groupMode))
+    .join(", ");
+}
+
+function getSelectedOptionValues(selectControl) {
+  if (!selectControl) {
+    return [];
+  }
+
+  return [...selectControl.selectedOptions].map((option) => option.value).filter(Boolean);
+}
+
+function clearSelectedOptions(selectControl) {
+  if (!selectControl) {
+    return;
+  }
+
+  for (const option of selectControl.options) {
+    option.selected = false;
+  }
 }
 
 function createColorMarker(color) {

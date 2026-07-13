@@ -172,15 +172,14 @@
               <div class="color-reference-controls" aria-label="Color reference filters">
                 <label class="color-reference-control" for="color-reference-mode">
                   <span>Show by</span>
-                  <select id="color-reference-mode" data-color-reference-mode>
+                  <select id="color-reference-mode" data-color-reference-mode multiple size="2">
+                    <option value="collection" selected>Collection</option>
                     <option value="color-family">Color Family</option>
-                    <option value="collection">Collection</option>
                   </select>
                 </label>
                 <label class="color-reference-control" for="color-reference-value">
-                  <span>Group</span>
-                  <select id="color-reference-value" data-color-reference-value>
-                    <option value="">All Color Families</option>
+                  <span>Groups</span>
+                  <select id="color-reference-value" data-color-reference-value multiple size="6">
                   </select>
                 </label>
               </div>
