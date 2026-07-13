@@ -4,15 +4,32 @@ This guide is for someone using Card Supply Catalog for the first time.
 
 ## Recommended Browser
 
-Use a Chromium-based desktop browser such as Chrome, Edge, or Brave.
+For iPad, use Safari and install the shared app URL on the Home Screen.
+
+For desktop setup and image-folder management, use a Chromium-based browser such as Chrome, Edge, or Brave.
 
 The app can browse catalog data in other modern browsers, but choosing an image library folder depends on the File System Access API, which is mainly supported in Chromium desktop browsers.
 
-## Open the App
+## Install on iPad
+
+Use the shared app URL from the person maintaining the catalog.
+
+1. Open the shared app URL in Safari.
+2. Tap the Share button.
+3. Tap Add to Home Screen.
+4. Keep the suggested name or rename it to Card Catalog.
+5. Tap Add.
+6. Open Card Catalog from the iPad Home Screen.
+
+The Home Screen app opens without needing Python, GitHub, or a local server.
+
+## Open the App on Desktop
 
 Card Supply Catalog is a local-first web app. It should be opened from the shared app URL or from a local development server, not by double-clicking `index.html`.
 
-During local development:
+For normal use, open the shared app URL in Chrome, Edge, Brave, or Safari.
+
+During local development only:
 
 1. Start a local web server from the project folder.
 2. Open the local URL in the browser.
@@ -91,9 +108,32 @@ To move or restore the catalog:
 3. Choose or reconnect the image library folder.
 4. Run Check Image Library in Settings.
 
+## Sharing With an iPad User
+
+Use the iPad backup when the other person needs to see images without connecting a local image folder.
+
+On the computer that has access to the image folder:
+
+1. Open the app.
+2. Go to Settings.
+3. Choose or reconnect the image library folder.
+4. Run Check Image Library and resolve missing images if needed.
+5. Choose Export iPad Backup.
+6. Share the downloaded JSON file with the iPad user.
+
+On the iPad:
+
+1. Open Card Catalog from the Home Screen.
+2. Go to Settings.
+3. Choose Import Backup.
+4. Select the iPad backup JSON.
+
+The iPad backup embeds compressed images directly in the backup file. It is larger than the normal catalog backup, but it does not need access to the shared image folder.
+
 ## Important Habits
 
 - Export a backup after cataloging sessions.
+- Use Export iPad Backup when sharing a self-contained catalog with an iPad user.
 - Back up or sync the image library folder separately.
 - Keep the catalog backup JSON and image folder together.
 - Reconnect the image folder if the browser asks for permission again.
@@ -102,5 +142,7 @@ To move or restore the catalog:
 
 - The app is focused on Designer Series Paper.
 - Folder-backed image storage requires a supported desktop browser.
+- iPad is best for browsing, searching, viewing colors, and using imported catalog data.
+- Full image-folder setup and folder-backed image migration should be done from a supported desktop browser.
 - Folder-backed images are not embedded in the JSON backup.
 - Each user must have access to the same image folder if sharing catalog data.

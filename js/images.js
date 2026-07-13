@@ -200,6 +200,22 @@ export function getPatternImageSource(patternEntry) {
   return patternObject?.imagePreviewSrc || patternObject?.imageSrc || "";
 }
 
+export async function getPatternImageFile(patternEntry) {
+  const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
+
+  if (!patternObject?.imagePath) {
+    return null;
+  }
+
+  const directoryHandle = await getReadableImageLibraryDirectoryHandle();
+
+  if (!directoryHandle) {
+    return null;
+  }
+
+  return await findFileFromImagePath(directoryHandle, patternObject.imagePath);
+}
+
 export async function preparePaperPackImagesForSave(paperPack) {
   const directoryHandle = await getWritableImageLibraryDirectoryHandle();
 

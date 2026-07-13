@@ -4,6 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Card Supply Catalog</title>
+    <meta name="theme-color" content="#52786d">
+    <meta name="apple-mobile-web-app-title" content="Card Catalog">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="assets/logo/app-logo.png">
     <link rel="stylesheet" href="css/styles.css">
     <script type="module" src="js/app.js"></script>
   </head>
@@ -178,6 +184,7 @@
 
               <div class="settings-actions" aria-label="Backup and restore actions">
                 <button class="button" type="button" data-export-catalog>Export Backup</button>
+                <button class="button" type="button" data-export-ipad-catalog>Export iPad Backup</button>
                 <label class="button file-button" for="catalog-backup-import">Import Backup</label>
                 <input id="catalog-backup-import" class="visually-hidden" type="file" accept="application/json,.json" data-import-catalog>
               </div>

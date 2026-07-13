@@ -139,6 +139,12 @@ The project intentionally avoids unnecessary frameworks and dependencies in favo
 
 ---
 
+## Using the application
+
+For normal use, deploy the static app with GitHub Pages and share the Pages URL. On iPad, open that URL in Safari and use Share > Add to Home Screen.
+
+No Python, GitHub checkout, or local server is needed for end users.
+
 ## Running the application locally
 
 The application uses JavaScript ES modules and should be served from a local HTTP server during development.
@@ -160,6 +166,8 @@ For first-time setup and sharing the app with other users, see `USER_SETUP.md`.
 Before using the app for real catalog data, run the backup/restore round-trip in `BACKUP_RESTORE_VERIFICATION.md`.
 
 For normal backup instructions, see `BACKUP_GUIDE.md`.
+
+Use Export iPad Backup when sharing a self-contained catalog with an iPad user who cannot connect to the desktop image folder.
 
 ## Image Library Verification
 

@@ -5,6 +5,11 @@ Card Supply Catalog keeps your data under your control. A complete backup can in
 - a catalog backup JSON file
 - the image library folder, if you use folder-backed image storage
 
+## Backup Types
+
+- Export Backup creates a compact catalog backup. Folder-backed images stay as image folder references, so the image folder must be backed up or shared separately.
+- Export iPad Backup creates a larger self-contained backup with compressed images embedded in the JSON. Use this when an iPad user needs to see images without connecting an image folder.
+
 ## Export the Catalog
 
 1. Open the app.

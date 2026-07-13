@@ -1,4 +1,5 @@
 import { loadCatalogSetting, saveCatalogSetting, saveColor, savePaperPack } from "./storage.js";
+import { getPatternImageFile, getPatternImageSource } from "./images.js";
 import {
   BACKUP_SCHEMA_VERSION,
   CATALOG_SCHEMA_VERSION,
@@ -12,6 +13,7 @@ const LAST_BACKUP_IMPORT_SETTING_ID = "lastBackupImportedAt";
 
 export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
   const exportButton = document.querySelector("[data-export-catalog]");
+  const exportIpadButton = document.querySelector("[data-export-ipad-catalog]");
   const importInput = document.querySelector("[data-import-catalog]");
   const message = document.querySelector("[data-backup-message]");
 
@@ -29,6 +31,29 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
         renderBackupMessage(message, formatExportSummary(backup), "success");
       } catch (error) {
         renderBackupMessage(message, "The catalog backup could not be created.", "error");
+      }
+    });
+  }
+
+  if (exportIpadButton) {
+    exportIpadButton.addEventListener("click", async () => {
+      exportIpadButton.disabled = true;
+      renderBackupMessage(message, "Creating iPad backup with compressed images...", "");
+
+      try {
+        const backup = await createIpadCatalogBackup({
+          paperPacks,
+          colorsById
+        });
+
+        downloadJsonBackup(backup, "ipad-backup");
+        await saveCatalogSetting(LAST_BACKUP_EXPORT_SETTING_ID, backup.exportedAt);
+        document.dispatchEvent(new CustomEvent("catalog:backup-exported"));
+        renderBackupMessage(message, formatIpadExportSummary(backup), backup.imageStorage.missingImages > 0 ? "error" : "success");
+      } catch (error) {
+        renderBackupMessage(message, "The iPad backup could not be created.", "error");
+      } finally {
+        exportIpadButton.disabled = false;
       }
     });
   }
@@ -132,6 +157,50 @@ async function createCatalogBackup({ paperPacks, colorsById }) {
   };
 }
 
+async function createIpadCatalogBackup({ paperPacks, colorsById }) {
+  const compressedPaperPacks = [];
+  const imageSummary = {
+    embeddedImages: 0,
+    compressedImages: 0,
+    missingImages: 0,
+    folderImageReferences: 0
+  };
+
+  for (const paperPack of paperPacks) {
+    const result = await createSerializablePaperPackWithCompressedImages(paperPack);
+
+    compressedPaperPacks.push(result.paperPack);
+    imageSummary.embeddedImages += result.embeddedImages;
+    imageSummary.compressedImages += result.compressedImages;
+    imageSummary.missingImages += result.missingImages;
+    imageSummary.folderImageReferences += result.folderImageReferences;
+  }
+
+  return {
+    schemaVersion: BACKUP_SCHEMA_VERSION,
+    catalogSchemaVersion: CATALOG_SCHEMA_VERSION,
+    app: "card-supply-catalog",
+    backupProfile: "ipad-embedded-images",
+    exportedAt: new Date().toISOString(),
+    imageStorage: {
+      strategy: "embedded-compressed-images",
+      embeddedImages: imageSummary.embeddedImages,
+      compressedImages: imageSummary.compressedImages,
+      missingImages: imageSummary.missingImages,
+      folderImageReferences: imageSummary.folderImageReferences,
+      compression: {
+        format: "image/jpeg",
+        maxDimension: 900,
+        quality: 0.72
+      },
+      note:
+        "This iPad backup embeds compressed images directly in the JSON file so folder access is not required after import."
+    },
+    colors: sortObjectByKey(colorsById),
+    paperPacks: compressedPaperPacks
+  };
+}
+
 function summarizeImageStorage(paperPacks) {
   return paperPacks.reduce(
     (summary, paperPack) => {
@@ -156,6 +225,17 @@ function formatExportSummary(backup) {
   return `Catalog backup downloaded. ${folderImageReferences} folder image reference${folderImageReferences === 1 ? "" : "s"} included; back up or share the image folder separately.`;
 }
 
+function formatIpadExportSummary(backup) {
+  const compressedImages = backup.imageStorage?.compressedImages || 0;
+  const missingImages = backup.imageStorage?.missingImages || 0;
+
+  if (missingImages > 0) {
+    return `iPad backup downloaded with ${compressedImages} embedded image${compressedImages === 1 ? "" : "s"}. ${missingImages} image${missingImages === 1 ? "" : "s"} could not be embedded.`;
+  }
+
+  return `iPad backup downloaded with ${compressedImages} embedded image${compressedImages === 1 ? "" : "s"}.`;
+}
+
 function createSerializableImageLibrarySetting(imageLibrary) {
   if (!imageLibrary) {
     return null;
@@ -168,14 +248,14 @@ function createSerializableImageLibrarySetting(imageLibrary) {
   };
 }
 
-function downloadJsonBackup(backup) {
+function downloadJsonBackup(backup, label = "backup") {
   const backupJson = JSON.stringify(backup, null, 2);
   const blob = new Blob([backupJson], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
 
   link.href = url;
-  link.download = `card-supply-catalog-backup-${formatDateStamp(new Date())}.json`;
+  link.download = `card-supply-catalog-${label}-${formatDateStamp(new Date())}.json`;
   link.click();
 
   URL.revokeObjectURL(url);
@@ -312,6 +392,136 @@ function createSerializablePaperPack(paperPack) {
     ...cloneJsonSafe(paperPack),
     patterns: (paperPack.patterns || []).map(createSerializablePattern)
   });
+}
+
+async function createSerializablePaperPackWithCompressedImages(paperPack) {
+  const summary = {
+    embeddedImages: 0,
+    compressedImages: 0,
+    missingImages: 0,
+    folderImageReferences: 0
+  };
+  const patterns = [];
+
+  for (const patternEntry of paperPack.patterns || []) {
+    const pattern = await createCompressedSerializablePattern(patternEntry);
+
+    if (pattern && typeof pattern === "object" && pattern.imageSrc) {
+      summary.embeddedImages += 1;
+      summary.compressedImages += pattern.imageStorageStrategy === "embedded-compressed-image" ? 1 : 0;
+    }
+
+    if (pattern && typeof pattern === "object" && pattern.imagePath) {
+      summary.folderImageReferences += 1;
+      summary.missingImages += 1;
+    }
+
+    patterns.push(pattern);
+  }
+
+  return {
+    paperPack: addCatalogSchemaVersion({
+      ...cloneJsonSafe(paperPack),
+      imageStorageStrategy: "embedded-compressed-images",
+      patterns
+    }),
+    ...summary
+  };
+}
+
+async function createCompressedSerializablePattern(patternEntry) {
+  const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
+
+  if (!patternObject) {
+    return patternEntry;
+  }
+
+  const basePattern = {
+    id: patternObject.id,
+    imageName: patternObject.imageName
+  };
+  let compressedImageSrc = "";
+
+  try {
+    compressedImageSrc = await getCompressedPatternImageSource(patternEntry);
+  } catch (error) {
+    compressedImageSrc = "";
+  }
+
+  if (!compressedImageSrc) {
+    return createSerializablePattern(patternEntry);
+  }
+
+  return {
+    ...basePattern,
+    imageSrc: compressedImageSrc,
+    imageStorageStrategy: "embedded-compressed-image"
+  };
+}
+
+async function getCompressedPatternImageSource(patternEntry) {
+  const existingImageSrc = getPatternImageSource(patternEntry);
+
+  if (existingImageSrc) {
+    return await compressImageSource(existingImageSrc);
+  }
+
+  const imageFile = await getPatternImageFile(patternEntry);
+
+  if (!imageFile) {
+    return "";
+  }
+
+  const imageUrl = URL.createObjectURL(imageFile);
+
+  try {
+    return await compressImageSource(imageUrl);
+  } finally {
+    URL.revokeObjectURL(imageUrl);
+  }
+}
+
+async function compressImageSource(imageSrc) {
+  const image = await loadImageElement(imageSrc);
+  const { width, height } = getScaledImageSize(image.naturalWidth || image.width, image.naturalHeight || image.height, 900);
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+
+  if (!context || width === 0 || height === 0) {
+    return "";
+  }
+
+  canvas.width = width;
+  canvas.height = height;
+  context.drawImage(image, 0, 0, width, height);
+
+  return canvas.toDataURL("image/jpeg", 0.72);
+}
+
+function loadImageElement(imageSrc) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+
+    image.addEventListener("load", () => resolve(image));
+    image.addEventListener("error", () => reject(new Error("Image could not be loaded.")));
+    image.src = imageSrc;
+  });
+}
+
+function getScaledImageSize(width, height, maxDimension) {
+  if (!width || !height) {
+    return {
+      width: 0,
+      height: 0
+    };
+  }
+
+  const scale = Math.min(1, maxDimension / Math.max(width, height));
+
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale))
+  };
 }
 
 function createSerializablePattern(patternEntry) {
