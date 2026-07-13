@@ -505,6 +505,13 @@ h6 {
   color: var(--color-muted);
 }
 
+.section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
 .dsp-grid {
   display: grid;
   gap: var(--space-5);
@@ -1564,8 +1571,7 @@ button.pattern {
   color: #765b45;
 }
 
-.settings-subsection,
-.color-reference-section {
+.settings-subsection {
   margin-top: var(--space-6);
   margin-bottom: 0;
   border-top: 1px solid var(--color-border);
@@ -1737,8 +1743,7 @@ button.pattern {
   padding-left: var(--space-4);
 }
 
-.settings-subsection h4,
-.color-reference-section h4 {
+.settings-subsection h4 {
   margin-bottom: 0;
   font-size: 1.05rem;
   line-height: 1.2;

@@ -27,7 +27,8 @@
       <div class="app-layout">
         <nav class="side-nav" aria-label="Primary">
           <div class="nav-links">
-            <a class="nav-link nav-link-active" href="#library" aria-current="page" data-nav-link>Library</a>
+            <a class="nav-link nav-link-active" href="#library" aria-current="page" data-nav-link>Paper Library</a>
+            <a class="nav-link" href="#color-library" data-nav-link>Color Library</a>
             <a class="nav-link" href="#settings" data-nav-link>Settings</a>
           </div>
 
@@ -94,18 +95,57 @@
             </aside>
           </section>
 
+          <section class="app-screen color-reference-section" id="color-library" aria-labelledby="color-library-title" tabindex="-1" data-screen hidden>
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Color Library</p>
+                <h3 id="color-library-title">Color Reference</h3>
+                <p>Official color names and HEX values for pack metadata.</p>
+              </div>
+              <div class="section-actions" aria-label="Color library actions">
+                <button class="button" type="button" data-add-dsp-open>
+                  <span aria-hidden="true">+</span>
+                  Add DSP
+                </button>
+                <button class="button button-primary" type="button" data-add-color-open>
+                  <span aria-hidden="true">+</span>
+                  Add Color
+                </button>
+              </div>
+            </div>
+
+            <div class="color-reference-controls" aria-label="Color reference filters">
+              <label class="color-reference-control" for="color-reference-mode">
+                <span>Show by</span>
+                <select id="color-reference-mode" data-color-reference-mode>
+                  <option value="collection" selected>Collection</option>
+                  <option value="color-family">Color Family</option>
+                </select>
+              </label>
+              <label class="color-reference-control" for="color-reference-value">
+                <span>Groups</span>
+                <select id="color-reference-value" data-color-reference-value multiple size="6">
+                </select>
+              </label>
+            </div>
+            <p class="color-reference-summary" data-color-reference-summary aria-live="polite"></p>
+
+            <div class="color-library-grid" data-color-library aria-live="polite">
+              <p class="loading-message">Loading colors...</p>
+            </div>
+          </section>
+
           <section class="app-screen settings-section" id="settings" aria-labelledby="settings-title" tabindex="-1" data-screen hidden>
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Settings</p>
                 <h3 id="settings-title">Catalog Setup</h3>
               </div>
-              <p>Add and maintain paper packs and official colors here.</p>
+              <p>Manage storage, backups, and setup readiness here.</p>
             </div>
 
             <div class="settings-actions" aria-label="Settings actions">
               <button class="button" type="button" data-add-dsp-open>Add Paper Pack</button>
-              <button class="button" type="button" data-add-color-open>Add Color</button>
             </div>
 
             <section class="settings-subsection" aria-labelledby="image-library-title">
@@ -158,36 +198,6 @@
               </div>
 
               <div class="setup-status-list" data-setup-status aria-live="polite"></div>
-            </section>
-
-            <section class="color-reference-section" aria-labelledby="color-library-title">
-              <div class="section-heading">
-                <div>
-                  <p class="eyebrow">Reference</p>
-                  <h4 id="color-library-title">Color Reference</h4>
-                </div>
-                <p>Official color names and HEX values for pack metadata.</p>
-              </div>
-
-              <div class="color-reference-controls" aria-label="Color reference filters">
-                <label class="color-reference-control" for="color-reference-mode">
-                  <span>Show by</span>
-                  <select id="color-reference-mode" data-color-reference-mode>
-                    <option value="collection" selected>Collection</option>
-                    <option value="color-family">Color Family</option>
-                  </select>
-                </label>
-                <label class="color-reference-control" for="color-reference-value">
-                  <span>Groups</span>
-                  <select id="color-reference-value" data-color-reference-value multiple size="6">
-                  </select>
-                </label>
-              </div>
-              <p class="color-reference-summary" data-color-reference-summary aria-live="polite"></p>
-
-              <div class="color-library-grid" data-color-library aria-live="polite">
-                <p class="loading-message">Loading colors...</p>
-              </div>
             </section>
           </section>
         </main>
