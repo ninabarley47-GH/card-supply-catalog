@@ -779,12 +779,12 @@ function initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById, rend
     const packToSave = mode === "edit" ? paperPack : ensureUniquePaperPackId(paperPack, paperPacks);
     const existingIndex = paperPacks.findIndex((existingPack) => existingPack.id === packToSave.id);
 
+    if (mode === "add") {
+      addPackToLatestCatalogSession(packToSave.id);
+    }
+
     if (existingIndex === -1) {
       paperPacks.unshift(packToSave);
-
-      if (mode === "add") {
-        addPackToLatestCatalogSession(packToSave.id);
-      }
     } else {
       paperPacks.splice(existingIndex, 1, packToSave);
     }
