@@ -1,6 +1,7 @@
 import { getAvailablePatternImages } from "./images.js";
 
 const COVER_SHEET_SIZE = 1800;
+const COVER_SHEET_PRINT_DPI = 300;
 const OUTER_BORDER = 12;
 const INNER_BORDER = 6;
 const TITLE_HEIGHT = 300;
@@ -39,14 +40,63 @@ export async function createCoverSheetForPack(paperPack, colorsById) {
 
   drawCoverSheet(context, paperPack, images, colors);
 
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  const canvasBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 
-  if (!blob) {
+  if (!canvasBlob) {
     window.alert("The cover sheet could not be created.");
     return;
   }
 
+  const blob = await addPngPrintResolution(canvasBlob, COVER_SHEET_PRINT_DPI);
   await saveCoverSheet(blob, paperPack, fileHandle);
+}
+
+async function addPngPrintResolution(blob, dpi) {
+  const pngBytes = new Uint8Array(await blob.arrayBuffer());
+  const pixelsPerMeter = Math.round(dpi / 0.0254);
+  const resolutionData = new Uint8Array(9);
+  const resolutionView = new DataView(resolutionData.buffer);
+
+  resolutionView.setUint32(0, pixelsPerMeter);
+  resolutionView.setUint32(4, pixelsPerMeter);
+  resolutionData[8] = 1;
+
+  const resolutionChunk = createPngChunk("pHYs", resolutionData);
+  const ihdrChunkEnd = 8 + 4 + 4 + 13 + 4;
+  const output = new Uint8Array(pngBytes.length + resolutionChunk.length);
+
+  output.set(pngBytes.subarray(0, ihdrChunkEnd));
+  output.set(resolutionChunk, ihdrChunkEnd);
+  output.set(pngBytes.subarray(ihdrChunkEnd), ihdrChunkEnd + resolutionChunk.length);
+
+  return new Blob([output], { type: "image/png" });
+}
+
+function createPngChunk(type, data) {
+  const typeBytes = new TextEncoder().encode(type);
+  const chunk = new Uint8Array(12 + data.length);
+  const chunkView = new DataView(chunk.buffer);
+
+  chunkView.setUint32(0, data.length);
+  chunk.set(typeBytes, 4);
+  chunk.set(data, 8);
+  chunkView.setUint32(8 + data.length, calculatePngCrc(typeBytes, data));
+
+  return chunk;
+}
+
+function calculatePngCrc(typeBytes, data) {
+  let crc = 0xffffffff;
+
+  for (const byte of [...typeBytes, ...data]) {
+    crc ^= byte;
+
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+
+  return (crc ^ 0xffffffff) >>> 0;
 }
 
 async function loadPatternImages(imageEntries) {
