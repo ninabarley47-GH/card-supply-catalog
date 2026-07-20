@@ -123,6 +123,66 @@ export async function loadPatternImagesForPaperPackName(paperPackName) {
   }
 }
 
+export async function scanImageLibraryPaperPackFolders() {
+  const directoryHandle = await getReadableImageLibraryDirectoryHandle();
+
+  if (!directoryHandle) {
+    return {
+      ok: false,
+      folders: [],
+      message: "Choose or reconnect the image library folder before looking for uncataloged packs."
+    };
+  }
+
+  if (!directoryHandle.entries) {
+    return {
+      ok: false,
+      folders: [],
+      message: "This browser cannot scan the selected image library folder."
+    };
+  }
+
+  try {
+    const folders = [];
+
+    for await (const [folderName, folderHandle] of directoryHandle.entries()) {
+      if (folderHandle.kind !== "directory") {
+        continue;
+      }
+
+      const imageCount = await countImagesInDirectory(folderHandle);
+
+      if (imageCount > 0) {
+        folders.push({
+          id: createId(folderName),
+          folderName,
+          paperPackName: formatPaperPackNameFromFolder(folderName),
+          imageCount
+        });
+      }
+    }
+
+    folders.sort((firstFolder, secondFolder) =>
+      firstFolder.paperPackName.localeCompare(secondFolder.paperPackName, undefined, {
+        numeric: true,
+        sensitivity: "base"
+      })
+    );
+
+    return {
+      ok: true,
+      folders,
+      message: ""
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      folders: [],
+      message: "The image library folders could not be scanned."
+    };
+  }
+}
+
 export async function hydratePaperPackImageSources(paperPacks) {
   const directoryHandle = await getReadableImageLibraryDirectoryHandle();
 
@@ -586,6 +646,29 @@ async function getImagesFromDirectory(directoryHandle, directoryPath) {
       sensitivity: "base"
     })
   );
+}
+
+async function countImagesInDirectory(directoryHandle) {
+  let imageCount = 0;
+
+  for await (const [entryName, entryHandle] of directoryHandle.entries()) {
+    if (entryHandle.kind === "file" && isSupportedImageFileName(entryName)) {
+      imageCount += 1;
+    }
+  }
+
+  return imageCount;
+}
+
+function formatPaperPackNameFromFolder(folderName) {
+  return String(folderName || "")
+    .trim()
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`)
+    .join(" ");
 }
 
 function isSupportedImageFileName(fileName) {

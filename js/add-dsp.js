@@ -154,6 +154,30 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
     });
   });
 
+  document.addEventListener("paper-pack:add-from-library", async (event) => {
+    const paperPackName = cleanText(event.detail?.paperPackName);
+
+    if (!paperPackName) {
+      return;
+    }
+
+    openAddDspPanel(panel, form, selectedImages, imagePreviewList, imagePreviewCount, {
+      title,
+      summary,
+      submitButton,
+      formState
+    });
+    form.elements.name.value = paperPackName;
+    await autoLoadImagesForCurrentPaperPackName(
+      form,
+      selectedImages,
+      imagePreviewList,
+      imagePreviewCount,
+      message,
+      formState
+    );
+  });
+
   form.addEventListener("submit", (event) => {
     event.preventDefault();
 
