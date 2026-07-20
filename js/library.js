@@ -6,7 +6,8 @@ import {
   deletePaperPackImages,
   getPatternImageSource,
   hydratePaperPackImageSources,
-  preparePaperPackImagesForSave
+  preparePaperPackImagesForSave,
+  scanImageLibraryPaperPackFolders
 } from "./images.js";
 import { initializeSettings } from "./settings.js";
 import {
@@ -15,8 +16,12 @@ import {
   loadSavedPaperPacks,
   mergeColors,
   mergePaperPacks,
+  loadCatalogSetting,
+  saveCatalogSetting,
   savePaperPack
 } from "./storage.js";
+
+const IGNORED_UNCATALOGED_PACK_FOLDERS_SETTING_ID = "ignoredUncatalogedPaperPackFolders";
 
 const COLOR_FAMILY_ORDER = [
   "red",
@@ -106,6 +111,7 @@ export async function initializeLibraryShell() {
     const colors = Object.values(colorsById);
     initializeAddColorWorkflow(colorsById);
     initializeAddDspWorkflow(colorsById, paperPacks);
+    initializeUncatalogedPackFinder(paperPacks);
 
     if (paperPackLibrary) {
       renderPaperPackLibrary(paperPackLibrary, paperPacks, colorsById);
@@ -149,6 +155,151 @@ export async function initializeLibraryShell() {
       renderError(colorLibrary, "Colors could not be loaded.");
     }
   }
+}
+
+function initializeUncatalogedPackFinder(paperPacks) {
+  const findButton = document.querySelector("[data-find-uncataloged-packs]");
+  const panel = document.querySelector("[data-uncataloged-packs]");
+  const closeButton = document.querySelector("[data-close-uncataloged-packs]");
+  const message = document.querySelector("[data-uncataloged-packs-message]");
+  const list = document.querySelector("[data-uncataloged-pack-list]");
+
+  if (!findButton || !panel || !message || !list) {
+    return;
+  }
+
+  let currentFolders = [];
+
+  findButton.addEventListener("click", async () => {
+    panel.hidden = false;
+    list.replaceChildren();
+    message.textContent = "Scanning the image library...";
+    message.dataset.tone = "";
+    findButton.disabled = true;
+
+    try {
+      const [result, ignoredFolderIds] = await Promise.all([
+        scanImageLibraryPaperPackFolders(),
+        loadIgnoredUncatalogedPackFolderIds()
+      ]);
+
+      if (!result.ok) {
+        currentFolders = [];
+        message.textContent = result.message;
+        message.dataset.tone = "error";
+        return;
+      }
+
+      currentFolders = getUncatalogedImageFolders(result.folders, paperPacks, ignoredFolderIds);
+      renderUncatalogedPackFolders(list, currentFolders);
+      message.textContent = getUncatalogedPackScanMessage(currentFolders.length);
+      message.dataset.tone = currentFolders.length > 0 ? "success" : "";
+    } catch (error) {
+      currentFolders = [];
+      message.textContent = "The image library could not be checked for uncataloged packs.";
+      message.dataset.tone = "error";
+    } finally {
+      findButton.disabled = false;
+    }
+  });
+
+  closeButton?.addEventListener("click", () => {
+    panel.hidden = true;
+    findButton.focus();
+  });
+
+  list.addEventListener("click", async (event) => {
+    const addButton = event.target.closest("[data-add-uncataloged-pack]");
+    const ignoreButton = event.target.closest("[data-ignore-uncataloged-pack]");
+    const folderId = addButton?.dataset.addUncatalogedPack || ignoreButton?.dataset.ignoreUncatalogedPack;
+    const folder = currentFolders.find((candidate) => candidate.id === folderId);
+
+    if (!folder) {
+      return;
+    }
+
+    if (addButton) {
+      panel.hidden = true;
+      document.dispatchEvent(
+        new CustomEvent("paper-pack:add-from-library", {
+          detail: {
+            paperPackName: folder.paperPackName
+          }
+        })
+      );
+      return;
+    }
+
+    try {
+      const ignoredFolderIds = await loadIgnoredUncatalogedPackFolderIds();
+      ignoredFolderIds.add(folder.id);
+      await saveCatalogSetting(IGNORED_UNCATALOGED_PACK_FOLDERS_SETTING_ID, [...ignoredFolderIds]);
+      currentFolders = currentFolders.filter((candidate) => candidate.id !== folder.id);
+      renderUncatalogedPackFolders(list, currentFolders);
+      message.textContent = getUncatalogedPackScanMessage(currentFolders.length);
+      message.dataset.tone = currentFolders.length > 0 ? "success" : "";
+    } catch (error) {
+      message.textContent = `${folder.paperPackName} could not be ignored permanently.`;
+      message.dataset.tone = "error";
+    }
+  });
+}
+
+function getUncatalogedImageFolders(folders, paperPacks, ignoredFolderIds) {
+  const catalogKeys = new Set(
+    paperPacks.flatMap((paperPack) => [normalizeFilterText(paperPack.id), normalizeFilterText(paperPack.name)])
+  );
+
+  return folders.filter(
+    (folder) =>
+      !ignoredFolderIds.has(folder.id) &&
+      !catalogKeys.has(normalizeFilterText(folder.id)) &&
+      !catalogKeys.has(normalizeFilterText(folder.paperPackName))
+  );
+}
+
+async function loadIgnoredUncatalogedPackFolderIds() {
+  const savedFolderIds = await loadCatalogSetting(IGNORED_UNCATALOGED_PACK_FOLDERS_SETTING_ID);
+  return new Set(Array.isArray(savedFolderIds) ? savedFolderIds.filter((folderId) => typeof folderId === "string") : []);
+}
+
+function renderUncatalogedPackFolders(list, folders) {
+  list.replaceChildren(...folders.map(createUncatalogedPackFolderItem));
+}
+
+function createUncatalogedPackFolderItem(folder) {
+  const item = document.createElement("li");
+  const details = document.createElement("div");
+  const name = document.createElement("strong");
+  const count = document.createElement("span");
+  const actions = document.createElement("div");
+  const addButton = document.createElement("button");
+  const ignoreButton = document.createElement("button");
+
+  item.className = "uncataloged-pack-item";
+  details.className = "uncataloged-pack-details";
+  name.textContent = folder.paperPackName;
+  count.textContent = `${folder.imageCount} image${folder.imageCount === 1 ? "" : "s"}`;
+  actions.className = "uncataloged-pack-actions";
+  addButton.className = "button button-primary";
+  addButton.type = "button";
+  addButton.dataset.addUncatalogedPack = folder.id;
+  addButton.textContent = "Add to Paper Library";
+  ignoreButton.className = "button";
+  ignoreButton.type = "button";
+  ignoreButton.dataset.ignoreUncatalogedPack = folder.id;
+  ignoreButton.textContent = "Ignore";
+
+  details.append(name, count);
+  actions.append(addButton, ignoreButton);
+  item.append(details, actions);
+  return item;
+}
+
+function getUncatalogedPackScanMessage(folderCount) {
+  return folderCount === 0
+    ? "Every image folder is already cataloged or ignored."
+    : `${folderCount} uncataloged paper pack${folderCount === 1 ? "" : "s"} found.`;
 }
 
 function initializeScreenNavigation() {
