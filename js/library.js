@@ -162,13 +162,31 @@ function initializeUncatalogedPackFinder(paperPacks) {
   const panel = document.querySelector("[data-uncataloged-packs]");
   const closeButton = document.querySelector("[data-close-uncataloged-packs]");
   const message = document.querySelector("[data-uncataloged-packs-message]");
+  const showIgnoredControl = document.querySelector("[data-show-ignored-uncataloged-packs]");
   const list = document.querySelector("[data-uncataloged-pack-list]");
 
   if (!findButton || !panel || !message || !list) {
     return;
   }
 
+  let scannedFolders = [];
+  let ignoredFolderIds = new Set();
   let currentFolders = [];
+
+  function refreshResults() {
+    const candidateFolders = getUncatalogedImageFolderCandidates(scannedFolders, paperPacks);
+    const availableFolders = candidateFolders.filter((folder) => !ignoredFolderIds.has(folder.id));
+    const ignoredFolders = candidateFolders
+      .filter((folder) => ignoredFolderIds.has(folder.id))
+      .map((folder) => ({ ...folder, ignored: true }));
+
+    currentFolders = showIgnoredControl?.checked
+      ? [...availableFolders, ...ignoredFolders]
+      : availableFolders;
+    renderUncatalogedPackFolders(list, currentFolders);
+    message.textContent = getUncatalogedPackScanMessage(availableFolders.length, ignoredFolders.length, showIgnoredControl?.checked);
+    message.dataset.tone = availableFolders.length > 0 ? "success" : "";
+  }
 
   findButton.addEventListener("click", async () => {
     panel.hidden = false;
@@ -178,23 +196,24 @@ function initializeUncatalogedPackFinder(paperPacks) {
     findButton.disabled = true;
 
     try {
-      const [result, ignoredFolderIds] = await Promise.all([
+      const [result, savedIgnoredFolderIds] = await Promise.all([
         scanImageLibraryPaperPackFolders(),
         loadIgnoredUncatalogedPackFolderIds()
       ]);
 
       if (!result.ok) {
+        scannedFolders = [];
         currentFolders = [];
         message.textContent = result.message;
         message.dataset.tone = "error";
         return;
       }
 
-      currentFolders = getUncatalogedImageFolders(result.folders, paperPacks, ignoredFolderIds);
-      renderUncatalogedPackFolders(list, currentFolders);
-      message.textContent = getUncatalogedPackScanMessage(currentFolders.length);
-      message.dataset.tone = currentFolders.length > 0 ? "success" : "";
+      scannedFolders = result.folders;
+      ignoredFolderIds = savedIgnoredFolderIds;
+      refreshResults();
     } catch (error) {
+      scannedFolders = [];
       currentFolders = [];
       message.textContent = "The image library could not be checked for uncataloged packs.";
       message.dataset.tone = "error";
@@ -208,10 +227,16 @@ function initializeUncatalogedPackFinder(paperPacks) {
     findButton.focus();
   });
 
+  showIgnoredControl?.addEventListener("change", refreshResults);
+
   list.addEventListener("click", async (event) => {
     const addButton = event.target.closest("[data-add-uncataloged-pack]");
     const ignoreButton = event.target.closest("[data-ignore-uncataloged-pack]");
-    const folderId = addButton?.dataset.addUncatalogedPack || ignoreButton?.dataset.ignoreUncatalogedPack;
+    const restoreButton = event.target.closest("[data-restore-uncataloged-pack]");
+    const folderId =
+      addButton?.dataset.addUncatalogedPack ||
+      ignoreButton?.dataset.ignoreUncatalogedPack ||
+      restoreButton?.dataset.restoreUncatalogedPack;
     const folder = currentFolders.find((candidate) => candidate.id === folderId);
 
     if (!folder) {
@@ -230,29 +255,37 @@ function initializeUncatalogedPackFinder(paperPacks) {
       return;
     }
 
+    const wasIgnored = ignoredFolderIds.has(folder.id);
+
     try {
-      const ignoredFolderIds = await loadIgnoredUncatalogedPackFolderIds();
-      ignoredFolderIds.add(folder.id);
+      if (restoreButton) {
+        ignoredFolderIds.delete(folder.id);
+      } else {
+        ignoredFolderIds.add(folder.id);
+      }
+
       await saveCatalogSetting(IGNORED_UNCATALOGED_PACK_FOLDERS_SETTING_ID, [...ignoredFolderIds]);
-      currentFolders = currentFolders.filter((candidate) => candidate.id !== folder.id);
-      renderUncatalogedPackFolders(list, currentFolders);
-      message.textContent = getUncatalogedPackScanMessage(currentFolders.length);
-      message.dataset.tone = currentFolders.length > 0 ? "success" : "";
+      refreshResults();
     } catch (error) {
-      message.textContent = `${folder.paperPackName} could not be ignored permanently.`;
+      if (wasIgnored) {
+        ignoredFolderIds.add(folder.id);
+      } else {
+        ignoredFolderIds.delete(folder.id);
+      }
+
+      message.textContent = `${folder.paperPackName} could not be ${restoreButton ? "restored" : "ignored"} permanently.`;
       message.dataset.tone = "error";
     }
   });
 }
 
-function getUncatalogedImageFolders(folders, paperPacks, ignoredFolderIds) {
+function getUncatalogedImageFolderCandidates(folders, paperPacks) {
   const catalogKeys = new Set(
     paperPacks.flatMap((paperPack) => [normalizeFilterText(paperPack.id), normalizeFilterText(paperPack.name)])
   );
 
   return folders.filter(
     (folder) =>
-      !ignoredFolderIds.has(folder.id) &&
       !catalogKeys.has(normalizeFilterText(folder.id)) &&
       !catalogKeys.has(normalizeFilterText(folder.paperPackName))
   );
@@ -276,30 +309,43 @@ function createUncatalogedPackFolderItem(folder) {
   const addButton = document.createElement("button");
   const ignoreButton = document.createElement("button");
 
-  item.className = "uncataloged-pack-item";
+  item.className = folder.ignored ? "uncataloged-pack-item uncataloged-pack-item-ignored" : "uncataloged-pack-item";
   details.className = "uncataloged-pack-details";
   name.textContent = folder.paperPackName;
-  count.textContent = `${folder.imageCount} image${folder.imageCount === 1 ? "" : "s"}`;
+  count.textContent = `${folder.imageCount} image${folder.imageCount === 1 ? "" : "s"}${folder.ignored ? " · Ignored" : ""}`;
   actions.className = "uncataloged-pack-actions";
-  addButton.className = "button button-primary";
-  addButton.type = "button";
-  addButton.dataset.addUncatalogedPack = folder.id;
-  addButton.textContent = "Add to Paper Library";
-  ignoreButton.className = "button";
-  ignoreButton.type = "button";
-  ignoreButton.dataset.ignoreUncatalogedPack = folder.id;
-  ignoreButton.textContent = "Ignore";
+  if (folder.ignored) {
+    ignoreButton.className = "button";
+    ignoreButton.type = "button";
+    ignoreButton.dataset.restoreUncatalogedPack = folder.id;
+    ignoreButton.textContent = "Restore";
+  } else {
+    addButton.className = "button button-primary";
+    addButton.type = "button";
+    addButton.dataset.addUncatalogedPack = folder.id;
+    addButton.textContent = "Add to Paper Library";
+    ignoreButton.className = "button";
+    ignoreButton.type = "button";
+    ignoreButton.dataset.ignoreUncatalogedPack = folder.id;
+    ignoreButton.textContent = "Ignore";
+  }
 
   details.append(name, count);
-  actions.append(addButton, ignoreButton);
+  actions.append(...(folder.ignored ? [ignoreButton] : [addButton, ignoreButton]));
   item.append(details, actions);
   return item;
 }
 
-function getUncatalogedPackScanMessage(folderCount) {
-  return folderCount === 0
+function getUncatalogedPackScanMessage(folderCount, ignoredCount = 0, showingIgnored = false) {
+  const availableMessage = folderCount === 0
     ? "Every image folder is already cataloged or ignored."
     : `${folderCount} uncataloged paper pack${folderCount === 1 ? "" : "s"} found.`;
+
+  if (!showingIgnored) {
+    return availableMessage;
+  }
+
+  return `${availableMessage} ${ignoredCount} ignored folder${ignoredCount === 1 ? "" : "s"}.`;
 }
 
 function initializeScreenNavigation() {
