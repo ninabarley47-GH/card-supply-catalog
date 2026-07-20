@@ -309,6 +309,7 @@ function buildPaperPackFromForm(formData, colorsById, selectedImages = [], editi
       patternCount,
       availability: formData.get("availability") || "available",
       refillAvailable: parseOptionalBoolean(formData.get("refillAvailable")),
+      recentlyAdded: editingPaperPack?.recentlyAdded === true,
       keywords,
       colors: colorResult.colorIds,
       patterns

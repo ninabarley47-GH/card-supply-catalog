@@ -604,6 +604,10 @@ h6 {
 }
 
 .card-context-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
   min-height: 2rem;
   border-bottom: 1px solid rgba(47, 44, 40, 0.28);
   border-radius: var(--radius-medium) var(--radius-medium) 0 0;
@@ -613,6 +617,30 @@ h6 {
   font-size: 0.78rem;
   font-weight: 800;
   line-height: 1.2;
+}
+
+.card-context-clear {
+  display: inline-grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 50%;
+  padding: 0;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.card-context-clear:hover,
+.card-context-clear:focus-visible {
+  background: rgba(255, 255, 255, 0.2);
+  outline: 2px solid #ffffff;
+  outline-offset: 1px;
 }
 
 .detail-panel {

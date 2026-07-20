@@ -91,11 +91,6 @@ const PATTERN_CLASS_MAP = {
 
 const PATTERN_CLASS_SEQUENCE = Object.values(PATTERN_CLASS_MAP);
 
-const DEFAULT_CATALOG_SESSION_PACK_IDS = ["moonlit-flora", "velvet-meadow"];
-const CATALOG_SESSION_STORAGE_KEY = "card-supply-catalog.latestCatalogSessionPackIds.v2";
-const LATEST_CATALOG_SESSION_PACK_IDS = new Set(loadCatalogSessionPackIds());
-let hasUserCatalogSession = hasSavedCatalogSession();
-
 export async function initializeLibraryShell() {
   initializeScreenNavigation();
 
@@ -776,12 +771,9 @@ function initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById, rend
       return;
     }
 
-    const packToSave = mode === "edit" ? paperPack : ensureUniquePaperPackId(paperPack, paperPacks);
+    const candidatePack = mode === "edit" ? paperPack : ensureUniquePaperPackId(paperPack, paperPacks);
+    const packToSave = mode === "add" ? { ...candidatePack, recentlyAdded: true } : candidatePack;
     const existingIndex = paperPacks.findIndex((existingPack) => existingPack.id === packToSave.id);
-
-    if (mode === "add") {
-      addPackToLatestCatalogSession(packToSave.id);
-    }
 
     if (existingIndex === -1) {
       paperPacks.unshift(packToSave);
@@ -906,7 +898,19 @@ function createCardContextBar(paperPack) {
 
   const contextBar = document.createElement("div");
   contextBar.className = "card-context-bar";
-  contextBar.textContent = context.label;
+
+  const label = document.createElement("span");
+  label.textContent = context.label;
+
+  const clearButton = document.createElement("button");
+  clearButton.className = "card-context-clear";
+  clearButton.type = "button";
+  clearButton.dataset.clearRecentlyAdded = paperPack.id;
+  clearButton.textContent = "×";
+  clearButton.setAttribute("aria-label", `Clear Recently Added status for ${paperPack.name}`);
+  clearButton.title = "Clear Recently Added status";
+
+  contextBar.append(label, clearButton);
 
   return contextBar;
 }
@@ -922,50 +926,7 @@ function getCardContext(paperPack) {
 }
 
 function isRecentlyAddedPaperPack(paperPack) {
-  return LATEST_CATALOG_SESSION_PACK_IDS.has(paperPack.id);
-}
-
-function addPackToLatestCatalogSession(paperPackId) {
-  if (!hasUserCatalogSession) {
-    LATEST_CATALOG_SESSION_PACK_IDS.clear();
-    hasUserCatalogSession = true;
-  }
-
-  LATEST_CATALOG_SESSION_PACK_IDS.add(paperPackId);
-  saveCatalogSessionPackIds();
-}
-
-function loadCatalogSessionPackIds() {
-  try {
-    const savedPackIds = JSON.parse(window.sessionStorage.getItem(CATALOG_SESSION_STORAGE_KEY));
-
-    if (Array.isArray(savedPackIds) && savedPackIds.every((packId) => typeof packId === "string")) {
-      return savedPackIds;
-    }
-  } catch (error) {
-    // Fall back to the prototype sample context if session storage is unavailable.
-  }
-
-  return DEFAULT_CATALOG_SESSION_PACK_IDS;
-}
-
-function hasSavedCatalogSession() {
-  try {
-    return window.sessionStorage.getItem(CATALOG_SESSION_STORAGE_KEY) !== null;
-  } catch (error) {
-    return false;
-  }
-}
-
-function saveCatalogSessionPackIds() {
-  try {
-    window.sessionStorage.setItem(
-      CATALOG_SESSION_STORAGE_KEY,
-      JSON.stringify([...LATEST_CATALOG_SESSION_PACK_IDS])
-    );
-  } catch (error) {
-    // The in-memory context still works for the current page even if session storage is unavailable.
-  }
+  return paperPack.recentlyAdded === true;
 }
 
 function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderCurrentLibrary) {
@@ -979,6 +940,19 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
   }
 
   paperPackLibrary.addEventListener("click", (event) => {
+    const clearRecentlyAddedButton = event.target.closest("[data-clear-recently-added]");
+
+    if (clearRecentlyAddedButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      clearRecentlyAddedStatus(
+        clearRecentlyAddedButton.dataset.clearRecentlyAdded,
+        paperPacks,
+        renderCurrentLibrary
+      );
+      return;
+    }
+
     const editButton = event.target.closest("[data-edit-pack]");
 
     if (editButton) {
@@ -1011,7 +985,7 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
 
     const card = event.target.closest("[data-paper-pack-card]");
 
-    if (!card || event.target.closest("[data-edit-pack]")) {
+    if (!card || event.target.closest("[data-edit-pack], [data-clear-recently-added]")) {
       return;
     }
 
@@ -1143,6 +1117,26 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
 
       closeDetailPanel(detailPanel);
     }
+  });
+}
+
+function clearRecentlyAddedStatus(paperPackId, paperPacks, renderCurrentLibrary) {
+  const paperPack = paperPacks.find((pack) => pack.id === paperPackId);
+
+  if (!paperPack || !isRecentlyAddedPaperPack(paperPack)) {
+    return;
+  }
+
+  const updatedPaperPack = {
+    ...paperPack,
+    recentlyAdded: false
+  };
+
+  replacePaperPack(paperPacks, updatedPaperPack);
+  renderCurrentLibrary();
+
+  savePaperPack(updatedPaperPack).catch(() => {
+    window.alert("The Recently Added status was cleared for this session, but the change could not be saved permanently.");
   });
 }
 
@@ -1480,7 +1474,6 @@ function deleteSelectedPaperPack(selectedPack, paperPacks, renderCurrentLibrary,
     paperPacks.splice(selectedPackIndex, 1);
   }
 
-  LATEST_CATALOG_SESSION_PACK_IDS.delete(selectedPack.id);
   renderCurrentLibrary();
   closeDetailPanel(detailPanel);
 }
