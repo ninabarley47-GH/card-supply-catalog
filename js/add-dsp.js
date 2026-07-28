@@ -6,6 +6,9 @@ import {
   loadPatternImagesForPaperPackName
 } from "./images.js";
 import { addCatalogSchemaVersion } from "./schema.js";
+import { loadCatalogSetting, saveCatalogSetting } from "./storage.js";
+
+const ADD_DSP_DEFAULTS_SETTING_ID = "addDspDefaults";
 
 export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
   const panel = document.querySelector("[data-add-dsp-panel]");
@@ -24,12 +27,21 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
   const formState = {
     editingPaperPack: null,
     autoLoadedPaperPackId: "",
-    isLoadingLibraryImages: false
+    isLoadingLibraryImages: false,
+    addDspDefaults: null
   };
 
   if (!panel || !form) {
     return;
   }
+
+  const defaultsReady = loadCatalogSetting(ADD_DSP_DEFAULTS_SETTING_ID)
+    .then((defaults) => {
+      formState.addDspDefaults = normalizeAddDspDefaults(defaults);
+    })
+    .catch(() => {
+      formState.addDspDefaults = null;
+    });
 
   message?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-add-missing-color]");
@@ -64,14 +76,15 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
   });
 
   for (const button of openButtons) {
-    button.addEventListener("click", () =>
+    button.addEventListener("click", async () => {
+      await defaultsReady;
       openAddDspPanel(panel, form, selectedImages, imagePreviewList, imagePreviewCount, {
         title,
         summary,
         submitButton,
         formState
-      })
-    );
+      });
+    });
   }
 
   for (const button of closeButtons) {
@@ -161,6 +174,7 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
       return;
     }
 
+    await defaultsReady;
     openAddDspPanel(panel, form, selectedImages, imagePreviewList, imagePreviewCount, {
       title,
       summary,
@@ -214,6 +228,7 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
       paperPack: result.paperPack,
       mode: formState.editingPaperPack ? "edit" : "add"
     };
+    const defaultsToSave = createAddDspDefaults(result.paperPack);
 
     document.dispatchEvent(
       new CustomEvent("paper-pack:save", {
@@ -237,6 +252,13 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
         return;
       }
 
+      if (saveDetail.mode === "add") {
+        formState.addDspDefaults = defaultsToSave;
+        saveCatalogSetting(ADD_DSP_DEFAULTS_SETTING_ID, defaultsToSave).catch(() => {
+          // The paper pack is already saved; defaults are a non-critical convenience.
+        });
+      }
+
       if (saveResult.warning) {
         window.alert(saveResult.warning);
       }
@@ -246,8 +268,52 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
 
 function openAddDspPanel(panel, form, selectedImages, imagePreviewList, imagePreviewCount, controls) {
   resetAddDspForm(form, selectedImages, imagePreviewList, imagePreviewCount, controls);
+  applyAddDspDefaults(form, controls.formState.addDspDefaults);
   panel.hidden = false;
   panel.querySelector("input, select, textarea, button")?.focus();
+}
+
+function createAddDspDefaults(paperPack) {
+  return {
+    owner: paperPack.owner,
+    releaseYear: paperPack.releaseYear,
+    availability: paperPack.availability,
+    refillAvailable: paperPack.refillAvailable
+  };
+}
+
+function normalizeAddDspDefaults(defaults) {
+  if (!defaults || typeof defaults !== "object") {
+    return null;
+  }
+
+  const owner = cleanText(defaults.owner);
+  const releaseYear = Number.parseInt(defaults.releaseYear, 10);
+
+  if (!owner || !Number.isInteger(releaseYear) || releaseYear < 1990 || releaseYear > 2100) {
+    return null;
+  }
+
+  return {
+    owner,
+    releaseYear,
+    availability: defaults.availability === "used-up" ? "used-up" : "available",
+    refillAvailable:
+      defaults.refillAvailable === true || defaults.refillAvailable === false
+        ? defaults.refillAvailable
+        : null
+  };
+}
+
+function applyAddDspDefaults(form, defaults) {
+  if (!defaults) {
+    return;
+  }
+
+  form.elements.owner.value = defaults.owner;
+  form.elements.releaseYear.value = `${defaults.releaseYear}`;
+  form.elements.availability.value = defaults.availability;
+  form.elements.refillAvailable.value = formatOptionalBoolean(defaults.refillAvailable);
 }
 
 function openEditDspPanel(panel, form, paperPack, colorsById, selectedImages, imagePreviewList, imagePreviewCount, controls) {
