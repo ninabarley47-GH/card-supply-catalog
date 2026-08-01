@@ -379,6 +379,122 @@ export async function checkImageLibraryHealth(paperPacks) {
   };
 }
 
+export async function repairBrokenPaperPackImageLinks(paperPacks) {
+  const directoryHandle = await getReadableImageLibraryDirectoryHandle();
+  const summary = {
+    packsChecked: paperPacks.length,
+    packsRepaired: 0,
+    linksRepaired: 0,
+    packsUnresolved: [],
+    repairedPaperPacks: []
+  };
+
+  if (!directoryHandle) {
+    return {
+      ok: false,
+      needsFolder: true,
+      summary
+    };
+  }
+
+  for (const paperPack of paperPacks) {
+    const brokenLinkCount = await countBrokenImageLinks(paperPack, directoryHandle);
+
+    if (brokenLinkCount === 0) {
+      continue;
+    }
+
+    const packDirectory = await findPaperPackImageDirectoryForPack(directoryHandle, paperPack);
+
+    if (!packDirectory) {
+      summary.packsUnresolved.push(paperPack.name || paperPack.id || "Untitled pack");
+      continue;
+    }
+
+    const images = await getImagesFromDirectory(packDirectory.handle, packDirectory.path);
+
+    if (images.length === 0) {
+      summary.packsUnresolved.push(paperPack.name || paperPack.id || "Untitled pack");
+      continue;
+    }
+
+    const repairedPaperPack = rebuildPaperPackImageReferences(paperPack, images);
+    summary.packsRepaired += 1;
+    summary.linksRepaired += brokenLinkCount;
+    summary.repairedPaperPacks.push(repairedPaperPack);
+  }
+
+  return {
+    ok: true,
+    needsFolder: false,
+    summary
+  };
+}
+
+async function countBrokenImageLinks(paperPack, directoryHandle) {
+  let brokenLinkCount = 0;
+
+  for (const patternEntry of paperPack.patterns || []) {
+    const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
+
+    if (!patternObject?.imagePath) {
+      continue;
+    }
+
+    try {
+      await findFileFromImagePath(directoryHandle, patternObject.imagePath);
+    } catch (error) {
+      brokenLinkCount += 1;
+    }
+  }
+
+  return brokenLinkCount;
+}
+
+async function findPaperPackImageDirectoryForPack(directoryHandle, paperPack) {
+  const candidateIds = [...new Set([createId(paperPack.id), createId(paperPack.name)].filter(Boolean))];
+
+  for (const candidateId of candidateIds) {
+    const packDirectory = await findPaperPackImageDirectory(directoryHandle, candidateId);
+
+    if (packDirectory) {
+      return packDirectory;
+    }
+  }
+
+  return null;
+}
+
+function rebuildPaperPackImageReferences(paperPack, images) {
+  const patternCount = Math.max(
+    Number.isInteger(paperPack.patternCount) ? paperPack.patternCount : 0,
+    (paperPack.patterns || []).length,
+    images.length
+  );
+
+  const patterns = Array.from({ length: patternCount }, (_, index) => {
+    const image = images[index];
+
+    if (!image) {
+      return `pattern-${index + 1}`;
+    }
+
+    return {
+      id: `pattern-${index + 1}`,
+      imageName: image.name,
+      imagePath: image.imagePath,
+      imageStorageStrategy: LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY
+    };
+  });
+
+  return {
+    ...paperPack,
+    patternCount,
+    patterns,
+    imageStorageStrategy: LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY
+  };
+}
+
 export async function deletePaperPackImages(paperPack) {
   const directoryHandle = await getWritableImageLibraryDirectoryHandle();
 

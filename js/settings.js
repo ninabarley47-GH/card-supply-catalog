@@ -1,4 +1,8 @@
-import { checkImageLibraryHealth, migratePaperPackImagesToLocalFolder } from "./images.js";
+import {
+  checkImageLibraryHealth,
+  migratePaperPackImagesToLocalFolder,
+  repairBrokenPaperPackImageLinks
+} from "./images.js";
 import { loadCatalogSetting, saveCatalogSetting, savePaperPack } from "./storage.js";
 
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
@@ -27,6 +31,7 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
   const chooseButton = document.querySelector("[data-choose-image-library]");
   const reconnectButton = document.querySelector("[data-reconnect-image-library]");
   const checkButton = document.querySelector("[data-check-image-library]");
+  const repairButton = document.querySelector("[data-repair-image-library]");
   const migrateButton = document.querySelector("[data-migrate-image-library]");
   const status = document.querySelector("[data-image-library-status]");
   const health = document.querySelector("[data-image-library-health]");
@@ -42,6 +47,9 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
     }
     if (checkButton) {
       checkButton.disabled = true;
+    }
+    if (repairButton) {
+      repairButton.disabled = true;
     }
     if (migrateButton) {
       migrateButton.disabled = true;
@@ -98,6 +106,39 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
     renderSetupStatus(document.querySelector("[data-setup-status]"), paperPacks);
   });
 
+  repairButton?.addEventListener("click", async () => {
+    repairButton.disabled = true;
+    renderImageLibraryStatus(status, "Repairing broken image links from the selected folder...", "");
+
+    try {
+      const result = await repairBrokenPaperPackImageLinks(paperPacks);
+
+      if (!result.ok) {
+        renderImageLibraryStatus(status, "Reconnect the image folder before repairing image links.", "error");
+        return;
+      }
+
+      for (const repairedPaperPack of result.summary.repairedPaperPacks) {
+        await savePaperPack(repairedPaperPack);
+        replacePaperPack(paperPacks, repairedPaperPack);
+      }
+
+      await onImagesMigrated?.();
+      const healthResult = await checkImageLibraryHealth(paperPacks);
+      renderImageLibraryHealth(health, healthResult.summary);
+      renderImageLibraryStatus(
+        status,
+        formatImageLinkRepairSummary(result.summary),
+        result.summary.packsUnresolved.length > 0 ? "error" : "success"
+      );
+      renderSetupStatus(document.querySelector("[data-setup-status]"), paperPacks);
+    } catch (error) {
+      renderImageLibraryStatus(status, "Broken image links could not be repaired.", "error");
+    } finally {
+      repairButton.disabled = false;
+    }
+  });
+
   migrateButton?.addEventListener("click", async () => {
     migrateButton.disabled = true;
     renderImageLibraryStatus(status, "Migrating embedded images into the selected folder...", "");
@@ -114,6 +155,20 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
       migrateButton.disabled = false;
     }
   });
+}
+
+function formatImageLinkRepairSummary(summary) {
+  if (summary.linksRepaired === 0 && summary.packsUnresolved.length === 0) {
+    return "No broken image links were found.";
+  }
+
+  const repairedMessage = `${summary.linksRepaired} image link${summary.linksRepaired === 1 ? "" : "s"} repaired across ${summary.packsRepaired} paper pack${summary.packsRepaired === 1 ? "" : "s"}.`;
+
+  if (summary.packsUnresolved.length === 0) {
+    return repairedMessage;
+  }
+
+  return `${repairedMessage} No matching image folder was found for: ${formatLimitedList(summary.packsUnresolved, 5)}.`;
 }
 
 async function selectImageLibraryFolder({ paperPacks = [], status, health, onImageLibrarySelected, successPrefix }) {
