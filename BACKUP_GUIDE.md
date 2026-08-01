@@ -15,7 +15,7 @@ Card Supply Catalog keeps your data under your control. A complete backup can in
 1. Open the app.
 2. Go to Settings.
 3. Choose Export Backup.
-4. Save the downloaded JSON file somewhere outside the app.
+4. If an image library folder is selected, confirm the JSON file appears there. Otherwise, save the downloaded JSON file somewhere safe.
 
 The JSON backup includes catalog metadata such as paper packs, colors, tags, owners, release years, availability, and image references.
 

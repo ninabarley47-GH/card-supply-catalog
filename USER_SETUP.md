@@ -138,7 +138,7 @@ On the computer that has access to the image folder:
 3. Choose or reconnect the image library folder.
 4. Run Check Image Library and resolve missing images if needed.
 5. Choose Export iPad Backup.
-6. Share the downloaded JSON file with the iPad user.
+6. Share the JSON file from the selected image folder, or from browser downloads when no folder is selected, with the iPad user.
 
 On the iPad:
 

@@ -20,15 +20,16 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
   if (exportButton) {
     exportButton.addEventListener("click", async () => {
       try {
+        const backupDirectory = await getWritableBackupDirectoryHandle();
         const backup = await createCatalogBackup({
           paperPacks,
           colorsById
         });
 
-        downloadJsonBackup(backup);
+        const saveResult = await saveJsonBackup(backup, "backup", backupDirectory);
         await saveCatalogSetting(LAST_BACKUP_EXPORT_SETTING_ID, backup.exportedAt);
         document.dispatchEvent(new CustomEvent("catalog:backup-exported"));
-        renderBackupMessage(message, formatExportSummary(backup), "success");
+        renderBackupMessage(message, formatExportSummary(backup, saveResult), "success");
       } catch (error) {
         renderBackupMessage(message, "The catalog backup could not be created.", "error");
       }
@@ -41,15 +42,16 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
       renderBackupMessage(message, "Creating iPad backup with compressed images...", "");
 
       try {
+        const backupDirectory = await getWritableBackupDirectoryHandle();
         const backup = await createIpadCatalogBackup({
           paperPacks,
           colorsById
         });
 
-        downloadJsonBackup(backup, "ipad-backup");
+        const saveResult = await saveJsonBackup(backup, "ipad-backup", backupDirectory);
         await saveCatalogSetting(LAST_BACKUP_EXPORT_SETTING_ID, backup.exportedAt);
         document.dispatchEvent(new CustomEvent("catalog:backup-exported"));
-        renderBackupMessage(message, formatIpadExportSummary(backup), backup.imageStorage.missingImages > 0 ? "error" : "success");
+        renderBackupMessage(message, formatIpadExportSummary(backup, saveResult), backup.imageStorage.missingImages > 0 ? "error" : "success");
       } catch (error) {
         renderBackupMessage(message, "The iPad backup could not be created.", "error");
       } finally {
@@ -215,25 +217,33 @@ function summarizeImageStorage(paperPacks) {
   );
 }
 
-function formatExportSummary(backup) {
+function formatExportSummary(backup, saveResult) {
   const folderImageReferences = backup.imageStorage?.folderImageReferences || 0;
+  const savedMessage = formatBackupSaveDestination(saveResult, "Catalog backup");
 
   if (folderImageReferences === 0) {
-    return "Catalog backup downloaded.";
+    return savedMessage;
   }
 
-  return `Catalog backup downloaded. ${folderImageReferences} folder image reference${folderImageReferences === 1 ? "" : "s"} included; back up or share the image folder separately.`;
+  return `${savedMessage} ${folderImageReferences} folder image reference${folderImageReferences === 1 ? "" : "s"} included; back up or share the image folder separately.`;
 }
 
-function formatIpadExportSummary(backup) {
+function formatIpadExportSummary(backup, saveResult) {
   const compressedImages = backup.imageStorage?.compressedImages || 0;
   const missingImages = backup.imageStorage?.missingImages || 0;
+  const savedMessage = formatBackupSaveDestination(saveResult, "iPad backup");
 
   if (missingImages > 0) {
-    return `iPad backup downloaded with ${compressedImages} embedded image${compressedImages === 1 ? "" : "s"}. ${missingImages} image${missingImages === 1 ? "" : "s"} could not be embedded.`;
+    return `${savedMessage} ${compressedImages} embedded image${compressedImages === 1 ? "" : "s"} included. ${missingImages} image${missingImages === 1 ? "" : "s"} could not be embedded.`;
   }
 
-  return `iPad backup downloaded with ${compressedImages} embedded image${compressedImages === 1 ? "" : "s"}.`;
+  return `${savedMessage} ${compressedImages} embedded image${compressedImages === 1 ? "" : "s"} included.`;
+}
+
+function formatBackupSaveDestination(saveResult, backupLabel) {
+  return saveResult?.savedToFolder
+    ? `${backupLabel} saved to ${saveResult.folderName}.`
+    : `${backupLabel} downloaded.`;
 }
 
 function createSerializableImageLibrarySetting(imageLibrary) {
@@ -248,17 +258,74 @@ function createSerializableImageLibrarySetting(imageLibrary) {
   };
 }
 
-function downloadJsonBackup(backup, label = "backup") {
+async function saveJsonBackup(backup, label = "backup", directoryHandle = null) {
   const backupJson = JSON.stringify(backup, null, 2);
   const blob = new Blob([backupJson], { type: "application/json" });
+  const fileName = `card-supply-catalog-${label}-${formatDateStamp(new Date())}.json`;
+
+  if (directoryHandle) {
+    try {
+      const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+
+      return {
+        savedToFolder: true,
+        folderName: directoryHandle.name || "the selected folder",
+        fileName
+      };
+    } catch (error) {
+      // Fall back to a browser download if the selected folder cannot be written.
+    }
+  }
+
+  downloadJsonBackup(blob, fileName);
+  return {
+    savedToFolder: false,
+    folderName: "",
+    fileName
+  };
+}
+
+function downloadJsonBackup(blob, fileName) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
 
   link.href = url;
-  link.download = `card-supply-catalog-${label}-${formatDateStamp(new Date())}.json`;
+  link.download = fileName;
   link.click();
 
   URL.revokeObjectURL(url);
+}
+
+async function getWritableBackupDirectoryHandle() {
+  const imageLibrary = await loadCatalogSetting(IMAGE_LIBRARY_SETTING_ID);
+  const directoryHandle = imageLibrary?.directoryHandle;
+
+  if (!directoryHandle) {
+    return null;
+  }
+
+  if (!directoryHandle.queryPermission) {
+    return directoryHandle;
+  }
+
+  try {
+    const permission = { mode: "readwrite" };
+
+    if ((await directoryHandle.queryPermission(permission)) === "granted") {
+      return directoryHandle;
+    }
+
+    if (directoryHandle.requestPermission && (await directoryHandle.requestPermission(permission)) === "granted") {
+      return directoryHandle;
+    }
+  } catch (error) {
+    // A download will be used when saved-folder permission is unavailable.
+  }
+
+  return null;
 }
 
 async function readBackupFile(backupFile) {
