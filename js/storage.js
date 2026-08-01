@@ -24,7 +24,7 @@ export async function loadSavedPaperPacks() {
   await migrateLegacyLocalStorage(database);
   const paperPacks = await getAllFromStore(database, PAPER_PACKS_STORE);
 
-  return paperPacks.filter(isPaperPack).map(normalizePaperPackKeywords);
+  return paperPacks.filter(isPaperPack).map(normalizePaperPackForRuntime);
 }
 
 export async function savePaperPack(paperPack) {
@@ -94,8 +94,8 @@ export async function deletePaperPack(paperPackId) {
 export async function mergePaperPacks(basePaperPacks, savedPaperPacks) {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
-  const normalizedSavedPaperPacks = savedPaperPacks.map(normalizePaperPackKeywords);
-  const normalizedBasePaperPacks = basePaperPacks.map(normalizePaperPackKeywords);
+  const normalizedSavedPaperPacks = savedPaperPacks.map(normalizePaperPackForRuntime);
+  const normalizedBasePaperPacks = basePaperPacks.map(normalizePaperPackForRuntime);
   const savedPaperPackIds = new Set(normalizedSavedPaperPacks.map((paperPack) => paperPack.id));
   const deletedPaperPackIds = new Set(
     (await getAllFromStore(database, DELETED_PAPER_PACK_IDS_STORE)).map((entry) => entry.id)
@@ -217,7 +217,30 @@ function markLegacyMigrationComplete() {
 }
 
 function normalizePaperPackForStorage(paperPack) {
-  return addCatalogSchemaVersion(normalizePaperPackKeywords(paperPack));
+  return addCatalogSchemaVersion(normalizePaperPackForRuntime(paperPack));
+}
+
+function normalizePaperPackForRuntime(paperPack) {
+  const normalizedPaperPack = normalizePaperPackKeywords(paperPack);
+
+  return {
+    ...normalizedPaperPack,
+    patterns: (normalizedPaperPack.patterns || []).map(removeTransientPatternImageFields)
+  };
+}
+
+function removeTransientPatternImageFields(patternEntry) {
+  if (!patternEntry || typeof patternEntry !== "object") {
+    return patternEntry;
+  }
+
+  const { __imageFile, imagePreviewSrc, ...persistentPattern } = patternEntry;
+
+  if (typeof persistentPattern.imageSrc === "string" && persistentPattern.imageSrc.startsWith("blob:")) {
+    delete persistentPattern.imageSrc;
+  }
+
+  return persistentPattern;
 }
 
 function normalizePaperPackKeywords(paperPack) {

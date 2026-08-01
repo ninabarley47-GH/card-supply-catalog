@@ -794,15 +794,35 @@ function isSupportedImageFileName(fileName) {
 async function hydratePatternImageSource(patternEntry, directoryHandle) {
   const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
 
-  if (!patternObject?.imagePath || patternObject.imagePreviewSrc || patternObject.imageSrc) {
+  if (!patternObject?.imagePath) {
     return;
   }
+
+  clearStalePatternObjectUrls(patternObject);
 
   try {
     const file = await findFileFromImagePath(directoryHandle, patternObject.imagePath);
     patternObject.imagePreviewSrc = URL.createObjectURL(file);
   } catch (error) {
     // The placeholder remains visible if the local image cannot be read.
+  }
+}
+
+function clearStalePatternObjectUrls(patternObject) {
+  for (const fieldName of ["imagePreviewSrc", "imageSrc"]) {
+    const imageSource = patternObject[fieldName];
+
+    if (typeof imageSource !== "string" || !imageSource.startsWith("blob:")) {
+      continue;
+    }
+
+    try {
+      URL.revokeObjectURL(imageSource);
+    } catch (error) {
+      // The URL may belong to an earlier browser session and already be invalid.
+    }
+
+    delete patternObject[fieldName];
   }
 }
 
