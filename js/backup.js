@@ -1,4 +1,10 @@
-import { loadCatalogSetting, saveCatalogSetting, saveColor, savePaperPack } from "./storage.js";
+import {
+  loadCatalogSetting,
+  loadSavedPaperPacks,
+  saveCatalogSetting,
+  saveColor,
+  savePaperPack
+} from "./storage.js";
 import { getPatternImageFile, getPatternImageSource } from "./images.js";
 import {
   BACKUP_SCHEMA_VERSION,
@@ -366,6 +372,14 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
 
   const importedColorsById = backup.colors || {};
   const importedPaperPacks = backup.paperPacks || [];
+  const embeddedImageDiagnostic = findFirstEmbeddedImage(importedPaperPacks);
+
+  logImportDiagnostic("Import started", {
+    origin: window.location.origin,
+    href: window.location.href,
+    paperPackCount: importedPaperPacks.length,
+    embeddedImage: describeEmbeddedImage(embeddedImageDiagnostic)
+  });
 
   for (const color of Object.values(importedColorsById)) {
     try {
@@ -373,6 +387,7 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
       colorsById[color.id] = color;
       summary.colorsImported += 1;
     } catch (error) {
+      logImportError("Color write failed", error, { colorId: color?.id });
       summary.errors.push(`Color could not be imported: ${color?.name || color?.id || "Unknown color"}`);
     }
   }
@@ -387,9 +402,15 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
       summary.imagesImported += countEmbeddedPatternImages(versionedPaperPack);
       summary.folderImageReferencesImported += countFolderImageReferences(versionedPaperPack);
     } catch (error) {
+      logImportError("Paper-pack write failed", error, {
+        paperPackId: paperPack?.id,
+        embeddedImageCount: countEmbeddedPatternImages(paperPack)
+      });
       summary.errors.push(`Paper pack could not be imported: ${paperPack?.name || paperPack?.id || "Unknown pack"}`);
     }
   }
+
+  await runEmbeddedImageImportDiagnostic(embeddedImageDiagnostic);
 
   if (summary.folderImageReferencesImported > 0 || backup.imageStorage?.configuredLibrary) {
     summary.warnings.push(
@@ -402,6 +423,109 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
   }
 
   return summary;
+}
+
+function findFirstEmbeddedImage(paperPacks) {
+  for (const paperPack of paperPacks) {
+    for (const [patternIndex, pattern] of (paperPack.patterns || []).entries()) {
+      if (pattern && typeof pattern === "object" && typeof pattern.imageSrc === "string") {
+        return { paperPackId: paperPack.id, patternIndex, imageSrc: pattern.imageSrc };
+      }
+    }
+  }
+
+  return null;
+}
+
+async function runEmbeddedImageImportDiagnostic(diagnostic) {
+  if (!diagnostic) {
+    logImportDiagnostic("No embedded imageSrc was present in the imported paper packs.");
+    return;
+  }
+
+  try {
+    const savedPaperPacks = await loadSavedPaperPacks();
+    const savedPaperPack = savedPaperPacks.find((paperPack) => paperPack.id === diagnostic.paperPackId);
+    const savedImageSrc = savedPaperPack?.patterns?.[diagnostic.patternIndex]?.imageSrc;
+    const quota = await getStorageQuotaDiagnostic();
+    const decode = await decodeImageDiagnostic(savedImageSrc);
+
+    logImportDiagnostic("First embedded image round-trip", {
+      origin: window.location.origin,
+      paperPackId: diagnostic.paperPackId,
+      patternIndex: diagnostic.patternIndex,
+      input: describeImageSource(diagnostic.imageSrc),
+      stored: describeImageSource(savedImageSrc),
+      exactMatch: savedImageSrc === diagnostic.imageSrc,
+      decode,
+      quota
+    });
+  } catch (error) {
+    logImportError("Embedded-image round-trip diagnostic failed", error, {
+      paperPackId: diagnostic.paperPackId,
+      patternIndex: diagnostic.patternIndex
+    });
+  }
+}
+
+function describeEmbeddedImage(diagnostic) {
+  return diagnostic
+    ? { paperPackId: diagnostic.paperPackId, patternIndex: diagnostic.patternIndex, ...describeImageSource(diagnostic.imageSrc) }
+    : null;
+}
+
+function describeImageSource(imageSrc) {
+  return {
+    present: typeof imageSrc === "string" && imageSrc.length > 0,
+    length: typeof imageSrc === "string" ? imageSrc.length : 0,
+    prefix: typeof imageSrc === "string" ? imageSrc.slice(0, 32) : "",
+    isJpegDataUrl: /^data:image\\/jpeg;base64,/i.test(imageSrc || "")
+  };
+}
+
+async function decodeImageDiagnostic(imageSrc) {
+  if (!imageSrc) {
+    return { ok: false, error: "The stored imageSrc is missing." };
+  }
+
+  const image = new Image();
+  image.src = imageSrc;
+
+  try {
+    await image.decode();
+    return { ok: true, width: image.naturalWidth, height: image.naturalHeight };
+  } catch (error) {
+    return { ok: false, errorName: error?.name || "Error", error: error?.message || String(error) };
+  }
+}
+
+async function getStorageQuotaDiagnostic() {
+  if (!navigator.storage?.estimate) {
+    return null;
+  }
+
+  const estimate = await navigator.storage.estimate();
+
+  return {
+    usage: estimate.usage,
+    quota: estimate.quota,
+    available: Number.isFinite(estimate.quota) && Number.isFinite(estimate.usage)
+      ? estimate.quota - estimate.usage
+      : null
+  };
+}
+
+function logImportDiagnostic(message, details) {
+  console.info(`[Backup import diagnostic] ${message}`, details || "");
+}
+
+function logImportError(message, error, details = {}) {
+  console.error(`[Backup import diagnostic] ${message}`, {
+    ...details,
+    errorName: error?.name || "Error",
+    errorMessage: error?.message || String(error),
+    error
+  });
 }
 
 function validateBackup(backup) {
