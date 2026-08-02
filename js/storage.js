@@ -37,6 +37,21 @@ export async function savePaperPack(paperPack) {
   });
 }
 
+export async function savePaperPacks(paperPacks) {
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
+
+  await writeTransaction(database, [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE], (transaction) => {
+    const paperPackStore = transaction.objectStore(PAPER_PACKS_STORE);
+    const deletedPaperPackIdStore = transaction.objectStore(DELETED_PAPER_PACK_IDS_STORE);
+
+    for (const paperPack of paperPacks) {
+      paperPackStore.put(normalizePaperPackForStorage(paperPack));
+      deletedPaperPackIdStore.delete(paperPack.id);
+    }
+  });
+}
+
 export async function loadSavedColors() {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);

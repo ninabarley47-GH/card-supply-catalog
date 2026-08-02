@@ -191,6 +191,25 @@
               <div class="image-library-health" data-image-library-health aria-live="polite"></div>
             </section>
 
+            <section class="settings-subsection" aria-labelledby="bulk-owner-title">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Catalog Maintenance</p>
+                  <h4 id="bulk-owner-title">Change All Paper Pack Owners</h4>
+                </div>
+                <p>Replace the owner on every paper pack with one new value.</p>
+              </div>
+
+              <form class="bulk-owner-form" data-bulk-owner-form>
+                <div class="form-field">
+                  <label for="bulk-paper-pack-owner">New owner</label>
+                  <input id="bulk-paper-pack-owner" type="text" autocomplete="off" placeholder="e.g., Nina" data-bulk-owner-input required>
+                </div>
+                <button class="button button-primary" type="submit" data-bulk-owner-submit>Update All Owners</button>
+              </form>
+              <p class="settings-message" data-bulk-owner-message aria-live="polite"></p>
+            </section>
+
             <section class="settings-subsection" aria-labelledby="backup-restore-title">
               <div class="section-heading">
                 <div>

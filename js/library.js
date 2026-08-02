@@ -125,6 +125,9 @@ export async function initializeLibraryShell() {
         },
         onImagesMigrated: () => {
           hydratePaperPackImageSources(paperPacks).then(librarySearch.renderCurrent);
+        },
+        onPaperPacksUpdated: () => {
+          librarySearch.renderCurrent();
         }
       });
       initializeCatalogBackup({

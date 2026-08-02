@@ -1713,6 +1713,22 @@ button.pattern {
   color: var(--color-muted);
 }
 
+.bulk-owner-form {
+  display: flex;
+  align-items: end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.bulk-owner-form .form-field {
+  flex: 1 1 16rem;
+  margin: 0;
+}
+
+.bulk-owner-form .button {
+  flex: 0 0 auto;
+}
+
 .settings-help {
   max-width: 44rem;
   margin-top: var(--space-3);
@@ -2118,6 +2134,11 @@ button.pattern {
 
   .uncataloged-pack-actions {
     justify-content: flex-start;
+  }
+
+  .bulk-owner-form {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .empty-library {

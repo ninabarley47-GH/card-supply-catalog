@@ -3,7 +3,7 @@ import {
   migratePaperPackImagesToLocalFolder,
   repairBrokenPaperPackImageLinks
 } from "./images.js";
-import { loadCatalogSetting, saveCatalogSetting, savePaperPack } from "./storage.js";
+import { loadCatalogSetting, saveCatalogSetting, savePaperPack, savePaperPacks } from "./storage.js";
 
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
 const LAST_BACKUP_EXPORT_SETTING_ID = "lastBackupExportedAt";
@@ -12,6 +12,62 @@ const LAST_BACKUP_IMPORT_SETTING_ID = "lastBackupImportedAt";
 export function initializeSettings(options = {}) {
   initializeSetupStatus(options);
   initializeImageLibrarySettings(options);
+  initializeBulkOwnerSettings(options);
+}
+
+function initializeBulkOwnerSettings({ paperPacks = [], onPaperPacksUpdated } = {}) {
+  const form = document.querySelector("[data-bulk-owner-form]");
+  const ownerInput = document.querySelector("[data-bulk-owner-input]");
+  const submitButton = document.querySelector("[data-bulk-owner-submit]");
+  const message = document.querySelector("[data-bulk-owner-message]");
+
+  if (!form || !ownerInput || !submitButton || !message) {
+    return;
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const newOwner = String(ownerInput.value || "").trim().replace(/\s+/g, " ");
+
+    if (!newOwner) {
+      renderBulkOwnerMessage(message, "Enter the new owner name before updating the catalog.", "error");
+      ownerInput.focus();
+      return;
+    }
+
+    const affectedPacks = paperPacks.filter((paperPack) => paperPack.owner !== newOwner);
+
+    if (affectedPacks.length === 0) {
+      renderBulkOwnerMessage(message, `All paper packs are already owned by ${newOwner}.`, "");
+      return;
+    }
+
+    if (!window.confirm(`Change the owner to "${newOwner}" for ${affectedPacks.length} paper pack${affectedPacks.length === 1 ? "" : "s"}?`)) {
+      renderBulkOwnerMessage(message, "Owner update cancelled. No catalog changes were made.", "");
+      return;
+    }
+
+    const updatedPaperPacks = paperPacks.map((paperPack) => ({ ...paperPack, owner: newOwner }));
+    submitButton.disabled = true;
+    renderBulkOwnerMessage(message, "Updating paper pack owners...", "");
+
+    try {
+      await savePaperPacks(updatedPaperPacks);
+      paperPacks.splice(0, paperPacks.length, ...updatedPaperPacks);
+      onPaperPacksUpdated?.();
+      ownerInput.value = "";
+      renderBulkOwnerMessage(message, `${affectedPacks.length} paper pack${affectedPacks.length === 1 ? "" : "s"} updated to owner ${newOwner}.`, "success");
+    } catch (error) {
+      renderBulkOwnerMessage(message, "Paper pack owners could not be updated.", "error");
+    } finally {
+      submitButton.disabled = false;
+    }
+  });
+}
+
+function renderBulkOwnerMessage(message, text, tone) {
+  message.textContent = text;
+  message.dataset.tone = tone;
 }
 
 function initializeSetupStatus({ paperPacks = [] } = {}) {
