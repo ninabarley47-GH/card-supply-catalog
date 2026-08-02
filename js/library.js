@@ -1061,7 +1061,7 @@ function createPaperPackCard(paperPack, colorsById) {
 
   const keywords = createKeywordList(paperPack);
   const colorList = createPackColorList(paperPack, colorsById);
-  const availability = createAvailabilityIndicator(paperPack.availability);
+  const availability = createAvailabilityIndicator(paperPack);
   const meta = document.createElement("p");
   meta.className = "card-meta";
   meta.textContent = paperPack.owner;
@@ -1140,6 +1140,15 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
   }
 
   paperPackLibrary.addEventListener("click", (event) => {
+    const markUsedUpButton = event.target.closest("[data-mark-used-up]");
+
+    if (markUsedUpButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      markPaperPackUsedUp(markUsedUpButton.dataset.markUsedUp, paperPacks, renderCurrentLibrary);
+      return;
+    }
+
     const clearRecentlyAddedButton = event.target.closest("[data-clear-recently-added]");
 
     if (clearRecentlyAddedButton) {
@@ -1185,7 +1194,7 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
 
     const card = event.target.closest("[data-paper-pack-card]");
 
-    if (!card || event.target.closest("[data-edit-pack], [data-clear-recently-added]")) {
+    if (!card || event.target.closest("[data-edit-pack], [data-clear-recently-added], [data-mark-used-up]")) {
       return;
     }
 
@@ -1678,14 +1687,50 @@ function deleteSelectedPaperPack(selectedPack, paperPacks, renderCurrentLibrary,
   closeDetailPanel(detailPanel);
 }
 
-function createAvailabilityIndicator(availability) {
+function createAvailabilityIndicator(paperPack) {
+  const control = document.createElement("div");
   const indicator = document.createElement("p");
-  const normalizedAvailability = normalizeAvailability(availability);
+  const normalizedAvailability = normalizeAvailability(paperPack.availability);
 
+  control.className = "availability-control";
   indicator.className = `availability-indicator availability-${normalizedAvailability}`;
   indicator.textContent = formatAvailabilityLabel(normalizedAvailability);
+  control.append(indicator);
 
-  return indicator;
+  if (normalizedAvailability === "available") {
+    const markUsedUpButton = document.createElement("button");
+    markUsedUpButton.className = "availability-clear";
+    markUsedUpButton.type = "button";
+    markUsedUpButton.dataset.markUsedUp = paperPack.id;
+    markUsedUpButton.textContent = "\u00d7";
+    markUsedUpButton.setAttribute("aria-label", `Mark ${paperPack.name} as used up`);
+    markUsedUpButton.title = "Mark as used up";
+    control.append(markUsedUpButton);
+  }
+
+  return control;
+}
+
+function markPaperPackUsedUp(paperPackId, paperPacks, renderCurrentLibrary) {
+  const paperPack = paperPacks.find((pack) => pack.id === paperPackId);
+
+  if (!paperPack || isPaperPackUsedUp(paperPack)) {
+    return;
+  }
+
+  const updatedPaperPack = {
+    ...paperPack,
+    availability: "used-up"
+  };
+
+  replacePaperPack(paperPacks, updatedPaperPack);
+  renderCurrentLibrary();
+
+  savePaperPack(updatedPaperPack).catch(() => {
+    replacePaperPack(paperPacks, paperPack);
+    renderCurrentLibrary();
+    window.alert(`${paperPack.name} could not be marked as used up.`);
+  });
 }
 
 function normalizeAvailability(availability) {

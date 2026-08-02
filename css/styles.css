@@ -1661,16 +1661,42 @@ button.pattern {
   line-height: 1.2;
 }
 
-.availability-indicator {
+.availability-control {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   width: max-content;
   margin: var(--space-3) 0 0;
+}
+
+.availability-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
   color: var(--color-muted);
   font-size: 0.82rem;
   font-weight: 800;
   line-height: 1.2;
+}
+
+.availability-clear {
+  border: 0;
+  padding: 0.05rem 0.2rem;
+  background: transparent;
+  color: var(--color-accent-dark);
+  cursor: pointer;
+  font-family: Arial, sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.availability-clear:hover,
+.availability-clear:focus-visible {
+  color: var(--color-text);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }
 
 .availability-indicator::before {
