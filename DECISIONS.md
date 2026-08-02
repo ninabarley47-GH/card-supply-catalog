@@ -1,4 +1,4 @@
-July 2026
+Last Updated: 2026-08-02
 
 # Decision 1:
 ## Quantity Tracking
@@ -51,14 +51,17 @@ Makes it easy to compare paper packs, but also to get details about an individua
 ## Keywords
 
 Keywords are the following:
+Cartoon
 Scenery
 Floral
 Foliage
 Water
+Words
 Land Animals
 Flying Animals
 Ocean Animals
 Hobbies
+Masculine
 Specialty
 Textures
 Holiday
@@ -77,21 +80,17 @@ The catalog view is for visual recognition and creative inspiration. Every card 
 
 # Decision 7
 ## Color IDs and Names
-Nothing stores colors by name. Everything stores a color ID. The color ID will be based on the color name. For example, if the color is "Basic Beige", the color ID is "basic-beige". Corresponding to this color ID, the CSS should also contain a color variable name.
+Paper packs store color IDs rather than color names. A color ID is based on the color name; for example, "Basic Beige" uses `basic-beige`. `data/colors.json` is the authoritative source for names, HEX values, families, collections, status, aliases, and product metadata. Color swatches use that data directly; a separate CSS variable is not required for every catalog color.
 
 # Decision 8
 ## Color Display
 
-We want to show all the colors on the catalog cards, with the colors represented by a dot showing the color, followed by the color id. These should be presented in columns. The cards should adapt to the available space. Let CSS decide how many cards per column on the page, and how many columns of colors to display based on the card width.
+Show all coordinating colors on catalog cards as a color dot followed by the human-readable color name. Present them in responsive columns and let CSS adapt both the card grid and color layout to the available width.
 
 # Decision 9
 ## Left Nav
 
-The left nav should be very simple. It should only include Library and Settings. 
-
-Settings would allow the user to add a color or add a new paper pack. 
-
-Library shows the overall catalog. 
+The left navigation remains simple and contains Paper Library, Color Library, and Settings. Add DSP and Add Color are global actions in the app header. Search and catalog filters live in the left sidebar, which remains visible while the desktop library scrolls. On narrow screens it returns to the normal document flow.
 
 # Decision 10
 Clicking a pattern pack from the Library will display a larger, detailed view of the pack, and will provide a feature to allow edits to the pack.
@@ -99,13 +98,14 @@ Clicking a pattern pack from the Library will display a larger, detailed view of
 # Decision 11
 ## Recently Added
 
-The "Recently Added" section represents the most recent cataloging session, not a rolling date range.
+"Recently Added" is a persistent per-pack status, not a date range or cataloging session.
 
-- It displays all DSP packs added during the latest cataloging session.
-- The section remains unchanged until a newer cataloging session occurs.
-- It does not expire simply because time passes.
-- "Recently Updated" is intentionally omitted, as edits are considered maintenance rather than a primary browsing workflow.
-- "Recently Added" is presented as a collapsible section at the top of the Library view rather than as a permanent item in the left navigation.
+- Every newly added DSP pack receives `recentlyAdded: true`.
+- Recently added available packs sort before other available packs.
+- Each affected card displays a green context bar.
+- The user clears the status permanently with the control on that bar.
+- Editing a pack preserves its current status.
+- The status does not expire with time, and there is no separate Recently Updated state.
 
 # Decision 12
 ## Every Feature Must Support a Crafting Decision
@@ -146,13 +146,9 @@ The context bar communicates the current browsing context (such as Recently Adde
 Only one context bar is displayed on a card at any time.
 
 # Decision 17 
-## Prototype Image Storage
+## Browser Image Fallback
 
-During the prototype cataloging workflow, selected DSP images may be stored as data URLs in browser localStorage.
-
-This is acceptable only for early testing because it keeps the Add DSP workflow simple.
-
-A future storage milestone should replace this with a durable local image-file strategy so larger paper pack collections do not overload localStorage.
+When a selected image-library folder is unavailable or unsupported, images may be embedded as data URLs in paper-pack records stored in IndexedDB. This is a compatibility fallback, not the preferred durable image strategy. Legacy localStorage catalog data is migrated into IndexedDB.
 
 # Decision 18
 ## Image Storage Solutions
@@ -162,21 +158,19 @@ Instead of storing image data inside the browser database, the catalog would sto
 {
   "id": "pattern-1",
   "imageName": "velvet-meadow-01.jpg",
-  "imagePath": "Images/Velvet Meadow/velvet-meadow-01.jpg"
+  "imagePath": "Velvet Meadow/velvet-meadow-01.jpg"
 }
 Then the app displays the image from that path.
 
-Ultimately, we want to move toward using an app-managed shared image folder in OneDrive, but store stable image URLs or relative cloud paths in the catalog. 
-
-Then the app resolves that path against a configured shared OneDrive folder.
+The implemented preferred strategy is a user-selected local folder, which may be inside a locally synced OneDrive folder. The catalog stores stable relative `imagePath` references and resolves them against the selected directory handle. The app can check the library, reconnect it, migrate embedded images, repair broken links, auto-load a matching pack folder, and find uncataloged folders. Direct OneDrive API integration is not required.
 
 # Decision 19
 ## Search and Filter Location
-The catalog gets more room. Moving the filters out of the content area lets your featured pack and "Recently Added" section breathe. Right now the filter controls consume the upper-right corner, forcing the content down.
+Moving search and filters into the left sidebar gives the catalog more room and keeps the Library header focused on results and library-specific actions.
 
-2. It scales naturally. It allows filters to expand beyond search and tags to Owner, Color family, Individual colors, Release year, Retired/current and Favorites. The sidebar can grow without making the main page feel crowded.
+It scales naturally. Filters can expand without pushing the paper cards farther down the page.
 
-3. It matches how people expect catalog apps to work.
+It also matches how people expect catalog applications to work.
 
 # Decision 20
 ## Filtering Architecture
@@ -230,14 +224,8 @@ Once the color is added, the user should return to the Add or Edit DSP screen an
 This functionality should be able to be reused in the "Add Color" section of the Settings tab.
 
 # Decision 25
-## Add Backup/Export Feature
-Add export/import so users can back up:
-catalog JSON
-colors
-paper pack metadata
-optionally embedded image data for now
-
-This gives a safety net before changing storage. IndexedDB is useful, but browser storage limits and eviction policies vary by browser and origin, so it should not be the permanent home for the image library. MDN notes that quotas and eviction differ by browser, and IndexedDB/File System API storage is managed per origin by the browser. Sources: MDN Storage Quotas, MDN File System API.
+## Backup and Restore
+Provide user-triggered JSON export and import for colors, paper-pack metadata, and image references or embedded images. Standard exports retain relative folder references; iPad exports embed compressed images. When a writable image-library folder is selected, exports are saved there, with browser download as the fallback. Folder-backed image files must still be backed up or shared with the JSON.
 
 # Decision 26
 ## Add User-Selected Image Library Folder
@@ -267,14 +255,9 @@ Caveat:
 This depends on each user having the shared folder synced locally. A browser cannot reliably read arbitrary remote OneDrive URLs as a folder.
 
 # Decision 28
-## IndexedDB as Cache/Fallback
+## IndexedDB for Writable Catalog Data
 
-Keep IndexedDB for:
-1. browsers without File System Access
-2. temporary image cache
-3. thumbnails
-4. offline fallback when folder permissions need to be re-granted
-But treat it as a cache or compatibility mode, not the canonical image library.
+IndexedDB is the canonical writable store for paper-pack records, deletion markers, user-added colors, and settings. Bundled JSON files provide the base catalog and color data, which are merged with saved browser data at startup. Embedded image data may also live in IndexedDB as a compatibility fallback, while a selected folder remains the preferred canonical image library.
 
 Permission Notes
 The File System Access API requires:

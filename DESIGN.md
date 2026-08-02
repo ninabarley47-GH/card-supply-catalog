@@ -4,10 +4,10 @@
 
 This document defines the visual and interaction principles for Card Supply Catalog. Functional behavior is defined in SPEC.md, and implementation details are defined in ARCHITECTURE.md.
 
-**Version:** 1.0  
-**Status:** Frozen
+**Version:** 1.1
+**Status:** Maintained
 
-**Last Updated:** 2026-07-01
+**Last Updated:** 2026-08-02
 
 # Design Priorities
 
@@ -37,16 +37,14 @@ Avoid fixed widths whenever possible.
 # Overall Experience
 Card Supply Catalog should feel calm, uncluttered, and inviting. The interface should encourage browsing and rediscovery rather than data management. Users should spend their time looking at paper, not interacting with the application.
 
+# Navigation and Layout
+The desktop experience uses a sticky left sidebar for primary navigation, search, and filters so these controls remain reachable while browsing a long library. The main navigation contains Paper Library, Color Library, and Settings. Add DSP and Add Color remain visible as global header actions. On phone-sized screens, the sidebar returns to the normal page flow.
+
 # Visual Hierarchy
-Highest Priority: DSP images
-Secondary: DSP name
-Tertiary: Availability
-Year
-Keywords
-Lowest Priority:
-Buttons
-Controls
-Settings
+Highest priority: DSP images
+Secondary: DSP name and the complete coordinating color palette
+Tertiary: availability, owner, and tags
+Lowest priority: buttons, controls, and settings
 
 # Empty States
 Empty Library
@@ -76,7 +74,7 @@ image viewer opens smoothly
 No bouncing, spinning or animated cards
 
 # Icons
-Icons should clarify actions, never replace labels. Not mysterious icon-only buttons.
+Icons should clarify actions and normally accompany labels. Compact familiar controls may be icon-only when space matters, but they must have an accessible name and, where useful, a tooltip. Examples include closing a panel, clearing Recently Added, and marking an available pack Used Up.
 
 Examples:
 ✓ Settings
@@ -96,6 +94,8 @@ Consistent spacing.
 Related fields grouped together.
 Required fields minimized.
 Defaults provided whenever possible.
+
+The Add DSP form remembers the owner, release year, availability, and backup-supply value from the most recently added pack. Entering a DSP name may automatically load images from a matching folder in the selected image library.
 
 # Error Philosophy
 Make mistakes easy to recover from.
@@ -135,7 +135,7 @@ Whenever possible, images should be large enough for users to recognize patterns
 
 # Delight
 The app should have moments to delight the user. 
-For example: When you add a new DSP, it immediately appears under Recently Added with its four thumbnails.
+For example: when a new DSP is added, it moves to the top of the available library and receives a green Recently Added context bar. That status remains until the user clears it from the card.
 
 When in doubt, remove something instead of adding something.
 
