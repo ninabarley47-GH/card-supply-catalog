@@ -1,4 +1,4 @@
-const CACHE_NAME = "card-supply-catalog-v1";
+const CACHE_NAME = "card-supply-catalog-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -39,7 +39,11 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") {
+  const requestUrl = new URL(event.request.url);
+  const isHttpRequest = requestUrl.protocol === "http:" || requestUrl.protocol === "https:";
+  const isSameOrigin = requestUrl.origin === self.location.origin;
+
+  if (event.request.method !== "GET" || !isHttpRequest || !isSameOrigin) {
     return;
   }
 
@@ -48,11 +52,13 @@ self.addEventListener("fetch", (event) => {
       .then((response) => {
         const responseCopy = response.clone();
 
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseCopy);
-        });
-
-        return response;
+        return caches
+          .open(CACHE_NAME)
+          .then((cache) => cache.put(event.request, responseCopy))
+          .catch((error) => {
+            console.warn("The response could not be cached.", error);
+          })
+          .then(() => response);
       })
       .catch(() => caches.match(event.request))
   );
