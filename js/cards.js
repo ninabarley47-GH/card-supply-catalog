@@ -1,8 +1,36 @@
 const SAMPLE_CARDS = [
-  { id: 'floral-friendship', tags: ['Friendship', 'Floral', 'Magenta'], favorite: true },
-  { id: 'summer-cheers', tags: ['Cheers', 'Fun Fold', 'Pink'], favorite: false },
-  { id: 'woodland-music', tags: ['Woodland', 'Music', 'Interactive'], favorite: true },
-  { id: 'rose-birthday', tags: ['Birthday', 'Roses', 'Gold'], favorite: false }
+  {
+    id: 'floral-friendship',
+    dateCreated: '2026-07-12',
+    tags: ['Friendship', 'Floral', 'Magenta'],
+    paperPackIds: [],
+    colorIds: ['berry-burst', 'lost-lagoon', 'lemon-lolly'],
+    favorite: true
+  },
+  {
+    id: 'summer-cheers',
+    dateCreated: '2026-07-18',
+    tags: ['Cheers', 'Fun Fold', 'Pink'],
+    paperPackIds: [],
+    colorIds: ['melon-mambo', 'flirty-flamingo', 'lemon-lolly'],
+    favorite: false
+  },
+  {
+    id: 'woodland-music',
+    dateCreated: '2026-07-24',
+    tags: ['Woodland', 'Music', 'Interactive'],
+    paperPackIds: [],
+    colorIds: ['berry-burst', 'balmy-blue', 'pecan-pie'],
+    favorite: true
+  },
+  {
+    id: 'rose-birthday',
+    dateCreated: '2026-07-30',
+    tags: ['Birthday', 'Roses', 'Gold'],
+    paperPackIds: [],
+    colorIds: ['calypso-coral', 'petal-pink', 'garden-green'],
+    favorite: false
+  }
 ];
 
 export function initializeCardLibrary() {
