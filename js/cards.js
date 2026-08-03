@@ -5,7 +5,8 @@ const SAMPLE_CARDS = [
     tags: ['Friendship', 'Floral', 'Magenta'],
     paperPackIds: [],
     colorIds: ['berry-burst', 'lost-lagoon', 'lemon-lolly'],
-    size: { width: 4.25, height: 5.5 },
+    size: { width: 5.5, height: 4.25 },
+    imagePath: 'assets/cards/IMG_7797.JPEG',
     favorite: true
   },
   {
@@ -14,7 +15,8 @@ const SAMPLE_CARDS = [
     tags: ['Cheers', 'Fun Fold', 'Pink'],
     paperPackIds: [],
     colorIds: ['melon-mambo', 'flirty-flamingo', 'lemon-lolly'],
-    size: { width: 5.5, height: 4.25 },
+    size: { width: 5.5, height: 8 },
+    imagePath: 'assets/cards/IMG_5309.JPG',
     favorite: false
   },
   {
@@ -24,6 +26,7 @@ const SAMPLE_CARDS = [
     paperPackIds: [],
     colorIds: ['berry-burst', 'balmy-blue', 'pecan-pie'],
     size: { width: 6, height: 6 },
+    imagePath: 'assets/cards/IMG_5464.JPEG',
     favorite: true
   },
   {
@@ -32,7 +35,8 @@ const SAMPLE_CARDS = [
     tags: ['Birthday', 'Roses', 'Gold'],
     paperPackIds: [],
     colorIds: ['calypso-coral', 'petal-pink', 'garden-green'],
-    size: { width: 5.5, height: 8 },
+    size: { width: 4.25, height: 5.5 },
+    imagePath: 'assets/cards/IMG_3109.JPEG',
     favorite: false
   }
 ];
@@ -99,11 +103,10 @@ function createCardTile(card, index) {
   const image = document.createElement('div');
   image.className = `card-library-placeholder card-library-placeholder-${index + 1}`;
   applyCardMockupSize(image, card);
-  image.setAttribute('role', 'img');
-  image.setAttribute(
-    'aria-label',
-    `${card.size.width} by ${card.size.height} inch image placeholder for ${card.tags[0]} card`
-  );
+
+  const cardImage = createCardImage(card, 'card-library-image');
+  cardImage.loading = 'lazy';
+  image.append(cardImage);
 
   if (card.favorite) {
     const favorite = document.createElement('span');
@@ -200,11 +203,7 @@ function createCardDetailContent(card, index) {
   const image = document.createElement('div');
   image.className = `card-detail-placeholder card-library-placeholder-${index + 1}`;
   applyCardMockupSize(image, card);
-  image.setAttribute('role', 'img');
-  image.setAttribute(
-    'aria-label',
-    `Large ${card.size.width} by ${card.size.height} inch image placeholder for ${card.tags[0]} card`
-  );
+  image.append(createCardImage(card, 'card-detail-image'));
 
   const metadata = document.createElement('div');
   metadata.className = 'card-detail-metadata';
@@ -234,6 +233,15 @@ function applyCardMockupSize(element, card) {
   element.style.setProperty('--card-width', card.size.width);
   element.style.setProperty('--card-height', card.size.height);
   element.style.setProperty('--card-mockup-width', mockupWidth);
+}
+
+function createCardImage(card, className) {
+  const image = document.createElement('img');
+  image.className = className;
+  image.src = card.imagePath;
+  image.alt = `${card.tags[0]} handmade card, ${card.size.width} by ${card.size.height} inches`;
+  image.decoding = 'async';
+  return image;
 }
 
 function createCardFacts(card) {

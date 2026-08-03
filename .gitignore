@@ -6,3 +6,7 @@ build/
 *.png
 *.jpeg
 *.webp
+!assets/cards/
+!assets/cards/*.jpg
+!assets/cards/*.jpeg
+!assets/cards/*.webp
