@@ -48,7 +48,7 @@ const SAMPLE_CARDS = [
 const CARD_SIZE_PRESETS = {
   'a2-portrait': { label: 'A2 Portrait — 4.25 × 5.5 inches', width: 4.25, height: 5.5 },
   'a2-landscape': { label: 'A2 Landscape — 5.5 × 4.25 inches', width: 5.5, height: 4.25 },
-  square: { label: 'Square — 5.5 × 5.5 inches', width: 5.5, height: 5.5 },
+  square: { label: 'Square — 6 × 6 inches', width: 6, height: 6 },
   'mini-slimline': { label: 'Mini Slimline — 3.25 × 6.25 inches', width: 3.25, height: 6.25 },
   slimline: { label: 'Slimline — 3.5 × 8.5 inches', width: 3.5, height: 8.5 },
   custom: { label: 'Custom', width: '', height: '' }
