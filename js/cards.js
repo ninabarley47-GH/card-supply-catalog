@@ -5,6 +5,7 @@ const SAMPLE_CARDS = [
     tags: ['Friendship', 'Floral', 'Magenta'],
     paperPackIds: [],
     colorIds: ['berry-burst', 'lost-lagoon', 'lemon-lolly'],
+    size: { width: 4.25, height: 5.5 },
     favorite: true
   },
   {
@@ -13,6 +14,7 @@ const SAMPLE_CARDS = [
     tags: ['Cheers', 'Fun Fold', 'Pink'],
     paperPackIds: [],
     colorIds: ['melon-mambo', 'flirty-flamingo', 'lemon-lolly'],
+    size: { width: 5.5, height: 4.25 },
     favorite: false
   },
   {
@@ -21,6 +23,7 @@ const SAMPLE_CARDS = [
     tags: ['Woodland', 'Music', 'Interactive'],
     paperPackIds: [],
     colorIds: ['berry-burst', 'balmy-blue', 'pecan-pie'],
+    size: { width: 6, height: 6 },
     favorite: true
   },
   {
@@ -29,6 +32,7 @@ const SAMPLE_CARDS = [
     tags: ['Birthday', 'Roses', 'Gold'],
     paperPackIds: [],
     colorIds: ['calypso-coral', 'petal-pink', 'garden-green'],
+    size: { width: 5.5, height: 8 },
     favorite: false
   }
 ];
@@ -94,8 +98,12 @@ function createCardTile(card, index) {
 
   const image = document.createElement('div');
   image.className = `card-library-placeholder card-library-placeholder-${index + 1}`;
+  applyCardMockupSize(image, card);
   image.setAttribute('role', 'img');
-  image.setAttribute('aria-label', `Image placeholder for ${card.tags[0]} card`);
+  image.setAttribute(
+    'aria-label',
+    `${card.size.width} by ${card.size.height} inch image placeholder for ${card.tags[0]} card`
+  );
 
   if (card.favorite) {
     const favorite = document.createElement('span');
@@ -191,8 +199,12 @@ function createCardDetailContent(card, index) {
 
   const image = document.createElement('div');
   image.className = `card-detail-placeholder card-library-placeholder-${index + 1}`;
+  applyCardMockupSize(image, card);
   image.setAttribute('role', 'img');
-  image.setAttribute('aria-label', `Large image placeholder for ${card.tags[0]} card`);
+  image.setAttribute(
+    'aria-label',
+    `Large ${card.size.width} by ${card.size.height} inch image placeholder for ${card.tags[0]} card`
+  );
 
   const metadata = document.createElement('div');
   metadata.className = 'card-detail-metadata';
@@ -205,6 +217,23 @@ function createCardDetailContent(card, index) {
 
   content.append(image, metadata);
   return content;
+}
+
+function applyCardMockupSize(element, card) {
+  const aspectRatio = card.size.width / card.size.height;
+  let mockupWidth = '58%';
+
+  if (aspectRatio > 1) {
+    mockupWidth = '78%';
+  } else if (aspectRatio === 1) {
+    mockupWidth = '68%';
+  } else if (aspectRatio < 0.75) {
+    mockupWidth = '52%';
+  }
+
+  element.style.setProperty('--card-width', card.size.width);
+  element.style.setProperty('--card-height', card.size.height);
+  element.style.setProperty('--card-mockup-width', mockupWidth);
 }
 
 function createCardFacts(card) {
