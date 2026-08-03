@@ -1,5 +1,6 @@
 import {
   loadCatalogSetting,
+  loadSavedPaperPack,
   loadSavedPaperPacks,
   saveCatalogSetting,
   saveColor,
@@ -16,6 +17,8 @@ import {
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
 const LAST_BACKUP_EXPORT_SETTING_ID = "lastBackupExportedAt";
 const LAST_BACKUP_IMPORT_SETTING_ID = "lastBackupImportedAt";
+const IMPORT_DIAGNOSTIC_QUERY_PARAMETER = "importDiagnostics";
+const SUPPORTED_EMBEDDED_IMAGE_PATTERN = /^data:image\/(jpeg|png|webp|gif);base64,([a-z0-9+/]*={0,2})$/i;
 
 export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
   const exportButton = document.querySelector("[data-export-catalog]");
@@ -372,14 +375,7 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
 
   const importedColorsById = backup.colors || {};
   const importedPaperPacks = backup.paperPacks || [];
-  const embeddedImageDiagnostic = findFirstEmbeddedImage(importedPaperPacks);
-
-  logImportDiagnostic("Import started", {
-    origin: window.location.origin,
-    href: window.location.href,
-    paperPackCount: importedPaperPacks.length,
-    embeddedImage: describeEmbeddedImage(embeddedImageDiagnostic)
-  });
+  const importDiagnostic = await createImportDiagnostic(importedPaperPacks);
 
   for (const color of Object.values(importedColorsById)) {
     try {
@@ -397,11 +393,13 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
       const versionedPaperPack = addCatalogSchemaVersion(paperPack);
 
       await savePaperPack(versionedPaperPack);
+      await verifySavedPaperPackImages(importDiagnostic, versionedPaperPack);
       upsertPaperPack(paperPacks, versionedPaperPack);
       summary.packsImported += 1;
       summary.imagesImported += countEmbeddedPatternImages(versionedPaperPack);
       summary.folderImageReferencesImported += countFolderImageReferences(versionedPaperPack);
     } catch (error) {
+      recordPaperPackStorageFailure(importDiagnostic, paperPack, error);
       logImportError("Paper-pack write failed", error, {
         paperPackId: paperPack?.id,
         embeddedImageCount: countEmbeddedPatternImages(paperPack)
@@ -410,7 +408,7 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
     }
   }
 
-  await runEmbeddedImageImportDiagnostic(embeddedImageDiagnostic);
+  await reportImportDiagnostic(importDiagnostic);
 
   if (summary.folderImageReferencesImported > 0 || backup.imageStorage?.configuredLibrary) {
     summary.warnings.push(

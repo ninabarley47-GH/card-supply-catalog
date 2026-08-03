@@ -15,6 +15,8 @@ Provide a searchable gallery of finished cards linked to DSP packs.
 # Architecture
 Reuse or extract shared page-shell and navigation behavior where that can be done safely, but do not undertake a broad refactor as part of the preliminary tasks.
 
+Favor incremental changes over broad refactoring.
+
 # Navigation
 
 Left Nav

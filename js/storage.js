@@ -28,6 +28,14 @@ export async function loadSavedPaperPacks() {
   return paperPacks.filter(isPaperPack).map(normalizePaperPackForRuntime);
 }
 
+export async function loadSavedPaperPack(paperPackId) {
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
+  const paperPack = await getFromStore(database, PAPER_PACKS_STORE, paperPackId);
+
+  return isPaperPack(paperPack) ? normalizePaperPackForRuntime(paperPack) : null;
+}
+
 export async function savePaperPack(paperPack) {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);

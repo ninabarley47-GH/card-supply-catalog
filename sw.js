@@ -1,4 +1,4 @@
-const CACHE_NAME = "card-supply-catalog-v2";
+const CACHE_NAME = "card-supply-catalog-v3";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -62,4 +62,10 @@ self.addEventListener("fetch", (event) => {
       })
       .catch(() => caches.match(event.request))
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "catalog:get-service-worker-version") {
+    event.ports?.[0]?.postMessage({ version: CACHE_NAME });
+  }
 });
