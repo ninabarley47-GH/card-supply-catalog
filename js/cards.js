@@ -128,11 +128,11 @@ function createCardDetailView() {
   overlay.className = 'card-detail-overlay';
   overlay.hidden = true;
 
-  const modal = document.createElement('section');
-  modal.className = 'card-detail-modal';
-  modal.setAttribute('role', 'dialog');
-  modal.setAttribute('aria-modal', 'true');
-  modal.setAttribute('aria-labelledby', 'card-detail-title');
+  const panel = document.createElement('aside');
+  panel.className = 'card-detail-panel';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-modal', 'true');
+  panel.setAttribute('aria-labelledby', 'card-detail-title');
 
   const header = document.createElement('header');
   header.className = 'card-detail-header';
@@ -143,6 +143,7 @@ function createCardDetailView() {
   eyebrow.textContent = 'Card Library';
   const title = document.createElement('h3');
   title.id = 'card-detail-title';
+  title.textContent = 'Card Details';
   heading.append(eyebrow, title);
 
   const close = document.createElement('button');
@@ -154,10 +155,10 @@ function createCardDetailView() {
   const body = document.createElement('div');
   body.className = 'card-detail-body';
   header.append(heading, close);
-  modal.append(header, body);
-  overlay.append(modal);
+  panel.append(header, body);
+  overlay.append(panel);
 
-  return { overlay, modal, title, close, body };
+  return { overlay, panel, close, body };
 }
 
 function openCardDetail(detailView, card, tile) {
@@ -166,7 +167,6 @@ function openCardDetail(detailView, card, tile) {
   }
 
   const cardIndex = SAMPLE_CARDS.indexOf(card);
-  detailView.title.textContent = `${card.tags[0]} Card`;
   detailView.body.replaceChildren(createCardDetailContent(card, cardIndex));
   detailView.overlay.hidden = false;
   detailView.close.focus();
