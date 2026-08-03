@@ -479,7 +479,7 @@ function describeImageSource(imageSrc) {
     present: typeof imageSrc === "string" && imageSrc.length > 0,
     length: typeof imageSrc === "string" ? imageSrc.length : 0,
     prefix: typeof imageSrc === "string" ? imageSrc.slice(0, 32) : "",
-    isJpegDataUrl: /^data:image\\/jpeg;base64,/i.test(imageSrc || "")
+    isJpegDataUrl: /^data:image\/jpeg;base64,/i.test(imageSrc || "")
   };
 }
 
