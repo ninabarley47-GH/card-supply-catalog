@@ -70,6 +70,7 @@ export function initializeCardLibrary() {
   gallery.replaceChildren(...SAMPLE_CARDS.map(createCardTile));
   toolbar.append(addCardButton);
   document.body.append(detailView.overlay, addCardView.overlay);
+  loadAvailablePaperPacks(addCardView);
 
   addCardButton.addEventListener('click', () => openAddCardView(addCardView));
   addCardView.close.addEventListener('click', () => closeAddCardView(addCardView, addCardButton));
@@ -195,6 +196,8 @@ function createAddCardView() {
     createAddCardField('Card Size', sizePreset),
     dimensions
   );
+  const paperPackPicker = createPaperPackPicker();
+  controls.append(paperPackPicker.section);
   layout.append(futureImage, controls);
   content.append(layout);
 
@@ -208,14 +211,48 @@ function createAddCardView() {
   save.className = 'button button-primary';
   save.type = 'submit';
   save.textContent = 'Save';
-  save.disabled = true;
   actions.append(cancel, save);
   form.append(content, actions);
   panel.append(header, form);
   overlay.append(panel);
 
-  const addCardView = { overlay, panel, form, close, cancel, save, dateCreated, sizePreset, width, height };
+  const addCardView = {
+    overlay,
+    panel,
+    form,
+    close,
+    cancel,
+    save,
+    dateCreated,
+    sizePreset,
+    width,
+    height,
+    paperPackSearch: paperPackPicker.search,
+    paperPackResults: paperPackPicker.results,
+    paperPackSelected: paperPackPicker.selected,
+    paperPackStatus: paperPackPicker.status,
+    availablePaperPacks: [],
+    paperPackIds: []
+  };
   sizePreset.addEventListener('change', () => applyCardSizePreset(addCardView));
+  paperPackPicker.search.addEventListener('input', () => renderPaperPackSearchResults(addCardView));
+  paperPackPicker.results.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-add-paper-pack]');
+
+    if (button) {
+      addTemporaryPaperPack(addCardView, button.dataset.addPaperPack);
+    }
+  });
+  paperPackPicker.selected.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-remove-paper-pack]');
+
+    if (button) {
+      removeTemporaryPaperPack(addCardView, button.dataset.removePaperPack);
+    }
+  });
+  form.addEventListener('submit', () => {
+    console.log('Temporary card', createTemporaryCard(addCardView));
+  });
   resetAddCardForm(addCardView);
   return addCardView;
 }
@@ -255,11 +292,121 @@ function createDimensionInput(name) {
   return input;
 }
 
+function createPaperPackPicker() {
+  const section = document.createElement('section');
+  section.className = 'card-add-paper-packs';
+  const heading = document.createElement('h4');
+  heading.textContent = 'Paper Packs Used';
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.placeholder = 'Search paper packs by name';
+  search.setAttribute('aria-label', 'Search paper packs by name');
+  const status = document.createElement('p');
+  status.className = 'card-add-paper-pack-status';
+  status.setAttribute('aria-live', 'polite');
+  const results = document.createElement('ul');
+  results.className = 'card-add-paper-pack-results';
+  results.setAttribute('aria-label', 'Paper pack search results');
+  const selected = document.createElement('ul');
+  selected.className = 'card-add-selected-packs';
+  selected.setAttribute('aria-label', 'Selected paper packs');
+  section.append(heading, search, status, results, selected);
+  return { section, search, status, results, selected };
+}
+
+async function loadAvailablePaperPacks(addCardView) {
+  try {
+    const response = await fetch('data/paper-packs.json');
+
+    if (!response.ok) {
+      throw new Error('Unable to load paper pack catalog');
+    }
+
+    const data = await response.json();
+    addCardView.availablePaperPacks = (data.paperPacks || [])
+      .filter((paperPack) => paperPack.id && paperPack.name)
+      .sort((first, second) => first.name.localeCompare(second.name));
+    renderPaperPackSearchResults(addCardView);
+  } catch (error) {
+    addCardView.paperPackStatus.textContent = 'Paper packs could not be loaded.';
+  }
+}
+
+function renderPaperPackSearchResults(addCardView) {
+  const query = addCardView.paperPackSearch.value.trim().toLowerCase();
+  addCardView.paperPackResults.replaceChildren();
+
+  if (!query) {
+    addCardView.paperPackStatus.textContent = 'Type to search paper packs.';
+    return;
+  }
+
+  const matches = addCardView.availablePaperPacks.filter((paperPack) =>
+    paperPack.name.toLowerCase().includes(query) && !addCardView.paperPackIds.includes(paperPack.id)
+  );
+  addCardView.paperPackStatus.textContent = matches.length === 0 ? 'No matching paper packs.' : '';
+
+  matches.forEach((paperPack) => {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.addPaperPack = paperPack.id;
+    button.textContent = paperPack.name;
+    item.append(button);
+    addCardView.paperPackResults.append(item);
+  });
+}
+
+function addTemporaryPaperPack(addCardView, paperPackId) {
+  if (!paperPackId || addCardView.paperPackIds.includes(paperPackId)) {
+    return;
+  }
+
+  addCardView.paperPackIds.push(paperPackId);
+  addCardView.paperPackSearch.value = '';
+  renderSelectedPaperPacks(addCardView);
+  renderPaperPackSearchResults(addCardView);
+  addCardView.paperPackSearch.focus();
+}
+
+function removeTemporaryPaperPack(addCardView, paperPackId) {
+  addCardView.paperPackIds = addCardView.paperPackIds.filter((id) => id !== paperPackId);
+  renderSelectedPaperPacks(addCardView);
+  renderPaperPackSearchResults(addCardView);
+}
+
+function renderSelectedPaperPacks(addCardView) {
+  addCardView.paperPackSelected.replaceChildren();
+
+  addCardView.paperPackIds.forEach((paperPackId) => {
+    const paperPack = addCardView.availablePaperPacks.find((candidate) => candidate.id === paperPackId);
+
+    if (!paperPack) {
+      return;
+    }
+
+    const item = document.createElement('li');
+    const name = document.createElement('span');
+    name.textContent = paperPack.name;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.dataset.removePaperPack = paperPack.id;
+    remove.setAttribute('aria-label', `Remove ${paperPack.name}`);
+    remove.textContent = String.fromCodePoint(215);
+    item.append(name, remove);
+    addCardView.paperPackSelected.append(item);
+  });
+}
+
 function resetAddCardForm(addCardView) {
   addCardView.form.reset();
   addCardView.dateCreated.value = getLocalDateValue();
   addCardView.sizePreset.value = 'a2-portrait';
+  addCardView.paperPackIds = [];
+  addCardView.paperPackSearch.value = '';
   applyCardSizePreset(addCardView);
+  renderSelectedPaperPacks(addCardView);
+  renderPaperPackSearchResults(addCardView);
 }
 
 function applyCardSizePreset(addCardView) {
@@ -277,6 +424,21 @@ function getLocalDateValue() {
   const month = String(today.getMonth() + 1).padStart(2, '0');
   const day = String(today.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function createTemporaryCard(addCardView) {
+  return {
+    dateCreated: addCardView.dateCreated.value,
+    size: {
+      preset: addCardView.sizePreset.value,
+      width: Number(addCardView.width.value),
+      height: Number(addCardView.height.value)
+    },
+    tags: [],
+    paperPackIds: [...addCardView.paperPackIds],
+    colorIds: [],
+    favorite: false
+  };
 }
 
 function createCardTile(card, index) {

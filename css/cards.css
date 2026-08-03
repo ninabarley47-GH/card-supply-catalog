@@ -240,6 +240,103 @@
   gap: var(--space-3);
 }
 
+.card-add-paper-packs {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+.card-add-paper-packs h4 {
+  margin-bottom: 0;
+}
+
+.card-add-paper-packs > input {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  padding: 0.65rem 0.75rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.card-add-paper-pack-status {
+  min-height: 1.3rem;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.84rem;
+}
+
+.card-add-paper-pack-results,
+.card-add-selected-packs {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card-add-paper-pack-results {
+  max-height: 11rem;
+  overflow-y: auto;
+}
+
+.card-add-paper-pack-results button {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  padding: 0.6rem 0.75rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.card-add-paper-pack-results button:hover,
+.card-add-paper-pack-results button:focus-visible {
+  border-color: rgba(82, 120, 109, 0.62);
+}
+
+.card-add-selected-packs {
+  grid-template-columns: repeat(auto-fit, minmax(10rem, max-content));
+}
+
+.card-add-selected-packs li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  background: var(--color-surface);
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.card-add-selected-packs button {
+  display: grid;
+  width: 1.65rem;
+  height: 1.65rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 1rem;
+}
+
+.card-add-selected-packs button:hover {
+  background: var(--color-page);
+  color: var(--color-text);
+}
+
 .card-add-actions {
   display: flex;
   justify-content: flex-end;
