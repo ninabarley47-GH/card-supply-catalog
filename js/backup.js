@@ -1,7 +1,6 @@
 import {
   loadCatalogSetting,
   loadSavedPaperPack,
-  loadSavedPaperPacks,
   saveCatalogSetting,
   saveColor,
   savePaperPack
@@ -18,7 +17,7 @@ const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
 const LAST_BACKUP_EXPORT_SETTING_ID = "lastBackupExportedAt";
 const LAST_BACKUP_IMPORT_SETTING_ID = "lastBackupImportedAt";
 const IMPORT_DIAGNOSTIC_QUERY_PARAMETER = "importDiagnostics";
-const SUPPORTED_EMBEDDED_IMAGE_PATTERN = /^data:image\/(jpeg|png|webp|gif);base64,([a-z0-9+/]*={0,2})$/i;
+const SUPPORTED_EMBEDDED_IMAGE_PREFIX_PATTERN = /^data:image\/(jpeg|png|webp|gif);base64,/i;
 
 export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
   const exportButton = document.querySelector("[data-export-catalog]");
@@ -423,78 +422,184 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
   return summary;
 }
 
-function findFirstEmbeddedImage(paperPacks) {
+async function createImportDiagnostic(paperPacks) {
+  if (!isImportDiagnosticEnabled()) {
+    return null;
+  }
+
+  const diagnostic = {
+    environment: {
+      origin: window.location.origin,
+      standalone: isStandaloneDisplayMode(),
+      serviceWorkerVersion: await getServiceWorkerVersion()
+    },
+    images: [],
+    storageErrors: [],
+    quotaBefore: await getStorageQuotaDiagnostic(),
+    quotaAfter: null
+  };
+
   for (const paperPack of paperPacks) {
     for (const [patternIndex, pattern] of (paperPack.patterns || []).entries()) {
-      if (pattern && typeof pattern === "object" && typeof pattern.imageSrc === "string") {
-        return { paperPackId: paperPack.id, patternIndex, imageSrc: pattern.imageSrc };
+      if (!pattern || typeof pattern !== "object" || typeof pattern.imageSrc !== "string") {
+        continue;
       }
+
+      const entry = createImportDiagnosticEntry(paperPack, pattern, patternIndex);
+      const match = pattern.imageSrc.match(SUPPORTED_EMBEDDED_IMAGE_PREFIX_PATTERN);
+      entry.supportedPrefix = Boolean(match);
+
+      if (!match) {
+        entry.failures.push("Unsupported or malformed data:image/...;base64, value.");
+      } else {
+        try {
+          entry.decodedByteLength = window.atob(pattern.imageSrc.slice(match[0].length)).length;
+          entry.base64Decoded = entry.decodedByteLength > 0;
+          if (!entry.base64Decoded) entry.failures.push("Base64 decoded to an empty value.");
+        } catch (error) {
+          entry.failures.push(`Base64 decode failed: ${formatDiagnosticError(error)}`);
+        }
+
+        try {
+          const image = await loadDiagnosticImage(pattern.imageSrc);
+          entry.renderedBeforeStorage = true;
+          entry.renderWidth = image.naturalWidth;
+          entry.renderHeight = image.naturalHeight;
+        } catch (error) {
+          entry.failures.push(`Browser image render failed: ${formatDiagnosticError(error)}`);
+        }
+      }
+
+      diagnostic.images.push(entry);
     }
   }
 
-  return null;
+  return diagnostic;
 }
 
-async function runEmbeddedImageImportDiagnostic(diagnostic) {
-  if (!diagnostic) {
-    logImportDiagnostic("No embedded imageSrc was present in the imported paper packs.");
-    return;
-  }
-
-  try {
-    const savedPaperPacks = await loadSavedPaperPacks();
-    const savedPaperPack = savedPaperPacks.find((paperPack) => paperPack.id === diagnostic.paperPackId);
-    const savedImageSrc = savedPaperPack?.patterns?.[diagnostic.patternIndex]?.imageSrc;
-    const quota = await getStorageQuotaDiagnostic();
-    const decode = await decodeImageDiagnostic(savedImageSrc);
-
-    logImportDiagnostic("First embedded image round-trip", {
-      origin: window.location.origin,
-      paperPackId: diagnostic.paperPackId,
-      patternIndex: diagnostic.patternIndex,
-      input: describeImageSource(diagnostic.imageSrc),
-      stored: describeImageSource(savedImageSrc),
-      exactMatch: savedImageSrc === diagnostic.imageSrc,
-      decode,
-      quota
-    });
-  } catch (error) {
-    logImportError("Embedded-image round-trip diagnostic failed", error, {
-      paperPackId: diagnostic.paperPackId,
-      patternIndex: diagnostic.patternIndex
-    });
-  }
-}
-
-function describeEmbeddedImage(diagnostic) {
-  return diagnostic
-    ? { paperPackId: diagnostic.paperPackId, patternIndex: diagnostic.patternIndex, ...describeImageSource(diagnostic.imageSrc) }
-    : null;
-}
-
-function describeImageSource(imageSrc) {
+function createImportDiagnosticEntry(paperPack, pattern, patternIndex) {
   return {
-    present: typeof imageSrc === "string" && imageSrc.length > 0,
-    length: typeof imageSrc === "string" ? imageSrc.length : 0,
-    prefix: typeof imageSrc === "string" ? imageSrc.slice(0, 32) : "",
-    isJpegDataUrl: /^data:image\/jpeg;base64,/i.test(imageSrc || "")
+    paperPackId: paperPack.id || "",
+    patternId: pattern.id || `pattern-${patternIndex + 1}`,
+    patternIndex,
+    imageName: pattern.imageName || "",
+    imageSrcLength: pattern.imageSrc.length,
+    supportedPrefix: false,
+    base64Decoded: false,
+    decodedByteLength: 0,
+    renderedBeforeStorage: false,
+    renderWidth: 0,
+    renderHeight: 0,
+    savedImageSrcLength: null,
+    matchedAfterReadBack: false,
+    failures: []
   };
 }
 
-async function decodeImageDiagnostic(imageSrc) {
-  if (!imageSrc) {
-    return { ok: false, error: "The stored imageSrc is missing." };
-  }
-
-  const image = new Image();
-  image.src = imageSrc;
+async function verifySavedPaperPackImages(diagnostic, paperPack) {
+  if (!diagnostic) return;
 
   try {
-    await image.decode();
-    return { ok: true, width: image.naturalWidth, height: image.naturalHeight };
+    const savedPaperPack = await loadSavedPaperPack(paperPack.id);
+    for (const entry of diagnostic.images.filter((image) => image.paperPackId === paperPack.id)) {
+      const savedImageSrc = savedPaperPack?.patterns?.[entry.patternIndex]?.imageSrc;
+      entry.savedImageSrcLength = typeof savedImageSrc === "string" ? savedImageSrc.length : null;
+      entry.matchedAfterReadBack = entry.savedImageSrcLength === entry.imageSrcLength;
+      if (!entry.matchedAfterReadBack) {
+        entry.failures.push(`IndexedDB read-back length mismatch: expected ${entry.imageSrcLength}, received ${entry.savedImageSrcLength ?? "missing"}.`);
+      }
+    }
   } catch (error) {
-    return { ok: false, errorName: error?.name || "Error", error: error?.message || String(error) };
+    recordPaperPackStorageFailure(diagnostic, paperPack, error, "IndexedDB read-back failed");
   }
+}
+
+function recordPaperPackStorageFailure(diagnostic, paperPack, error, operation = "IndexedDB write failed") {
+  if (!diagnostic) return;
+
+  const storageError = {
+    paperPackId: paperPack?.id || "",
+    operation,
+    errorName: error?.name || "Error",
+    errorMessage: error?.message || String(error)
+  };
+  diagnostic.storageErrors.push(storageError);
+
+  for (const entry of diagnostic.images.filter((image) => image.paperPackId === paperPack?.id)) {
+    entry.failures.push(`${operation}: ${storageError.errorName}: ${storageError.errorMessage}`);
+  }
+}
+
+async function reportImportDiagnostic(diagnostic) {
+  if (!diagnostic) return;
+
+  diagnostic.quotaAfter = await getStorageQuotaDiagnostic();
+  const summary = {
+    imagesReceived: diagnostic.images.length,
+    base64StringsDecoded: diagnostic.images.filter((image) => image.base64Decoded).length,
+    imagesRenderedBeforeStorage: diagnostic.images.filter((image) => image.renderedBeforeStorage).length,
+    imagesMatchedAfterIndexedDbReadBack: diagnostic.images.filter((image) => image.matchedAfterReadBack).length,
+    failures: diagnostic.images.reduce((count, image) => count + image.failures.length, 0) +
+      diagnostic.storageErrors.filter(
+        (error) => !diagnostic.images.some((image) => image.paperPackId === error.paperPackId)
+      ).length
+  };
+
+  console.group("[Backup import diagnostic] Embedded image import report");
+  console.info("Environment", diagnostic.environment);
+  console.info(
+    `${summary.imagesReceived} images received\n` +
+    `${summary.base64StringsDecoded} base64 strings decoded\n` +
+    `${summary.imagesRenderedBeforeStorage} images rendered before storage\n` +
+    `${summary.imagesMatchedAfterIndexedDbReadBack} images matched after IndexedDB read-back\n` +
+    `${summary.failures} failures`
+  );
+  console.table(diagnostic.images);
+  if (diagnostic.storageErrors.length > 0) console.error("IndexedDB errors", diagnostic.storageErrors);
+  console.info("Storage quota", { before: diagnostic.quotaBefore, after: diagnostic.quotaAfter });
+  console.groupEnd();
+}
+
+function isImportDiagnosticEnabled() {
+  return new URLSearchParams(window.location.search).get(IMPORT_DIAGNOSTIC_QUERY_PARAMETER) === "1";
+}
+
+function isStandaloneDisplayMode() {
+  return window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+
+function loadDiagnosticImage(imageSrc) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener("load", () => resolve(image), { once: true });
+    image.addEventListener("error", () => reject(new Error("The image element emitted an error event.")), { once: true });
+    image.src = imageSrc;
+  });
+}
+
+async function getServiceWorkerVersion() {
+  const controller = navigator.serviceWorker?.controller;
+  if (!controller) return "uncontrolled";
+
+  return await new Promise((resolve) => {
+    const channel = new MessageChannel();
+    const timeoutId = window.setTimeout(() => resolve("unknown-or-legacy"), 1500);
+    channel.port1.addEventListener("message", (event) => {
+      window.clearTimeout(timeoutId);
+      resolve(event.data?.version || "unknown");
+    }, { once: true });
+    channel.port1.start();
+    try {
+      controller.postMessage({ type: "catalog:get-service-worker-version" }, [channel.port2]);
+    } catch (error) {
+      window.clearTimeout(timeoutId);
+      resolve(`unavailable: ${formatDiagnosticError(error)}`);
+    }
+  });
+}
+
+function formatDiagnosticError(error) {
+  return `${error?.name || "Error"}: ${error?.message || String(error)}`;
 }
 
 async function getStorageQuotaDiagnostic() {
@@ -502,19 +607,22 @@ async function getStorageQuotaDiagnostic() {
     return null;
   }
 
-  const estimate = await navigator.storage.estimate();
+  try {
+    const estimate = await navigator.storage.estimate();
 
-  return {
-    usage: estimate.usage,
-    quota: estimate.quota,
-    available: Number.isFinite(estimate.quota) && Number.isFinite(estimate.usage)
-      ? estimate.quota - estimate.usage
-      : null
-  };
-}
-
-function logImportDiagnostic(message, details) {
-  console.info(`[Backup import diagnostic] ${message}`, details || "");
+    return {
+      usage: estimate.usage,
+      quota: estimate.quota,
+      available: Number.isFinite(estimate.quota) && Number.isFinite(estimate.usage)
+        ? estimate.quota - estimate.usage
+        : null
+    };
+  } catch (error) {
+    return {
+      errorName: error?.name || "Error",
+      errorMessage: error?.message || String(error)
+    };
+  }
 }
 
 function logImportError(message, error, details = {}) {
