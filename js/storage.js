@@ -13,6 +13,7 @@ const KEYWORD_REPLACEMENTS = new Map([
   ["background", ""],
   ["mammals", "Land Animals"],
   ["ocean", "Water"],
+  ["ocean animals", "Water Animals"],
   ["winged creatures", "Flying Animals"]
 ]);
 

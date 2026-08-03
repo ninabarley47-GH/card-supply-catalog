@@ -59,8 +59,9 @@ Water
 Words
 Land Animals
 Flying Animals
-Ocean Animals
+Water Animals
 Hobbies
+Food
 Masculine
 Specialty
 Textures
