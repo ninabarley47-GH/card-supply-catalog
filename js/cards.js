@@ -6,7 +6,8 @@ const SAMPLE_CARDS = [
     paperPackIds: [],
     colorIds: ['berry-burst', 'lost-lagoon', 'lemon-lolly'],
     size: { width: 5.5, height: 4.25 },
-    imagePath: 'assets/cards/IMG_7797.JPEG',
+    thumbnailImagePath: 'assets/cards/IMG_7797.JPEG',
+    detailImagePath: 'assets/cards/IMG_7797-detail.webp',
     favorite: true
   },
   {
@@ -16,7 +17,8 @@ const SAMPLE_CARDS = [
     paperPackIds: [],
     colorIds: ['melon-mambo', 'flirty-flamingo', 'lemon-lolly'],
     size: { width: 5.5, height: 8 },
-    imagePath: 'assets/cards/IMG_5309.JPG',
+    thumbnailImagePath: 'assets/cards/IMG_5309.JPG',
+    detailImagePath: 'assets/cards/IMG_5309-detail.webp',
     favorite: false
   },
   {
@@ -26,7 +28,8 @@ const SAMPLE_CARDS = [
     paperPackIds: [],
     colorIds: ['berry-burst', 'balmy-blue', 'pecan-pie'],
     size: { width: 6, height: 6 },
-    imagePath: 'assets/cards/IMG_5464.JPEG',
+    thumbnailImagePath: 'assets/cards/IMG_5464.JPEG',
+    detailImagePath: 'assets/cards/IMG_5464-detail.webp',
     favorite: true
   },
   {
@@ -36,7 +39,8 @@ const SAMPLE_CARDS = [
     paperPackIds: [],
     colorIds: ['calypso-coral', 'petal-pink', 'garden-green'],
     size: { width: 4.25, height: 5.5 },
-    imagePath: 'assets/cards/IMG_3109.JPEG',
+    thumbnailImagePath: 'assets/cards/IMG_3109.JPEG',
+    detailImagePath: 'assets/cards/IMG_3109-detail.webp',
     favorite: false
   }
 ];
@@ -104,7 +108,7 @@ function createCardTile(card, index) {
   image.className = `card-library-placeholder card-library-placeholder-${index + 1}`;
   applyCardMockupSize(image, card);
 
-  const cardImage = createCardImage(card, 'card-library-image');
+  const cardImage = createCardImage(card, 'card-library-image', card.thumbnailImagePath);
   cardImage.loading = 'lazy';
   image.append(cardImage);
 
@@ -203,7 +207,7 @@ function createCardDetailContent(card, index) {
   const image = document.createElement('div');
   image.className = `card-detail-placeholder card-library-placeholder-${index + 1}`;
   applyCardMockupSize(image, card);
-  image.append(createCardImage(card, 'card-detail-image'));
+  image.append(createCardImage(card, 'card-detail-image', card.detailImagePath, card.thumbnailImagePath));
 
   const metadata = document.createElement('div');
   metadata.className = 'card-detail-metadata';
@@ -235,12 +239,19 @@ function applyCardMockupSize(element, card) {
   element.style.setProperty('--card-mockup-width', mockupWidth);
 }
 
-function createCardImage(card, className) {
+function createCardImage(card, className, imagePath, fallbackPath = null) {
   const image = document.createElement('img');
   image.className = className;
-  image.src = card.imagePath;
+  image.src = imagePath;
   image.alt = `${card.tags[0]} handmade card, ${card.size.width} by ${card.size.height} inches`;
   image.decoding = 'async';
+
+  if (fallbackPath) {
+    image.addEventListener('error', () => {
+      image.src = fallbackPath;
+    }, { once: true });
+  }
+
   return image;
 }
 

@@ -35,7 +35,7 @@
   border: 1px solid rgba(47, 44, 40, 0.16);
   border-radius: var(--radius-small);
   box-shadow: 0 10px 24px rgba(47, 44, 40, 0.08);
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .card-library-placeholder-1 { --placeholder-one: #d99bc7; --placeholder-two: #9fc9bf; }
@@ -173,7 +173,7 @@
   border: 1px solid rgba(47, 44, 40, 0.16);
   border-radius: var(--radius-small);
   box-shadow: 0 14px 32px rgba(47, 44, 40, 0.12);
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .card-detail-metadata,
