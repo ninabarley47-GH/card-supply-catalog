@@ -314,6 +314,8 @@ function createPaperPackPicker() {
   return { section, search, status, results, selected };
 }
 
+// Prototype only: paper-pack selection uses bundled sample data until a shared
+// read-only catalog service is available after the DSP image-import bug is resolved.
 async function loadAvailablePaperPacks(addCardView) {
   try {
     const response = await fetch('data/paper-packs.json');
