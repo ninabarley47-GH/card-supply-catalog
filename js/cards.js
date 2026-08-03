@@ -443,6 +443,7 @@ function createCardFacts(card) {
   const facts = document.createElement('dl');
   facts.className = 'card-detail-facts';
   appendFact(facts, 'Date created', card.dateCreated);
+  appendFact(facts, 'Card size', `${card.size.width} × ${card.size.height} inches`);
   appendFact(facts, 'Favorite', card.favorite ? 'Yes' : 'No');
   return facts;
 }
