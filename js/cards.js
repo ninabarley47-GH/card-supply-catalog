@@ -47,16 +47,29 @@ const SAMPLE_CARDS = [
 
 export function initializeCardLibrary() {
   const gallery = document.querySelector('[data-card-library]');
+  const toolbar = gallery?.closest('#cards')?.querySelector('.library-toolbar');
 
-  if (!gallery) {
+  if (!gallery || !toolbar) {
     return;
   }
 
   const detailView = createCardDetailView();
+  const addCardView = createAddCardView();
+  const addCardButton = createAddCardButton();
   let activeTile = null;
 
   gallery.replaceChildren(...SAMPLE_CARDS.map(createCardTile));
-  document.body.append(detailView.overlay);
+  toolbar.append(addCardButton);
+  document.body.append(detailView.overlay, addCardView.overlay);
+
+  addCardButton.addEventListener('click', () => openAddCardView(addCardView));
+  addCardView.close.addEventListener('click', () => closeAddCardView(addCardView, addCardButton));
+  addCardView.cancel.addEventListener('click', () => closeAddCardView(addCardView, addCardButton));
+  addCardView.overlay.addEventListener('click', (event) => {
+    if (event.target === addCardView.overlay) {
+      closeAddCardView(addCardView, addCardButton);
+    }
+  });
 
   gallery.addEventListener('click', (event) => {
     const tile = event.target.closest('[data-card-id]');
@@ -89,10 +102,88 @@ export function initializeCardLibrary() {
   });
 
   document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !addCardView.overlay.hidden) {
+      closeAddCardView(addCardView, addCardButton);
+      return;
+    }
+
     if (event.key === 'Escape' && !detailView.overlay.hidden) {
       closeCardDetail(detailView, activeTile);
     }
   });
+}
+
+function createAddCardButton() {
+  const button = document.createElement('button');
+  button.className = 'button button-primary';
+  button.type = 'button';
+  button.textContent = '+ Add Card';
+  button.setAttribute('aria-haspopup', 'dialog');
+  return button;
+}
+
+function createAddCardView() {
+  const overlay = document.createElement('div');
+  overlay.className = 'card-add-overlay';
+  overlay.hidden = true;
+
+  const panel = document.createElement('aside');
+  panel.className = 'card-add-panel';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-modal', 'true');
+  panel.setAttribute('aria-labelledby', 'card-add-title');
+
+  const header = document.createElement('header');
+  header.className = 'card-add-header';
+  const title = document.createElement('h3');
+  title.id = 'card-add-title';
+  title.textContent = 'Add Card';
+
+  const close = document.createElement('button');
+  close.className = 'card-add-close';
+  close.type = 'button';
+  close.setAttribute('aria-label', 'Close Add Card');
+  close.textContent = String.fromCodePoint(215);
+  header.append(title, close);
+
+  const form = document.createElement('form');
+  form.className = 'card-add-form';
+  form.addEventListener('submit', (event) => event.preventDefault());
+
+  const content = document.createElement('div');
+  content.className = 'card-add-form-content';
+
+  const actions = document.createElement('div');
+  actions.className = 'card-add-actions';
+  const cancel = document.createElement('button');
+  cancel.className = 'button';
+  cancel.type = 'button';
+  cancel.textContent = 'Cancel';
+  const save = document.createElement('button');
+  save.className = 'button button-primary';
+  save.type = 'submit';
+  save.textContent = 'Save';
+  save.disabled = true;
+  actions.append(cancel, save);
+  form.append(content, actions);
+  panel.append(header, form);
+  overlay.append(panel);
+
+  return { overlay, panel, close, cancel, save };
+}
+
+function openAddCardView(addCardView) {
+  addCardView.overlay.hidden = false;
+  addCardView.close.focus();
+}
+
+function closeAddCardView(addCardView, addCardButton) {
+  if (addCardView.overlay.hidden) {
+    return;
+  }
+
+  addCardView.overlay.hidden = true;
+  addCardButton.focus();
 }
 
 function createCardTile(card, index) {
