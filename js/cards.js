@@ -45,6 +45,15 @@ const SAMPLE_CARDS = [
   }
 ];
 
+const CARD_SIZE_PRESETS = {
+  'a2-portrait': { label: 'A2 Portrait — 4.25 × 5.5 inches', width: 4.25, height: 5.5 },
+  'a2-landscape': { label: 'A2 Landscape — 5.5 × 4.25 inches', width: 5.5, height: 4.25 },
+  square: { label: 'Square — 5.5 × 5.5 inches', width: 5.5, height: 5.5 },
+  'mini-slimline': { label: 'Mini Slimline — 3.25 × 6.25 inches', width: 3.25, height: 6.25 },
+  slimline: { label: 'Slimline — 3.5 × 8.5 inches', width: 3.5, height: 8.5 },
+  custom: { label: 'Custom', width: '', height: '' }
+};
+
 export function initializeCardLibrary() {
   const gallery = document.querySelector('[data-card-library]');
   const toolbar = gallery?.closest('#cards')?.querySelector('.library-toolbar');
@@ -153,6 +162,42 @@ function createAddCardView() {
   const content = document.createElement('div');
   content.className = 'card-add-form-content';
 
+  const layout = document.createElement('div');
+  layout.className = 'card-add-form-layout';
+  const futureImage = document.createElement('div');
+  futureImage.className = 'card-add-future-image';
+  futureImage.textContent = 'Future card image area';
+
+  const controls = document.createElement('div');
+  controls.className = 'card-add-controls';
+  const dateCreated = document.createElement('input');
+  dateCreated.type = 'date';
+  dateCreated.name = 'dateCreated';
+  const sizePreset = document.createElement('select');
+  sizePreset.name = 'cardSize';
+  Object.entries(CARD_SIZE_PRESETS).forEach(([value, preset]) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = preset.label;
+    sizePreset.append(option);
+  });
+
+  const dimensions = document.createElement('div');
+  dimensions.className = 'card-add-dimensions';
+  const width = createDimensionInput('width');
+  const height = createDimensionInput('height');
+  dimensions.append(
+    createAddCardField('Width (inches)', width),
+    createAddCardField('Height (inches)', height)
+  );
+  controls.append(
+    createAddCardField('Date Created', dateCreated),
+    createAddCardField('Card Size', sizePreset),
+    dimensions
+  );
+  layout.append(futureImage, controls);
+  content.append(layout);
+
   const actions = document.createElement('div');
   actions.className = 'card-add-actions';
   const cancel = document.createElement('button');
@@ -169,10 +214,14 @@ function createAddCardView() {
   panel.append(header, form);
   overlay.append(panel);
 
-  return { overlay, panel, close, cancel, save };
+  const addCardView = { overlay, panel, form, close, cancel, save, dateCreated, sizePreset, width, height };
+  sizePreset.addEventListener('change', () => applyCardSizePreset(addCardView));
+  resetAddCardForm(addCardView);
+  return addCardView;
 }
 
 function openAddCardView(addCardView) {
+  resetAddCardForm(addCardView);
   addCardView.overlay.hidden = false;
   addCardView.close.focus();
 }
@@ -183,7 +232,51 @@ function closeAddCardView(addCardView, addCardButton) {
   }
 
   addCardView.overlay.hidden = true;
+  resetAddCardForm(addCardView);
   addCardButton.focus();
+}
+
+function createAddCardField(labelText, control) {
+  const label = document.createElement('label');
+  label.className = 'card-add-field';
+  const text = document.createElement('span');
+  text.textContent = labelText;
+  label.append(text, control);
+  return label;
+}
+
+function createDimensionInput(name) {
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.name = name;
+  input.min = '0.25';
+  input.step = '0.25';
+  input.inputMode = 'decimal';
+  return input;
+}
+
+function resetAddCardForm(addCardView) {
+  addCardView.form.reset();
+  addCardView.dateCreated.value = getLocalDateValue();
+  addCardView.sizePreset.value = 'a2-portrait';
+  applyCardSizePreset(addCardView);
+}
+
+function applyCardSizePreset(addCardView) {
+  const preset = CARD_SIZE_PRESETS[addCardView.sizePreset.value];
+  const isCustom = addCardView.sizePreset.value === 'custom';
+  addCardView.width.readOnly = !isCustom;
+  addCardView.height.readOnly = !isCustom;
+  addCardView.width.value = preset.width;
+  addCardView.height.value = preset.height;
+}
+
+function getLocalDateValue() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function createCardTile(card, index) {
