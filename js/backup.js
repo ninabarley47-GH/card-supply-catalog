@@ -16,6 +16,7 @@ import {
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
 const LAST_BACKUP_EXPORT_SETTING_ID = "lastBackupExportedAt";
 const LAST_BACKUP_IMPORT_SETTING_ID = "lastBackupImportedAt";
+const APP_VERSION = "2026.08.03-import-diagnostic";
 const IMPORT_DIAGNOSTIC_QUERY_PARAMETER = "importDiagnostics";
 const SUPPORTED_EMBEDDED_IMAGE_PREFIX_PATTERN = /^data:image\/(jpeg|png|webp|gif);base64,/i;
 
@@ -23,7 +24,10 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
   const exportButton = document.querySelector("[data-export-catalog]");
   const exportIpadButton = document.querySelector("[data-export-ipad-catalog]");
   const importInput = document.querySelector("[data-import-catalog]");
+  const diagnosticImportInput = document.querySelector("[data-import-catalog-diagnostic]");
+  const downloadDiagnosticButton = document.querySelector("[data-download-import-diagnostic]");
   const message = document.querySelector("[data-backup-message]");
+  let latestDiagnosticReport = null;
 
   if (exportButton) {
     exportButton.addEventListener("click", async () => {
@@ -114,6 +118,54 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
       }
     });
   }
+
+  if (diagnosticImportInput) {
+    diagnosticImportInput.addEventListener("change", async () => {
+      const [backupFile] = diagnosticImportInput.files || [];
+      if (!backupFile) return;
+
+      latestDiagnosticReport = null;
+      if (downloadDiagnosticButton) downloadDiagnosticButton.disabled = true;
+      renderBackupMessage(message, "Running import diagnostic. This may take several minutes...", "");
+
+      try {
+        const backup = await readBackupFile(backupFile);
+        const overwriteSummary = summarizeBackupOverwrites(backup, paperPacks, colorsById);
+        if (overwriteSummary.requiresConfirmation && !window.confirm(overwriteSummary.message)) {
+          renderBackupMessage(message, "Import diagnostic cancelled. No catalog changes were made.", "");
+          return;
+        }
+
+        const restoreSummary = await restoreCatalogBackup({
+          backup,
+          paperPacks,
+          colorsById,
+          diagnosticContext: {
+            backupFileName: backupFile.name,
+            backupFileSize: backupFile.size
+          }
+        });
+        latestDiagnosticReport = restoreSummary.diagnosticReport;
+        if (downloadDiagnosticButton) downloadDiagnosticButton.disabled = !latestDiagnosticReport;
+        onRestore?.();
+        renderBackupMessage(
+          message,
+          "Import diagnostic completed. Please download the report and send it to the app developer.",
+          latestDiagnosticReport ? "success" : "error"
+        );
+      } catch (error) {
+        latestDiagnosticReport = await createFailedDiagnosticReport(backupFile, error);
+        if (downloadDiagnosticButton) downloadDiagnosticButton.disabled = false;
+        renderBackupMessage(message, "Import diagnostic completed with an error. Please download the report and send it to the app developer.", "error");
+      } finally {
+        diagnosticImportInput.value = "";
+      }
+    });
+  }
+
+  downloadDiagnosticButton?.addEventListener("click", () => {
+    if (latestDiagnosticReport) downloadImportDiagnosticReport(latestDiagnosticReport);
+  });
 }
 
 function summarizeBackupOverwrites(backup, paperPacks, colorsById) {
@@ -340,7 +392,7 @@ async function readBackupFile(backupFile) {
   return JSON.parse(await backupFile.text());
 }
 
-async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
+async function restoreCatalogBackup({ backup, paperPacks, colorsById, diagnosticContext = null }) {
   const summary = {
     packsImported: 0,
     colorsImported: 0,
@@ -350,11 +402,18 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
     warnings: [],
     errors: []
   };
+  const importedColorsById = backup?.colors || {};
+  const importedPaperPacks = backup?.paperPacks || [];
+  const importDiagnostic = await createImportDiagnostic(
+    Array.isArray(importedPaperPacks) ? importedPaperPacks : [],
+    diagnosticContext
+  );
 
   const validation = validateBackup(backup);
 
   if (!validation.ok) {
     summary.errors.push(validation.message);
+    summary.diagnosticReport = await reportImportDiagnostic(importDiagnostic);
     return summary;
   }
 
@@ -371,10 +430,6 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
       `Imported catalog schema version ${catalogSchemaVersion || "unknown"}; current catalog schema version is ${CATALOG_SCHEMA_VERSION}.`
     );
   }
-
-  const importedColorsById = backup.colors || {};
-  const importedPaperPacks = backup.paperPacks || [];
-  const importDiagnostic = await createImportDiagnostic(importedPaperPacks);
 
   for (const color of Object.values(importedColorsById)) {
     try {
@@ -407,7 +462,7 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
     }
   }
 
-  await reportImportDiagnostic(importDiagnostic);
+  summary.diagnosticReport = await reportImportDiagnostic(importDiagnostic);
 
   if (summary.folderImageReferencesImported > 0 || backup.imageStorage?.configuredLibrary) {
     summary.warnings.push(
@@ -422,16 +477,29 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById }) {
   return summary;
 }
 
-async function createImportDiagnostic(paperPacks) {
-  if (!isImportDiagnosticEnabled()) {
+async function createImportDiagnostic(paperPacks, diagnosticContext = null) {
+  if (!diagnosticContext && !isImportDiagnosticEnabled()) {
     return null;
   }
 
   const diagnostic = {
+    reportVersion: 1,
+    startedAt: new Date().toISOString(),
+    appVersion: APP_VERSION,
     environment: {
+      userAgent: navigator.userAgent,
+      browser: getBrowserDescription(navigator.userAgent),
+      operatingSystem: getOperatingSystemDescription(navigator.userAgent),
       origin: window.location.origin,
+      pageUrl: window.location.href,
       standalone: isStandaloneDisplayMode(),
       serviceWorkerVersion: await getServiceWorkerVersion()
+    },
+    backup: {
+      fileName: diagnosticContext?.backupFileName || "not recorded",
+      fileSize: diagnosticContext?.backupFileSize ?? null,
+      paperPackCount: paperPacks.length,
+      embeddedImageCount: paperPacks.reduce((count, paperPack) => count + countEmbeddedPatternImages(paperPack), 0)
     },
     images: [],
     storageErrors: [],
@@ -480,6 +548,7 @@ async function createImportDiagnostic(paperPacks) {
 function createImportDiagnosticEntry(paperPack, pattern, patternIndex) {
   return {
     paperPackId: paperPack.id || "",
+    paperPackName: paperPack.name || "",
     patternId: pattern.id || `pattern-${patternIndex + 1}`,
     patternIndex,
     imageName: pattern.imageName || "",
@@ -490,8 +559,12 @@ function createImportDiagnosticEntry(paperPack, pattern, patternIndex) {
     renderedBeforeStorage: false,
     renderWidth: 0,
     renderHeight: 0,
+    indexedDbWriteSucceeded: false,
     savedImageSrcLength: null,
     matchedAfterReadBack: false,
+    renderedAfterReadBack: false,
+    storedRenderWidth: 0,
+    storedRenderHeight: 0,
     failures: []
   };
 }
@@ -503,10 +576,22 @@ async function verifySavedPaperPackImages(diagnostic, paperPack) {
     const savedPaperPack = await loadSavedPaperPack(paperPack.id);
     for (const entry of diagnostic.images.filter((image) => image.paperPackId === paperPack.id)) {
       const savedImageSrc = savedPaperPack?.patterns?.[entry.patternIndex]?.imageSrc;
+      entry.indexedDbWriteSucceeded = true;
       entry.savedImageSrcLength = typeof savedImageSrc === "string" ? savedImageSrc.length : null;
       entry.matchedAfterReadBack = entry.savedImageSrcLength === entry.imageSrcLength;
       if (!entry.matchedAfterReadBack) {
         entry.failures.push(`IndexedDB read-back length mismatch: expected ${entry.imageSrcLength}, received ${entry.savedImageSrcLength ?? "missing"}.`);
+      }
+
+      if (typeof savedImageSrc === "string") {
+        try {
+          const storedImage = await loadDiagnosticImage(savedImageSrc);
+          entry.renderedAfterReadBack = true;
+          entry.storedRenderWidth = storedImage.naturalWidth;
+          entry.storedRenderHeight = storedImage.naturalHeight;
+        } catch (error) {
+          entry.failures.push(`Stored image render failed: ${formatDiagnosticError(error)}`);
+        }
       }
     }
   } catch (error) {
@@ -531,9 +616,10 @@ function recordPaperPackStorageFailure(diagnostic, paperPack, error, operation =
 }
 
 async function reportImportDiagnostic(diagnostic) {
-  if (!diagnostic) return;
+  if (!diagnostic) return null;
 
   diagnostic.quotaAfter = await getStorageQuotaDiagnostic();
+  diagnostic.completedAt = new Date().toISOString();
   const summary = {
     imagesReceived: diagnostic.images.length,
     base64StringsDecoded: diagnostic.images.filter((image) => image.base64Decoded).length,
@@ -558,6 +644,9 @@ async function reportImportDiagnostic(diagnostic) {
   if (diagnostic.storageErrors.length > 0) console.error("IndexedDB errors", diagnostic.storageErrors);
   console.info("Storage quota", { before: diagnostic.quotaBefore, after: diagnostic.quotaAfter });
   console.groupEnd();
+  diagnostic.summary = summary;
+
+  return diagnostic;
 }
 
 function isImportDiagnosticEnabled() {
@@ -600,6 +689,81 @@ async function getServiceWorkerVersion() {
 
 function formatDiagnosticError(error) {
   return `${error?.name || "Error"}: ${error?.message || String(error)}`;
+}
+
+function getBrowserDescription(userAgent) {
+  const value = String(userAgent || "");
+  const candidates = [
+    ["Microsoft Edge", /Edg\/([\d.]+)/],
+    ["Google Chrome", /(?:Chrome|CriOS)\/([\d.]+)/],
+    ["Mozilla Firefox", /(?:Firefox|FxiOS)\/([\d.]+)/],
+    ["Safari", /Version\/([\d.]+).*Safari\//]
+  ];
+
+  for (const [name, pattern] of candidates) {
+    const match = value.match(pattern);
+    if (match) return `${name} ${match[1]}`;
+  }
+
+  return "Unknown browser";
+}
+
+function getOperatingSystemDescription(userAgent) {
+  const value = String(userAgent || "");
+  const mac = value.match(/Mac OS X ([\d_]+)/);
+  const ios = value.match(/(?:CPU (?:iPhone )?OS|iPad; CPU OS) ([\d_]+)/);
+  const windows = value.match(/Windows NT ([\d.]+)/);
+
+  if (ios) return `iOS/iPadOS ${ios[1].replaceAll("_", ".")}`;
+  if (mac) return `macOS ${mac[1].replaceAll("_", ".")}`;
+  if (windows) return `Windows NT ${windows[1]}`;
+  if (/Android/.test(value)) return value.match(/Android ([\d.]+)/)?.[0] || "Android";
+  if (/Linux/.test(value)) return "Linux";
+  return "Unknown operating system";
+}
+
+async function createFailedDiagnosticReport(backupFile, error) {
+  return {
+    reportVersion: 1,
+    startedAt: new Date().toISOString(),
+    completedAt: new Date().toISOString(),
+    appVersion: APP_VERSION,
+    environment: {
+      userAgent: navigator.userAgent,
+      browser: getBrowserDescription(navigator.userAgent),
+      operatingSystem: getOperatingSystemDescription(navigator.userAgent),
+      origin: window.location.origin,
+      pageUrl: window.location.href,
+      standalone: isStandaloneDisplayMode(),
+      serviceWorkerVersion: await getServiceWorkerVersion()
+    },
+    backup: {
+      fileName: backupFile?.name || "unknown",
+      fileSize: backupFile?.size ?? null,
+      paperPackCount: null,
+      embeddedImageCount: null
+    },
+    quotaBefore: await getStorageQuotaDiagnostic(),
+    quotaAfter: await getStorageQuotaDiagnostic(),
+    images: [],
+    storageErrors: [],
+    fatalError: {
+      errorName: error?.name || "Error",
+      errorMessage: error?.message || String(error)
+    },
+    summary: {
+      imagesReceived: 0,
+      base64StringsDecoded: 0,
+      imagesRenderedBeforeStorage: 0,
+      imagesMatchedAfterIndexedDbReadBack: 0,
+      failures: 1
+    }
+  };
+}
+
+function downloadImportDiagnosticReport(report) {
+  const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+  downloadJsonBackup(blob, `card-supply-catalog-import-diagnostic-${formatDateStamp(new Date())}.json`);
 }
 
 async function getStorageQuotaDiagnostic() {

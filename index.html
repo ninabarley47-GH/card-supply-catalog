@@ -238,7 +238,11 @@
                 <button class="button" type="button" data-export-ipad-catalog>Export iPad Backup</button>
                 <label class="button file-button" for="catalog-backup-import">Import Backup</label>
                 <input id="catalog-backup-import" class="visually-hidden" type="file" accept="application/json,.json" data-import-catalog>
+                <label class="button file-button" for="catalog-diagnostic-import">Import Diagnostic</label>
+                <input id="catalog-diagnostic-import" class="visually-hidden" type="file" accept="application/json,.json" data-import-catalog-diagnostic>
+                <button class="button" type="button" data-download-import-diagnostic disabled>Download Diagnostic Report</button>
               </div>
+              <p class="settings-help">If an imported backup is missing images, choose <strong>Import Diagnostic</strong>, select the same backup, then download the report to send to the app developer.</p>
               <details class="settings-help">
                 <summary>How do I share this catalog with an iPad or another computer?</summary>
                 <ol>
