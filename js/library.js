@@ -133,7 +133,8 @@ export async function initializeLibraryShell() {
       initializeCatalogBackup({
         paperPacks,
         colorsById,
-        onRestore: () => {
+        onRestore: async () => {
+          await hydratePaperPackImageSources(paperPacks);
           librarySearch.renderCurrent();
 
           if (colorLibrary) {

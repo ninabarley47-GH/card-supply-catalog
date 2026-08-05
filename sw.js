@@ -1,4 +1,4 @@
-const CACHE_NAME = "card-supply-catalog-v3";
+const CACHE_NAME = "card-supply-catalog-v4";
 const APP_SHELL = [
   "./",
   "./index.html",

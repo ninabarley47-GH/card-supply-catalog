@@ -199,6 +199,14 @@ export async function hydratePaperPackImageSources(paperPacks) {
   return paperPacks;
 }
 
+export function clearPaperPackImageObjectUrls(paperPack) {
+  for (const patternEntry of paperPack?.patterns || []) {
+    if (patternEntry && typeof patternEntry === "object") {
+      clearStalePatternObjectUrls(patternEntry);
+    }
+  }
+}
+
 export function createPatternSlots(patternCount, selectedImages = [], existingPatterns = []) {
   return Array.from({ length: patternCount }, (_, index) => {
     const selectedImage = selectedImages[index];

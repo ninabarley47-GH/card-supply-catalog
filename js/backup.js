@@ -5,7 +5,7 @@ import {
   saveColor,
   savePaperPack
 } from "./storage.js";
-import { getPatternImageFile, getPatternImageSource } from "./images.js";
+import { clearPaperPackImageObjectUrls, getPatternImageFile, getPatternImageSource } from "./images.js";
 import {
   BACKUP_SCHEMA_VERSION,
   CATALOG_SCHEMA_VERSION,
@@ -95,6 +95,9 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
           colorsById
         });
 
+        await onRestore?.();
+        restoreSummary.postRestoreVerification = await verifyPostRestoreCatalog(backup.paperPacks, paperPacks);
+        reportPostRestoreVerification(restoreSummary.postRestoreVerification);
         renderRestoreSummary(message, restoreSummary);
 
         if (restoreSummary.errors.length === 0) {
@@ -102,7 +105,6 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
           document.dispatchEvent(new CustomEvent("catalog:backup-imported"));
         }
 
-        onRestore?.();
       } catch (error) {
         renderRestoreSummary(message, {
           packsImported: 0,
@@ -147,7 +149,12 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
         });
         latestDiagnosticReport = restoreSummary.diagnosticReport;
         if (downloadDiagnosticButton) downloadDiagnosticButton.disabled = !latestDiagnosticReport;
-        onRestore?.();
+        await onRestore?.();
+        restoreSummary.postRestoreVerification = await verifyPostRestoreCatalog(backup.paperPacks, paperPacks);
+        if (latestDiagnosticReport) {
+          latestDiagnosticReport.postRestoreVerification = restoreSummary.postRestoreVerification;
+        }
+        reportPostRestoreVerification(restoreSummary.postRestoreVerification);
         renderBackupMessage(
           message,
           "Import diagnostic completed. Please download the report and send it to the app developer.",
@@ -827,7 +834,62 @@ function upsertPaperPack(paperPacks, paperPack) {
     return;
   }
 
+  clearPaperPackImageObjectUrls(paperPacks[existingIndex]);
   paperPacks.splice(existingIndex, 1, paperPack);
+}
+
+async function verifyPostRestoreCatalog(importedPaperPacks, rendererCatalog) {
+  const importedPaperPack = importedPaperPacks.find((paperPack) =>
+    rendererCatalog.some((catalogPaperPack) => catalogPaperPack.id === paperPack?.id)
+  );
+
+  if (!importedPaperPack) return null;
+
+  const indexedDbPaperPack = await loadSavedPaperPack(importedPaperPack.id);
+  const rendererPaperPack = rendererCatalog.find((paperPack) => paperPack.id === importedPaperPack.id);
+
+  const sources = [
+    summarizePostRestorePaperPack("Imported object", importedPaperPack),
+    summarizePostRestorePaperPack("IndexedDB read-back", indexedDbPaperPack),
+    summarizePostRestorePaperPack("Library renderer catalog", rendererPaperPack)
+  ];
+  const importedSummary = sources[0];
+
+  return {
+    paperPackId: importedPaperPack.id,
+    paperPackName: importedPaperPack.name,
+    sources: sources.map((source) => ({
+      ...source,
+      matchesImported:
+        source.patternCount === importedSummary.patternCount &&
+        source.imageSrcLengths.join(",") === importedSummary.imageSrcLengths.join(",")
+    }))
+  };
+}
+
+function summarizePostRestorePaperPack(source, paperPack) {
+  return {
+    source,
+    patternCount: paperPack?.patterns?.length ?? null,
+    imageSrcLengths: (paperPack?.patterns || []).map((pattern) =>
+      typeof pattern?.imageSrc === "string" ? pattern.imageSrc.length : null
+    )
+  };
+}
+
+function reportPostRestoreVerification(verification) {
+  if (!verification) return;
+
+  console.group(`[Post-restore verification] ${verification.paperPackName || verification.paperPackId}`);
+  console.table(
+    verification.sources.map(({ source, patternCount, imageSrcLengths, matchesImported }) => ({
+      source,
+      patternCount,
+      imageSrcLengths: imageSrcLengths.join(", "),
+      matchesImported
+    }))
+  );
+  console.groupEnd();
 }
 
 function countEmbeddedPatternImages(paperPack) {
