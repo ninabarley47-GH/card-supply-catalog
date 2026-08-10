@@ -246,6 +246,11 @@
                 <input id="catalog-diagnostic-import" class="visually-hidden" type="file" accept="application/json,.json" data-import-catalog-diagnostic>
                 <button class="button" type="button" data-download-import-diagnostic disabled>Download Diagnostic Report</button>
               </div>
+              <label class="settings-checkbox-option">
+                <input type="checkbox" data-import-overwrite-existing>
+                <span>Replace existing catalog entries during import</span>
+              </label>
+              <p class="settings-help">By default, import adds only missing paper packs and colors. Select this option only when you intentionally want the backup to replace matching catalog entries.</p>
               <p class="settings-help">If an imported backup is missing images, choose <strong>Import Diagnostic</strong>, select the same backup, then download the report to send to the app developer.</p>
               <details class="settings-help">
                 <summary>How do I share this catalog with an iPad or another computer?</summary>

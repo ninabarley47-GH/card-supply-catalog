@@ -25,6 +25,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
   const exportIpadButton = document.querySelector("[data-export-ipad-catalog]");
   const importInput = document.querySelector("[data-import-catalog]");
   const diagnosticImportInput = document.querySelector("[data-import-catalog-diagnostic]");
+  const overwriteExistingInput = document.querySelector("[data-import-overwrite-existing]");
   const downloadDiagnosticButton = document.querySelector("[data-download-import-diagnostic]");
   const message = document.querySelector("[data-backup-message]");
   let latestDiagnosticReport = null;
@@ -82,9 +83,10 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
 
       try {
         const backup = await readBackupFile(backupFile);
+        const overwriteExisting = overwriteExistingInput?.checked === true;
         const overwriteSummary = summarizeBackupOverwrites(backup, paperPacks, colorsById);
 
-        if (overwriteSummary.requiresConfirmation && !window.confirm(overwriteSummary.message)) {
+        if (overwriteExisting && overwriteSummary.requiresConfirmation && !window.confirm(overwriteSummary.message)) {
           renderBackupMessage(message, "Import cancelled. No catalog changes were made.", "");
           return;
         }
@@ -92,11 +94,15 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
         const restoreSummary = await restoreCatalogBackup({
           backup,
           paperPacks,
-          colorsById
+          colorsById,
+          overwriteExisting
         });
 
         await onRestore?.();
-        restoreSummary.postRestoreVerification = await verifyPostRestoreCatalog(backup.paperPacks, paperPacks);
+        restoreSummary.postRestoreVerification = await verifyPostRestoreCatalog(
+          getImportedPaperPacksForVerification(backup.paperPacks, restoreSummary),
+          paperPacks
+        );
         reportPostRestoreVerification(restoreSummary.postRestoreVerification);
         renderRestoreSummary(message, restoreSummary);
 
@@ -108,7 +114,9 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
       } catch (error) {
         renderRestoreSummary(message, {
           packsImported: 0,
+          packsSkipped: 0,
           colorsImported: 0,
+          colorsSkipped: 0,
           imagesImported: 0,
           folderImageReferencesImported: 0,
           notes: [],
@@ -132,8 +140,9 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
 
       try {
         const backup = await readBackupFile(backupFile);
+        const overwriteExisting = overwriteExistingInput?.checked === true;
         const overwriteSummary = summarizeBackupOverwrites(backup, paperPacks, colorsById);
-        if (overwriteSummary.requiresConfirmation && !window.confirm(overwriteSummary.message)) {
+        if (overwriteExisting && overwriteSummary.requiresConfirmation && !window.confirm(overwriteSummary.message)) {
           renderBackupMessage(message, "Import diagnostic cancelled. No catalog changes were made.", "");
           return;
         }
@@ -142,6 +151,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
           backup,
           paperPacks,
           colorsById,
+          overwriteExisting,
           diagnosticContext: {
             backupFileName: backupFile.name,
             backupFileSize: backupFile.size
@@ -150,7 +160,10 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
         latestDiagnosticReport = restoreSummary.diagnosticReport;
         if (downloadDiagnosticButton) downloadDiagnosticButton.disabled = !latestDiagnosticReport;
         await onRestore?.();
-        restoreSummary.postRestoreVerification = await verifyPostRestoreCatalog(backup.paperPacks, paperPacks);
+        restoreSummary.postRestoreVerification = await verifyPostRestoreCatalog(
+          getImportedPaperPacksForVerification(backup.paperPacks, restoreSummary),
+          paperPacks
+        );
         if (latestDiagnosticReport) {
           latestDiagnosticReport.postRestoreVerification = restoreSummary.postRestoreVerification;
         }
@@ -399,20 +412,34 @@ async function readBackupFile(backupFile) {
   return JSON.parse(await backupFile.text());
 }
 
-async function restoreCatalogBackup({ backup, paperPacks, colorsById, diagnosticContext = null }) {
+async function restoreCatalogBackup({
+  backup,
+  paperPacks,
+  colorsById,
+  overwriteExisting = false,
+  diagnosticContext = null
+}) {
   const summary = {
     packsImported: 0,
+    packsSkipped: 0,
     colorsImported: 0,
+    colorsSkipped: 0,
     imagesImported: 0,
     folderImageReferencesImported: 0,
+    importedPaperPackIds: [],
     notes: [],
     warnings: [],
     errors: []
   };
   const importedColorsById = backup?.colors || {};
-  const importedPaperPacks = backup?.paperPacks || [];
+  const importedPaperPacks = Array.isArray(backup?.paperPacks) ? backup.paperPacks : [];
+  const existingPackIds = new Set(paperPacks.map((paperPack) => paperPack.id));
+  const existingColorIds = new Set(Object.keys(colorsById));
+  const paperPacksToImport = overwriteExisting
+    ? importedPaperPacks
+    : importedPaperPacks.filter((paperPack) => !existingPackIds.has(paperPack?.id));
   const importDiagnostic = await createImportDiagnostic(
-    Array.isArray(importedPaperPacks) ? importedPaperPacks : [],
+    paperPacksToImport,
     diagnosticContext
   );
 
@@ -439,9 +466,15 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById, diagnostic
   }
 
   for (const color of Object.values(importedColorsById)) {
+    if (!overwriteExisting && existingColorIds.has(color?.id)) {
+      summary.colorsSkipped += 1;
+      continue;
+    }
+
     try {
       await saveColor(color);
       colorsById[color.id] = color;
+      existingColorIds.add(color.id);
       summary.colorsImported += 1;
     } catch (error) {
       logImportError("Color write failed", error, { colorId: color?.id });
@@ -450,13 +483,20 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById, diagnostic
   }
 
   for (const paperPack of importedPaperPacks) {
+    if (!overwriteExisting && existingPackIds.has(paperPack?.id)) {
+      summary.packsSkipped += 1;
+      continue;
+    }
+
     try {
       const versionedPaperPack = addCatalogSchemaVersion(paperPack);
 
       await savePaperPack(versionedPaperPack);
       await verifySavedPaperPackImages(importDiagnostic, versionedPaperPack);
       upsertPaperPack(paperPacks, versionedPaperPack);
+      existingPackIds.add(versionedPaperPack.id);
       summary.packsImported += 1;
+      summary.importedPaperPackIds.push(versionedPaperPack.id);
       summary.imagesImported += countEmbeddedPatternImages(versionedPaperPack);
       summary.folderImageReferencesImported += countFolderImageReferences(versionedPaperPack);
     } catch (error) {
@@ -477,11 +517,21 @@ async function restoreCatalogBackup({ backup, paperPacks, colorsById, diagnostic
     );
   }
 
+  if (summary.packsSkipped > 0 || summary.colorsSkipped > 0) {
+    summary.notes.push("Existing catalog entries were left unchanged.");
+  }
+
   if (summary.errors.length === 0 && summary.warnings.length === 0) {
     summary.notes.push("Import completed. Re-export and compare with the original backup as the verification checklist describes.");
   }
 
   return summary;
+}
+
+function getImportedPaperPacksForVerification(importedPaperPacks, restoreSummary) {
+  const importedIds = new Set(restoreSummary.importedPaperPackIds || []);
+
+  return (importedPaperPacks || []).filter((paperPack) => importedIds.has(paperPack?.id));
 }
 
 async function createImportDiagnostic(paperPacks, diagnosticContext = null) {
@@ -1093,7 +1143,9 @@ function renderRestoreSummary(message, summary) {
 
   counts.append(
     createSummaryItem("Packs imported", summary.packsImported),
+    createSummaryItem("Existing packs skipped", summary.packsSkipped || 0),
     createSummaryItem("Colors imported", summary.colorsImported),
+    createSummaryItem("Existing colors skipped", summary.colorsSkipped || 0),
     createSummaryItem("Embedded images imported", summary.imagesImported),
     createSummaryItem("Folder image references imported", summary.folderImageReferencesImported || 0)
   );
