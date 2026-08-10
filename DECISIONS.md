@@ -51,7 +51,7 @@ Makes it easy to compare paper packs, but also to get details about an individua
 ## Keywords
 
 Keywords are the following:
-Cartoon
+Illustration
 Scenery
 Floral
 Foliage

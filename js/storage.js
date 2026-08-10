@@ -11,6 +11,7 @@ const LEGACY_DELETED_PAPER_PACK_IDS_STORAGE_KEY = "card-supply-catalog.deletedPa
 const LEGACY_MIGRATION_STORAGE_KEY = "card-supply-catalog.indexedDbMigrationComplete";
 const KEYWORD_REPLACEMENTS = new Map([
   ["background", ""],
+  ["cartoon", "Illustration"],
   ["mammals", "Land Animals"],
   ["ocean", "Water"],
   ["ocean animals", "Water Animals"],
