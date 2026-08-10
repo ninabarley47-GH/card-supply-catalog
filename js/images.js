@@ -323,13 +323,17 @@ export async function migratePaperPackImagesToLocalFolder(paperPack) {
     };
   }
 
-  const imagesToMigrate = countEmbeddedPatternImages(paperPack);
-  const migratedPaperPack = await preparePaperPackWithLocalFolderImages(paperPack, directoryHandle);
+  const migrationStats = { imagesAdded: 0 };
+  const migratedPaperPack = await preparePaperPackWithLocalFolderImages(
+    paperPack,
+    directoryHandle,
+    migrationStats
+  );
 
   return {
     ok: true,
     paperPack: migratedPaperPack,
-    imagesMigrated: imagesToMigrate,
+    imagesMigrated: migrationStats.imagesAdded,
     warning: ""
   };
 }
@@ -460,7 +464,13 @@ async function countBrokenImageLinks(paperPack, directoryHandle) {
 }
 
 async function findPaperPackImageDirectoryForPack(directoryHandle, paperPack) {
-  const candidateIds = [...new Set([createId(paperPack.id), createId(paperPack.name)].filter(Boolean))];
+  const referencedFolderNames = (paperPack.patterns || [])
+    .map((pattern) => (pattern && typeof pattern === "object" ? pattern.imagePath : ""))
+    .map((imagePath) => String(imagePath || "").split("/").filter(Boolean)[0])
+    .filter(Boolean);
+  const candidateIds = [
+    ...new Set([...referencedFolderNames, paperPack.name, paperPack.id].filter(Boolean))
+  ];
 
   for (const candidateId of candidateIds) {
     const packDirectory = await findPaperPackImageDirectory(directoryHandle, candidateId);
@@ -521,11 +531,19 @@ function createMissingImageEntry(paperPack, patternObject, index) {
   };
 }
 
-async function preparePaperPackWithLocalFolderImages(paperPack, directoryHandle) {
+async function preparePaperPackWithLocalFolderImages(paperPack, directoryHandle, migrationStats = null) {
   const patterns = [];
 
   for (const [index, patternEntry] of (paperPack.patterns || []).entries()) {
-    patterns.push(await preparePatternForLocalFolderStorage(directoryHandle, paperPack, patternEntry, index));
+    patterns.push(
+      await preparePatternForLocalFolderStorage(
+        directoryHandle,
+        paperPack,
+        patternEntry,
+        index,
+        migrationStats
+      )
+    );
   }
 
   return {
@@ -543,7 +561,13 @@ function preparePaperPackWithEmbeddedImages(paperPack) {
   };
 }
 
-async function preparePatternForLocalFolderStorage(directoryHandle, paperPack, patternEntry, index) {
+async function preparePatternForLocalFolderStorage(
+  directoryHandle,
+  paperPack,
+  patternEntry,
+  index,
+  migrationStats = null
+) {
   const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
 
   if (!patternObject) {
@@ -556,12 +580,16 @@ async function preparePatternForLocalFolderStorage(directoryHandle, paperPack, p
 
   const imageName = createStoredImageFileName(patternObject, index);
   const imageBlob = patternObject.__imageFile || (await getBlobFromImageSource(patternObject.imageSrc));
-  const imagePath = await writePatternImageFile(directoryHandle, paperPack, imageBlob, imageName);
+  const writeResult = await writePatternImageFile(directoryHandle, paperPack, imageBlob, imageName);
+
+  if (migrationStats && writeResult.wasCreated) {
+    migrationStats.imagesAdded += 1;
+  }
 
   return {
     id: patternObject.id || `pattern-${index + 1}`,
     imageName,
-    imagePath,
+    imagePath: writeResult.imagePath,
     imageStorageStrategy: LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY
   };
 }
@@ -728,8 +756,10 @@ async function findPaperPackImageDirectory(directoryHandle, paperPackId) {
     return null;
   }
 
+  const normalizedPaperPackId = createId(paperPackId);
+
   for await (const [entryName, entryHandle] of directoryHandle.entries()) {
-    if (entryHandle.kind === "directory" && createId(entryName) === paperPackId) {
+    if (entryHandle.kind === "directory" && createId(entryName) === normalizedPaperPackId) {
       return {
         handle: entryHandle,
         path: entryName
@@ -960,15 +990,58 @@ function getFlexibleImageFileKey(fileName) {
 }
 
 async function writePatternImageFile(directoryHandle, paperPack, imageFile, imageName) {
-  const packFolderName = createId(paperPack.id || paperPack.name) || "paper-pack";
-  const packDirectory = await directoryHandle.getDirectoryHandle(packFolderName, { create: true });
+  const existingPackDirectory = await findPaperPackImageDirectoryForPack(directoryHandle, paperPack);
+  const packFolderName =
+    existingPackDirectory?.path || createId(paperPack.id || paperPack.name) || "paper-pack";
+  const packDirectory =
+    existingPackDirectory?.handle ||
+    (await directoryHandle.getDirectoryHandle(packFolderName, { create: true }));
+  const existingImageName = await findExistingImageFileName(packDirectory, imageName);
+
+  if (existingImageName) {
+    return {
+      imagePath: `${packFolderName}/${existingImageName}`,
+      wasCreated: false
+    };
+  }
+
   const fileHandle = await packDirectory.getFileHandle(imageName, { create: true });
   const writable = await fileHandle.createWritable();
 
   await writable.write(imageFile);
   await writable.close();
 
-  return `${packFolderName}/${imageName}`;
+  return {
+    imagePath: `${packFolderName}/${imageName}`,
+    wasCreated: true
+  };
+}
+
+async function findExistingImageFileName(directoryHandle, imageName) {
+  try {
+    await directoryHandle.getFileHandle(imageName);
+    return imageName;
+  } catch (error) {
+    // Fall through to normalized filename matching.
+  }
+
+  if (!directoryHandle.entries) {
+    return "";
+  }
+
+  const imageKey = getFlexibleImageFileKey(imageName);
+
+  for await (const [entryName, entryHandle] of directoryHandle.entries()) {
+    if (
+      entryHandle.kind === "file" &&
+      isSupportedImageFileName(entryName) &&
+      getFlexibleImageFileKey(entryName) === imageKey
+    ) {
+      return entryName;
+    }
+  }
+
+  return "";
 }
 
 async function getBlobFromImageSource(imageSrc) {
@@ -979,11 +1052,6 @@ async function getBlobFromImageSource(imageSrc) {
   }
 
   return await response.blob();
-}
-
-function countEmbeddedPatternImages(paperPack) {
-  return (paperPack.patterns || []).filter((pattern) => pattern && typeof pattern === "object" && pattern.imageSrc)
-    .length;
 }
 
 async function deleteLocalPaperPackImageFolder(directoryHandle, paperPack) {
