@@ -347,7 +347,8 @@ export async function checkImageLibraryHealth(paperPacks) {
     imagesFound: 0,
     imagesMissing: 0,
     embeddedImages: 0,
-    missingImages: []
+    missingImages: [],
+    fallbackPaperPacks: []
   };
 
   for (const paperPack of paperPacks) {
@@ -380,6 +381,19 @@ export async function checkImageLibraryHealth(paperPacks) {
 
       if (patternObject.imageSrc || patternObject.imagePreviewSrc) {
         summary.embeddedImages += 1;
+        const fallbackPaperPack = summary.fallbackPaperPacks.find(
+          (entry) => entry.packId === paperPack.id
+        );
+
+        if (fallbackPaperPack) {
+          fallbackPaperPack.imageCount += 1;
+        } else {
+          summary.fallbackPaperPacks.push({
+            packId: paperPack.id,
+            packName: paperPack.name || "Untitled pack",
+            imageCount: 1
+          });
+        }
       }
     }
   }

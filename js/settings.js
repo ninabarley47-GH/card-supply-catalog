@@ -512,6 +512,26 @@ function renderImageLibraryHealth(container, summary) {
 
   const children = [overview];
 
+  if ((summary.fallbackPaperPacks || []).length > 0) {
+    const fallback = document.createElement("div");
+    fallback.className = "image-library-fallback";
+
+    const title = document.createElement("p");
+    title.textContent = "Paper packs using fallback storage";
+
+    const list = document.createElement("ul");
+    list.className = "image-library-missing-list";
+
+    for (const paperPack of summary.fallbackPaperPacks) {
+      const item = document.createElement("li");
+      item.textContent = `${paperPack.packName} (${paperPack.imageCount} image${paperPack.imageCount === 1 ? "" : "s"})`;
+      list.append(item);
+    }
+
+    fallback.append(title, list);
+    children.push(fallback);
+  }
+
   if (summary.missingImages.length > 0) {
     const missing = document.createElement("div");
     missing.className = "image-library-missing";

@@ -195,6 +195,8 @@ function summarizeBackupOverwrites(backup, paperPacks, colorsById) {
   const existingColorIds = new Set(Object.keys(colorsById));
   const packOverwriteCount = importedPaperPacks.filter((paperPack) => existingPackIds.has(paperPack?.id)).length;
   const colorOverwriteCount = importedColors.filter((color) => existingColorIds.has(color?.id)).length;
+  const newPackCount = importedPaperPacks.length - packOverwriteCount;
+  const newColorCount = importedColors.length - colorOverwriteCount;
   const overwriteParts = [];
 
   if (packOverwriteCount > 0) {
@@ -214,7 +216,15 @@ function summarizeBackupOverwrites(backup, paperPacks, colorsById) {
 
   return {
     requiresConfirmation: true,
-    message: `This backup will overwrite ${overwriteParts.join(" and ")} already in the catalog. Continue with import?`
+    message: [
+      "Replace matching catalog entries?",
+      "",
+      `This will replace ${overwriteParts.join(" and ")} already in the catalog. Only image data and references belonging to those matching paper packs can change; all other catalog images will remain untouched. Files in your selected image folder will not be deleted.`,
+      "",
+      `The import will also add ${newPackCount} new paper pack${newPackCount === 1 ? "" : "s"} and ${newColorCount} new color${newColorCount === 1 ? "" : "s"}.`,
+      "",
+      "Continue with replacement import?"
+    ].join("\n")
   };
 }
 async function createCatalogBackup({ paperPacks, colorsById }) {
