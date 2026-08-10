@@ -22,6 +22,10 @@ import {
 } from "./storage.js";
 
 const IGNORED_UNCATALOGED_PACK_FOLDERS_SETTING_ID = "ignoredUncatalogedPaperPackFolders";
+const LIBRARY_PATTERN_PREVIEW_LIMIT = 12;
+const expandedLibraryPaperPacks = new Set();
+const collapsedLibraryPaperPacks = new Set();
+let areAllLibraryPatternsExpanded = false;
 
 const COLOR_FAMILY_ORDER = [
   "red",
@@ -116,6 +120,7 @@ export async function initializeLibraryShell() {
     if (paperPackLibrary) {
       renderPaperPackLibrary(paperPackLibrary, paperPacks, colorsById);
       const librarySearch = initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById);
+      initializePatternExpansionControls(librarySearch.renderCurrent);
       initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, librarySearch.renderCurrent);
       initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById, librarySearch.renderCurrent);
       initializeSettings({
@@ -159,6 +164,28 @@ export async function initializeLibraryShell() {
       renderError(colorLibrary, "Colors could not be loaded.");
     }
   }
+}
+
+function initializePatternExpansionControls(renderCurrentLibrary) {
+  const expandAllButton = document.querySelector("[data-expand-all-patterns]");
+
+  updateExpandAllPatternsButton(expandAllButton);
+  expandAllButton?.addEventListener("click", () => {
+    areAllLibraryPatternsExpanded = !areAllLibraryPatternsExpanded;
+    expandedLibraryPaperPacks.clear();
+    collapsedLibraryPaperPacks.clear();
+    updateExpandAllPatternsButton(expandAllButton);
+    renderCurrentLibrary();
+  });
+}
+
+function updateExpandAllPatternsButton(button) {
+  if (!button) {
+    return;
+  }
+
+  button.textContent = areAllLibraryPatternsExpanded ? "Show 12 Patterns" : "Show All Patterns";
+  button.setAttribute("aria-pressed", `${areAllLibraryPatternsExpanded}`);
 }
 
 function initializeUncatalogedPackFinder(paperPacks) {
@@ -1048,7 +1075,12 @@ function createPaperPackCard(paperPack, colorsById) {
   card.setAttribute("role", "button");
   card.setAttribute("aria-label", `Open ${paperPack.name}`);
 
-  const patternGrid = createPatternGrid(paperPack);
+  const patterns = paperPack.patterns || [];
+  const isExpanded = areAllLibraryPatternsExpanded
+    ? !collapsedLibraryPaperPacks.has(paperPack.id)
+    : expandedLibraryPaperPacks.has(paperPack.id);
+  const visiblePatterns = isExpanded ? patterns : patterns.slice(0, LIBRARY_PATTERN_PREVIEW_LIMIT);
+  const patternGrid = createPatternGrid({ ...paperPack, patterns: visiblePatterns });
   const contextBar = createCardContextBar(paperPack);
   const cardBody = document.createElement("div");
   cardBody.className = "card-body";
@@ -1074,7 +1106,21 @@ function createPaperPackCard(paperPack, colorsById) {
     card.append(contextBar);
   }
 
-  card.append(titleRow, patternGrid, cardBody, editButton);
+  card.append(titleRow, patternGrid);
+
+  if (patterns.length > LIBRARY_PATTERN_PREVIEW_LIMIT) {
+    const patternToggle = document.createElement("button");
+    const hiddenPatternCount = patterns.length - LIBRARY_PATTERN_PREVIEW_LIMIT;
+
+    patternToggle.className = "pattern-expand-button";
+    patternToggle.type = "button";
+    patternToggle.dataset.togglePackPatterns = paperPack.id;
+    patternToggle.setAttribute("aria-expanded", `${isExpanded}`);
+    patternToggle.textContent = isExpanded ? "Show less" : `+ See ${hiddenPatternCount} more`;
+    card.append(patternToggle);
+  }
+
+  card.append(cardBody, editButton);
 
   return card;
 }
@@ -1141,6 +1187,37 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
   }
 
   paperPackLibrary.addEventListener("click", (event) => {
+    const patternToggle = event.target.closest("[data-toggle-pack-patterns]");
+
+    if (patternToggle) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const paperPackId = patternToggle.dataset.togglePackPatterns;
+
+      const isCurrentlyExpanded = areAllLibraryPatternsExpanded
+        ? !collapsedLibraryPaperPacks.has(paperPackId)
+        : expandedLibraryPaperPacks.has(paperPackId);
+
+      if (areAllLibraryPatternsExpanded) {
+        if (isCurrentlyExpanded) {
+          collapsedLibraryPaperPacks.add(paperPackId);
+        } else {
+          collapsedLibraryPaperPacks.delete(paperPackId);
+        }
+      } else if (isCurrentlyExpanded) {
+        expandedLibraryPaperPacks.delete(paperPackId);
+      } else {
+        expandedLibraryPaperPacks.add(paperPackId);
+      }
+
+      renderCurrentLibrary();
+      paperPackLibrary
+        .querySelector(`[data-toggle-pack-patterns="${CSS.escape(paperPackId)}"]`)
+        ?.focus();
+      return;
+    }
+
     const markUsedUpButton = event.target.closest("[data-mark-used-up]");
 
     if (markUsedUpButton) {
@@ -1195,7 +1272,12 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
 
     const card = event.target.closest("[data-paper-pack-card]");
 
-    if (!card || event.target.closest("[data-edit-pack], [data-clear-recently-added], [data-mark-used-up]")) {
+    if (
+      !card ||
+      event.target.closest(
+        "[data-edit-pack], [data-clear-recently-added], [data-mark-used-up], [data-toggle-pack-patterns]"
+      )
+    ) {
       return;
     }
 
