@@ -260,8 +260,13 @@ This depends on each user having the shared folder synced locally. A browser can
 
 IndexedDB is the canonical writable store for paper-pack records, deletion markers, user-added colors, and settings. Bundled JSON files provide the base catalog and color data, which are merged with saved browser data at startup. Embedded image data may also live in IndexedDB as a compatibility fallback, while a selected folder remains the preferred canonical image library.
 
-Permission Notes
-The File System Access API requires:
+# Decision 29
+## Incremental Backup File Loading
+
+Provide a feature where you can load backup files incrementally. This allows a user to leverage another user's DSP creation in the app without overlaying any tagging or ownership they've already done.
+
+# Permission Notes
+## The File System Access API requires:
 secure context, generally HTTPS or localhost
 explicit user action to open folder picker
 user-selected folder access

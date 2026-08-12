@@ -4,6 +4,7 @@ import { initializeAddColorWorkflow } from "./color-form.js";
 import { createCoverSheetForPack } from "./cover-sheet.js";
 import {
   deletePaperPackImages,
+  getPaperLibraryImageSource,
   getPatternImageSource,
   hydratePaperPackImageSources,
   preparePaperPackImagesForSave,
@@ -1080,7 +1081,10 @@ function createPaperPackCard(paperPack, colorsById) {
     ? !collapsedLibraryPaperPacks.has(paperPack.id)
     : expandedLibraryPaperPacks.has(paperPack.id);
   const visiblePatterns = isExpanded ? patterns : patterns.slice(0, LIBRARY_PATTERN_PREVIEW_LIMIT);
-  const patternGrid = createPatternGrid({ ...paperPack, patterns: visiblePatterns });
+  const patternGrid = createPatternGrid(
+    { ...paperPack, patterns: visiblePatterns },
+    { preferThumbnail: true }
+  );
   const contextBar = createCardContextBar(paperPack);
   const cardBody = document.createElement("div");
   cardBody.className = "card-body";
@@ -1895,7 +1899,9 @@ function createPatternGrid(paperPack, options = {}) {
 function createPatternPreview(patternEntry, index, options = {}) {
   const pattern = options.interactive ? document.createElement("button") : document.createElement("span");
   const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
-  const imageSrc = getPatternImageSource(patternEntry);
+  const imageSrc = options.preferThumbnail
+    ? getPaperLibraryImageSource(patternEntry)
+    : getPatternImageSource(patternEntry);
   const imageName = patternObject?.imageName || "";
 
   if (options.interactive) {

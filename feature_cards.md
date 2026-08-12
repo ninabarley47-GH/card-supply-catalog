@@ -38,6 +38,8 @@ Phase 3
 Phase 4
     Pack relationships
 Phase 5
-    Automatic thumbnail creating and image storage
+    Add incremental backup loads
 Phase 6
+    Automatic thumbnail creation and image storage
+Phase 7
     Card Gallery

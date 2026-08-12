@@ -272,6 +272,12 @@ export function getPatternImageSource(patternEntry) {
   return patternObject?.imagePreviewSrc || patternObject?.imageSrc || "";
 }
 
+export function getPaperLibraryImageSource(patternEntry) {
+  const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
+
+  return patternObject?.imageThumbnailSrc || getPatternImageSource(patternEntry);
+}
+
 export async function getPatternImageFile(patternEntry) {
   const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
 
@@ -718,8 +724,8 @@ async function preparePatternForLocalFolderStorage(
   const imageBlob = patternObject.__imageFile || (await getBlobFromImageSource(patternObject.imageSrc));
   const writeResult = await writePatternImageFile(directoryHandle, paperPack, imageBlob, imageName);
 
-  if (patternObject.__imageFile && writeResult.wasCreated) {
-    await writeNewPatternThumbnail(writeResult.packDirectory, imageBlob, imageName);
+  if (patternObject.__imageFile) {
+    await writeNewPatternThumbnail(writeResult.packDirectory, imageBlob, writeResult.imageName);
   }
 
   if (migrationStats && writeResult.wasCreated) {
@@ -983,6 +989,7 @@ async function hydratePatternImageSource(patternEntry, directoryHandle) {
   }
 
   clearStalePatternObjectUrls(patternObject);
+  await hydratePatternThumbnailSource(patternObject, directoryHandle);
 
   try {
     const file = await findFileFromImagePath(directoryHandle, patternObject.imagePath);
@@ -992,8 +999,23 @@ async function hydratePatternImageSource(patternEntry, directoryHandle) {
   }
 }
 
+async function hydratePatternThumbnailSource(patternObject, directoryHandle) {
+  const thumbnailPath = createThumbnailImagePath(patternObject.imagePath);
+
+  try {
+    const thumbnailFile = await getFileFromImagePath(directoryHandle, thumbnailPath);
+    Object.defineProperty(patternObject, "imageThumbnailSrc", {
+      configurable: true,
+      writable: true,
+      value: URL.createObjectURL(thumbnailFile)
+    });
+  } catch (error) {
+    // Existing packs without thumbnails continue using their full-resolution image.
+  }
+}
+
 function clearStalePatternObjectUrls(patternObject) {
-  for (const fieldName of ["imagePreviewSrc", "imageSrc"]) {
+  for (const fieldName of ["imageThumbnailSrc", "imagePreviewSrc", "imageSrc"]) {
     const imageSource = patternObject[fieldName];
 
     if (typeof imageSource !== "string" || !imageSource.startsWith("blob:")) {
@@ -1147,7 +1169,9 @@ async function writePatternImageFile(directoryHandle, paperPack, imageFile, imag
   if (existingImageName) {
     return {
       imagePath: `${packFolderName}/${existingImageName}`,
-      wasCreated: false
+      imageName: existingImageName,
+      wasCreated: false,
+      packDirectory
     };
   }
 
@@ -1159,6 +1183,7 @@ async function writePatternImageFile(directoryHandle, paperPack, imageFile, imag
 
   return {
     imagePath: `${packFolderName}/${imageName}`,
+    imageName,
     wasCreated: true,
     packDirectory
   };
@@ -1166,8 +1191,13 @@ async function writePatternImageFile(directoryHandle, paperPack, imageFile, imag
 
 async function writeNewPatternThumbnail(packDirectory, sourceImage, imageName) {
   try {
-    const thumbnailBlob = await generateImageThumbnail(sourceImage);
     const thumbnailName = createThumbnailImageFileName(imageName);
+
+    if (await fileExists(packDirectory, thumbnailName)) {
+      return;
+    }
+
+    const thumbnailBlob = await generateImageThumbnail(sourceImage);
     const thumbnailHandle = await packDirectory.getFileHandle(thumbnailName, { create: true });
     const thumbnailWritable = await thumbnailHandle.createWritable();
 
@@ -1178,8 +1208,24 @@ async function writeNewPatternThumbnail(packDirectory, sourceImage, imageName) {
   }
 }
 
+async function fileExists(directoryHandle, fileName) {
+  try {
+    await directoryHandle.getFileHandle(fileName);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
 function createThumbnailImageFileName(imageName) {
   return `${String(imageName || "pattern").replace(/\.[^.]+$/, "")}.thumb.jpg`;
+}
+
+function createThumbnailImagePath(imagePath) {
+  const pathParts = String(imagePath || "").split("/");
+  const imageName = pathParts.pop();
+
+  return [...pathParts, createThumbnailImageFileName(imageName)].join("/");
 }
 
 async function findExistingImageFileName(directoryHandle, imageName) {
