@@ -5,7 +5,12 @@ import {
   saveColor,
   savePaperPack
 } from "./storage.js";
-import { clearPaperPackImageObjectUrls, getPatternImageFile, getPatternImageSource } from "./images.js";
+import {
+  clearPaperPackImageObjectUrls,
+  getPatternImageFile,
+  getPatternImageSource,
+  reconnectPaperPackImagesToExistingFolder
+} from "./images.js";
 import {
   BACKUP_SCHEMA_VERSION,
   CATALOG_SCHEMA_VERSION,
@@ -499,7 +504,8 @@ async function restoreCatalogBackup({
     }
 
     try {
-      const versionedPaperPack = addCatalogSchemaVersion(paperPack);
+      const reconnectResult = await reconnectPaperPackImagesToExistingFolder(paperPack);
+      const versionedPaperPack = addCatalogSchemaVersion(reconnectResult.paperPack);
 
       await savePaperPack(versionedPaperPack);
       await verifySavedPaperPackImages(importDiagnostic, versionedPaperPack);

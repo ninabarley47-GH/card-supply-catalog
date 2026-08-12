@@ -425,8 +425,9 @@ export async function repairBrokenPaperPackImageLinks(paperPacks) {
 
   for (const paperPack of paperPacks) {
     const brokenLinkCount = await countBrokenImageLinks(paperPack, directoryHandle);
+    const fallbackImageCount = countFallbackPatternImages(paperPack);
 
-    if (brokenLinkCount === 0) {
+    if (brokenLinkCount === 0 && fallbackImageCount === 0) {
       continue;
     }
 
@@ -444,10 +445,21 @@ export async function repairBrokenPaperPackImageLinks(paperPacks) {
       continue;
     }
 
-    const repairedPaperPack = rebuildPaperPackImageReferences(paperPack, images);
+    const repairResult = brokenLinkCount > 0
+      ? {
+          paperPack: rebuildPaperPackImageReferences(paperPack, images),
+          linksRepaired: brokenLinkCount + fallbackImageCount
+        }
+      : reconnectFallbackPatternsFromImages(paperPack, images);
+
+    if (repairResult.linksRepaired === 0) {
+      summary.packsUnresolved.push(paperPack.name || paperPack.id || "Untitled pack");
+      continue;
+    }
+
     summary.packsRepaired += 1;
-    summary.linksRepaired += brokenLinkCount;
-    summary.repairedPaperPacks.push(repairedPaperPack);
+    summary.linksRepaired += repairResult.linksRepaired;
+    summary.repairedPaperPacks.push(repairResult.paperPack);
   }
 
   return {
@@ -455,6 +467,66 @@ export async function repairBrokenPaperPackImageLinks(paperPacks) {
     needsFolder: false,
     summary
   };
+}
+
+export async function reconnectPaperPackImagesToExistingFolder(paperPack) {
+  const directoryHandle = await getReadableImageLibraryDirectoryHandle();
+
+  if (!directoryHandle || countFallbackPatternImages(paperPack) === 0) {
+    return { paperPack, linksRepaired: 0 };
+  }
+
+  const packDirectory = await findPaperPackImageDirectoryForPack(directoryHandle, paperPack);
+
+  if (!packDirectory) {
+    return { paperPack, linksRepaired: 0 };
+  }
+
+  const images = await getImagesFromDirectory(packDirectory.handle, packDirectory.path);
+  return reconnectFallbackPatternsFromImages(paperPack, images);
+}
+
+function reconnectFallbackPatternsFromImages(paperPack, images) {
+  let linksRepaired = 0;
+  const patterns = (paperPack.patterns || []).map((patternEntry, index) => {
+    const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
+
+    if (!patternObject || patternObject.imagePath || (!patternObject.imageSrc && !patternObject.imagePreviewSrc)) {
+      return patternEntry;
+    }
+
+    const desiredImageName = createStoredImageFileName(patternObject, index);
+    const desiredImageKey = getFlexibleImageFileKey(desiredImageName);
+    const matchingImage = images.find(
+      (image) => getFlexibleImageFileKey(image.name) === desiredImageKey
+    ) || images[index];
+
+    if (!matchingImage) {
+      return patternEntry;
+    }
+
+    linksRepaired += 1;
+    return {
+      id: patternObject.id || `pattern-${index + 1}`,
+      imageName: matchingImage.name,
+      imagePath: matchingImage.imagePath,
+      imageStorageStrategy: LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY
+    };
+  });
+
+  return {
+    paperPack: linksRepaired > 0
+      ? { ...paperPack, patterns, imageStorageStrategy: LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY }
+      : paperPack,
+    linksRepaired
+  };
+}
+
+function countFallbackPatternImages(paperPack) {
+  return (paperPack.patterns || []).filter(
+    (pattern) => pattern && typeof pattern === "object" && !pattern.imagePath &&
+      (pattern.imageSrc || pattern.imagePreviewSrc)
+  ).length;
 }
 
 async function countBrokenImageLinks(paperPack, directoryHandle) {

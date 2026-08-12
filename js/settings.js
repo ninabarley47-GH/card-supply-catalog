@@ -164,7 +164,7 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
 
   repairButton?.addEventListener("click", async () => {
     repairButton.disabled = true;
-    renderImageLibraryStatus(status, "Repairing broken image links from the selected folder...", "");
+    renderImageLibraryStatus(status, "Repairing image links and reconnecting fallback images...", "");
 
     try {
       const result = await repairBrokenPaperPackImageLinks(paperPacks);
@@ -189,7 +189,7 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
       );
       renderSetupStatus(document.querySelector("[data-setup-status]"), paperPacks);
     } catch (error) {
-      renderImageLibraryStatus(status, "Broken image links could not be repaired.", "error");
+      renderImageLibraryStatus(status, "Image links and fallback images could not be repaired.", "error");
     } finally {
       repairButton.disabled = false;
     }
@@ -215,7 +215,7 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
 
 function formatImageLinkRepairSummary(summary) {
   if (summary.linksRepaired === 0 && summary.packsUnresolved.length === 0) {
-    return "No broken image links were found.";
+    return "No broken links or reconnectable fallback images were found.";
   }
 
   const repairedMessage = `${summary.linksRepaired} image link${summary.linksRepaired === 1 ? "" : "s"} repaired across ${summary.packsRepaired} paper pack${summary.packsRepaired === 1 ? "" : "s"}.`;
