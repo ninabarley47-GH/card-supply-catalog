@@ -1,9 +1,6 @@
 name: Deploy GitHub Pages
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
@@ -24,6 +21,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate version metadata
+        shell: bash
+        run: |
+          RELEASE_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)"
+          VERSION="${RELEASE_TAG#v}"
+          BUILD="$(date -u +'%Y.%m.%d').${GITHUB_RUN_NUMBER}"
+          BUILT_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          COMMIT="${GITHUB_SHA:0:7}"
+          printf '{\n  "version": "%s",\n  "build": "%s",\n  "builtAt": "%s",\n  "commit": "%s"\n}\n' "$VERSION" "$BUILD" "$BUILT_AT" "$COMMIT" > version.json
+          printf 'self.CSC_BUILD = "%s";\n' "$BUILD" > sw-build.js
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

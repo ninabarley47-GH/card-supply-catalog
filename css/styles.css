@@ -201,6 +201,68 @@ h6 {
   border-right: 1px solid var(--color-border);
 }
 
+.app-version {
+  margin-top: auto;
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-4);
+  color: var(--color-muted);
+  font-size: 0.75rem;
+}
+
+.app-version summary {
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.app-version[data-update-available="true"] summary {
+  color: var(--color-accent-dark);
+}
+
+.app-version[data-update-available="true"] summary::after {
+  content: " Update available";
+  display: block;
+  margin-top: var(--space-1);
+  font-weight: 850;
+}
+
+.app-version-details {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-3) 0;
+}
+
+.app-version-details div {
+  display: grid;
+  grid-template-columns: 3.25rem minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+.app-version-details dt {
+  font-weight: 800;
+}
+
+.app-version-details dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.version-update-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-accent-dark);
+  font: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 0.15rem;
+  cursor: pointer;
+}
+
+.version-message {
+  margin: var(--space-2) 0 0;
+}
+
 .nav-links {
   display: flex;
   flex-direction: column;

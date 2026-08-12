@@ -1,8 +1,12 @@
-const CACHE_NAME = "card-supply-catalog-v4";
+importScripts("./sw-build.js");
+
+const CACHE_NAME = `card-supply-catalog-${self.CSC_BUILD || "local"}`;
 const APP_SHELL = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
+  "./version.json",
+  "./sw-build.js",
   "./css/styles.css",
   "./js/app.js",
   "./js/add-dsp.js",
@@ -15,6 +19,7 @@ const APP_SHELL = [
   "./js/schema.js",
   "./js/settings.js",
   "./js/storage.js",
+  "./js/version.js",
   "./data/colors.json",
   "./data/paper-packs.json",
   "./assets/logo/app-logo.png"
@@ -65,6 +70,11 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("message", (event) => {
+  if (event.data?.type === "catalog:activate-update") {
+    self.skipWaiting();
+    return;
+  }
+
   if (event.data?.type === "catalog:get-service-worker-version") {
     event.ports?.[0]?.postMessage({ version: CACHE_NAME });
   }
