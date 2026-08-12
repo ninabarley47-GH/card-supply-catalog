@@ -1,0 +1,265 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #302d29;
+  background: #f5f1e9;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  width: min(76rem, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 3rem 0 5rem;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin-top: 0;
+}
+
+.page-header {
+  max-width: 48rem;
+  margin-bottom: 2rem;
+}
+
+.page-header h1 {
+  margin-bottom: 0.75rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1;
+}
+
+.page-header > p:last-child,
+.picker p,
+.status,
+.metadata,
+.card-preview-group p {
+  color: #69625a;
+}
+
+.eyebrow {
+  margin-bottom: 0.6rem;
+  color: #52786d;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid #d7d0c4;
+  border-radius: 0.9rem;
+  background: #fffdf9;
+  box-shadow: 0 0.35rem 1.5rem rgba(48, 45, 41, 0.06);
+}
+
+.picker h2,
+.picker p,
+.comparison-header p,
+.card-preview-group h4,
+.card-preview-group p {
+  margin-bottom: 0;
+}
+
+.picker h2 {
+  font-size: 1.1rem;
+}
+
+.picker p,
+.status,
+.metadata,
+.comparison-header p,
+.card-preview-group p {
+  font-size: 0.875rem;
+}
+
+.file-button {
+  flex: none;
+  padding: 0.75rem 1rem;
+  border-radius: 0.55rem;
+  color: white;
+  background: #52786d;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.file-button:hover {
+  background: #3f6259;
+}
+
+.file-button:focus-within {
+  outline: 3px solid rgba(82, 120, 109, 0.35);
+  outline-offset: 3px;
+}
+
+.file-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+}
+
+.status {
+  margin: 1rem 0;
+}
+
+.comparisons {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.comparison {
+  overflow: hidden;
+  border: 1px solid #d7d0c4;
+  border-radius: 0.9rem;
+  background: #fffdf9;
+}
+
+.comparison-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e5ded3;
+}
+
+.comparison-header h2 {
+  margin-bottom: 0.2rem;
+  overflow-wrap: anywhere;
+  font-size: 1.1rem;
+}
+
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.image-panel {
+  min-width: 0;
+  padding: 1.25rem;
+}
+
+.image-panel + .image-panel {
+  border-left: 1px solid #e5ded3;
+}
+
+.image-panel h3 {
+  margin-bottom: 0.25rem;
+  font-size: 1rem;
+}
+
+.metadata {
+  min-height: 1.3rem;
+  margin-bottom: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.image-stage {
+  display: grid;
+  place-items: center;
+  min-height: 26rem;
+  overflow: auto;
+  border: 1px solid #ddd6cb;
+  border-radius: 0.5rem;
+  background:
+    linear-gradient(45deg, #eeeae3 25%, transparent 25%),
+    linear-gradient(-45deg, #eeeae3 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #eeeae3 75%),
+    linear-gradient(-45deg, transparent 75%, #eeeae3 75%),
+    #faf8f4;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-size: 16px 16px;
+}
+
+.image-stage img {
+  display: block;
+}
+
+.original-stage img {
+  max-width: 100%;
+  max-height: 32rem;
+  object-fit: contain;
+}
+
+.thumbnail-stage img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+}
+
+.card-preview-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background: #f2eee7;
+}
+
+.card-preview-group h4 {
+  font-size: 0.875rem;
+}
+
+.card-preview {
+  flex: none;
+  width: 120px;
+  height: 77px;
+  overflow: hidden;
+  border: 1px solid rgba(47, 44, 40, 0.15);
+  border-radius: 0.35rem;
+  background: white;
+}
+
+.card-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.error {
+  margin: 0;
+  padding: 1rem 1.25rem;
+  color: #8b2f28;
+}
+
+@media (max-width: 48rem) {
+  main {
+    padding-top: 1.5rem;
+  }
+
+  .picker,
+  .card-preview-group {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .comparison-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .image-panel + .image-panel {
+    border-top: 1px solid #e5ded3;
+    border-left: 0;
+  }
+
+  .image-stage {
+    min-height: 18rem;
+  }
+}

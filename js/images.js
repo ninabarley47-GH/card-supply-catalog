@@ -1,4 +1,5 @@
 import { loadCatalogSetting } from "./storage.js";
+import { generateImageThumbnail } from "./thumbnails.js";
 
 const EMBEDDED_IMAGE_STORAGE_STRATEGY = "embedded-indexed-db";
 const LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY = "local-folder";
@@ -717,6 +718,10 @@ async function preparePatternForLocalFolderStorage(
   const imageBlob = patternObject.__imageFile || (await getBlobFromImageSource(patternObject.imageSrc));
   const writeResult = await writePatternImageFile(directoryHandle, paperPack, imageBlob, imageName);
 
+  if (patternObject.__imageFile && writeResult.wasCreated) {
+    await writeNewPatternThumbnail(writeResult.packDirectory, imageBlob, imageName);
+  }
+
   if (migrationStats && writeResult.wasCreated) {
     migrationStats.imagesAdded += 1;
   }
@@ -961,7 +966,13 @@ function formatPaperPackNameFromFolder(folderName) {
 }
 
 function isSupportedImageFileName(fileName) {
-  return /\.(jpe?g|png|webp|gif)$/i.test(String(fileName || ""));
+  const normalizedFileName = String(fileName || "");
+
+  return !isThumbnailImageFileName(normalizedFileName) && /\.(jpe?g|png|webp|gif)$/i.test(normalizedFileName);
+}
+
+function isThumbnailImageFileName(fileName) {
+  return /\.thumb\.jpe?g$/i.test(String(fileName || ""));
 }
 
 async function hydratePatternImageSource(patternEntry, directoryHandle) {
@@ -1148,8 +1159,27 @@ async function writePatternImageFile(directoryHandle, paperPack, imageFile, imag
 
   return {
     imagePath: `${packFolderName}/${imageName}`,
-    wasCreated: true
+    wasCreated: true,
+    packDirectory
   };
+}
+
+async function writeNewPatternThumbnail(packDirectory, sourceImage, imageName) {
+  try {
+    const thumbnailBlob = await generateImageThumbnail(sourceImage);
+    const thumbnailName = createThumbnailImageFileName(imageName);
+    const thumbnailHandle = await packDirectory.getFileHandle(thumbnailName, { create: true });
+    const thumbnailWritable = await thumbnailHandle.createWritable();
+
+    await thumbnailWritable.write(thumbnailBlob);
+    await thumbnailWritable.close();
+  } catch (error) {
+    console.warn("The full-resolution image was saved, but its thumbnail could not be created.", error);
+  }
+}
+
+function createThumbnailImageFileName(imageName) {
+  return `${String(imageName || "pattern").replace(/\.[^.]+$/, "")}.thumb.jpg`;
 }
 
 async function findExistingImageFileName(directoryHandle, imageName) {

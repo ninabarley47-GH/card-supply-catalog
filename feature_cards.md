@@ -20,9 +20,12 @@ Favor incremental changes over broad refactoring.
 # Navigation
 
 Left Nav
-- Library
-- Cards
+- Paper Library
+- Color Library
+- Card Library
 - Settings
+
+Version & build information
 
 # Phases
 
@@ -31,6 +34,10 @@ Phase 1
 Phase 2
     Gallery
 Phase 3
-    Storage
+    Initial image storage
 Phase 4
     Pack relationships
+Phase 5
+    Automatic thumbnail creating and image storage
+Phase 6
+    Card Gallery

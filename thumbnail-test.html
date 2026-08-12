@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CSC Thumbnail Quality Test</title>
+    <link rel="stylesheet" href="css/thumbnail-test.css">
+  </head>
+  <body>
+    <main>
+      <header class="page-header">
+        <p class="eyebrow">Temporary evaluation page</p>
+        <h1>CSC thumbnail quality test</h1>
+        <p>
+          Select local images to compare each source with a newly generated JPEG thumbnail.
+          Images remain in memory for this page only and are not saved or added to the catalog.
+        </p>
+      </header>
+
+      <section class="picker" aria-labelledby="picker-title">
+        <div>
+          <h2 id="picker-title">Choose test images</h2>
+          <p>PNG, JPEG, WebP, GIF, or other image formats supported by your browser.</p>
+        </div>
+        <label class="file-button">
+          Select images
+          <input id="image-files" type="file" accept="image/*" multiple>
+        </label>
+      </section>
+
+      <p id="status" class="status" role="status" aria-live="polite">
+        No images selected.
+      </p>
+      <section id="comparisons" class="comparisons" aria-label="Thumbnail comparisons"></section>
+    </main>
+
+    <template id="comparison-template">
+      <article class="comparison">
+        <header class="comparison-header">
+          <div>
+            <h2 data-file-name></h2>
+            <p data-size-change></p>
+          </div>
+        </header>
+
+        <div class="comparison-grid">
+          <section class="image-panel">
+            <h3>Original</h3>
+            <p class="metadata" data-original-metadata></p>
+            <div class="image-stage original-stage">
+              <img data-original-image alt="">
+            </div>
+          </section>
+
+          <section class="image-panel">
+            <h3>Generated thumbnail</h3>
+            <p class="metadata" data-thumbnail-metadata></p>
+            <div class="image-stage thumbnail-stage">
+              <img data-thumbnail-image alt="">
+            </div>
+
+            <div class="card-preview-group">
+              <div>
+                <h4>Approximate Paper Library card size</h4>
+                <p>120 × 77px display frame</p>
+              </div>
+              <div class="card-preview">
+                <img data-card-image alt="">
+              </div>
+            </div>
+          </section>
+        </div>
+      </article>
+    </template>
+
+    <script type="module" src="js/thumbnail-test.js"></script>
+  </body>
+</html>
