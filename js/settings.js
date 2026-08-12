@@ -224,7 +224,7 @@ function formatImageLinkRepairSummary(summary) {
     return repairedMessage;
   }
 
-  return `${repairedMessage} No matching image folder was found for: ${formatLimitedList(summary.packsUnresolved, 5)}.`;
+  return `${repairedMessage} No unique matching image folder could be identified for: ${formatLimitedList(summary.packsUnresolved, 5)}.`;
 }
 
 async function selectImageLibraryFolder({ paperPacks = [], status, health, onImageLibrarySelected, successPrefix }) {

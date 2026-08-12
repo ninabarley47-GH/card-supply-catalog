@@ -554,16 +554,65 @@ async function findPaperPackImageDirectoryForPack(directoryHandle, paperPack) {
     .map((pattern) => (pattern && typeof pattern === "object" ? pattern.imagePath : ""))
     .map((imagePath) => String(imagePath || "").split("/").filter(Boolean)[0])
     .filter(Boolean);
-  const candidateIds = [
-    ...new Set([...referencedFolderNames, paperPack.name, paperPack.id].filter(Boolean))
-  ];
+  const candidateIds = new Set(
+    [...referencedFolderNames, paperPack.name, paperPack.id].filter(Boolean).map(createId)
+  );
 
-  for (const candidateId of candidateIds) {
-    const packDirectory = await findPaperPackImageDirectory(directoryHandle, candidateId);
+  if (!directoryHandle.entries) {
+    for (const candidateId of candidateIds) {
+      const packDirectory = await findPaperPackImageDirectory(directoryHandle, candidateId);
 
-    if (packDirectory) {
-      return packDirectory;
+      if (packDirectory) {
+        return packDirectory;
+      }
     }
+
+    return null;
+  }
+
+  const directories = [];
+
+  for await (const [folderName, folderHandle] of directoryHandle.entries()) {
+    if (folderHandle.kind !== "directory") {
+      continue;
+    }
+
+    const images = await getImagesFromDirectory(folderHandle, folderName);
+
+    if (images.length > 0) {
+      directories.push({ handle: folderHandle, path: folderName, images });
+    }
+  }
+
+  const nameMatches = directories
+    .filter((directory) => candidateIds.has(createId(directory.path)))
+    .sort((firstDirectory, secondDirectory) => secondDirectory.images.length - firstDirectory.images.length);
+
+  if (nameMatches.length > 0) {
+    return nameMatches[0];
+  }
+
+  const expectedImageKeys = new Set(
+    (paperPack.patterns || [])
+      .map((pattern, index) => {
+        const patternObject = pattern && typeof pattern === "object" ? pattern : null;
+        return patternObject ? getFlexibleImageFileKey(createStoredImageFileName(patternObject, index)) : "";
+      })
+      .filter(Boolean)
+  );
+  const scoredDirectories = directories
+    .map((directory) => ({
+      ...directory,
+      matchCount: directory.images.filter((image) => expectedImageKeys.has(getFlexibleImageFileKey(image.name))).length
+    }))
+    .filter((directory) => directory.matchCount > 0)
+    .sort((firstDirectory, secondDirectory) => secondDirectory.matchCount - firstDirectory.matchCount);
+
+  if (
+    scoredDirectories.length > 0 &&
+    (scoredDirectories.length === 1 || scoredDirectories[0].matchCount > scoredDirectories[1].matchCount)
+  ) {
+    return scoredDirectories[0];
   }
 
   return null;
