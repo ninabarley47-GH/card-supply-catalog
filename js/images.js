@@ -10,6 +10,70 @@ export async function addPatternImageFiles(files) {
   return await Promise.all(imageFiles.map(readImageFileAsStoredImage));
 }
 
+export async function generateMissingImageThumbnails() {
+  const directoryHandle = await getWritableImageLibraryDirectoryHandle();
+
+  if (!directoryHandle) {
+    return {
+      ok: false,
+      summary: { imagesScanned: 0, thumbnailsCreated: 0, thumbnailsSkipped: 0, errors: [] }
+    };
+  }
+
+  const summary = { imagesScanned: 0, thumbnailsCreated: 0, thumbnailsSkipped: 0, errors: [] };
+  await generateMissingThumbnailsInDirectory(directoryHandle, "", summary);
+
+  return { ok: true, summary };
+}
+
+async function generateMissingThumbnailsInDirectory(directoryHandle, directoryPath, summary) {
+  const entries = [];
+
+  for await (const [entryName, entryHandle] of directoryHandle.entries()) {
+    entries.push([entryName, entryHandle]);
+  }
+
+  const fileNames = new Set(
+    entries
+      .filter(([, entryHandle]) => entryHandle.kind === "file")
+      .map(([entryName]) => entryName.toLocaleLowerCase())
+  );
+
+  for (const [entryName, entryHandle] of entries) {
+    const entryPath = directoryPath ? `${directoryPath}/${entryName}` : entryName;
+
+    if (entryHandle.kind === "directory") {
+      await generateMissingThumbnailsInDirectory(entryHandle, entryPath, summary);
+      continue;
+    }
+
+    if (!isSupportedImageFileName(entryName)) {
+      continue;
+    }
+
+    summary.imagesScanned += 1;
+    const thumbnailName = createThumbnailImageFileName(entryName);
+
+    if (fileNames.has(thumbnailName.toLocaleLowerCase())) {
+      summary.thumbnailsSkipped += 1;
+      continue;
+    }
+
+    try {
+      const sourceImage = await entryHandle.getFile();
+      const thumbnailBlob = await generateImageThumbnail(sourceImage);
+      const thumbnailHandle = await directoryHandle.getFileHandle(thumbnailName, { create: true });
+      const writable = await thumbnailHandle.createWritable();
+
+      await writable.write(thumbnailBlob);
+      await writable.close();
+      summary.thumbnailsCreated += 1;
+    } catch (error) {
+      summary.errors.push(entryPath);
+    }
+  }
+}
+
 export async function choosePatternImagesFromLibrary() {
   if (!("showOpenFilePicker" in window)) {
     return {

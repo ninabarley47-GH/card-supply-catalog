@@ -208,6 +208,7 @@
                 <button class="button" type="button" data-reconnect-image-library>Reconnect Image Folder</button>
                 <button class="button" type="button" data-check-image-library>Check Image Library</button>
                 <button class="button" type="button" data-repair-image-library>Repair Image Links</button>
+                <button class="button" type="button" data-generate-missing-thumbnails>Generate Missing Thumbnails</button>
                 <button class="button" type="button" data-migrate-image-library>Move Images to Folder</button>
               </div>
               <details class="settings-help">
@@ -217,6 +218,10 @@
               <details class="settings-help">
                 <summary>What does Repair Image Links do?</summary>
                 <p>Rescans matching paper-pack folders, repairs broken image references, and reconnects fallback backup images to files already in the selected folder. It does not copy, overwrite, or delete image files.</p>
+              </details>
+              <details class="settings-help">
+                <summary>What does Generate Missing Thumbnails do?</summary>
+                <p>Scans the selected folder and its subfolders, leaves every existing <code>.thumb.jpg</code> unchanged, and creates thumbnails only where they are missing.</p>
               </details>
               <p class="settings-message" data-image-library-status aria-live="polite">Checking image folder support...</p>
               <div class="image-library-health" data-image-library-health aria-live="polite"></div>

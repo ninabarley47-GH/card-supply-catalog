@@ -1,5 +1,6 @@
 import {
   checkImageLibraryHealth,
+  generateMissingImageThumbnails,
   migratePaperPackImagesToLocalFolder,
   repairBrokenPaperPackImageLinks
 } from "./images.js";
@@ -88,6 +89,7 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
   const reconnectButton = document.querySelector("[data-reconnect-image-library]");
   const checkButton = document.querySelector("[data-check-image-library]");
   const repairButton = document.querySelector("[data-repair-image-library]");
+  const generateThumbnailsButton = document.querySelector("[data-generate-missing-thumbnails]");
   const migrateButton = document.querySelector("[data-migrate-image-library]");
   const status = document.querySelector("[data-image-library-status]");
   const health = document.querySelector("[data-image-library-health]");
@@ -109,6 +111,9 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
     }
     if (migrateButton) {
       migrateButton.disabled = true;
+    }
+    if (generateThumbnailsButton) {
+      generateThumbnailsButton.disabled = true;
     }
     renderImageLibraryStatus(
       status,
@@ -192,6 +197,35 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
       renderImageLibraryStatus(status, "Image links and fallback images could not be repaired.", "error");
     } finally {
       repairButton.disabled = false;
+    }
+  });
+
+  generateThumbnailsButton?.addEventListener("click", async () => {
+    generateThumbnailsButton.disabled = true;
+    renderImageLibraryStatus(status, "Scanning the selected folder for missing thumbnails...", "");
+
+    try {
+      const result = await generateMissingImageThumbnails();
+
+      if (!result.ok) {
+        renderImageLibraryStatus(status, "Reconnect the image folder before generating thumbnails.", "error");
+        return;
+      }
+
+      const { imagesScanned, thumbnailsCreated, thumbnailsSkipped, errors } = result.summary;
+      const errorMessage = errors.length > 0
+        ? ` ${errors.length} image${errors.length === 1 ? "" : "s"} could not be processed.`
+        : "";
+      renderImageLibraryStatus(
+        status,
+        `${imagesScanned} image${imagesScanned === 1 ? "" : "s"} scanned. ${thumbnailsCreated} missing thumbnail${thumbnailsCreated === 1 ? "" : "s"} created; ${thumbnailsSkipped} existing thumbnail${thumbnailsSkipped === 1 ? "" : "s"} left unchanged.${errorMessage}`,
+        errors.length > 0 ? "error" : "success"
+      );
+      await onImagesMigrated?.();
+    } catch (error) {
+      renderImageLibraryStatus(status, "Missing thumbnails could not be generated.", "error");
+    } finally {
+      generateThumbnailsButton.disabled = false;
     }
   });
 
