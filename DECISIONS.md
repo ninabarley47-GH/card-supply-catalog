@@ -265,6 +265,24 @@ IndexedDB is the canonical writable store for paper-pack records, deletion marke
 
 Provide a feature where you can load backup files incrementally. This allows a user to leverage another user's DSP creation in the app without overlaying any tagging or ownership they've already done.
 
+# Decision 30
+## Card Library Decisions
+1. no card titles
+2. card image is the primary visual identifier
+3. dateCreated, defaulting to today
+4. 5. card size, with common presets plus custom dimensions such as 5.5" × 5.5"
+6. tags handle occasion/style/technique rather than separate fields
+7. paperPackIds array
+8. colorIds array
+9. favorites
+10. Card Library grid, similar to paper pack grid
+11. Card Detail opens in the right-side panel, like Paper Detail
+12. Add Card uses a top button, similar to add color and add paper
+13. When adding card image, tags and paper pack info, it should show up in the right panel, like paper detail.
+14. paper-pack selection should ultimately come from the real catalog
+cards and paper packs should eventually link in both directions
+card images should use the same folder-backed + thumbnail methodology you’ve now established for paper images
+
 # Permission Notes
 ## The File System Access API requires:
 secure context, generally HTTPS or localhost

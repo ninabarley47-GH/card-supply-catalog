@@ -43,3 +43,20 @@ Phase 6
     Automatic thumbnail creation and image storage
 Phase 7
     Card Gallery
+
+## CSC v0.2.1 — Paper Library Improvements
+
+### New
+- Added thumbnail generation and thumbnail-first loading for Paper Library images
+- Paper pack cards now show up to 12 patterns by default, with an option to expand
+- Added additional sort options, including name, owner, and release year in ascending or descending order
+- Added visible version/build information for troubleshooting and update checks
+- Imports can now add only new paper packs without replacing packs already in the catalog
+
+### Fixed
+- Fixed duplicate folders being created by Move Images to Folder
+- Improved image-folder and thumbnail hydration behavior
+
+### Notes
+- Existing full-resolution images remain unchanged
+- Paper Library falls back to full-resolution images when thumbnails are unavailable
