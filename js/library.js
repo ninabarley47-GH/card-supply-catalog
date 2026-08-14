@@ -445,6 +445,7 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
   const clearAllButton = document.querySelector("[data-library-clear-all]");
   const clearTagsButton = document.querySelector("[data-library-clear-tags]");
   const clearColorsButton = document.querySelector("[data-library-clear-colors]");
+  const sortControl = document.querySelector("[data-library-sort]");
   const tagFilter = document.querySelector("[data-library-tag-filters]");
   const colorFilter = document.querySelector("[data-library-color-filters]");
 
@@ -465,7 +466,8 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
       query: filterState.query,
       selectedTags: filterState.selectedTags,
       selectedColors: filterState.selectedColors,
-      totalCount: paperPacks.length
+      totalCount: paperPacks.length,
+      sortOrder: sortControl?.value || "name-asc"
     });
 
     if (clearAllButton) {
@@ -513,6 +515,7 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
   });
   tagFilter?.addEventListener("change", renderCurrent);
   colorFilter?.addEventListener("change", renderCurrent);
+  sortControl?.addEventListener("change", renderCurrent);
   form.addEventListener("submit", (event) => event.preventDefault());
 
   return {
@@ -851,10 +854,12 @@ function normalizeFilterText(value) {
 }
 
 function renderPaperPackLibrary(container, paperPacks, colorsById, options = {}) {
-  const availablePaperPacks = sortPaperPacksForLibrary(
-    paperPacks.filter((paperPack) => !isPaperPackUsedUp(paperPack))
+  const sortOrder = options.sortOrder || "name-asc";
+  const availablePaperPacks = sortPaperPacks(
+    paperPacks.filter((paperPack) => !isPaperPackUsedUp(paperPack)),
+    sortOrder
   );
-  const usedUpPaperPacks = sortPaperPacksAlphabetically(paperPacks.filter(isPaperPackUsedUp));
+  const usedUpPaperPacks = sortPaperPacks(paperPacks.filter(isPaperPackUsedUp), sortOrder);
 
   updateLibraryResultCount({
     availableCount: availablePaperPacks.length,
@@ -945,27 +950,46 @@ function createUsedUpPaperPackSection(paperPacks, colorsById) {
   return section;
 }
 
-function sortPaperPacksForLibrary(paperPacks) {
-  const recentlyAdded = [];
-  const remaining = [];
+function sortPaperPacks(paperPacks, sortOrder = "name-asc") {
+  const [field, direction] = String(sortOrder).split("-");
+  const multiplier = direction === "desc" ? -1 : 1;
 
-  for (const paperPack of paperPacks) {
-    if (isRecentlyAddedPaperPack(paperPack)) {
-      recentlyAdded.push(paperPack);
+  return [...paperPacks].sort((firstPack, secondPack) => {
+    let comparison = 0;
+
+    if (field === "release") {
+      comparison = compareReleaseYears(firstPack.releaseYear, secondPack.releaseYear, multiplier);
     } else {
-      remaining.push(paperPack);
+      const firstValue = field === "owner" ? firstPack.owner : firstPack.name;
+      const secondValue = field === "owner" ? secondPack.owner : secondPack.name;
+      comparison = compareTextValues(firstValue, secondValue) * multiplier;
     }
-  }
 
-  return [...sortPaperPacksAlphabetically(recentlyAdded), ...sortPaperPacksAlphabetically(remaining)];
+    return comparison || compareTextValues(firstPack.name, secondPack.name);
+  });
 }
 
-function sortPaperPacksAlphabetically(paperPacks) {
-  return [...paperPacks].sort((firstPack, secondPack) =>
-    String(firstPack.name || "").localeCompare(String(secondPack.name || ""), undefined, {
-      sensitivity: "base"
-    })
-  );
+function compareReleaseYears(firstYear, secondYear, multiplier) {
+  const firstValue = Number(firstYear);
+  const secondValue = Number(secondYear);
+  const firstIsValid = Number.isFinite(firstValue);
+  const secondIsValid = Number.isFinite(secondValue);
+
+  if (firstIsValid && secondIsValid) {
+    return (firstValue - secondValue) * multiplier;
+  }
+
+  if (firstIsValid !== secondIsValid) {
+    return firstIsValid ? -1 : 1;
+  }
+
+  return 0;
+}
+
+function compareTextValues(firstValue, secondValue) {
+  return String(firstValue || "").localeCompare(String(secondValue || ""), undefined, {
+    sensitivity: "base"
+  });
 }
 
 function renderEmptyPaperPackLibrary(

@@ -46,6 +46,19 @@
             <a class="nav-link" href="#settings" data-nav-link>Settings</a>
           </div>
 
+          <section class="library-sort" aria-labelledby="library-sort-heading">
+            <h3 id="library-sort-heading">Sort</h3>
+            <label for="library-sort-order">Order</label>
+            <select id="library-sort-order" data-library-sort>
+              <option value="name-asc" selected>Name: A–Z</option>
+              <option value="name-desc">Name: Z–A</option>
+              <option value="release-asc">Release date: Oldest first</option>
+              <option value="release-desc">Release date: Newest first</option>
+              <option value="owner-asc">Owner: A–Z</option>
+              <option value="owner-desc">Owner: Z–A</option>
+            </select>
+          </section>
+
           <form class="search-form nav-search" role="search" aria-label="Search catalog" data-library-search-form>
             <div class="filter-heading-row">
               <h3>Filter</h3>
