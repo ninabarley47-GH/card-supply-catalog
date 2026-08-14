@@ -573,30 +573,43 @@ function renderImageLibraryHealth(container, summary) {
     const title = document.createElement("p");
     title.textContent = "Missing references";
 
-    const folderSummary = document.createElement("p");
-    const missingImageFolders = getMissingImageFolders(summary.missingImages);
-    folderSummary.textContent = `Folders needing attention: ${formatLimitedList(missingImageFolders, 8)}.`;
-
     const list = document.createElement("ul");
     list.className = "image-library-missing-list";
 
-    for (const missingImage of summary.missingImages.slice(0, 5)) {
+    for (const paperPack of groupMissingImagesByPaperPack(summary.missingImages)) {
       const item = document.createElement("li");
-      item.textContent = `${missingImage.packName}: ${missingImage.imagePath || missingImage.patternName}`;
+      item.textContent = `${paperPack.packName} (${paperPack.imageCount} missing image${paperPack.imageCount === 1 ? "" : "s"})`;
       list.append(item);
     }
 
-    if (summary.missingImages.length > 5) {
-      const item = document.createElement("li");
-      item.textContent = `${summary.missingImages.length - 5} more missing image reference${summary.missingImages.length - 5 === 1 ? "" : "s"}.`;
-      list.append(item);
-    }
-
-    missing.append(title, folderSummary, list);
+    missing.append(title, list);
     children.push(missing);
   }
 
   container.replaceChildren(...children);
+}
+
+function groupMissingImagesByPaperPack(missingImages = []) {
+  const paperPacksById = new Map();
+
+  for (const missingImage of missingImages) {
+    const packName = missingImage.packName || "Untitled pack";
+    const packId = missingImage.packId || packName;
+    const existingPaperPack = paperPacksById.get(packId);
+
+    if (existingPaperPack) {
+      existingPaperPack.imageCount += 1;
+    } else {
+      paperPacksById.set(packId, { packName, imageCount: 1 });
+    }
+  }
+
+  return [...paperPacksById.values()].sort((firstPack, secondPack) =>
+    firstPack.packName.localeCompare(secondPack.packName, undefined, {
+      numeric: true,
+      sensitivity: "base"
+    })
+  );
 }
 
 function createHealthItem(label, value) {

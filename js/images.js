@@ -731,6 +731,7 @@ export async function deletePaperPackImages(paperPack) {
 
 function createMissingImageEntry(paperPack, patternObject, index) {
   return {
+    packId: paperPack.id || paperPack.name || "untitled-pack",
     packName: paperPack.name || "Untitled pack",
     patternName: patternObject.imageName || `Pattern ${index + 1}`,
     imagePath: patternObject.imagePath || ""
