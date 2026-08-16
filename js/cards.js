@@ -1,49 +1,4 @@
-const SAMPLE_CARDS = [
-  {
-    id: 'floral-friendship',
-    dateCreated: '2026-07-12',
-    tags: ['Friendship', 'Floral', 'Magenta'],
-    paperPackIds: [],
-    colorIds: ['berry-burst', 'lost-lagoon', 'lemon-lolly'],
-    size: { width: 5.5, height: 4.25 },
-    thumbnailImagePath: 'assets/cards/IMG_7797.JPEG',
-    detailImagePath: 'assets/cards/IMG_7797-detail.webp',
-    favorite: true
-  },
-  {
-    id: 'summer-cheers',
-    dateCreated: '2026-07-18',
-    tags: ['Cheers', 'Fun Fold', 'Pink'],
-    paperPackIds: [],
-    colorIds: ['melon-mambo', 'flirty-flamingo', 'lemon-lolly'],
-    size: { width: 5.5, height: 8 },
-    thumbnailImagePath: 'assets/cards/IMG_5309.JPG',
-    detailImagePath: 'assets/cards/IMG_5309-detail.webp',
-    favorite: false
-  },
-  {
-    id: 'woodland-music',
-    dateCreated: '2026-07-24',
-    tags: ['Woodland', 'Music', 'Interactive'],
-    paperPackIds: [],
-    colorIds: ['berry-burst', 'balmy-blue', 'pecan-pie'],
-    size: { width: 6, height: 6 },
-    thumbnailImagePath: 'assets/cards/IMG_5464.JPEG',
-    detailImagePath: 'assets/cards/IMG_5464-detail.webp',
-    favorite: true
-  },
-  {
-    id: 'rose-birthday',
-    dateCreated: '2026-07-30',
-    tags: ['Birthday', 'Roses', 'Gold'],
-    paperPackIds: [],
-    colorIds: ['calypso-coral', 'petal-pink', 'garden-green'],
-    size: { width: 4.25, height: 5.5 },
-    thumbnailImagePath: 'assets/cards/IMG_3109.JPEG',
-    detailImagePath: 'assets/cards/IMG_3109-detail.webp',
-    favorite: false
-  }
-];
+import { loadSavedCards, saveCard } from './storage.js';
 
 const CARD_SIZE_PRESETS = {
   'a2-portrait': { label: 'A2 Portrait — 4.25 × 5.5 inches', width: 4.25, height: 5.5 },
@@ -54,7 +9,7 @@ const CARD_SIZE_PRESETS = {
   custom: { label: 'Custom', width: '', height: '' }
 };
 
-export function initializeCardLibrary() {
+export async function initializeCardLibrary() {
   const gallery = document.querySelector('[data-card-library]');
   const toolbar = gallery?.closest('#cards')?.querySelector('.library-toolbar');
 
@@ -65,12 +20,21 @@ export function initializeCardLibrary() {
   const detailView = createCardDetailView();
   const addCardView = createAddCardView();
   const addCardButton = createAddCardButton();
+  const cards = [];
   let activeTile = null;
 
-  gallery.replaceChildren(...SAMPLE_CARDS.map(createCardTile));
+  renderCardLibrary(gallery, cards);
   toolbar.append(addCardButton);
   document.body.append(detailView.overlay, addCardView.overlay);
   loadAvailablePaperPacks(addCardView);
+
+  try {
+    cards.push(...await loadSavedCards());
+    sortCards(cards);
+    renderCardLibrary(gallery, cards);
+  } catch (error) {
+    renderCardLibraryError(gallery);
+  }
 
   addCardButton.addEventListener('click', () => openAddCardView(addCardView));
   addCardView.close.addEventListener('click', () => closeAddCardView(addCardView, addCardButton));
@@ -85,7 +49,7 @@ export function initializeCardLibrary() {
     const tile = event.target.closest('[data-card-id]');
 
     if (tile) {
-      openCardDetail(detailView, findCard(tile.dataset.cardId), tile);
+      openCardDetail(detailView, findCard(cards, tile.dataset.cardId), tile, cards);
       activeTile = tile;
     }
   });
@@ -99,7 +63,7 @@ export function initializeCardLibrary() {
 
     if (tile) {
       event.preventDefault();
-      openCardDetail(detailView, findCard(tile.dataset.cardId), tile);
+      openCardDetail(detailView, findCard(cards, tile.dataset.cardId), tile, cards);
       activeTile = tile;
     }
   });
@@ -108,6 +72,23 @@ export function initializeCardLibrary() {
   detailView.overlay.addEventListener('click', (event) => {
     if (event.target === detailView.overlay) {
       closeCardDetail(detailView, activeTile);
+    }
+  });
+
+  addCardView.form.addEventListener('submit', async () => {
+    const card = createCardRecord(addCardView);
+    addCardView.save.disabled = true;
+
+    try {
+      await saveCard(card);
+      cards.push(card);
+      sortCards(cards);
+      renderCardLibrary(gallery, cards);
+      closeAddCardView(addCardView, addCardButton);
+    } catch (error) {
+      window.alert('The card could not be saved.');
+    } finally {
+      addCardView.save.disabled = false;
     }
   });
 
@@ -249,9 +230,6 @@ function createAddCardView() {
     if (button) {
       removeTemporaryPaperPack(addCardView, button.dataset.removePaperPack);
     }
-  });
-  form.addEventListener('submit', () => {
-    console.log('Temporary card', createTemporaryCard(addCardView));
   });
   resetAddCardForm(addCardView);
   return addCardView;
@@ -428,8 +406,11 @@ function getLocalDateValue() {
   return `${year}-${month}-${day}`;
 }
 
-function createTemporaryCard(addCardView) {
+function createCardRecord(addCardView) {
+  const createdAt = new Date().toISOString();
+
   return {
+    id: createCardId(createdAt),
     dateCreated: addCardView.dateCreated.value,
     size: {
       preset: addCardView.sizePreset.value,
@@ -439,8 +420,43 @@ function createTemporaryCard(addCardView) {
     tags: [],
     paperPackIds: [...addCardView.paperPackIds],
     colorIds: [],
-    favorite: false
+    favorite: false,
+    createdAt,
+    updatedAt: createdAt
   };
+}
+
+function createCardId(createdAt) {
+  const randomPart = globalThis.crypto?.randomUUID?.();
+  return randomPart
+    ? `card-${randomPart}`
+    : `card-${createdAt.replace(/\D/g, '')}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function sortCards(cards) {
+  cards.sort((first, second) =>
+    String(second.dateCreated).localeCompare(String(first.dateCreated)) ||
+    String(second.createdAt || '').localeCompare(String(first.createdAt || ''))
+  );
+}
+
+function renderCardLibrary(gallery, cards) {
+  if (cards.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'card-library-empty';
+    empty.textContent = 'No cards have been added yet.';
+    gallery.replaceChildren(empty);
+    return;
+  }
+
+  gallery.replaceChildren(...cards.map(createCardTile));
+}
+
+function renderCardLibraryError(gallery) {
+  const error = document.createElement('p');
+  error.className = 'card-library-empty';
+  error.textContent = 'Cards could not be loaded.';
+  gallery.replaceChildren(error);
 }
 
 function createCardTile(card, index) {
@@ -450,15 +466,20 @@ function createCardTile(card, index) {
   tile.setAttribute('role', 'button');
   tile.setAttribute('tabindex', '0');
   tile.setAttribute('aria-haspopup', 'dialog');
-  tile.setAttribute('aria-label', `View details for ${card.tags[0]} card`);
+  tile.setAttribute('aria-label', `View card created ${card.dateCreated}`);
 
   const image = document.createElement('div');
-  image.className = `card-library-placeholder card-library-placeholder-${index + 1}`;
+  image.className = `card-library-placeholder card-library-placeholder-${getCardPlaceholderNumber(index)}`;
   applyCardMockupSize(image, card);
 
   const cardImage = createCardImage(card, 'card-library-image', card.thumbnailImagePath);
-  cardImage.loading = 'lazy';
-  image.append(cardImage);
+
+  if (cardImage) {
+    cardImage.loading = 'lazy';
+    image.append(cardImage);
+  } else {
+    image.append(createMissingCardImageMessage());
+  }
 
   if (card.favorite) {
     const favorite = document.createElement('span');
@@ -482,8 +503,8 @@ function createCardTile(card, index) {
   return tile;
 }
 
-function findCard(cardId) {
-  return SAMPLE_CARDS.find((card) => card.id === cardId);
+function findCard(cards, cardId) {
+  return cards.find((card) => card.id === cardId);
 }
 
 function createCardDetailView() {
@@ -524,12 +545,12 @@ function createCardDetailView() {
   return { overlay, panel, close, body };
 }
 
-function openCardDetail(detailView, card, tile) {
+function openCardDetail(detailView, card, tile, cards) {
   if (!card) {
     return;
   }
 
-  const cardIndex = SAMPLE_CARDS.indexOf(card);
+  const cardIndex = cards.indexOf(card);
   detailView.body.replaceChildren(createCardDetailContent(card, cardIndex));
   detailView.overlay.hidden = false;
   detailView.close.focus();
@@ -553,9 +574,10 @@ function createCardDetailContent(card, index) {
   content.className = 'card-detail-content';
 
   const image = document.createElement('div');
-  image.className = `card-detail-placeholder card-library-placeholder-${index + 1}`;
+  image.className = `card-detail-placeholder card-library-placeholder-${getCardPlaceholderNumber(index)}`;
   applyCardMockupSize(image, card);
-  image.append(createCardImage(card, 'card-detail-image', card.detailImagePath, card.thumbnailImagePath));
+  const cardImage = createCardImage(card, 'card-detail-image', card.detailImagePath, card.thumbnailImagePath);
+  image.append(cardImage || createMissingCardImageMessage());
 
   const metadata = document.createElement('div');
   metadata.className = 'card-detail-metadata';
@@ -588,10 +610,14 @@ function applyCardMockupSize(element, card) {
 }
 
 function createCardImage(card, className, imagePath, fallbackPath = null) {
+  if (!imagePath) {
+    return null;
+  }
+
   const image = document.createElement('img');
   image.className = className;
   image.src = imagePath;
-  image.alt = `${card.tags[0]} handmade card, ${card.size.width} by ${card.size.height} inches`;
+  image.alt = `Handmade card, ${card.size.width} by ${card.size.height} inches`;
   image.decoding = 'async';
 
   if (fallbackPath) {
@@ -601,6 +627,17 @@ function createCardImage(card, className, imagePath, fallbackPath = null) {
   }
 
   return image;
+}
+
+function getCardPlaceholderNumber(index) {
+  return (Math.max(0, index) % 4) + 1;
+}
+
+function createMissingCardImageMessage() {
+  const message = document.createElement('span');
+  message.className = 'card-image-missing';
+  message.textContent = 'No image yet';
+  return message;
 }
 
 function createCardFacts(card) {

@@ -65,7 +65,7 @@ Every module should have one clear job. The current modules are:
 | `color-form.js` | Add Color workflow, including missing-color handoff from Add/Edit DSP |
 | `images.js` | Embedded images, selected-folder access, relative paths, health checks, migration, and link repair |
 | `settings.js` | Image-library settings, setup status, and bulk owner changes |
-| `storage.js` | IndexedDB persistence, base-data merging, deletion markers, and legacy localStorage migration |
+| `storage.js` | IndexedDB persistence for paper packs, cards, colors, settings, base-data merging, deletion markers, and legacy localStorage migration |
 | `backup.js` | User-triggered standard/iPad export and import |
 | `cover-sheet.js` | Printable 6-by-6-inch cover-sheet generation |
 | `detail.js` | Detail-panel dismissal behavior |
@@ -78,7 +78,7 @@ Every module should have one clear job. The current modules are:
 The application has three storage layers:
 
 1. `data/paper-packs.json` and `data/colors.json` provide version-controlled base data.
-2. IndexedDB stores writable paper packs, deleted base-pack IDs, user-added colors, and settings. Saved browser records are merged with base JSON at startup.
+2. IndexedDB stores writable paper packs, cards, deleted base-pack IDs, user-added colors, and settings. Saved paper-pack records are merged with base JSON at startup; cards are user-created records with no bundled base-data layer.
 3. A user-selected image-library folder is the preferred durable location for image files on supported desktop browsers. Paper-pack records store relative `imagePath` values. Embedded data URLs in IndexedDB remain the compatibility fallback.
 
 Directory handles are permission-scoped browser objects and may require the user to reconnect or grant access again. A cloud-synced local folder such as OneDrive can be selected, but the app does not call a cloud-storage API directly.

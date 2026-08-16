@@ -1,11 +1,12 @@
 import { addCatalogSchemaVersion } from "./schema.js";
 
 const DATABASE_NAME = "card-supply-catalog";
-const DATABASE_VERSION = 3;
+const DATABASE_VERSION = 4;
 const PAPER_PACKS_STORE = "paperPacks";
 const DELETED_PAPER_PACK_IDS_STORE = "deletedPaperPackIds";
 const COLORS_STORE = "colors";
 const SETTINGS_STORE = "settings";
+const CARDS_STORE = "cards";
 const LEGACY_PAPER_PACKS_STORAGE_KEY = "card-supply-catalog.paperPacks";
 const LEGACY_DELETED_PAPER_PACK_IDS_STORAGE_KEY = "card-supply-catalog.deletedPaperPackIds";
 const LEGACY_MIGRATION_STORAGE_KEY = "card-supply-catalog.indexedDbMigrationComplete";
@@ -76,6 +77,23 @@ export async function saveColor(color) {
 
   await writeTransaction(database, [COLORS_STORE], (transaction) => {
     transaction.objectStore(COLORS_STORE).put(color);
+  });
+}
+
+export async function loadSavedCards() {
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
+  const cards = await getAllFromStore(database, CARDS_STORE);
+
+  return cards.filter(isCard);
+}
+
+export async function saveCard(card) {
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
+
+  await writeTransaction(database, [CARDS_STORE], (transaction) => {
+    transaction.objectStore(CARDS_STORE).put(addCatalogSchemaVersion(card));
   });
 }
 
@@ -159,6 +177,10 @@ function openCatalogDatabase() {
 
       if (!database.objectStoreNames.contains(SETTINGS_STORE)) {
         database.createObjectStore(SETTINGS_STORE, { keyPath: "id" });
+      }
+
+      if (!database.objectStoreNames.contains(CARDS_STORE)) {
+        database.createObjectStore(CARDS_STORE, { keyPath: "id" });
       }
     });
 
@@ -357,5 +379,20 @@ function isColor(color) {
     Array.isArray(color.aliases) &&
     color.products &&
     typeof color.products === "object"
+  );
+}
+
+function isCard(card) {
+  return (
+    card &&
+    typeof card.id === "string" &&
+    typeof card.dateCreated === "string" &&
+    card.size &&
+    Number.isFinite(card.size.width) &&
+    Number.isFinite(card.size.height) &&
+    Array.isArray(card.tags) &&
+    Array.isArray(card.paperPackIds) &&
+    Array.isArray(card.colorIds) &&
+    typeof card.favorite === "boolean"
   );
 }
