@@ -4,6 +4,7 @@ import { generateImageThumbnail } from "./thumbnails.js";
 const EMBEDDED_IMAGE_STORAGE_STRATEGY = "embedded-indexed-db";
 const LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY = "local-folder";
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
+const RESERVED_CARD_IMAGE_DIRECTORY_ID = "cards";
 
 export async function addPatternImageFiles(files) {
   const imageFiles = files.filter((file) => file.type.startsWith("image/"));
@@ -211,7 +212,7 @@ export async function scanImageLibraryPaperPackFolders() {
     const folders = [];
 
     for await (const [folderName, folderHandle] of directoryHandle.entries()) {
-      if (folderHandle.kind !== "directory") {
+      if (folderHandle.kind !== "directory" || createId(folderName) === RESERVED_CARD_IMAGE_DIRECTORY_ID) {
         continue;
       }
 

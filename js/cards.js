@@ -1,4 +1,12 @@
 import { loadSavedCards, saveCard } from './storage.js';
+import {
+  clearSelectedCardImage,
+  createSelectedCardImage,
+  getCardDetailImageSource,
+  getCardLibraryImageSource,
+  hydrateCardImageSources,
+  prepareCardImageForSave
+} from './card-images.js';
 
 const CARD_SIZE_PRESETS = {
   'a2-portrait': { label: 'A2 Portrait — 4.25 × 5.5 inches', width: 4.25, height: 5.5 },
@@ -30,6 +38,7 @@ export async function initializeCardLibrary() {
 
   try {
     cards.push(...await loadSavedCards());
+    await hydrateCardImageSources(cards);
     sortCards(cards);
     renderCardLibrary(gallery, cards);
   } catch (error) {
@@ -80,11 +89,17 @@ export async function initializeCardLibrary() {
     addCardView.save.disabled = true;
 
     try {
-      await saveCard(card);
-      cards.push(card);
+      const imageResult = await prepareCardImageForSave(card, addCardView.selectedImage);
+      await saveCard(imageResult.card);
+      await hydrateCardImageSources([imageResult.card]);
+      cards.push(imageResult.card);
       sortCards(cards);
       renderCardLibrary(gallery, cards);
       closeAddCardView(addCardView, addCardButton);
+
+      if (imageResult.usedFallback) {
+        window.alert('The card was saved, but its image was kept in browser storage because the image folder was unavailable.');
+      }
     } catch (error) {
       window.alert('The card could not be saved.');
     } finally {
@@ -146,9 +161,7 @@ function createAddCardView() {
 
   const layout = document.createElement('div');
   layout.className = 'card-add-form-layout';
-  const futureImage = document.createElement('div');
-  futureImage.className = 'card-add-future-image';
-  futureImage.textContent = 'Future card image area';
+  const imagePicker = createCardImagePicker();
 
   const controls = document.createElement('div');
   controls.className = 'card-add-controls';
@@ -179,7 +192,7 @@ function createAddCardView() {
   );
   const paperPackPicker = createPaperPackPicker();
   controls.append(paperPackPicker.section);
-  layout.append(futureImage, controls);
+  layout.append(imagePicker.container, controls);
   content.append(layout);
 
   const actions = document.createElement('div');
@@ -208,6 +221,11 @@ function createAddCardView() {
     sizePreset,
     width,
     height,
+    imageInput: imagePicker.input,
+    imagePreview: imagePicker.preview,
+    imagePlaceholder: imagePicker.placeholder,
+    imageMessage: imagePicker.message,
+    selectedImage: null,
     paperPackSearch: paperPackPicker.search,
     paperPackResults: paperPackPicker.results,
     paperPackSelected: paperPackPicker.selected,
@@ -216,6 +234,24 @@ function createAddCardView() {
     paperPackIds: []
   };
   sizePreset.addEventListener('change', () => applyCardSizePreset(addCardView));
+  imagePicker.input.addEventListener('change', async () => {
+    const [file] = imagePicker.input.files || [];
+
+    if (!file) {
+      return;
+    }
+
+    clearSelectedCardImage(addCardView.selectedImage);
+
+    try {
+      addCardView.selectedImage = await createSelectedCardImage(file);
+      renderSelectedCardImage(addCardView);
+    } catch (error) {
+      addCardView.selectedImage = null;
+      imagePicker.input.value = '';
+      imagePicker.message.textContent = 'Choose a JPG, PNG, WebP, or GIF image.';
+    }
+  });
   paperPackPicker.search.addEventListener('input', () => renderPaperPackSearchResults(addCardView));
   paperPackPicker.results.addEventListener('click', (event) => {
     const button = event.target.closest('[data-add-paper-pack]');
@@ -258,6 +294,45 @@ function createAddCardField(labelText, control) {
   text.textContent = labelText;
   label.append(text, control);
   return label;
+}
+
+function createCardImagePicker() {
+  const container = document.createElement('section');
+  container.className = 'card-add-image-picker';
+  const previewFrame = document.createElement('div');
+  previewFrame.className = 'card-add-image-preview-frame';
+  const preview = document.createElement('img');
+  preview.className = 'card-add-image-preview';
+  preview.alt = 'Selected card preview';
+  preview.hidden = true;
+  const placeholder = document.createElement('p');
+  placeholder.className = 'card-add-image-placeholder';
+  placeholder.textContent = 'No image selected';
+  previewFrame.append(preview, placeholder);
+
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/jpeg,image/png,image/webp,image/gif';
+  input.hidden = true;
+  const choose = document.createElement('button');
+  choose.className = 'button';
+  choose.type = 'button';
+  choose.textContent = 'Choose Card Image';
+  choose.addEventListener('click', () => input.click());
+  const message = document.createElement('p');
+  message.className = 'card-add-image-message';
+  message.setAttribute('aria-live', 'polite');
+  container.append(previewFrame, input, choose, message);
+
+  return { container, input, preview, placeholder, message };
+}
+
+function renderSelectedCardImage(addCardView) {
+  const hasImage = Boolean(addCardView.selectedImage?.previewSrc);
+  addCardView.imagePreview.hidden = !hasImage;
+  addCardView.imagePlaceholder.hidden = hasImage;
+  addCardView.imagePreview.src = hasImage ? addCardView.selectedImage.previewSrc : '';
+  addCardView.imageMessage.textContent = hasImage ? addCardView.selectedImage.name : '';
 }
 
 function createDimensionInput(name) {
@@ -379,14 +454,17 @@ function renderSelectedPaperPacks(addCardView) {
 }
 
 function resetAddCardForm(addCardView) {
+  clearSelectedCardImage(addCardView.selectedImage);
   addCardView.form.reset();
   addCardView.dateCreated.value = getLocalDateValue();
   addCardView.sizePreset.value = 'a2-portrait';
   addCardView.paperPackIds = [];
+  addCardView.selectedImage = null;
   addCardView.paperPackSearch.value = '';
   applyCardSizePreset(addCardView);
   renderSelectedPaperPacks(addCardView);
   renderPaperPackSearchResults(addCardView);
+  renderSelectedCardImage(addCardView);
 }
 
 function applyCardSizePreset(addCardView) {
@@ -472,7 +550,7 @@ function createCardTile(card, index) {
   image.className = `card-library-placeholder card-library-placeholder-${getCardPlaceholderNumber(index)}`;
   applyCardMockupSize(image, card);
 
-  const cardImage = createCardImage(card, 'card-library-image', card.thumbnailImagePath);
+  const cardImage = createCardImage(card, 'card-library-image', getCardLibraryImageSource(card));
 
   if (cardImage) {
     cardImage.loading = 'lazy';
@@ -576,7 +654,12 @@ function createCardDetailContent(card, index) {
   const image = document.createElement('div');
   image.className = `card-detail-placeholder card-library-placeholder-${getCardPlaceholderNumber(index)}`;
   applyCardMockupSize(image, card);
-  const cardImage = createCardImage(card, 'card-detail-image', card.detailImagePath, card.thumbnailImagePath);
+  const cardImage = createCardImage(
+    card,
+    'card-detail-image',
+    getCardDetailImageSource(card),
+    getCardLibraryImageSource(card)
+  );
   image.append(cardImage || createMissingCardImageMessage());
 
   const metadata = document.createElement('div');

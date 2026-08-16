@@ -85,7 +85,7 @@ export async function loadSavedCards() {
   await migrateLegacyLocalStorage(database);
   const cards = await getAllFromStore(database, CARDS_STORE);
 
-  return cards.filter(isCard);
+  return cards.filter(isCard).map(normalizeCardForRuntime);
 }
 
 export async function saveCard(card) {
@@ -93,7 +93,7 @@ export async function saveCard(card) {
   await migrateLegacyLocalStorage(database);
 
   await writeTransaction(database, [CARDS_STORE], (transaction) => {
-    transaction.objectStore(CARDS_STORE).put(addCatalogSchemaVersion(card));
+    transaction.objectStore(CARDS_STORE).put(addCatalogSchemaVersion(normalizeCardForRuntime(card)));
   });
 }
 
@@ -380,6 +380,12 @@ function isColor(color) {
     color.products &&
     typeof color.products === "object"
   );
+}
+
+function normalizeCardForRuntime(card) {
+  const { selectedImage, imagePreviewSrc, imageThumbnailSrc, ...persistentCard } = card;
+
+  return persistentCard;
 }
 
 function isCard(card) {
