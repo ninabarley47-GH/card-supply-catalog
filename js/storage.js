@@ -384,8 +384,42 @@ function isColor(color) {
 
 function normalizeCardForRuntime(card) {
   const { selectedImage, imagePreviewSrc, imageThumbnailSrc, ...persistentCard } = card;
+  const { stampSet: legacyStampSet, ...cardWithoutLegacyStampSet } = persistentCard;
+  const tags = [];
+  const seenTags = new Set();
+  const stampSets = [];
+  const seenStampSets = new Set();
 
-  return persistentCard;
+  for (const tag of persistentCard.tags || []) {
+    const normalizedTag = String(tag || "").trim().replace(/\s+/g, " ");
+    const tagKey = normalizedTag.toLocaleLowerCase();
+
+    if (normalizedTag && !seenTags.has(tagKey)) {
+      tags.push(normalizedTag);
+      seenTags.add(tagKey);
+    }
+  }
+
+  const stampSetCandidates = [
+    ...(Array.isArray(persistentCard.stampSets) ? persistentCard.stampSets : []),
+    legacyStampSet
+  ];
+
+  for (const stampSet of stampSetCandidates) {
+    const normalizedStampSet = String(stampSet || "").trim().replace(/\s+/g, " ");
+    const stampSetKey = normalizedStampSet.toLocaleLowerCase();
+
+    if (normalizedStampSet && !seenStampSets.has(stampSetKey)) {
+      stampSets.push(normalizedStampSet);
+      seenStampSets.add(stampSetKey);
+    }
+  }
+
+  return {
+    ...cardWithoutLegacyStampSet,
+    tags,
+    stampSets
+  };
 }
 
 function isCard(card) {

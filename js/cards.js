@@ -85,6 +85,8 @@ export async function initializeCardLibrary() {
   });
 
   addCardView.form.addEventListener('submit', async () => {
+    addStampSetsFromInput(addCardView, false);
+    addCardTagsFromInput(addCardView, false);
     const card = createCardRecord(addCardView);
     addCardView.save.disabled = true;
 
@@ -181,6 +183,9 @@ function createAddCardView() {
   dimensions.className = 'card-add-dimensions';
   const width = createDimensionInput('width');
   const height = createDimensionInput('height');
+  const favorite = document.createElement('input');
+  favorite.type = 'checkbox';
+  favorite.name = 'favorite';
   dimensions.append(
     createAddCardField('Width (inches)', width),
     createAddCardField('Height (inches)', height)
@@ -188,8 +193,13 @@ function createAddCardView() {
   controls.append(
     createAddCardField('Date Created', dateCreated),
     createAddCardField('Card Size', sizePreset),
-    dimensions
+    dimensions,
+    createFavoriteField(favorite)
   );
+  const stampSetPicker = createStampSetPicker();
+  controls.append(stampSetPicker.section);
+  const tagPicker = createCardTagPicker();
+  controls.append(tagPicker.section);
   const paperPackPicker = createPaperPackPicker();
   controls.append(paperPackPicker.section);
   layout.append(imagePicker.container, controls);
@@ -221,6 +231,13 @@ function createAddCardView() {
     sizePreset,
     width,
     height,
+    favorite,
+    stampSetInput: stampSetPicker.input,
+    stampSetList: stampSetPicker.selected,
+    stampSets: [],
+    tagInput: tagPicker.input,
+    tagList: tagPicker.selected,
+    tags: [],
     imageInput: imagePicker.input,
     imagePreview: imagePicker.preview,
     imagePlaceholder: imagePicker.placeholder,
@@ -234,6 +251,34 @@ function createAddCardView() {
     paperPackIds: []
   };
   sizePreset.addEventListener('change', () => applyCardSizePreset(addCardView));
+  stampSetPicker.add.addEventListener('click', () => addStampSetsFromInput(addCardView));
+  stampSetPicker.input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ',') {
+      event.preventDefault();
+      addStampSetsFromInput(addCardView);
+    }
+  });
+  stampSetPicker.selected.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-remove-stamp-set]');
+
+    if (button) {
+      removeStampSet(addCardView, button.dataset.removeStampSet);
+    }
+  });
+  tagPicker.add.addEventListener('click', () => addCardTagsFromInput(addCardView));
+  tagPicker.input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ',') {
+      event.preventDefault();
+      addCardTagsFromInput(addCardView);
+    }
+  });
+  tagPicker.selected.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-remove-card-tag]');
+
+    if (button) {
+      removeCardTag(addCardView, button.dataset.removeCardTag);
+    }
+  });
   imagePicker.input.addEventListener('change', async () => {
     const [file] = imagePicker.input.files || [];
 
@@ -294,6 +339,164 @@ function createAddCardField(labelText, control) {
   text.textContent = labelText;
   label.append(text, control);
   return label;
+}
+
+function createFavoriteField(control) {
+  const label = document.createElement('label');
+  label.className = 'card-add-favorite-field';
+  const text = document.createElement('span');
+  text.textContent = 'Favorite';
+  label.append(control, text);
+  return label;
+}
+
+function createStampSetPicker() {
+  const section = document.createElement('section');
+  section.className = 'card-add-stamp-sets';
+  const heading = document.createElement('h4');
+  heading.textContent = 'Stamp Sets';
+  const inputRow = document.createElement('div');
+  inputRow.className = 'card-add-stamp-set-input-row';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Add a stamp set';
+  input.setAttribute('aria-label', 'Add stamp sets');
+  const add = document.createElement('button');
+  add.className = 'button';
+  add.type = 'button';
+  add.textContent = 'Add';
+  inputRow.append(input, add);
+  const help = document.createElement('p');
+  help.className = 'card-add-stamp-set-help';
+  help.textContent = 'Separate multiple stamp sets with commas.';
+  const selected = document.createElement('ul');
+  selected.className = 'card-add-selected-stamp-sets';
+  selected.setAttribute('aria-label', 'Selected stamp sets');
+  section.append(heading, inputRow, help, selected);
+  return { section, input, add, selected };
+}
+
+function addStampSetsFromInput(addCardView, shouldFocus = true) {
+  const candidates = addCardView.stampSetInput.value
+    .split(',')
+    .map(normalizeCardTag)
+    .filter(Boolean);
+  const existingStampSets = new Set(addCardView.stampSets.map((stampSet) => stampSet.toLocaleLowerCase()));
+
+  for (const candidate of candidates) {
+    const stampSetKey = candidate.toLocaleLowerCase();
+
+    if (!existingStampSets.has(stampSetKey)) {
+      addCardView.stampSets.push(candidate);
+      existingStampSets.add(stampSetKey);
+    }
+  }
+
+  addCardView.stampSetInput.value = '';
+  renderSelectedStampSets(addCardView);
+
+  if (shouldFocus) {
+    addCardView.stampSetInput.focus();
+  }
+}
+
+function removeStampSet(addCardView, stampSetKey) {
+  addCardView.stampSets = addCardView.stampSets.filter(
+    (stampSet) => stampSet.toLocaleLowerCase() !== stampSetKey
+  );
+  renderSelectedStampSets(addCardView);
+}
+
+function renderSelectedStampSets(addCardView) {
+  addCardView.stampSetList.replaceChildren();
+
+  for (const stampSet of addCardView.stampSets) {
+    const item = document.createElement('li');
+    const name = document.createElement('span');
+    name.textContent = stampSet;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.dataset.removeStampSet = stampSet.toLocaleLowerCase();
+    remove.setAttribute('aria-label', `Remove ${stampSet}`);
+    remove.textContent = String.fromCodePoint(215);
+    item.append(name, remove);
+    addCardView.stampSetList.append(item);
+  }
+}
+
+function createCardTagPicker() {
+  const section = document.createElement('section');
+  section.className = 'card-add-tags';
+  const heading = document.createElement('h4');
+  heading.textContent = 'Tags';
+  const inputRow = document.createElement('div');
+  inputRow.className = 'card-add-tag-input-row';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Birthday, floral, fun fold';
+  input.setAttribute('aria-label', 'Add Card tags');
+  const add = document.createElement('button');
+  add.className = 'button';
+  add.type = 'button';
+  add.textContent = 'Add';
+  inputRow.append(input, add);
+  const help = document.createElement('p');
+  help.className = 'card-add-tag-help';
+  help.textContent = 'Separate multiple tags with commas.';
+  const selected = document.createElement('ul');
+  selected.className = 'card-add-selected-tags';
+  selected.setAttribute('aria-label', 'Selected Card tags');
+  section.append(heading, inputRow, help, selected);
+  return { section, input, add, selected };
+}
+
+function addCardTagsFromInput(addCardView, shouldFocus = true) {
+  const candidates = addCardView.tagInput.value
+    .split(',')
+    .map(normalizeCardTag)
+    .filter(Boolean);
+  const existingTags = new Set(addCardView.tags.map((tag) => tag.toLocaleLowerCase()));
+
+  for (const candidate of candidates) {
+    const tagKey = candidate.toLocaleLowerCase();
+
+    if (!existingTags.has(tagKey)) {
+      addCardView.tags.push(candidate);
+      existingTags.add(tagKey);
+    }
+  }
+
+  addCardView.tagInput.value = '';
+  renderSelectedCardTags(addCardView);
+  if (shouldFocus) {
+    addCardView.tagInput.focus();
+  }
+}
+
+function removeCardTag(addCardView, tagKey) {
+  addCardView.tags = addCardView.tags.filter((tag) => tag.toLocaleLowerCase() !== tagKey);
+  renderSelectedCardTags(addCardView);
+}
+
+function renderSelectedCardTags(addCardView) {
+  addCardView.tagList.replaceChildren();
+
+  for (const tag of addCardView.tags) {
+    const item = document.createElement('li');
+    const name = document.createElement('span');
+    name.textContent = tag;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.dataset.removeCardTag = tag.toLocaleLowerCase();
+    remove.setAttribute('aria-label', `Remove ${tag}`);
+    remove.textContent = String.fromCodePoint(215);
+    item.append(name, remove);
+    addCardView.tagList.append(item);
+  }
+}
+
+function normalizeCardTag(tag) {
+  return String(tag || '').trim().replace(/\s+/g, ' ');
 }
 
 function createCardImagePicker() {
@@ -459,11 +662,15 @@ function resetAddCardForm(addCardView) {
   addCardView.dateCreated.value = getLocalDateValue();
   addCardView.sizePreset.value = 'a2-portrait';
   addCardView.paperPackIds = [];
+  addCardView.tags = [];
+  addCardView.stampSets = [];
   addCardView.selectedImage = null;
   addCardView.paperPackSearch.value = '';
   applyCardSizePreset(addCardView);
   renderSelectedPaperPacks(addCardView);
   renderPaperPackSearchResults(addCardView);
+  renderSelectedCardTags(addCardView);
+  renderSelectedStampSets(addCardView);
   renderSelectedCardImage(addCardView);
 }
 
@@ -495,10 +702,11 @@ function createCardRecord(addCardView) {
       width: Number(addCardView.width.value),
       height: Number(addCardView.height.value)
     },
-    tags: [],
+    tags: [...addCardView.tags],
+    stampSets: [...addCardView.stampSets],
     paperPackIds: [...addCardView.paperPackIds],
     colorIds: [],
-    favorite: false,
+    favorite: addCardView.favorite.checked,
     createdAt,
     updatedAt: createdAt
   };
@@ -666,6 +874,7 @@ function createCardDetailContent(card, index) {
   metadata.className = 'card-detail-metadata';
   metadata.append(
     createCardFacts(card),
+    createChipSection('Stamp sets', card.stampSets || []),
     createChipSection('Tags', card.tags),
     createChipSection('Paper packs', card.paperPackIds),
     createChipSection('Colors', card.colorIds)

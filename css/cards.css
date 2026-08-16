@@ -278,21 +278,65 @@
   color: var(--color-muted);
 }
 
+.card-add-favorite-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.card-add-favorite-field input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin: 0;
+}
+
 .card-add-dimensions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
 }
 
-.card-add-paper-packs {
+.card-add-paper-packs,
+.card-add-tags,
+.card-add-stamp-sets {
   display: grid;
   gap: var(--space-3);
   padding-top: var(--space-2);
   border-top: 1px solid var(--color-border);
 }
 
-.card-add-paper-packs h4 {
+.card-add-paper-packs h4,
+.card-add-tags h4,
+.card-add-stamp-sets h4 {
   margin-bottom: 0;
+}
+
+.card-add-tag-input-row,
+.card-add-stamp-set-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+}
+
+.card-add-tag-input-row input,
+.card-add-stamp-set-input-row input {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  padding: 0.65rem 0.75rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.card-add-tag-help,
+.card-add-stamp-set-help {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.8rem;
 }
 
 .card-add-paper-packs > input {
@@ -313,7 +357,9 @@
 }
 
 .card-add-paper-pack-results,
-.card-add-selected-packs {
+.card-add-selected-packs,
+.card-add-selected-tags,
+.card-add-selected-stamp-sets {
   display: grid;
   gap: var(--space-2);
   margin: 0;
@@ -343,11 +389,15 @@
   border-color: rgba(82, 120, 109, 0.62);
 }
 
-.card-add-selected-packs {
+.card-add-selected-packs,
+.card-add-selected-tags,
+.card-add-selected-stamp-sets {
   grid-template-columns: repeat(auto-fit, minmax(10rem, max-content));
 }
 
-.card-add-selected-packs li {
+.card-add-selected-packs li,
+.card-add-selected-tags li,
+.card-add-selected-stamp-sets li {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -361,7 +411,9 @@
   font-weight: 650;
 }
 
-.card-add-selected-packs button {
+.card-add-selected-packs button,
+.card-add-selected-tags button,
+.card-add-selected-stamp-sets button {
   display: grid;
   width: 1.65rem;
   height: 1.65rem;
@@ -376,7 +428,9 @@
   font-size: 1rem;
 }
 
-.card-add-selected-packs button:hover {
+.card-add-selected-packs button:hover,
+.card-add-selected-tags button:hover,
+.card-add-selected-stamp-sets button:hover {
   background: var(--color-page);
   color: var(--color-text);
 }

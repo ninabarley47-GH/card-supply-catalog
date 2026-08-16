@@ -280,6 +280,7 @@ Provide a feature where you can load backup files incrementally. This allows a u
 12. Add Card uses a top button, similar to add color and add paper
 13. When adding card image, tags and paper pack info, it should show up in the right panel, like paper detail.
 14. paper-pack selection should ultimately come from the real catalog
+15. stampSets is an optional array because a Card may use multiple stamp sets
 cards and paper packs should eventually link in both directions
 card images should use the same folder-backed + thumbnail methodology you’ve now established for paper images
 
