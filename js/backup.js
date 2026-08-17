@@ -1,10 +1,13 @@
 import {
   loadCatalogSetting,
+  loadSavedCards,
   loadSavedPaperPack,
   saveCatalogSetting,
+  saveCard,
   saveColor,
   savePaperPack
 } from "./storage.js";
+import { getCardDetailImageSource, hydrateCardImageSources } from "./card-images.js";
 import {
   clearPaperPackImageObjectUrls,
   getPatternImageFile,
@@ -19,6 +22,7 @@ import {
 } from "./schema.js";
 
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
+const CARD_IMAGE_LIBRARY_SETTING_ID = "cardImageLibrary";
 const LAST_BACKUP_EXPORT_SETTING_ID = "lastBackupExportedAt";
 const LAST_BACKUP_IMPORT_SETTING_ID = "lastBackupImportedAt";
 const APP_VERSION = "2026.08.03-import-diagnostic";
@@ -89,7 +93,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
       try {
         const backup = await readBackupFile(backupFile);
         const overwriteExisting = overwriteExistingInput?.checked === true;
-        const overwriteSummary = summarizeBackupOverwrites(backup, paperPacks, colorsById);
+        const overwriteSummary = await summarizeBackupOverwrites(backup, paperPacks, colorsById);
 
         if (overwriteExisting && overwriteSummary.requiresConfirmation && !window.confirm(overwriteSummary.message)) {
           renderBackupMessage(message, "Import cancelled. No catalog changes were made.", "");
@@ -122,6 +126,8 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
           packsSkipped: 0,
           colorsImported: 0,
           colorsSkipped: 0,
+          cardsImported: 0,
+          cardsSkipped: 0,
           imagesImported: 0,
           folderImageReferencesImported: 0,
           notes: [],
@@ -146,7 +152,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
       try {
         const backup = await readBackupFile(backupFile);
         const overwriteExisting = overwriteExistingInput?.checked === true;
-        const overwriteSummary = summarizeBackupOverwrites(backup, paperPacks, colorsById);
+        const overwriteSummary = await summarizeBackupOverwrites(backup, paperPacks, colorsById);
         if (overwriteExisting && overwriteSummary.requiresConfirmation && !window.confirm(overwriteSummary.message)) {
           renderBackupMessage(message, "Import diagnostic cancelled. No catalog changes were made.", "");
           return;
@@ -193,15 +199,20 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
   });
 }
 
-function summarizeBackupOverwrites(backup, paperPacks, colorsById) {
+async function summarizeBackupOverwrites(backup, paperPacks, colorsById) {
   const importedPaperPacks = Array.isArray(backup?.paperPacks) ? backup.paperPacks : [];
   const importedColors = backup?.colors && typeof backup.colors === "object" ? Object.values(backup.colors) : [];
+  const importedCards = Array.isArray(backup?.cards) ? backup.cards : [];
+  const savedCards = await loadSavedCards();
   const existingPackIds = new Set(paperPacks.map((paperPack) => paperPack.id));
   const existingColorIds = new Set(Object.keys(colorsById));
+  const existingCardIds = new Set(savedCards.map((card) => card.id));
   const packOverwriteCount = importedPaperPacks.filter((paperPack) => existingPackIds.has(paperPack?.id)).length;
   const colorOverwriteCount = importedColors.filter((color) => existingColorIds.has(color?.id)).length;
+  const cardOverwriteCount = importedCards.filter((card) => existingCardIds.has(card?.id)).length;
   const newPackCount = importedPaperPacks.length - packOverwriteCount;
   const newColorCount = importedColors.length - colorOverwriteCount;
+  const newCardCount = importedCards.length - cardOverwriteCount;
   const overwriteParts = [];
 
   if (packOverwriteCount > 0) {
@@ -210,6 +221,10 @@ function summarizeBackupOverwrites(backup, paperPacks, colorsById) {
 
   if (colorOverwriteCount > 0) {
     overwriteParts.push(`${colorOverwriteCount} color${colorOverwriteCount === 1 ? "" : "s"}`);
+  }
+
+  if (cardOverwriteCount > 0) {
+    overwriteParts.push(`${cardOverwriteCount} Card${cardOverwriteCount === 1 ? "" : "s"}`);
   }
 
   if (overwriteParts.length === 0) {
@@ -224,17 +239,21 @@ function summarizeBackupOverwrites(backup, paperPacks, colorsById) {
     message: [
       "Replace matching catalog entries?",
       "",
-      `This will replace ${overwriteParts.join(" and ")} already in the catalog. Only image data and references belonging to those matching paper packs can change; all other catalog images will remain untouched. Files in your selected image folder will not be deleted.`,
+      `This will replace ${overwriteParts.join(" and ")} already in the catalog. Only image data and references belonging to matching paper packs and Cards can change; all other catalog images will remain untouched. Files in your selected image folders will not be deleted.`,
       "",
-      `The import will also add ${newPackCount} new paper pack${newPackCount === 1 ? "" : "s"} and ${newColorCount} new color${newColorCount === 1 ? "" : "s"}.`,
+      `The import will also add ${newPackCount} new paper pack${newPackCount === 1 ? "" : "s"}, ${newColorCount} new color${newColorCount === 1 ? "" : "s"}, and ${newCardCount} new Card${newCardCount === 1 ? "" : "s"}.`,
       "",
       "Continue with replacement import?"
     ].join("\n")
   };
 }
 async function createCatalogBackup({ paperPacks, colorsById }) {
-  const imageLibrary = await loadCatalogSetting(IMAGE_LIBRARY_SETTING_ID);
-  const imageSummary = summarizeImageStorage(paperPacks);
+  const [imageLibrary, cardImageLibrary, cards] = await Promise.all([
+    loadCatalogSetting(IMAGE_LIBRARY_SETTING_ID),
+    loadCatalogSetting(CARD_IMAGE_LIBRARY_SETTING_ID),
+    loadSavedCards()
+  ]);
+  const imageSummary = summarizeImageStorage(paperPacks, cards);
 
   return {
     schemaVersion: BACKUP_SCHEMA_VERSION,
@@ -244,18 +263,23 @@ async function createCatalogBackup({ paperPacks, colorsById }) {
     imageStorage: {
       strategy: imageSummary.folderImageReferences > 0 ? "local-folder-with-fallback" : "embedded-indexed-db",
       configuredLibrary: createSerializableImageLibrarySetting(imageLibrary),
+      configuredCardLibrary: createSerializableImageLibrarySetting(cardImageLibrary),
       embeddedImages: imageSummary.embeddedImages,
       folderImageReferences: imageSummary.folderImageReferences,
       note:
-        "Backup stores folder-backed images as relative imagePath references. Back up or share the image folder separately, then reconnect it after import."
+        "Backup stores folder-backed images as relative imagePath references. Back up or share the Paper and Card image folders separately, then reconnect them after import."
     },
     colors: sortObjectByKey(colorsById),
-    paperPacks: paperPacks.map(createSerializablePaperPack)
+    paperPacks: paperPacks.map(createSerializablePaperPack),
+    cards: cards.map(createSerializableCard)
   };
 }
 
 async function createIpadCatalogBackup({ paperPacks, colorsById }) {
   const compressedPaperPacks = [];
+  const cards = await loadSavedCards();
+  await hydrateCardImageSources(cards);
+  const compressedCards = [];
   const imageSummary = {
     embeddedImages: 0,
     compressedImages: 0,
@@ -267,6 +291,15 @@ async function createIpadCatalogBackup({ paperPacks, colorsById }) {
     const result = await createSerializablePaperPackWithCompressedImages(paperPack);
 
     compressedPaperPacks.push(result.paperPack);
+    imageSummary.embeddedImages += result.embeddedImages;
+    imageSummary.compressedImages += result.compressedImages;
+    imageSummary.missingImages += result.missingImages;
+    imageSummary.folderImageReferences += result.folderImageReferences;
+  }
+
+  for (const card of cards) {
+    const result = await createSerializableCardWithCompressedImage(card);
+    compressedCards.push(result.card);
     imageSummary.embeddedImages += result.embeddedImages;
     imageSummary.compressedImages += result.compressedImages;
     imageSummary.missingImages += result.missingImages;
@@ -294,12 +327,13 @@ async function createIpadCatalogBackup({ paperPacks, colorsById }) {
         "This iPad backup embeds compressed images directly in the JSON file so folder access is not required after import."
     },
     colors: sortObjectByKey(colorsById),
-    paperPacks: compressedPaperPacks
+    paperPacks: compressedPaperPacks,
+    cards: compressedCards
   };
 }
 
-function summarizeImageStorage(paperPacks) {
-  return paperPacks.reduce(
+function summarizeImageStorage(paperPacks, cards = []) {
+  const summary = paperPacks.reduce(
     (summary, paperPack) => {
       summary.embeddedImages += countEmbeddedPatternImages(paperPack);
       summary.folderImageReferences += countFolderImageReferences(paperPack);
@@ -310,6 +344,13 @@ function summarizeImageStorage(paperPacks) {
       folderImageReferences: 0
     }
   );
+
+  for (const card of cards) {
+    summary.embeddedImages += card.imageSrc ? 1 : 0;
+    summary.folderImageReferences += card.imagePath ? 1 : 0;
+  }
+
+  return summary;
 }
 
 function formatExportSummary(backup, saveResult) {
@@ -439,6 +480,8 @@ async function restoreCatalogBackup({
     packsSkipped: 0,
     colorsImported: 0,
     colorsSkipped: 0,
+    cardsImported: 0,
+    cardsSkipped: 0,
     imagesImported: 0,
     folderImageReferencesImported: 0,
     importedPaperPackIds: [],
@@ -448,8 +491,11 @@ async function restoreCatalogBackup({
   };
   const importedColorsById = backup?.colors || {};
   const importedPaperPacks = Array.isArray(backup?.paperPacks) ? backup.paperPacks : [];
+  const importedCards = Array.isArray(backup?.cards) ? backup.cards : [];
+  const savedCards = await loadSavedCards();
   const existingPackIds = new Set(paperPacks.map((paperPack) => paperPack.id));
   const existingColorIds = new Set(Object.keys(colorsById));
+  const existingCardIds = new Set(savedCards.map((card) => card.id));
   const paperPacksToImport = overwriteExisting
     ? importedPaperPacks
     : importedPaperPacks.filter((paperPack) => !existingPackIds.has(paperPack?.id));
@@ -525,15 +571,42 @@ async function restoreCatalogBackup({
     }
   }
 
+  for (const card of importedCards) {
+    if (!overwriteExisting && existingCardIds.has(card?.id)) {
+      summary.cardsSkipped += 1;
+      continue;
+    }
+
+    try {
+      const versionedCard = addCatalogSchemaVersion(createSerializableCard(card));
+      await saveCard(versionedCard);
+      existingCardIds.add(versionedCard.id);
+      summary.cardsImported += 1;
+      summary.imagesImported += versionedCard.imageSrc ? 1 : 0;
+      summary.folderImageReferencesImported += versionedCard.imagePath ? 1 : 0;
+    } catch (error) {
+      logImportError("Card write failed", error, { cardId: card?.id });
+      summary.errors.push(`Card could not be imported: ${card?.id || "Unknown Card"}`);
+    }
+  }
+
+  if (summary.cardsImported > 0) {
+    document.dispatchEvent(new CustomEvent("catalog:cards-restored"));
+  }
+
   summary.diagnosticReport = await reportImportDiagnostic(importDiagnostic);
 
-  if (summary.folderImageReferencesImported > 0 || backup.imageStorage?.configuredLibrary) {
+  if (
+    summary.folderImageReferencesImported > 0 ||
+    backup.imageStorage?.configuredLibrary ||
+    backup.imageStorage?.configuredCardLibrary
+  ) {
     summary.warnings.push(
-      "Folder-backed image files are not inside the backup JSON. Choose or reconnect the image folder after import."
+      "Folder-backed image files are not inside the backup JSON. Choose or reconnect the Paper and Card image folders after import."
     );
   }
 
-  if (summary.packsSkipped > 0 || summary.colorsSkipped > 0) {
+  if (summary.packsSkipped > 0 || summary.colorsSkipped > 0 || summary.cardsSkipped > 0) {
     summary.notes.push("Existing catalog entries were left unchanged.");
   }
 
@@ -983,6 +1056,62 @@ function createSerializablePaperPack(paperPack) {
   });
 }
 
+function createSerializableCard(card) {
+  const {
+    selectedImage,
+    imagePreviewSrc,
+    imageThumbnailSrc,
+    ...serializableCard
+  } = card || {};
+
+  return addCatalogSchemaVersion(cloneJsonSafe(serializableCard));
+}
+
+async function createSerializableCardWithCompressedImage(card) {
+  const serializableCard = createSerializableCard(card);
+  const imageSource = getCardDetailImageSource(card);
+  const hadFolderImage = Boolean(card?.imagePath);
+  let compressedImageSrc = "";
+
+  if (imageSource) {
+    try {
+      compressedImageSrc = await compressImageSource(imageSource);
+    } catch (error) {
+      compressedImageSrc = "";
+    }
+  }
+
+  if (!compressedImageSrc) {
+    return {
+      card: serializableCard,
+      embeddedImages: serializableCard.imageSrc ? 1 : 0,
+      compressedImages: 0,
+      missingImages: hadFolderImage ? 1 : 0,
+      folderImageReferences: hadFolderImage ? 1 : 0
+    };
+  }
+
+  const {
+    imagePath,
+    thumbnailImagePath,
+    imageLibrary,
+    thumbnailImageSrc,
+    ...cardWithoutFolderImage
+  } = serializableCard;
+
+  return {
+    card: {
+      ...cardWithoutFolderImage,
+      imageSrc: compressedImageSrc,
+      imageStorageStrategy: "embedded-compressed-image"
+    },
+    embeddedImages: 1,
+    compressedImages: 1,
+    missingImages: 0,
+    folderImageReferences: hadFolderImage ? 1 : 0
+  };
+}
+
 async function createSerializablePaperPackWithCompressedImages(paperPack) {
   const summary = {
     embeddedImages: 0,
@@ -1162,6 +1291,8 @@ function renderRestoreSummary(message, summary) {
     createSummaryItem("Existing packs skipped", summary.packsSkipped || 0),
     createSummaryItem("Colors imported", summary.colorsImported),
     createSummaryItem("Existing colors skipped", summary.colorsSkipped || 0),
+    createSummaryItem("Cards imported", summary.cardsImported || 0),
+    createSummaryItem("Existing Cards skipped", summary.cardsSkipped || 0),
     createSummaryItem("Embedded images imported", summary.imagesImported),
     createSummaryItem("Folder image references imported", summary.folderImageReferencesImported || 0)
   );

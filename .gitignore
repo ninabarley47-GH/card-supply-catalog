@@ -5,6 +5,7 @@ build/
 *.jpg
 *.png
 !assets/logo/CSC-logo.png
+!assets/icons/csc-favicon-32x32.png
 *.jpeg
 *.webp
 !assets/cards/

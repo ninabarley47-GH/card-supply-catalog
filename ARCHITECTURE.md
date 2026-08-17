@@ -129,8 +129,8 @@ Each color's JSON entry includes a color ID derived from the name, name, HEX val
 
 Backups are explicit, user-triggered JSON exports rather than automatic rolling snapshots.
 
-- Standard backup: includes catalog data, embedded fallback images, and relative references to folder-backed images. The image folder must be backed up separately.
-- iPad backup: embeds compressed copies of accessible images so the catalog can be restored where folder access is unavailable.
+- Standard backup: includes paper packs, Cards, colors, embedded fallback images, and relative references to folder-backed Paper and Card images. The image folders must be backed up separately.
+- iPad backup: embeds compressed copies of accessible Paper and Card images so the catalog can be restored where folder access is unavailable.
 - Import: validates the backup, warns before overwriting matching records, persists restored records to IndexedDB, and reports missing folder-image requirements.
 - Destination: if the selected image-library folder is writable, export saves there; otherwise it uses a browser download.
 

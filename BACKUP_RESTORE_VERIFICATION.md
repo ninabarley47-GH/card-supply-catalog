@@ -25,6 +25,10 @@ Use a test browser profile or a browser where app data can be safely cleared.
    - embedded images return if the backup includes embedded image data
    - folder-backed image references return as relative `imagePath` values
    - folder-backed images display after the image library folder is reconnected
+   - all Cards return
+   - Card dates, sizes, favorites, tags, stamp sets, paper-pack links, and color links are correct
+   - embedded Card images return when the backup includes embedded image data
+   - folder-backed Card image references return and display after the Card image folder is reconnected
 10. Confirm restored app behavior:
     - search still works
     - tag filters still work
@@ -42,4 +46,4 @@ Expected differences:
 - `exportedAt`
 - future verification metadata, if added later
 
-Folder-backed image files are not embedded in the JSON backup. The image folder must be backed up or shared separately.
+Folder-backed image files are not embedded in the standard JSON backup. The Paper and Card image folders must be backed up or shared separately. The iPad backup embeds accessible Paper and Card images.

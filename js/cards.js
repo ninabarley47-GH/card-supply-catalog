@@ -36,11 +36,16 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
   document.body.append(detailView.overlay, addCardView.overlay);
   loadAvailablePaperPacks(addCardView, paperPacks);
 
-  try {
-    cards.push(...await loadSavedCards());
-    await hydrateCardImageSources(cards);
-    sortCards(cards);
+  const reloadCards = async () => {
+    const savedCards = await loadSavedCards();
+    await hydrateCardImageSources(savedCards);
+    sortCards(savedCards);
+    cards.splice(0, cards.length, ...savedCards);
     renderCardLibrary(gallery, cards);
+  };
+
+  try {
+    await reloadCards();
   } catch (error) {
     renderCardLibraryError(gallery);
   }
@@ -48,6 +53,14 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
   document.addEventListener('catalog:card-image-library-selected', async () => {
     await hydrateCardImageSources(cards);
     renderCardLibrary(gallery, cards);
+  });
+
+  document.addEventListener('catalog:cards-restored', async () => {
+    try {
+      await reloadCards();
+    } catch (error) {
+      renderCardLibraryError(gallery);
+    }
   });
 
   addCardButton.addEventListener('click', () => {
