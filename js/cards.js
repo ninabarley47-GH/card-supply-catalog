@@ -1,4 +1,4 @@
-import { loadSavedCards, saveCard } from './storage.js';
+import { deleteCard, loadSavedCards, saveCard } from './storage.js';
 import {
   clearSelectedCardImage,
   chooseCardImageFromLibrary,
@@ -105,6 +105,18 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
     }
   });
   detailView.body.addEventListener('click', (event) => {
+    const deleteButton = event.target.closest('[data-delete-card]');
+
+    if (deleteButton) {
+      const card = findCard(cards, deleteButton.dataset.deleteCard);
+
+      if (card && deleteSelectedCard(card, cards, gallery, detailView, activeTile)) {
+        activeTile = null;
+      }
+
+      return;
+    }
+
     const editButton = event.target.closest('[data-edit-card]');
 
     if (!editButton) {
@@ -960,8 +972,37 @@ function createCardDetailActions(card) {
   edit.type = 'button';
   edit.dataset.editCard = card.id;
   edit.textContent = 'Edit Card';
-  actions.append(edit);
+
+  const deleteButton = document.createElement('button');
+  deleteButton.className = 'button button-danger';
+  deleteButton.type = 'button';
+  deleteButton.dataset.deleteCard = card.id;
+  deleteButton.textContent = 'Delete Card';
+
+  actions.append(edit, deleteButton);
   return actions;
+}
+
+function deleteSelectedCard(card, cards, gallery, detailView, activeTile) {
+  const shouldDelete = window.confirm('Delete this Card from the catalog?');
+
+  if (!shouldDelete) {
+    return false;
+  }
+
+  deleteCard(card.id).catch(() => {
+    window.alert('The Card was removed from this session, but the browser could not save the deletion permanently.');
+  });
+
+  const cardIndex = cards.findIndex((candidate) => candidate.id === card.id);
+
+  if (cardIndex !== -1) {
+    cards.splice(cardIndex, 1);
+  }
+
+  renderCardLibrary(gallery, cards);
+  closeCardDetail(detailView, activeTile);
+  return true;
 }
 
 function applyCardMockupSize(element, card) {

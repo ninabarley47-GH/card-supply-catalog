@@ -97,6 +97,15 @@ export async function saveCard(card) {
   });
 }
 
+export async function deleteCard(cardId) {
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
+
+  await writeTransaction(database, [CARDS_STORE], (transaction) => {
+    transaction.objectStore(CARDS_STORE).delete(cardId);
+  });
+}
+
 export function mergeColors(baseColorsById, savedColors) {
   return {
     ...baseColorsById,
