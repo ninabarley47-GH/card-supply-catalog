@@ -108,7 +108,7 @@ export async function initializeLibraryShell() {
   const colorLibrary = document.querySelector("[data-color-library]");
 
   if (!paperPackLibrary && !colorLibrary) {
-    return;
+    return { paperPacks: [], colorsById: {} };
   }
 
   try {
@@ -156,6 +156,8 @@ export async function initializeLibraryShell() {
         renderColorReference(colorLibrary, Object.values(colorsById));
       });
     }
+
+    return { paperPacks, colorsById };
   } catch (error) {
     if (paperPackLibrary) {
       renderError(paperPackLibrary, "Paper packs could not be loaded.");
@@ -164,6 +166,8 @@ export async function initializeLibraryShell() {
     if (colorLibrary) {
       renderError(colorLibrary, "Colors could not be loaded.");
     }
+
+    return { paperPacks: [], colorsById: {} };
   }
 }
 

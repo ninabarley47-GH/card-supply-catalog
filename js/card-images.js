@@ -2,20 +2,47 @@ import { loadCatalogSetting } from './storage.js';
 import { generateImageThumbnail } from './thumbnails.js';
 
 const IMAGE_LIBRARY_SETTING_ID = 'imageLibrary';
-const CARDS_DIRECTORY_NAME = 'cards';
+const CARD_IMAGE_LIBRARY_SETTING_ID = 'cardImageLibrary';
+const CARD_IMAGE_LIBRARY_MARKER = 'card-images';
 const LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY = 'local-folder';
 const EMBEDDED_IMAGE_STORAGE_STRATEGY = 'embedded-indexed-db';
 
-export async function createSelectedCardImage(file) {
-  if (!(file instanceof File) || !file.type.startsWith('image/')) {
-    throw new TypeError('Choose a valid image file.');
+export async function chooseCardImageFromLibrary() {
+  if (!("showOpenFilePicker" in window)) {
+    return { ok: false, image: null, message: 'Choosing Card library images is not supported in this browser.' };
   }
 
-  return {
-    file,
-    name: file.name,
-    previewSrc: URL.createObjectURL(file)
-  };
+  const directoryHandle = await getDirectoryHandle(CARD_IMAGE_LIBRARY_SETTING_ID, 'readwrite');
+
+  if (!directoryHandle) {
+    return { ok: false, image: null, message: 'Choose or reconnect the Card image folder first.' };
+  }
+
+  try {
+    const [fileHandle] = await window.showOpenFilePicker({
+      id: 'csc-card-image',
+      multiple: false,
+      startIn: directoryHandle,
+      types: [{
+        description: 'Card images',
+        accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.gif'] }
+      }]
+    });
+    const imagePath = await findRelativePathForFileHandle(directoryHandle, fileHandle);
+
+    const file = await fileHandle.getFile();
+    return {
+      ok: true,
+      image: { file, name: file.name, imagePath, previewSrc: URL.createObjectURL(file) },
+      message: imagePath ? '' : 'This image will be copied into the Card image folder when the Card is saved.'
+    };
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      return { ok: true, image: null, message: '' };
+    }
+
+    return { ok: false, image: null, message: 'The Card image could not be selected.' };
+  }
 }
 
 export function clearSelectedCardImage(selectedImage) {
@@ -29,7 +56,7 @@ export async function prepareCardImageForSave(card, selectedImage) {
     return { card, usedFallback: false };
   }
 
-  const directoryHandle = await getWritableImageLibraryDirectoryHandle();
+  const directoryHandle = await getDirectoryHandle(CARD_IMAGE_LIBRARY_SETTING_ID, 'readwrite');
 
   if (!directoryHandle) {
     return {
@@ -40,7 +67,7 @@ export async function prepareCardImageForSave(card, selectedImage) {
 
   try {
     return {
-      card: await prepareFolderBackedCardImage(card, selectedImage.file, directoryHandle),
+      card: await prepareFolderBackedCardImage(card, selectedImage, directoryHandle),
       usedFallback: false
     };
   } catch (error) {
@@ -58,13 +85,18 @@ export async function hydrateCardImageSources(cards) {
     return;
   }
 
-  const directoryHandle = await getReadableImageLibraryDirectoryHandle();
+  const [cardDirectoryHandle, legacyPaperDirectoryHandle] = await Promise.all([
+    getDirectoryHandle(CARD_IMAGE_LIBRARY_SETTING_ID, 'read'),
+    getDirectoryHandle(IMAGE_LIBRARY_SETTING_ID, 'read')
+  ]);
 
-  if (!directoryHandle) {
-    return;
-  }
+  await Promise.all(folderBackedCards.map((card) => {
+    const directoryHandle = card.imageLibrary === CARD_IMAGE_LIBRARY_MARKER
+      ? cardDirectoryHandle
+      : legacyPaperDirectoryHandle;
 
-  await Promise.all(folderBackedCards.map((card) => hydrateCardImageSource(card, directoryHandle)));
+    return directoryHandle ? hydrateCardImageSource(card, directoryHandle) : null;
+  }));
 }
 
 export function getCardLibraryImageSource(card) {
@@ -75,20 +107,31 @@ export function getCardDetailImageSource(card) {
   return card.imagePreviewSrc || card.imageSrc || getCardLibraryImageSource(card);
 }
 
-async function prepareFolderBackedCardImage(card, imageFile, rootDirectory) {
-  const cardsDirectory = await rootDirectory.getDirectoryHandle(CARDS_DIRECTORY_NAME, { create: true });
-  const cardDirectory = await cardsDirectory.getDirectoryHandle(card.id, { create: true });
-  const imageName = createCardImageFileName(imageFile.name);
+async function prepareFolderBackedCardImage(card, selectedImage, rootDirectory) {
+  const imageName = selectedImage.imagePath
+    ? selectedImage.file.name
+    : await createAvailableImageFileName(rootDirectory, selectedImage.file.name);
   const thumbnailName = createThumbnailImageFileName(imageName);
+  const { directory, directoryPath } = selectedImage.imagePath
+    ? await getDirectoryFromRelativePath(rootDirectory, selectedImage.imagePath)
+    : { directory: rootDirectory, directoryPath: '' };
+  const imagePath = selectedImage.imagePath || imageName;
+  const thumbnailPath = directoryPath ? `${directoryPath}/${thumbnailName}` : thumbnailName;
 
-  await writeFile(cardDirectory, imageName, imageFile);
-  await writeFile(cardDirectory, thumbnailName, await generateImageThumbnail(imageFile));
+  if (!selectedImage.imagePath) {
+    await writeFile(directory, imageName, selectedImage.file);
+  }
+
+  if (!(await fileExists(directory, thumbnailName))) {
+    await writeFile(directory, thumbnailName, await generateImageThumbnail(selectedImage.file));
+  }
 
   return {
     ...card,
     imageName,
-    imagePath: `${CARDS_DIRECTORY_NAME}/${card.id}/${imageName}`,
-    thumbnailImagePath: `${CARDS_DIRECTORY_NAME}/${card.id}/${thumbnailName}`,
+    imagePath,
+    thumbnailImagePath: thumbnailPath,
+    imageLibrary: CARD_IMAGE_LIBRARY_MARKER,
     imageStorageStrategy: LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY
   };
 }
@@ -133,22 +176,11 @@ function clearCardImageObjectUrls(card) {
   }
 }
 
-async function getReadableImageLibraryDirectoryHandle() {
-  const imageLibrary = await loadCatalogSetting(IMAGE_LIBRARY_SETTING_ID);
+async function getDirectoryHandle(settingId, mode) {
+  const imageLibrary = await loadCatalogSetting(settingId);
   const directoryHandle = imageLibrary?.directoryHandle;
 
-  if (!directoryHandle || !(await hasDirectoryPermission(directoryHandle, 'read'))) {
-    return null;
-  }
-
-  return directoryHandle;
-}
-
-async function getWritableImageLibraryDirectoryHandle() {
-  const imageLibrary = await loadCatalogSetting(IMAGE_LIBRARY_SETTING_ID);
-  const directoryHandle = imageLibrary?.directoryHandle;
-
-  if (!directoryHandle || !(await hasDirectoryPermission(directoryHandle, 'readwrite'))) {
+  if (!directoryHandle || !(await hasDirectoryPermission(directoryHandle, mode))) {
     return null;
   }
 
@@ -186,6 +218,42 @@ async function getFileFromRelativePath(rootDirectory, imagePath) {
   return await (await directory.getFileHandle(fileName)).getFile();
 }
 
+async function getDirectoryFromRelativePath(rootDirectory, imagePath) {
+  const pathParts = String(imagePath || '').split('/').filter(Boolean);
+  pathParts.pop();
+  let directory = rootDirectory;
+
+  for (const directoryName of pathParts) {
+    directory = await directory.getDirectoryHandle(directoryName);
+  }
+
+  return { directory, directoryPath: pathParts.join('/') };
+}
+
+async function findRelativePathForFileHandle(directoryHandle, targetFileHandle, pathPrefix = '') {
+  if (!directoryHandle.entries) {
+    return '';
+  }
+
+  for await (const [entryName, entryHandle] of directoryHandle.entries()) {
+    const entryPath = pathPrefix ? `${pathPrefix}/${entryName}` : entryName;
+
+    if (entryHandle.kind === 'file' && entryHandle.isSameEntry && await entryHandle.isSameEntry(targetFileHandle)) {
+      return entryPath;
+    }
+
+    if (entryHandle.kind === 'directory') {
+      const nestedPath = await findRelativePathForFileHandle(entryHandle, targetFileHandle, entryPath);
+
+      if (nestedPath) {
+        return nestedPath;
+      }
+    }
+  }
+
+  return '';
+}
+
 async function writeFile(directory, fileName, contents) {
   const fileHandle = await directory.getFileHandle(fileName, { create: true });
   const writable = await fileHandle.createWritable();
@@ -194,9 +262,36 @@ async function writeFile(directory, fileName, contents) {
   await writable.close();
 }
 
-function createCardImageFileName(originalName) {
-  const extensionMatch = String(originalName || '').match(/\.(jpe?g|png|webp|gif)$/i);
-  return `card${extensionMatch ? extensionMatch[0].toLowerCase() : '.jpg'}`;
+async function fileExists(directory, fileName) {
+  try {
+    await directory.getFileHandle(fileName);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+async function createAvailableImageFileName(directory, requestedName) {
+  const normalizedName = String(requestedName || 'card-image.jpg');
+
+  if (!(await fileExists(directory, normalizedName)) &&
+      !(await fileExists(directory, createThumbnailImageFileName(normalizedName)))) {
+    return normalizedName;
+  }
+
+  const extensionMatch = normalizedName.match(/(\.[^.]+)$/);
+  const extension = extensionMatch?.[1] || '';
+  const baseName = extension ? normalizedName.slice(0, -extension.length) : normalizedName;
+  let suffix = 2;
+  let candidateName = `${baseName}-${suffix}${extension}`;
+
+  while (await fileExists(directory, candidateName) ||
+         await fileExists(directory, createThumbnailImageFileName(candidateName))) {
+    suffix += 1;
+    candidateName = `${baseName}-${suffix}${extension}`;
+  }
+
+  return candidateName;
 }
 
 function createThumbnailImageFileName(imageName) {

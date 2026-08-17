@@ -68,6 +68,7 @@ Every module should have one clear job. The current modules are:
 | `storage.js` | IndexedDB persistence for paper packs, cards, colors, settings, base-data merging, deletion markers, and legacy localStorage migration |
 | `backup.js` | User-triggered standard/iPad export and import |
 | `card-images.js` | Card image selection, folder-backed storage, embedded fallback storage, thumbnail creation, and runtime hydration |
+| `cards.js` | Persisted Card gallery, Add Card workflow, Card detail rendering, and paper-pack relationship selection from the merged runtime catalog |
 | `cover-sheet.js` | Printable 6-by-6-inch cover-sheet generation |
 | `detail.js` | Detail-panel dismissal behavior |
 | `schema.js` | Catalog and backup schema versions |
@@ -80,7 +81,7 @@ The application has three storage layers:
 
 1. `data/paper-packs.json` and `data/colors.json` provide version-controlled base data.
 2. IndexedDB stores writable paper packs, cards, deleted base-pack IDs, user-added colors, and settings. Saved paper-pack records are merged with base JSON at startup; cards are user-created records with no bundled base-data layer.
-3. A user-selected image-library folder is the preferred durable location for image files on supported desktop browsers. Paper-pack and card records store relative `imagePath` values. Card images live under the reserved `cards/<card-id>/` directory. Embedded data URLs in IndexedDB remain the compatibility fallback.
+3. User-selected Paper and Card image-library folders are the preferred durable locations for image files on supported desktop browsers. Records store paths relative to their applicable folder. New Cards reference images already inside the separate Card folder without copying; images selected elsewhere are copied into its root. A sibling `.thumb.jpg` is created in either case. Legacy Card paths without an image-library marker continue resolving from the Paper image folder. Embedded data URLs in IndexedDB remain the compatibility fallback.
 
 Directory handles are permission-scoped browser objects and may require the user to reconnect or grant access again. A cloud-synced local folder such as OneDrive can be selected, but the app does not call a cloud-storage API directly.
 
@@ -199,6 +200,6 @@ No feature may require an internet connection to use the catalog.
 Never introduce a framework without approval.
 Never combine unrelated responsibilities into a single module.
 Never sacrifice readability for brevity.
-Do not create competing writable sources of truth. IndexedDB is authoritative for writable catalog records; an image-library folder is authoritative for folder-backed image files; exported JSON is a portable backup.
+Do not create competing writable sources of truth. IndexedDB is authoritative for writable catalog records; the selected Paper and Card image-library folders are authoritative for their respective folder-backed image files; exported JSON is a portable backup.
 Never duplicate business logic across modules.
 Prefer extending existing modules over creating unnecessary new ones.

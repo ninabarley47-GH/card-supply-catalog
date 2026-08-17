@@ -1,7 +1,7 @@
 import { loadSavedCards, saveCard } from './storage.js';
 import {
   clearSelectedCardImage,
-  createSelectedCardImage,
+  chooseCardImageFromLibrary,
   getCardDetailImageSource,
   getCardLibraryImageSource,
   hydrateCardImageSources,
@@ -17,7 +17,7 @@ const CARD_SIZE_PRESETS = {
   custom: { label: 'Custom', width: '', height: '' }
 };
 
-export async function initializeCardLibrary() {
+export async function initializeCardLibrary({ paperPacks = [] } = {}) {
   const gallery = document.querySelector('[data-card-library]');
   const toolbar = gallery?.closest('#cards')?.querySelector('.library-toolbar');
 
@@ -34,7 +34,7 @@ export async function initializeCardLibrary() {
   renderCardLibrary(gallery, cards);
   toolbar.append(addCardButton);
   document.body.append(detailView.overlay, addCardView.overlay);
-  loadAvailablePaperPacks(addCardView);
+  loadAvailablePaperPacks(addCardView, paperPacks);
 
   try {
     cards.push(...await loadSavedCards());
@@ -45,7 +45,15 @@ export async function initializeCardLibrary() {
     renderCardLibraryError(gallery);
   }
 
-  addCardButton.addEventListener('click', () => openAddCardView(addCardView));
+  document.addEventListener('catalog:card-image-library-selected', async () => {
+    await hydrateCardImageSources(cards);
+    renderCardLibrary(gallery, cards);
+  });
+
+  addCardButton.addEventListener('click', () => {
+    loadAvailablePaperPacks(addCardView, paperPacks);
+    openAddCardView(addCardView);
+  });
   addCardView.close.addEventListener('click', () => closeAddCardView(addCardView, addCardButton));
   addCardView.cancel.addEventListener('click', () => closeAddCardView(addCardView, addCardButton));
   addCardView.overlay.addEventListener('click', (event) => {
@@ -100,7 +108,7 @@ export async function initializeCardLibrary() {
       closeAddCardView(addCardView, addCardButton);
 
       if (imageResult.usedFallback) {
-        window.alert('The card was saved, but its image was kept in browser storage because the image folder was unavailable.');
+        window.alert('The card was saved, but its image was kept in browser storage because the Card image folder was unavailable.');
       }
     } catch (error) {
       window.alert('The card could not be saved.');
@@ -238,7 +246,7 @@ function createAddCardView() {
     tagInput: tagPicker.input,
     tagList: tagPicker.selected,
     tags: [],
-    imageInput: imagePicker.input,
+    imageChooseButton: imagePicker.choose,
     imagePreview: imagePicker.preview,
     imagePlaceholder: imagePicker.placeholder,
     imageMessage: imagePicker.message,
@@ -279,23 +287,16 @@ function createAddCardView() {
       removeCardTag(addCardView, button.dataset.removeCardTag);
     }
   });
-  imagePicker.input.addEventListener('change', async () => {
-    const [file] = imagePicker.input.files || [];
+  imagePicker.choose.addEventListener('click', async () => {
+    const result = await chooseCardImageFromLibrary();
 
-    if (!file) {
-      return;
-    }
-
-    clearSelectedCardImage(addCardView.selectedImage);
-
-    try {
-      addCardView.selectedImage = await createSelectedCardImage(file);
+    if (result.image) {
+      clearSelectedCardImage(addCardView.selectedImage);
+      addCardView.selectedImage = result.image;
       renderSelectedCardImage(addCardView);
-    } catch (error) {
-      addCardView.selectedImage = null;
-      imagePicker.input.value = '';
-      imagePicker.message.textContent = 'Choose a JPG, PNG, WebP, or GIF image.';
     }
+
+    imagePicker.message.textContent = result.message || result.image?.name || '';
   });
   paperPackPicker.search.addEventListener('input', () => renderPaperPackSearchResults(addCardView));
   paperPackPicker.results.addEventListener('click', (event) => {
@@ -513,21 +514,16 @@ function createCardImagePicker() {
   placeholder.textContent = 'No image selected';
   previewFrame.append(preview, placeholder);
 
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/jpeg,image/png,image/webp,image/gif';
-  input.hidden = true;
   const choose = document.createElement('button');
   choose.className = 'button';
   choose.type = 'button';
   choose.textContent = 'Choose Card Image';
-  choose.addEventListener('click', () => input.click());
   const message = document.createElement('p');
   message.className = 'card-add-image-message';
   message.setAttribute('aria-live', 'polite');
-  container.append(previewFrame, input, choose, message);
+  container.append(previewFrame, choose, message);
 
-  return { container, input, preview, placeholder, message };
+  return { container, choose, preview, placeholder, message };
 }
 
 function renderSelectedCardImage(addCardView) {
@@ -570,24 +566,11 @@ function createPaperPackPicker() {
   return { section, search, status, results, selected };
 }
 
-// Prototype only: paper-pack selection uses bundled sample data until a shared
-// read-only catalog service is available after the DSP image-import bug is resolved.
-async function loadAvailablePaperPacks(addCardView) {
-  try {
-    const response = await fetch('data/paper-packs.json');
-
-    if (!response.ok) {
-      throw new Error('Unable to load paper pack catalog');
-    }
-
-    const data = await response.json();
-    addCardView.availablePaperPacks = (data.paperPacks || [])
-      .filter((paperPack) => paperPack.id && paperPack.name)
-      .sort((first, second) => first.name.localeCompare(second.name));
-    renderPaperPackSearchResults(addCardView);
-  } catch (error) {
-    addCardView.paperPackStatus.textContent = 'Paper packs could not be loaded.';
-  }
+function loadAvailablePaperPacks(addCardView, paperPacks) {
+  addCardView.availablePaperPacks = paperPacks
+    .filter((paperPack) => paperPack.id && paperPack.name)
+    .sort((first, second) => first.name.localeCompare(second.name));
+  renderPaperPackSearchResults(addCardView);
 }
 
 function renderPaperPackSearchResults(addCardView) {

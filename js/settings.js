@@ -7,13 +7,102 @@ import {
 import { loadCatalogSetting, saveCatalogSetting, savePaperPack, savePaperPacks } from "./storage.js";
 
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
+const CARD_IMAGE_LIBRARY_SETTING_ID = "cardImageLibrary";
 const LAST_BACKUP_EXPORT_SETTING_ID = "lastBackupExportedAt";
 const LAST_BACKUP_IMPORT_SETTING_ID = "lastBackupImportedAt";
 
 export function initializeSettings(options = {}) {
   initializeSetupStatus(options);
   initializeImageLibrarySettings(options);
+  initializeCardImageLibrarySettings();
   initializeBulkOwnerSettings(options);
+}
+
+async function initializeCardImageLibrarySettings() {
+  const chooseButton = document.querySelector("[data-choose-card-image-library]");
+  const reconnectButton = document.querySelector("[data-reconnect-card-image-library]");
+  const status = document.querySelector("[data-card-image-library-status]");
+
+  if (!chooseButton || !status) {
+    return;
+  }
+
+  if (!isDirectoryPickerSupported()) {
+    chooseButton.disabled = true;
+    if (reconnectButton) {
+      reconnectButton.disabled = true;
+    }
+    renderImageLibraryStatus(
+      status,
+      "Card image folder selection is not supported in this browser. IndexedDB will remain the fallback.",
+      "error"
+    );
+    return;
+  }
+
+  await renderSavedCardImageLibraryStatus(status);
+
+  chooseButton.addEventListener("click", async () => {
+    await selectCardImageLibraryFolder(status, "Card image folder selected");
+  });
+
+  reconnectButton?.addEventListener("click", async () => {
+    await selectCardImageLibraryFolder(status, "Card image folder reconnected");
+  });
+}
+
+async function selectCardImageLibraryFolder(status, successPrefix) {
+  try {
+    const directoryHandle = await window.showDirectoryPicker({
+      id: "csc-card-image-library",
+      mode: "readwrite"
+    });
+
+    await saveCatalogSetting(CARD_IMAGE_LIBRARY_SETTING_ID, {
+      strategy: "local-folder",
+      directoryHandle,
+      selectedAt: new Date().toISOString()
+    });
+
+    renderImageLibraryStatus(status, `${successPrefix}: ${directoryHandle.name}.`, "success");
+    document.dispatchEvent(new CustomEvent("catalog:card-image-library-selected"));
+    return true;
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      renderImageLibraryStatus(status, "Card image folder selection was cancelled.", "");
+      return false;
+    }
+
+    renderImageLibraryStatus(status, getFolderSelectionErrorMessage(error), "error");
+    return false;
+  }
+}
+
+async function renderSavedCardImageLibraryStatus(status) {
+  const savedLibrary = await loadCatalogSetting(CARD_IMAGE_LIBRARY_SETTING_ID);
+  const directoryHandle = savedLibrary?.directoryHandle;
+
+  if (!directoryHandle) {
+    renderImageLibraryStatus(
+      status,
+      "No Card image folder selected. New Card images will use fallback browser storage.",
+      ""
+    );
+    return;
+  }
+
+  const permissionState = await getDirectoryPermissionState(directoryHandle);
+
+  if (permissionState === "granted") {
+    renderImageLibraryStatus(status, `Card image folder ready: ${directoryHandle.name}.`, "success");
+    return;
+  }
+
+  renderImageLibraryStatus(
+    status,
+    `Saved Card image folder: ${directoryHandle.name}. Reconnect may be needed before images can be read.`,
+    ""
+  );
 }
 
 function initializeBulkOwnerSettings({ paperPacks = [], onPaperPacksUpdated } = {}) {
