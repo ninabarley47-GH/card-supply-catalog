@@ -68,7 +68,7 @@ Every module should have one clear job. The current modules are:
 | `storage.js` | IndexedDB persistence for paper packs, cards, colors, settings, base-data merging, deletion markers, and legacy localStorage migration |
 | `backup.js` | User-triggered standard/iPad export and import |
 | `card-images.js` | Card image selection, folder-backed storage, embedded fallback storage, thumbnail creation, and runtime hydration |
-| `cards.js` | Persisted Card gallery, Add Card workflow, Card detail rendering, and paper-pack relationship selection from the merged runtime catalog |
+| `cards.js` | Persisted Card gallery, shared Add/Edit Card workflow, Card detail rendering, and paper-pack relationship selection from the merged runtime catalog |
 | `cover-sheet.js` | Printable 6-by-6-inch cover-sheet generation |
 | `detail.js` | Detail-panel dismissal behavior |
 | `schema.js` | Catalog and backup schema versions |

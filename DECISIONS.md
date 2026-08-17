@@ -282,6 +282,7 @@ Provide a feature where you can load backup files incrementally. This allows a u
 14. paper-pack selection should ultimately come from the real catalog
 15. stampSets is an optional array because a Card may use multiple stamp sets
 16. Card images use a separately selected Card image-library folder. Images already inside it are referenced without copying; images selected elsewhere are copied into its root. The app creates a sibling thumbnail and keeps legacy Card image paths readable from the Paper image folder
+17. Add Card and Edit Card reuse the same form; replacing an image does not automatically delete the previously referenced image file
 cards and paper packs should eventually link in both directions
 card images should use the same folder-backed + thumbnail methodology you’ve now established for paper images
 

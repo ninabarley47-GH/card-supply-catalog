@@ -108,6 +108,7 @@ export function getCardDetailImageSource(card) {
 }
 
 async function prepareFolderBackedCardImage(card, selectedImage, rootDirectory) {
+  const cardWithoutImage = removeStoredCardImageFields(card);
   const imageName = selectedImage.imagePath
     ? selectedImage.file.name
     : await createAvailableImageFileName(rootDirectory, selectedImage.file.name);
@@ -127,7 +128,7 @@ async function prepareFolderBackedCardImage(card, selectedImage, rootDirectory) 
   }
 
   return {
-    ...card,
+    ...cardWithoutImage,
     imageName,
     imagePath,
     thumbnailImagePath: thumbnailPath,
@@ -137,15 +138,33 @@ async function prepareFolderBackedCardImage(card, selectedImage, rootDirectory) 
 }
 
 async function prepareEmbeddedCardImage(card, imageFile) {
+  const cardWithoutImage = removeStoredCardImageFields(card);
   const thumbnail = await generateImageThumbnail(imageFile);
 
   return {
-    ...card,
+    ...cardWithoutImage,
     imageName: imageFile.name,
     imageSrc: await blobToDataUrl(imageFile),
     thumbnailImageSrc: await blobToDataUrl(thumbnail),
     imageStorageStrategy: EMBEDDED_IMAGE_STORAGE_STRATEGY
   };
+}
+
+function removeStoredCardImageFields(card) {
+  const {
+    imageName,
+    imagePath,
+    thumbnailImagePath,
+    imageLibrary,
+    imageStorageStrategy,
+    imageSrc,
+    thumbnailImageSrc,
+    imagePreviewSrc,
+    imageThumbnailSrc,
+    ...cardWithoutImage
+  } = card;
+
+  return cardWithoutImage;
 }
 
 async function hydrateCardImageSource(card, rootDirectory) {

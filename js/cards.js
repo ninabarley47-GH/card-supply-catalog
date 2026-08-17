@@ -91,6 +91,21 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
       closeCardDetail(detailView, activeTile);
     }
   });
+  detailView.body.addEventListener('click', (event) => {
+    const editButton = event.target.closest('[data-edit-card]');
+
+    if (!editButton) {
+      return;
+    }
+
+    const card = findCard(cards, editButton.dataset.editCard);
+
+    if (card) {
+      closeCardDetail(detailView, activeTile);
+      loadAvailablePaperPacks(addCardView, paperPacks);
+      openEditCardView(addCardView, card);
+    }
+  });
 
   addCardView.form.addEventListener('submit', async () => {
     addStampSetsFromInput(addCardView, false);
@@ -102,7 +117,13 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
       const imageResult = await prepareCardImageForSave(card, addCardView.selectedImage);
       await saveCard(imageResult.card);
       await hydrateCardImageSources([imageResult.card]);
-      cards.push(imageResult.card);
+      const existingCardIndex = cards.findIndex((candidate) => candidate.id === imageResult.card.id);
+
+      if (existingCardIndex >= 0) {
+        cards.splice(existingCardIndex, 1, imageResult.card);
+      } else {
+        cards.push(imageResult.card);
+      }
       sortCards(cards);
       renderCardLibrary(gallery, cards);
       closeAddCardView(addCardView, addCardButton);
@@ -232,6 +253,7 @@ function createAddCardView() {
     overlay,
     panel,
     form,
+    title,
     close,
     cancel,
     save,
@@ -251,6 +273,8 @@ function createAddCardView() {
     imagePlaceholder: imagePicker.placeholder,
     imageMessage: imagePicker.message,
     selectedImage: null,
+    existingCard: null,
+    existingImageSource: '',
     paperPackSearch: paperPackPicker.search,
     paperPackResults: paperPackPicker.results,
     paperPackSelected: paperPackPicker.selected,
@@ -319,6 +343,31 @@ function createAddCardView() {
 
 function openAddCardView(addCardView) {
   resetAddCardForm(addCardView);
+  addCardView.overlay.hidden = false;
+  addCardView.close.focus();
+}
+
+function openEditCardView(addCardView, card) {
+  resetAddCardForm(addCardView);
+  addCardView.existingCard = card;
+  addCardView.title.textContent = 'Edit Card';
+  addCardView.save.textContent = 'Save Changes';
+  addCardView.dateCreated.value = card.dateCreated;
+  addCardView.sizePreset.value = getCardSizePreset(card.size);
+  applyCardSizePreset(addCardView);
+  addCardView.width.value = card.size.width;
+  addCardView.height.value = card.size.height;
+  addCardView.favorite.checked = card.favorite;
+  addCardView.stampSets = [...(card.stampSets || [])];
+  addCardView.tags = [...(card.tags || [])];
+  addCardView.paperPackIds = [...(card.paperPackIds || [])];
+  addCardView.existingImageSource = getCardDetailImageSource(card);
+  addCardView.imageMessage.textContent = card.imageName || '';
+  renderSelectedStampSets(addCardView);
+  renderSelectedCardTags(addCardView);
+  renderSelectedPaperPacks(addCardView);
+  renderPaperPackSearchResults(addCardView);
+  renderSelectedCardImage(addCardView);
   addCardView.overlay.hidden = false;
   addCardView.close.focus();
 }
@@ -527,11 +576,15 @@ function createCardImagePicker() {
 }
 
 function renderSelectedCardImage(addCardView) {
-  const hasImage = Boolean(addCardView.selectedImage?.previewSrc);
+  const imageSource = addCardView.selectedImage?.previewSrc || addCardView.existingImageSource;
+  const hasImage = Boolean(imageSource);
   addCardView.imagePreview.hidden = !hasImage;
   addCardView.imagePlaceholder.hidden = hasImage;
-  addCardView.imagePreview.src = hasImage ? addCardView.selectedImage.previewSrc : '';
-  addCardView.imageMessage.textContent = hasImage ? addCardView.selectedImage.name : '';
+  addCardView.imagePreview.src = hasImage ? imageSource : '';
+
+  if (addCardView.selectedImage) {
+    addCardView.imageMessage.textContent = addCardView.selectedImage.name;
+  }
 }
 
 function createDimensionInput(name) {
@@ -648,6 +701,11 @@ function resetAddCardForm(addCardView) {
   addCardView.tags = [];
   addCardView.stampSets = [];
   addCardView.selectedImage = null;
+  addCardView.existingCard = null;
+  addCardView.existingImageSource = '';
+  addCardView.title.textContent = 'Add Card';
+  addCardView.save.textContent = 'Save';
+  addCardView.imageMessage.textContent = '';
   addCardView.paperPackSearch.value = '';
   applyCardSizePreset(addCardView);
   renderSelectedPaperPacks(addCardView);
@@ -675,10 +733,12 @@ function getLocalDateValue() {
 }
 
 function createCardRecord(addCardView) {
-  const createdAt = new Date().toISOString();
+  const timestamp = new Date().toISOString();
+  const existingCard = addCardView.existingCard;
 
   return {
-    id: createCardId(createdAt),
+    ...(existingCard || {}),
+    id: existingCard?.id || createCardId(timestamp),
     dateCreated: addCardView.dateCreated.value,
     size: {
       preset: addCardView.sizePreset.value,
@@ -688,11 +748,22 @@ function createCardRecord(addCardView) {
     tags: [...addCardView.tags],
     stampSets: [...addCardView.stampSets],
     paperPackIds: [...addCardView.paperPackIds],
-    colorIds: [],
+    colorIds: [...(existingCard?.colorIds || [])],
     favorite: addCardView.favorite.checked,
-    createdAt,
-    updatedAt: createdAt
+    createdAt: existingCard?.createdAt || timestamp,
+    updatedAt: timestamp
   };
+}
+
+function getCardSizePreset(size) {
+  if (size?.preset && CARD_SIZE_PRESETS[size.preset]) {
+    return size.preset;
+  }
+
+  const matchingPreset = Object.entries(CARD_SIZE_PRESETS).find(([, preset]) =>
+    preset.width === size?.width && preset.height === size?.height
+  );
+  return matchingPreset?.[0] || 'custom';
 }
 
 function createCardId(createdAt) {
@@ -860,11 +931,24 @@ function createCardDetailContent(card, index) {
     createChipSection('Stamp sets', card.stampSets || []),
     createChipSection('Tags', card.tags),
     createChipSection('Paper packs', card.paperPackIds),
-    createChipSection('Colors', card.colorIds)
+    createChipSection('Colors', card.colorIds),
+    createCardDetailActions(card)
   );
 
   content.append(image, metadata);
   return content;
+}
+
+function createCardDetailActions(card) {
+  const actions = document.createElement('div');
+  actions.className = 'card-detail-actions';
+  const edit = document.createElement('button');
+  edit.className = 'button button-primary';
+  edit.type = 'button';
+  edit.dataset.editCard = card.id;
+  edit.textContent = 'Edit Card';
+  actions.append(edit);
+  return actions;
 }
 
 function applyCardMockupSize(element, card) {

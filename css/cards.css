@@ -542,6 +542,13 @@
   color: var(--color-muted);
 }
 
+.card-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
 @media (max-width: 44rem) {
   .card-detail-panel,
   .card-add-panel {
