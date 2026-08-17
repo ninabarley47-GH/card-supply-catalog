@@ -4,6 +4,7 @@ build/
 *.zip
 *.jpg
 *.png
+!assets/logo/CSC-logo.png
 *.jpeg
 *.webp
 !assets/cards/

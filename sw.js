@@ -26,7 +26,7 @@ const APP_SHELL = [
   "./js/version.js",
   "./data/colors.json",
   "./data/paper-packs.json",
-  "./assets/logo/CSC-logo-150px.png"
+  "./assets/logo/CSC-logo.png"
 ];
 
 self.addEventListener("install", (event) => {

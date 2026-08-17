@@ -79,15 +79,17 @@ a {
   display: flex;
   align-items: center;
   min-width: 0;
-  gap: var(--space-4);
+  gap: var(--space-6);
 }
 
 .brand-mark {
   display: block;
-  width: 3.25rem;
-  height: 3.25rem;
+  width: 5rem;
+  height: 5rem;
   flex: 0 0 auto;
   object-fit: contain;
+  transform: scale(1.375);
+  transform-origin: center;
 }
 
 .eyebrow {

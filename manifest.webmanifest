@@ -9,8 +9,7 @@
   "theme_color": "#52786d",
   "icons": [
     {
-      "src": "assets/logo/CSC-logo-150px.png",
-      "sizes": "150x150",
+      "src": "assets/logo/CSC-logo.png",
       "type": "image/png",
       "purpose": "any"
     }
