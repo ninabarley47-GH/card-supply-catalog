@@ -64,6 +64,7 @@ Every module should have one clear job. The current modules are:
 | `add-dsp.js` | Add/Edit DSP workflow, validation, remembered defaults, and automatic folder-image loading |
 | `color-form.js` | Add Color workflow, including missing-color handoff from Add/Edit DSP |
 | `images.js` | Embedded images, selected-folder access, relative paths, health checks, migration, and link repair |
+| `import-mode.js` | Shared incremental/overlay import planning for paper packs, colors, and Cards |
 | `settings.js` | Image-library settings, setup status, and bulk owner changes |
 | `storage.js` | IndexedDB persistence for paper packs, cards, colors, settings, base-data merging, deletion markers, and legacy localStorage migration |
 | `backup.js` | User-triggered standard/iPad export and import |

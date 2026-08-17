@@ -43,6 +43,13 @@ Cloud-synced folders such as OneDrive, Dropbox, iCloud Drive, or Google Drive ca
 5. If the backup uses folder-backed images, choose or reconnect the Paper and Card image library folders.
 6. Run Check Image Library for the Paper library and confirm Card images display.
 
+## Import Modes
+
+- Incremental import is the default. It adds paper packs, colors, and Cards whose IDs are not already present and skips matching IDs.
+- Overlay import is enabled with **Replace existing catalog entries during import**. It replaces matching IDs with the backup versions and also adds missing IDs. Existing records absent from the backup remain untouched.
+
+Paper packs and Cards use the same ID-based rules. Two Cards that look alike but have different IDs are distinct records and are retained in either mode.
+
 ## Backup Routine
 
 Export a fresh catalog backup after every cataloging session where you add or edit several paper packs or Cards.

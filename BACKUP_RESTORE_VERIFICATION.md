@@ -47,3 +47,11 @@ Expected differences:
 - future verification metadata, if added later
 
 Folder-backed image files are not embedded in the standard JSON backup. The Paper and Card image folders must be backed up or shared separately. The iPad backup embeds accessible Paper and Card images.
+
+## Import Mode Verification
+
+1. With existing test paper packs and Cards present, import a backup with replacement unchecked.
+2. Confirm matching paper-pack and Card IDs are skipped, missing IDs are added, and current matching records remain unchanged.
+3. Import the same backup with **Replace existing catalog entries during import** checked and approve the confirmation.
+4. Confirm matching paper-pack and Card IDs now contain the backup values, missing IDs are added, and records absent from the backup remain unchanged.
+5. Confirm the restore summary reports imported and skipped paper packs, colors, and Cards accurately.

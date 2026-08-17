@@ -298,7 +298,7 @@
                 <input type="checkbox" data-import-overwrite-existing>
                 <span>Replace existing catalog entries during import</span>
               </label>
-              <p class="settings-help">By default, import adds only missing paper packs and colors. Select this option only when you intentionally want the backup to replace matching catalog entries.</p>
+              <p class="settings-help">By default, incremental import adds paper packs, colors, and Cards whose IDs are missing and leaves matching IDs unchanged. Select this option for an overlay import that replaces matching IDs while retaining unrelated catalog entries. Cards that look alike but have different IDs remain separate.</p>
               <p class="settings-help">If an imported backup is missing images, choose <strong>Import Diagnostic</strong>, select the same backup, then download the report to send to the app developer.</p>
               <details class="settings-help">
                 <summary>How do I share this catalog with an iPad or another computer?</summary>

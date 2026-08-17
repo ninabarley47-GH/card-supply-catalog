@@ -17,6 +17,7 @@ const APP_SHELL = [
   "./js/color-form.js",
   "./js/cover-sheet.js",
   "./js/images.js",
+  "./js/import-mode.js",
   "./js/library.js",
   "./js/pwa.js",
   "./js/schema.js",

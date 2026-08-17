@@ -8,6 +8,7 @@ import {
   savePaperPack
 } from "./storage.js";
 import { getCardDetailImageSource, hydrateCardImageSources } from "./card-images.js";
+import { createImportPlan } from "./import-mode.js";
 import {
   clearPaperPackImageObjectUrls,
   getPatternImageFile,
@@ -204,15 +205,15 @@ async function summarizeBackupOverwrites(backup, paperPacks, colorsById) {
   const importedColors = backup?.colors && typeof backup.colors === "object" ? Object.values(backup.colors) : [];
   const importedCards = Array.isArray(backup?.cards) ? backup.cards : [];
   const savedCards = await loadSavedCards();
-  const existingPackIds = new Set(paperPacks.map((paperPack) => paperPack.id));
-  const existingColorIds = new Set(Object.keys(colorsById));
-  const existingCardIds = new Set(savedCards.map((card) => card.id));
-  const packOverwriteCount = importedPaperPacks.filter((paperPack) => existingPackIds.has(paperPack?.id)).length;
-  const colorOverwriteCount = importedColors.filter((color) => existingColorIds.has(color?.id)).length;
-  const cardOverwriteCount = importedCards.filter((card) => existingCardIds.has(card?.id)).length;
-  const newPackCount = importedPaperPacks.length - packOverwriteCount;
-  const newColorCount = importedColors.length - colorOverwriteCount;
-  const newCardCount = importedCards.length - cardOverwriteCount;
+  const packPlan = createImportPlan(importedPaperPacks, paperPacks, true);
+  const colorPlan = createImportPlan(importedColors, Object.values(colorsById), true);
+  const cardPlan = createImportPlan(importedCards, savedCards, true);
+  const packOverwriteCount = packPlan.matchingCount;
+  const colorOverwriteCount = colorPlan.matchingCount;
+  const cardOverwriteCount = cardPlan.matchingCount;
+  const newPackCount = packPlan.newCount;
+  const newColorCount = colorPlan.newCount;
+  const newCardCount = cardPlan.newCount;
   const overwriteParts = [];
 
   if (packOverwriteCount > 0) {
@@ -493,14 +494,18 @@ async function restoreCatalogBackup({
   const importedPaperPacks = Array.isArray(backup?.paperPacks) ? backup.paperPacks : [];
   const importedCards = Array.isArray(backup?.cards) ? backup.cards : [];
   const savedCards = await loadSavedCards();
-  const existingPackIds = new Set(paperPacks.map((paperPack) => paperPack.id));
-  const existingColorIds = new Set(Object.keys(colorsById));
-  const existingCardIds = new Set(savedCards.map((card) => card.id));
-  const paperPacksToImport = overwriteExisting
-    ? importedPaperPacks
-    : importedPaperPacks.filter((paperPack) => !existingPackIds.has(paperPack?.id));
+  const colorPlan = createImportPlan(
+    importedColorsById ? Object.values(importedColorsById) : [],
+    Object.values(colorsById),
+    overwriteExisting
+  );
+  const paperPackPlan = createImportPlan(importedPaperPacks, paperPacks, overwriteExisting);
+  const cardPlan = createImportPlan(importedCards, savedCards, overwriteExisting);
+  summary.colorsSkipped = colorPlan.skippedCount;
+  summary.packsSkipped = paperPackPlan.skippedCount;
+  summary.cardsSkipped = cardPlan.skippedCount;
   const importDiagnostic = await createImportDiagnostic(
-    paperPacksToImport,
+    paperPackPlan.recordsToImport,
     diagnosticContext
   );
 
@@ -526,16 +531,10 @@ async function restoreCatalogBackup({
     );
   }
 
-  for (const color of Object.values(importedColorsById)) {
-    if (!overwriteExisting && existingColorIds.has(color?.id)) {
-      summary.colorsSkipped += 1;
-      continue;
-    }
-
+  for (const color of colorPlan.recordsToImport) {
     try {
       await saveColor(color);
       colorsById[color.id] = color;
-      existingColorIds.add(color.id);
       summary.colorsImported += 1;
     } catch (error) {
       logImportError("Color write failed", error, { colorId: color?.id });
@@ -543,12 +542,7 @@ async function restoreCatalogBackup({
     }
   }
 
-  for (const paperPack of importedPaperPacks) {
-    if (!overwriteExisting && existingPackIds.has(paperPack?.id)) {
-      summary.packsSkipped += 1;
-      continue;
-    }
-
+  for (const paperPack of paperPackPlan.recordsToImport) {
     try {
       const reconnectResult = await reconnectPaperPackImagesToExistingFolder(paperPack);
       const versionedPaperPack = addCatalogSchemaVersion(reconnectResult.paperPack);
@@ -556,7 +550,6 @@ async function restoreCatalogBackup({
       await savePaperPack(versionedPaperPack);
       await verifySavedPaperPackImages(importDiagnostic, versionedPaperPack);
       upsertPaperPack(paperPacks, versionedPaperPack);
-      existingPackIds.add(versionedPaperPack.id);
       summary.packsImported += 1;
       summary.importedPaperPackIds.push(versionedPaperPack.id);
       summary.imagesImported += countEmbeddedPatternImages(versionedPaperPack);
@@ -571,16 +564,10 @@ async function restoreCatalogBackup({
     }
   }
 
-  for (const card of importedCards) {
-    if (!overwriteExisting && existingCardIds.has(card?.id)) {
-      summary.cardsSkipped += 1;
-      continue;
-    }
-
+  for (const card of cardPlan.recordsToImport) {
     try {
       const versionedCard = addCatalogSchemaVersion(createSerializableCard(card));
       await saveCard(versionedCard);
-      existingCardIds.add(versionedCard.id);
       summary.cardsImported += 1;
       summary.imagesImported += versionedCard.imageSrc ? 1 : 0;
       summary.folderImageReferencesImported += versionedCard.imagePath ? 1 : 0;
