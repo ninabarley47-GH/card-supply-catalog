@@ -9,10 +9,10 @@
   "theme_color": "#52786d",
   "icons": [
     {
-      "src": "assets/logo/app-logo.png",
-      "sizes": "512x512",
+      "src": "assets/logo/CSC-logo-150px.png",
+      "sizes": "150x150",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }
