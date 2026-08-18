@@ -192,7 +192,7 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
     );
   });
 
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const result = buildPaperPackFromForm(
@@ -230,25 +230,20 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
     };
     const defaultsToSave = createAddDspDefaults(result.paperPack);
 
+    submitButton.disabled = true;
+    renderFormMessage(message, `Saving ${result.paperPack.name}...`, "");
+
     document.dispatchEvent(
       new CustomEvent("paper-pack:save", {
         detail: saveDetail
       })
     );
 
-    renderFormMessage(message, `${result.paperPack.name} was saved.`, "success");
-    form.reset();
-    closeAddDspPanel(panel, form, message, selectedImages, imagePreviewList, imagePreviewCount, {
-      title,
-      summary,
-      submitButton,
-      formState
-    });
-    window.location.hash = "library";
+    try {
+      const saveResult = await saveDetail.saveComplete;
 
-    saveDetail.saveComplete?.then((saveResult) => {
       if (!saveResult.ok) {
-        window.alert(saveResult.message);
+        renderFormMessage(message, saveResult.message, "error");
         return;
       }
 
@@ -262,7 +257,21 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
       if (saveResult.warning) {
         window.alert(saveResult.warning);
       }
-    });
+
+      renderFormMessage(message, `${result.paperPack.name} was saved.`, "success");
+      form.reset();
+      closeAddDspPanel(panel, form, message, selectedImages, imagePreviewList, imagePreviewCount, {
+        title,
+        summary,
+        submitButton,
+        formState
+      });
+      window.location.hash = "library";
+    } catch {
+      renderFormMessage(message, "The paper pack could not be saved in this browser.", "error");
+    } finally {
+      submitButton.disabled = false;
+    }
   });
 }
 
