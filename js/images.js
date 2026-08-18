@@ -5,6 +5,7 @@ const EMBEDDED_IMAGE_STORAGE_STRATEGY = "embedded-indexed-db";
 const LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY = "local-folder";
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
 const RESERVED_CARD_IMAGE_DIRECTORY_ID = "cards";
+const THUMBNAIL_GENERATION_CONCURRENCY = 4;
 
 export async function addPatternImageFiles(files) {
   const imageFiles = files.filter((file) => file.type.startsWith("image/"));
@@ -23,12 +24,14 @@ export async function generateMissingImageThumbnails(paperPacks = []) {
 
   const summary = { imagesScanned: 0, thumbnailsCreated: 0, thumbnailsRepaired: 0, thumbnailsSkipped: 0, errors: [] };
   const referencedImagePaths = getReferencedPaperPackImagePaths(paperPacks);
-  await generateMissingThumbnailsInDirectory(directoryHandle, "", summary, referencedImagePaths);
+  const thumbnailJobs = [];
+  await collectMissingThumbnailJobs(directoryHandle, "", summary, referencedImagePaths, thumbnailJobs);
+  await runTasksWithConcurrency(thumbnailJobs, THUMBNAIL_GENERATION_CONCURRENCY);
 
   return { ok: true, summary };
 }
 
-async function generateMissingThumbnailsInDirectory(directoryHandle, directoryPath, summary, referencedImagePaths) {
+async function collectMissingThumbnailJobs(directoryHandle, directoryPath, summary, referencedImagePaths, thumbnailJobs) {
   const entries = [];
 
   for await (const [entryName, entryHandle] of directoryHandle.entries()) {
@@ -47,7 +50,7 @@ async function generateMissingThumbnailsInDirectory(directoryHandle, directoryPa
 
     if (entryHandle.kind === "directory") {
       if (hasReferencedImageWithinDirectory(normalizedEntryPath, referencedImagePaths)) {
-        await generateMissingThumbnailsInDirectory(entryHandle, entryPath, summary, referencedImagePaths);
+        await collectMissingThumbnailJobs(entryHandle, entryPath, summary, referencedImagePaths, thumbnailJobs);
       }
       continue;
     }
@@ -65,23 +68,40 @@ async function generateMissingThumbnailsInDirectory(directoryHandle, directoryPa
       continue;
     }
 
-    try {
-      const sourceImage = await entryHandle.getFile();
-      const thumbnailBlob = await generateImageThumbnail(sourceImage);
-      const thumbnailHandle = await directoryHandle.getFileHandle(thumbnailName, { create: true });
-      const writable = await thumbnailHandle.createWritable();
+    thumbnailJobs.push(async () => {
+      try {
+        const sourceImage = await entryHandle.getFile();
+        const thumbnailBlob = await generateImageThumbnail(sourceImage);
+        const thumbnailHandle = await directoryHandle.getFileHandle(thumbnailName, { create: true });
+        const writable = await thumbnailHandle.createWritable();
 
-      await writable.write(thumbnailBlob);
-      await writable.close();
-      if (existingThumbnailHandle) {
-        summary.thumbnailsRepaired += 1;
-      } else {
-        summary.thumbnailsCreated += 1;
+        await writable.write(thumbnailBlob);
+        await writable.close();
+        if (existingThumbnailHandle) {
+          summary.thumbnailsRepaired += 1;
+        } else {
+          summary.thumbnailsCreated += 1;
+        }
+      } catch (error) {
+        summary.errors.push(entryPath);
       }
-    } catch (error) {
-      summary.errors.push(entryPath);
+    });
+  }
+}
+
+export async function runTasksWithConcurrency(tasks, concurrency) {
+  let nextTaskIndex = 0;
+
+  async function runWorker() {
+    while (nextTaskIndex < tasks.length) {
+      const taskIndex = nextTaskIndex;
+      nextTaskIndex += 1;
+      await tasks[taskIndex]();
     }
   }
+
+  const workerCount = Math.min(Math.max(1, concurrency), tasks.length);
+  await Promise.all(Array.from({ length: workerCount }, runWorker));
 }
 
 export function getReferencedPaperPackImagePaths(paperPacks = []) {
