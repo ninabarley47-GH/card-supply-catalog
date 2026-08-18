@@ -55,3 +55,15 @@ Folder-backed image files are not embedded in the standard JSON backup. The Pape
 3. Import the same backup with **Replace existing catalog entries during import** checked and approve the confirmation.
 4. Confirm matching paper-pack and Card IDs now contain the backup values, missing IDs are added, and records absent from the backup remain unchanged.
 5. Confirm the restore summary reports imported and skipped paper packs, colors, and Cards accurately.
+
+## Atomic Failure Verification
+
+Use only a disposable test profile for this check.
+
+1. Record the current paper-pack, color, and Card counts and the values of several recognizable records.
+2. Make a copy of a valid backup and deliberately invalidate one Card, such as changing `size.width` from a number to text.
+3. Import the invalid backup.
+4. Confirm the restore reports that nothing was imported.
+5. Confirm all original counts and recognizable record values are unchanged.
+6. Repeat with a duplicate paper-pack ID or a color object whose key does not match its `id`.
+7. Import the original valid backup and confirm the complete selected import succeeds.

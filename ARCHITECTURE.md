@@ -132,7 +132,7 @@ Backups are explicit, user-triggered JSON exports rather than automatic rolling 
 
 - Standard backup: includes paper packs, Cards, colors, embedded fallback images, and relative references to folder-backed Paper and Card images. The image folders must be backed up separately.
 - iPad backup: embeds compressed copies of accessible Paper and Card images so the catalog can be restored where folder access is unavailable.
-- Import: validates the backup, warns before overwriting matching records, persists restored records to IndexedDB, and reports missing folder-image requirements.
+- Import: validates every color, paper pack, and Card before writing; prepares image references; then persists the complete selected import in one IndexedDB transaction. Any validation, preparation, or transaction failure leaves the catalog unchanged. Import warns before overwriting matching records and reports missing folder-image requirements.
 - Destination: if the selected image-library folder is writable, export saves there; otherwise it uses a browser download.
 
 # Error Handling
@@ -140,6 +140,7 @@ Never lose user data.
 Validate before saving.
 Recover gracefully.
 Never leave an invalid or partially written catalog record in IndexedDB.
+Backup restore is atomic across paper packs, deletion markers, colors, and Cards: either the complete selected import commits or none of it does.
 
 # Performance Goals
 Startup feels instantaneous.

@@ -2,10 +2,11 @@ import {
   loadCatalogSetting,
   loadSavedCards,
   loadSavedPaperPack,
-  saveCatalogSetting,
-  saveCard,
-  saveColor,
-  savePaperPack
+  isCard,
+  isColor,
+  isPaperPack,
+  restoreCatalogRecords,
+  saveCatalogSetting
 } from "./storage.js";
 import { getCardDetailImageSource, hydrateCardImageSources } from "./card-images.js";
 import { createImportPlan } from "./import-mode.js";
@@ -490,6 +491,13 @@ async function restoreCatalogBackup({
     warnings: [],
     errors: []
   };
+  const validation = validateBackup(backup);
+
+  if (!validation.ok) {
+    summary.errors.push(validation.message);
+    return summary;
+  }
+
   const importedColorsById = backup?.colors || {};
   const importedPaperPacks = Array.isArray(backup?.paperPacks) ? backup.paperPacks : [];
   const importedCards = Array.isArray(backup?.cards) ? backup.cards : [];
@@ -509,14 +517,6 @@ async function restoreCatalogBackup({
     diagnosticContext
   );
 
-  const validation = validateBackup(backup);
-
-  if (!validation.ok) {
-    summary.errors.push(validation.message);
-    summary.diagnosticReport = await reportImportDiagnostic(importDiagnostic);
-    return summary;
-  }
-
   if (backup.schemaVersion !== BACKUP_SCHEMA_VERSION) {
     summary.warnings.push(
       `Imported backup schema version ${backup.schemaVersion || "unknown"}; current schema version is ${BACKUP_SCHEMA_VERSION}.`
@@ -531,51 +531,62 @@ async function restoreCatalogBackup({
     );
   }
 
-  for (const color of colorPlan.recordsToImport) {
-    try {
-      await saveColor(color);
-      colorsById[color.id] = color;
-      summary.colorsImported += 1;
-    } catch (error) {
-      logImportError("Color write failed", error, { colorId: color?.id });
-      summary.errors.push(`Color could not be imported: ${color?.name || color?.id || "Unknown color"}`);
-    }
-  }
+  const preparedPaperPacks = [];
+  const preparedCards = cardPlan.recordsToImport.map((card) =>
+    addCatalogSchemaVersion(createSerializableCard(card))
+  );
 
   for (const paperPack of paperPackPlan.recordsToImport) {
     try {
       const reconnectResult = await reconnectPaperPackImagesToExistingFolder(paperPack);
-      const versionedPaperPack = addCatalogSchemaVersion(reconnectResult.paperPack);
-
-      await savePaperPack(versionedPaperPack);
-      await verifySavedPaperPackImages(importDiagnostic, versionedPaperPack);
-      upsertPaperPack(paperPacks, versionedPaperPack);
-      summary.packsImported += 1;
-      summary.importedPaperPackIds.push(versionedPaperPack.id);
-      summary.imagesImported += countEmbeddedPatternImages(versionedPaperPack);
-      summary.folderImageReferencesImported += countFolderImageReferences(versionedPaperPack);
+      preparedPaperPacks.push(addCatalogSchemaVersion(reconnectResult.paperPack));
     } catch (error) {
-      recordPaperPackStorageFailure(importDiagnostic, paperPack, error);
-      logImportError("Paper-pack write failed", error, {
-        paperPackId: paperPack?.id,
-        embeddedImageCount: countEmbeddedPatternImages(paperPack)
-      });
-      summary.errors.push(`Paper pack could not be imported: ${paperPack?.name || paperPack?.id || "Unknown pack"}`);
+      logImportError("Paper-pack preparation failed", error, { paperPackId: paperPack?.id });
+      summary.errors.push(
+        `Nothing was imported because ${paperPack?.name || paperPack?.id || "a paper pack"} could not be prepared.`
+      );
+      summary.diagnosticReport = await reportImportDiagnostic(importDiagnostic);
+      return summary;
     }
   }
 
-  for (const card of cardPlan.recordsToImport) {
-    try {
-      const versionedCard = addCatalogSchemaVersion(createSerializableCard(card));
-      await saveCard(versionedCard);
-      summary.cardsImported += 1;
-      summary.imagesImported += versionedCard.imageSrc ? 1 : 0;
-      summary.folderImageReferencesImported += versionedCard.imagePath ? 1 : 0;
-    } catch (error) {
-      logImportError("Card write failed", error, { cardId: card?.id });
-      summary.errors.push(`Card could not be imported: ${card?.id || "Unknown Card"}`);
-    }
+  try {
+    await restoreCatalogRecords({
+      paperPacks: preparedPaperPacks,
+      colors: colorPlan.recordsToImport,
+      cards: preparedCards
+    });
+  } catch (error) {
+    logImportError("Atomic catalog restore failed", error, {
+      paperPackCount: preparedPaperPacks.length,
+      colorCount: colorPlan.recordsToImport.length,
+      cardCount: preparedCards.length
+    });
+    summary.errors.push("Nothing was imported because the catalog could not be saved as one complete transaction.");
+    summary.diagnosticReport = await reportImportDiagnostic(importDiagnostic);
+    return summary;
   }
+
+  for (const color of colorPlan.recordsToImport) {
+    colorsById[color.id] = color;
+  }
+
+  for (const paperPack of preparedPaperPacks) {
+    upsertPaperPack(paperPacks, paperPack);
+    await verifySavedPaperPackImages(importDiagnostic, paperPack);
+    summary.importedPaperPackIds.push(paperPack.id);
+    summary.imagesImported += countEmbeddedPatternImages(paperPack);
+    summary.folderImageReferencesImported += countFolderImageReferences(paperPack);
+  }
+
+  for (const card of preparedCards) {
+    summary.imagesImported += card.imageSrc ? 1 : 0;
+    summary.folderImageReferencesImported += card.imagePath ? 1 : 0;
+  }
+
+  summary.colorsImported = colorPlan.recordsToImport.length;
+  summary.packsImported = preparedPaperPacks.length;
+  summary.cardsImported = preparedCards.length;
 
   if (summary.cardsImported > 0) {
     document.dispatchEvent(new CustomEvent("catalog:cards-restored"));
@@ -931,7 +942,7 @@ function logImportError(message, error, details = {}) {
   });
 }
 
-function validateBackup(backup) {
+export function validateBackup(backup) {
   if (!backup || backup.app !== "card-supply-catalog") {
     return {
       ok: false,
@@ -939,11 +950,54 @@ function validateBackup(backup) {
     };
   }
 
-  if (!backup.colors || typeof backup.colors !== "object" || !Array.isArray(backup.paperPacks)) {
+  if (
+    !backup.colors ||
+    typeof backup.colors !== "object" ||
+    Array.isArray(backup.colors) ||
+    !Array.isArray(backup.paperPacks) ||
+    (backup.cards !== undefined && !Array.isArray(backup.cards))
+  ) {
     return {
       ok: false,
       message: "The backup is missing colors or paper packs."
     };
+  }
+
+  const colors = Object.values(backup.colors);
+  const cards = backup.cards || [];
+  const recordCollections = [
+    { label: "color", records: colors, validator: isColor },
+    { label: "paper pack", records: backup.paperPacks, validator: isPaperPack },
+    { label: "Card", records: cards, validator: isCard }
+  ];
+
+  for (const { label, records, validator } of recordCollections) {
+    const invalidIndex = records.findIndex((record) => !validator(record));
+
+    if (invalidIndex !== -1) {
+      return {
+        ok: false,
+        message: `Nothing was imported because ${label} record ${invalidIndex + 1} is invalid.`
+      };
+    }
+
+    const duplicateId = findDuplicateRecordId(records);
+
+    if (duplicateId) {
+      return {
+        ok: false,
+        message: `Nothing was imported because the backup contains duplicate ${label} ID "${duplicateId}".`
+      };
+    }
+  }
+
+  for (const [colorId, color] of Object.entries(backup.colors)) {
+    if (color.id !== colorId) {
+      return {
+        ok: false,
+        message: `Nothing was imported because color key "${colorId}" does not match its record ID.`
+      };
+    }
   }
 
   return {
@@ -1097,6 +1151,20 @@ async function createSerializableCardWithCompressedImage(card) {
     missingImages: 0,
     folderImageReferences: hadFolderImage ? 1 : 0
   };
+}
+
+function findDuplicateRecordId(records) {
+  const seenIds = new Set();
+
+  for (const record of records) {
+    if (seenIds.has(record.id)) {
+      return record.id;
+    }
+
+    seenIds.add(record.id);
+  }
+
+  return "";
 }
 
 async function createSerializablePaperPackWithCompressedImages(paperPack) {

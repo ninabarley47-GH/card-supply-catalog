@@ -97,6 +97,35 @@ export async function saveCard(card) {
   });
 }
 
+export async function restoreCatalogRecords({ paperPacks = [], colors = [], cards = [] }) {
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
+
+  await writeTransaction(
+    database,
+    [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE, COLORS_STORE, CARDS_STORE],
+    (transaction) => {
+      const paperPackStore = transaction.objectStore(PAPER_PACKS_STORE);
+      const deletedPaperPackIdStore = transaction.objectStore(DELETED_PAPER_PACK_IDS_STORE);
+      const colorStore = transaction.objectStore(COLORS_STORE);
+      const cardStore = transaction.objectStore(CARDS_STORE);
+
+      for (const paperPack of paperPacks) {
+        paperPackStore.put(normalizePaperPackForStorage(paperPack));
+        deletedPaperPackIdStore.delete(paperPack.id);
+      }
+
+      for (const color of colors) {
+        colorStore.put(color);
+      }
+
+      for (const card of cards) {
+        cardStore.put(addCatalogSchemaVersion(normalizeCardForRuntime(card)));
+      }
+    }
+  );
+}
+
 export async function deleteCard(cardId) {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
@@ -357,11 +386,16 @@ function writeTransaction(database, storeNames, writeCallback) {
     transaction.addEventListener("error", () => reject(transaction.error));
     transaction.addEventListener("abort", () => reject(transaction.error));
 
-    writeCallback(transaction);
+    try {
+      writeCallback(transaction);
+    } catch (error) {
+      transaction.abort();
+      reject(error);
+    }
   });
 }
 
-function isPaperPack(paperPack) {
+export function isPaperPack(paperPack) {
   return (
     paperPack &&
     typeof paperPack.id === "string" &&
@@ -375,7 +409,7 @@ function isPaperPack(paperPack) {
   );
 }
 
-function isColor(color) {
+export function isColor(color) {
   return (
     color &&
     typeof color.id === "string" &&
@@ -431,7 +465,7 @@ function normalizeCardForRuntime(card) {
   };
 }
 
-function isCard(card) {
+export function isCard(card) {
   return (
     card &&
     typeof card.id === "string" &&
