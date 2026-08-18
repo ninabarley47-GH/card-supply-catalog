@@ -56,7 +56,8 @@ Folder-backed image files are not embedded in the standard JSON backup. The Pape
 4. Confirm matching paper-pack and Card IDs now contain the backup values, missing IDs are added, and records absent from the backup remain unchanged.
 5. Confirm the restore summary reports imported and skipped paper packs, colors, and Cards accurately.
 
-## Atomic Failure Verification
+# Atomic Failure Verification
+## If validation, preparation, or any database write fails, the transaction is aborted and the existing catalog remains unchanged.
 
 Use only a disposable test profile for this check.
 
