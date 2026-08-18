@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  getReferencedPaperPackImagePaths,
   getPaperLibraryImageSource,
-  getPatternImageSource
+  getPatternImageSource,
+  isUsableThumbnailFile
 } from "./images.js";
 
 test("Paper Library prefers a hydrated thumbnail while detail keeps the full image", () => {
@@ -58,4 +60,29 @@ test("Paper Library can use a thumbnail when its full-resolution source is unava
     "blob:thumbnail-from-stored-path"
   );
   assert.equal(getPatternImageSource(packWithRenamedOriginal.patterns[0]), "");
+});
+
+test("thumbnail generation treats empty or unreadable thumbnail files as unusable", async () => {
+  assert.equal(await isUsableThumbnailFile({ getFile: async () => ({ size: 12_000 }) }), true);
+  assert.equal(await isUsableThumbnailFile({ getFile: async () => ({ size: 0 }) }), false);
+  assert.equal(await isUsableThumbnailFile({ getFile: async () => { throw new Error("unreadable"); } }), false);
+});
+
+test("thumbnail generation targets only unique catalog-referenced Paper Pack images", () => {
+  const paths = getReferencedPaperPackImagePaths([
+    {
+      patterns: [
+        { imagePath: "Dainty Flowers/Dainty Flowers_7.jpg" },
+        { imagePath: "dainty flowers\\Dainty Flowers_7.jpg" },
+        { imagePath: "Dainty Flowers/Dainty Flowers_8.jpg" },
+        { imageSrc: "data:image/jpeg;base64,embedded" },
+        "pattern-placeholder"
+      ]
+    }
+  ]);
+
+  assert.deepEqual([...paths], [
+    "dainty flowers/dainty flowers_7.jpg",
+    "dainty flowers/dainty flowers_8.jpg"
+  ]);
 });

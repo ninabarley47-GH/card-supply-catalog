@@ -295,20 +295,20 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
     renderImageLibraryStatus(status, "Scanning the selected folder for missing thumbnails...", "");
 
     try {
-      const result = await generateMissingImageThumbnails();
+      const result = await generateMissingImageThumbnails(paperPacks);
 
       if (!result.ok) {
         renderImageLibraryStatus(status, "Reconnect the image folder before generating thumbnails.", "error");
         return;
       }
 
-      const { imagesScanned, thumbnailsCreated, thumbnailsSkipped, errors } = result.summary;
+      const { imagesScanned, thumbnailsCreated, thumbnailsRepaired, thumbnailsSkipped, errors } = result.summary;
       const errorMessage = errors.length > 0
         ? ` ${errors.length} image${errors.length === 1 ? "" : "s"} could not be processed.`
         : "";
       renderImageLibraryStatus(
         status,
-        `${imagesScanned} image${imagesScanned === 1 ? "" : "s"} scanned. ${thumbnailsCreated} missing thumbnail${thumbnailsCreated === 1 ? "" : "s"} created; ${thumbnailsSkipped} existing thumbnail${thumbnailsSkipped === 1 ? "" : "s"} left unchanged.${errorMessage}`,
+        `${imagesScanned} image${imagesScanned === 1 ? "" : "s"} scanned. ${thumbnailsCreated} missing thumbnail${thumbnailsCreated === 1 ? "" : "s"} created; ${thumbnailsRepaired} empty thumbnail${thumbnailsRepaired === 1 ? "" : "s"} repaired; ${thumbnailsSkipped} existing thumbnail${thumbnailsSkipped === 1 ? "" : "s"} left unchanged.${errorMessage}`,
         errors.length > 0 ? "error" : "success"
       );
       await onImagesMigrated?.();

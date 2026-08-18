@@ -11,51 +11,56 @@ export async function addPatternImageFiles(files) {
   return await Promise.all(imageFiles.map(readImageFileAsStoredImage));
 }
 
-export async function generateMissingImageThumbnails() {
+export async function generateMissingImageThumbnails(paperPacks = []) {
   const directoryHandle = await getWritableImageLibraryDirectoryHandle();
 
   if (!directoryHandle) {
     return {
       ok: false,
-      summary: { imagesScanned: 0, thumbnailsCreated: 0, thumbnailsSkipped: 0, errors: [] }
+      summary: { imagesScanned: 0, thumbnailsCreated: 0, thumbnailsRepaired: 0, thumbnailsSkipped: 0, errors: [] }
     };
   }
 
-  const summary = { imagesScanned: 0, thumbnailsCreated: 0, thumbnailsSkipped: 0, errors: [] };
-  await generateMissingThumbnailsInDirectory(directoryHandle, "", summary);
+  const summary = { imagesScanned: 0, thumbnailsCreated: 0, thumbnailsRepaired: 0, thumbnailsSkipped: 0, errors: [] };
+  const referencedImagePaths = getReferencedPaperPackImagePaths(paperPacks);
+  await generateMissingThumbnailsInDirectory(directoryHandle, "", summary, referencedImagePaths);
 
   return { ok: true, summary };
 }
 
-async function generateMissingThumbnailsInDirectory(directoryHandle, directoryPath, summary) {
+async function generateMissingThumbnailsInDirectory(directoryHandle, directoryPath, summary, referencedImagePaths) {
   const entries = [];
 
   for await (const [entryName, entryHandle] of directoryHandle.entries()) {
     entries.push([entryName, entryHandle]);
   }
 
-  const fileNames = new Set(
+  const fileHandles = new Map(
     entries
       .filter(([, entryHandle]) => entryHandle.kind === "file")
-      .map(([entryName]) => entryName.toLocaleLowerCase())
+      .map(([entryName, entryHandle]) => [entryName.toLocaleLowerCase(), entryHandle])
   );
 
   for (const [entryName, entryHandle] of entries) {
     const entryPath = directoryPath ? `${directoryPath}/${entryName}` : entryName;
+    const normalizedEntryPath = normalizeImagePath(entryPath);
 
     if (entryHandle.kind === "directory") {
-      await generateMissingThumbnailsInDirectory(entryHandle, entryPath, summary);
+      if (hasReferencedImageWithinDirectory(normalizedEntryPath, referencedImagePaths)) {
+        await generateMissingThumbnailsInDirectory(entryHandle, entryPath, summary, referencedImagePaths);
+      }
       continue;
     }
 
-    if (!isSupportedImageFileName(entryName)) {
+    if (!isSupportedImageFileName(entryName) || !referencedImagePaths.has(normalizedEntryPath)) {
       continue;
     }
 
     summary.imagesScanned += 1;
     const thumbnailName = createThumbnailImageFileName(entryName);
+    const existingThumbnailHandle = fileHandles.get(thumbnailName.toLocaleLowerCase());
 
-    if (fileNames.has(thumbnailName.toLocaleLowerCase())) {
+    if (existingThumbnailHandle && await isUsableThumbnailFile(existingThumbnailHandle)) {
       summary.thumbnailsSkipped += 1;
       continue;
     }
@@ -68,10 +73,47 @@ async function generateMissingThumbnailsInDirectory(directoryHandle, directoryPa
 
       await writable.write(thumbnailBlob);
       await writable.close();
-      summary.thumbnailsCreated += 1;
+      if (existingThumbnailHandle) {
+        summary.thumbnailsRepaired += 1;
+      } else {
+        summary.thumbnailsCreated += 1;
+      }
     } catch (error) {
       summary.errors.push(entryPath);
     }
+  }
+}
+
+export function getReferencedPaperPackImagePaths(paperPacks = []) {
+  return new Set(
+    paperPacks.flatMap((paperPack) =>
+      (paperPack?.patterns || [])
+        .map((pattern) => pattern && typeof pattern === "object" ? normalizeImagePath(pattern.imagePath) : "")
+        .filter(Boolean)
+    )
+  );
+}
+
+function hasReferencedImageWithinDirectory(directoryPath, referencedImagePaths) {
+  const directoryPrefix = `${directoryPath}/`;
+  return [...referencedImagePaths].some((imagePath) => imagePath.startsWith(directoryPrefix));
+}
+
+function normalizeImagePath(imagePath) {
+  return String(imagePath || "")
+    .replace(/\\/g, "/")
+    .split("/")
+    .filter(Boolean)
+    .join("/")
+    .toLocaleLowerCase();
+}
+
+export async function isUsableThumbnailFile(fileHandle) {
+  try {
+    const file = await fileHandle.getFile();
+    return file.size > 0;
+  } catch (error) {
+    return false;
   }
 }
 
