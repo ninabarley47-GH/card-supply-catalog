@@ -49,6 +49,25 @@ test("accepts a complete backup and legacy backups without Cards", () => {
   assert.equal(validateBackup(backup).ok, true);
 });
 
+test("accepts optional tag vocabularies and backups without them", () => {
+  const backup = createValidBackup();
+  backup.tagVocabularies = { paper: ["Floral"], card: ["Birthday"] };
+  assert.equal(validateBackup(backup).ok, true);
+
+  delete backup.tagVocabularies;
+  assert.equal(validateBackup(backup).ok, true);
+});
+
+test("rejects malformed tag vocabularies", () => {
+  const backup = createValidBackup();
+  backup.tagVocabularies = { paper: ["Floral"], card: "Birthday" };
+
+  assert.deepEqual(validateBackup(backup), {
+    ok: false,
+    message: "Nothing was imported because the tag vocabularies are invalid."
+  });
+});
+
 test("rejects an invalid record before restore", () => {
   const backup = createValidBackup();
   backup.cards[0].size.width = "not-a-number";

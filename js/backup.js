@@ -1,5 +1,7 @@
 import {
   loadCatalogSetting,
+  loadCardTagVocabulary,
+  loadPaperTagVocabulary,
   loadSavedCards,
   loadSavedPaperPack,
   isCard,
@@ -8,6 +10,10 @@ import {
   restoreCatalogRecords,
   saveCatalogSetting
 } from "./storage.js";
+import {
+  buildEffectiveCardTagVocabulary,
+  buildEffectivePaperTagVocabulary
+} from "./tag-utils.js";
 import { getCardDetailImageSource, hydrateCardImageSources } from "./card-images.js";
 import { createImportPlan } from "./import-mode.js";
 import {
@@ -250,17 +256,20 @@ async function summarizeBackupOverwrites(backup, paperPacks, colorsById) {
   };
 }
 async function createCatalogBackup({ paperPacks, colorsById }) {
-  const [imageLibrary, cardImageLibrary, cards] = await Promise.all([
+  const [imageLibrary, cardImageLibrary, cards, paperTagVocabulary, cardTagVocabulary] = await Promise.all([
     loadCatalogSetting(IMAGE_LIBRARY_SETTING_ID),
     loadCatalogSetting(CARD_IMAGE_LIBRARY_SETTING_ID),
-    loadSavedCards()
+    loadSavedCards(),
+    loadPaperTagVocabulary(),
+    loadCardTagVocabulary()
   ]);
   return createCatalogBackupSnapshot({
     paperPacks,
     colorsById,
     cards,
     imageLibrary,
-    cardImageLibrary
+    cardImageLibrary,
+    tagVocabularies: { paper: paperTagVocabulary, card: cardTagVocabulary }
   });
 }
 
@@ -269,7 +278,8 @@ export function createCatalogBackupSnapshot({
   colorsById,
   cards = [],
   imageLibrary = null,
-  cardImageLibrary = null
+  cardImageLibrary = null,
+  tagVocabularies = {}
 }) {
   const imageSummary = summarizeImageStorage(paperPacks, cards);
 
@@ -289,13 +299,21 @@ export function createCatalogBackupSnapshot({
     },
     colors: sortObjectByKey(colorsById),
     paperPacks: paperPacks.map(createSerializablePaperPack),
-    cards: cards.map(createSerializableCard)
+    cards: cards.map(createSerializableCard),
+    tagVocabularies: {
+      paper: buildEffectivePaperTagVocabulary(tagVocabularies.paper, paperPacks),
+      card: buildEffectiveCardTagVocabulary(tagVocabularies.card, cards)
+    }
   };
 }
 
 async function createIpadCatalogBackup({ paperPacks, colorsById }) {
   const compressedPaperPacks = [];
-  const cards = await loadSavedCards();
+  const [cards, paperTagVocabulary, cardTagVocabulary] = await Promise.all([
+    loadSavedCards(),
+    loadPaperTagVocabulary(),
+    loadCardTagVocabulary()
+  ]);
   await hydrateCardImageSources(cards);
   const compressedCards = [];
   const imageSummary = {
@@ -346,7 +364,11 @@ async function createIpadCatalogBackup({ paperPacks, colorsById }) {
     },
     colors: sortObjectByKey(colorsById),
     paperPacks: compressedPaperPacks,
-    cards: compressedCards
+    cards: compressedCards,
+    tagVocabularies: {
+      paper: buildEffectivePaperTagVocabulary(paperTagVocabulary, paperPacks),
+      card: buildEffectiveCardTagVocabulary(cardTagVocabulary, cards)
+    }
   };
 }
 
@@ -518,7 +540,11 @@ export async function restoreCatalogBackup({
   const importedColorsById = backup?.colors || {};
   const importedPaperPacks = Array.isArray(backup?.paperPacks) ? backup.paperPacks : [];
   const importedCards = Array.isArray(backup?.cards) ? backup.cards : [];
-  const savedCards = await (services.loadSavedCards || loadSavedCards)();
+  const [savedCards, savedPaperTagVocabulary, savedCardTagVocabulary] = await Promise.all([
+    (services.loadSavedCards || loadSavedCards)(),
+    (services.loadPaperTagVocabulary || loadPaperTagVocabulary)(),
+    (services.loadCardTagVocabulary || loadCardTagVocabulary)()
+  ]);
   const colorPlan = createImportPlan(
     importedColorsById ? Object.values(importedColorsById) : [],
     Object.values(colorsById),
@@ -568,10 +594,22 @@ export async function restoreCatalogBackup({
   }
 
   try {
+    const tagVocabularies = {
+      paper: buildEffectivePaperTagVocabulary(
+        [...savedPaperTagVocabulary, ...(backup.tagVocabularies?.paper || [])],
+        [...paperPacks, ...preparedPaperPacks]
+      ),
+      card: buildEffectiveCardTagVocabulary(
+        [...savedCardTagVocabulary, ...(backup.tagVocabularies?.card || [])],
+        [...savedCards, ...preparedCards]
+      )
+    };
+
     await (services.restoreCatalogRecords || restoreCatalogRecords)({
       paperPacks: preparedPaperPacks,
       colors: colorPlan.recordsToImport,
-      cards: preparedCards
+      cards: preparedCards,
+      tagVocabularies
     });
   } catch (error) {
     logImportError("Atomic catalog restore failed", error, {
@@ -982,6 +1020,24 @@ export function validateBackup(backup) {
     return {
       ok: false,
       message: "The backup is missing colors or paper packs."
+    };
+  }
+
+  if (
+    backup.tagVocabularies !== undefined &&
+    (
+      !backup.tagVocabularies ||
+      typeof backup.tagVocabularies !== "object" ||
+      Array.isArray(backup.tagVocabularies) ||
+      !Array.isArray(backup.tagVocabularies.paper) ||
+      !Array.isArray(backup.tagVocabularies.card) ||
+      backup.tagVocabularies.paper.some((tag) => typeof tag !== "string") ||
+      backup.tagVocabularies.card.some((tag) => typeof tag !== "string")
+    )
+  ) {
+    return {
+      ok: false,
+      message: "Nothing was imported because the tag vocabularies are invalid."
     };
   }
 

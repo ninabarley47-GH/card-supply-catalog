@@ -1,4 +1,5 @@
 import { addCatalogSchemaVersion } from "./schema.js";
+import { uniqueTags } from "./tag-utils.js";
 
 const DATABASE_NAME = "card-supply-catalog";
 const DATABASE_VERSION = 4;
@@ -7,6 +8,8 @@ const DELETED_PAPER_PACK_IDS_STORE = "deletedPaperPackIds";
 const COLORS_STORE = "colors";
 const SETTINGS_STORE = "settings";
 const CARDS_STORE = "cards";
+export const PAPER_TAG_VOCABULARY_SETTING_ID = "paperTagVocabulary";
+export const CARD_TAG_VOCABULARY_SETTING_ID = "cardTagVocabulary";
 const LEGACY_PAPER_PACKS_STORAGE_KEY = "card-supply-catalog.paperPacks";
 const LEGACY_DELETED_PAPER_PACK_IDS_STORAGE_KEY = "card-supply-catalog.deletedPaperPackIds";
 const LEGACY_MIGRATION_STORAGE_KEY = "card-supply-catalog.indexedDbMigrationComplete";
@@ -97,18 +100,19 @@ export async function saveCard(card) {
   });
 }
 
-export async function restoreCatalogRecords({ paperPacks = [], colors = [], cards = [] }) {
+export async function restoreCatalogRecords({ paperPacks = [], colors = [], cards = [], tagVocabularies = null }) {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
 
   await writeTransaction(
     database,
-    [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE, COLORS_STORE, CARDS_STORE],
+    [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE, COLORS_STORE, CARDS_STORE, SETTINGS_STORE],
     (transaction) => {
       const paperPackStore = transaction.objectStore(PAPER_PACKS_STORE);
       const deletedPaperPackIdStore = transaction.objectStore(DELETED_PAPER_PACK_IDS_STORE);
       const colorStore = transaction.objectStore(COLORS_STORE);
       const cardStore = transaction.objectStore(CARDS_STORE);
+      const settingsStore = transaction.objectStore(SETTINGS_STORE);
 
       for (const paperPack of paperPacks) {
         paperPackStore.put(normalizePaperPackForStorage(paperPack));
@@ -121,6 +125,11 @@ export async function restoreCatalogRecords({ paperPacks = [], colors = [], card
 
       for (const card of cards) {
         cardStore.put(addCatalogSchemaVersion(normalizeCardForRuntime(card)));
+      }
+
+      if (tagVocabularies) {
+        settingsStore.put({ id: PAPER_TAG_VOCABULARY_SETTING_ID, value: tagVocabularies.paper || [] });
+        settingsStore.put({ id: CARD_TAG_VOCABULARY_SETTING_ID, value: tagVocabularies.card || [] });
       }
     }
   );
@@ -393,6 +402,22 @@ function writeTransaction(database, storeNames, writeCallback) {
       reject(error);
     }
   });
+}
+
+export function loadPaperTagVocabulary() {
+  return loadCatalogSetting(PAPER_TAG_VOCABULARY_SETTING_ID).then((value) => uniqueTags(value));
+}
+
+export function savePaperTagVocabulary(tags) {
+  return saveCatalogSetting(PAPER_TAG_VOCABULARY_SETTING_ID, uniqueTags(tags));
+}
+
+export function loadCardTagVocabulary() {
+  return loadCatalogSetting(CARD_TAG_VOCABULARY_SETTING_ID).then((value) => uniqueTags(value));
+}
+
+export function saveCardTagVocabulary(tags) {
+  return saveCatalogSetting(CARD_TAG_VOCABULARY_SETTING_ID, uniqueTags(tags));
 }
 
 export function isPaperPack(paperPack) {

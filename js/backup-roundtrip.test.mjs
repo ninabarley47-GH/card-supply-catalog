@@ -45,7 +45,11 @@ test("backup and restore round-trip includes Cards and their persistent image re
   const backup = createCatalogBackupSnapshot({
     paperPacks: [paperPack],
     colorsById: { [color.id]: color },
-    cards: [card]
+    cards: [card],
+    tagVocabularies: {
+      paper: ["Saved Paper Tag"],
+      card: ["Saved Card Tag"]
+    }
   });
   const persistedCalls = [];
   let cardsRestoredEvents = 0;
@@ -58,6 +62,9 @@ test("backup and restore round-trip includes Cards and their persistent image re
   assert.equal(backup.cards[0].thumbnailImagePath, card.thumbnailImagePath);
   assert.equal("imagePreviewSrc" in backup.cards[0], false);
   assert.equal(backup.imageStorage.folderImageReferences, 2);
+  assert.equal(backup.tagVocabularies.paper.includes("Saved Paper Tag"), true);
+  assert.equal(backup.tagVocabularies.card.includes("Saved Card Tag"), true);
+  assert.equal(backup.tagVocabularies.card.includes("birthday"), true);
 
   const summary = await restoreCatalogBackup({
     backup: JSON.parse(JSON.stringify(backup)),
@@ -65,6 +72,8 @@ test("backup and restore round-trip includes Cards and their persistent image re
     colorsById,
     services: {
       loadSavedCards: async () => [],
+      loadPaperTagVocabulary: async () => [],
+      loadCardTagVocabulary: async () => [],
       preparePaperPack: async (record) => ({ paperPack: record }),
       restoreCatalogRecords: async (records) => persistedCalls.push(records),
       dispatchCardsRestored: () => { cardsRestoredEvents += 1; }
@@ -77,9 +86,42 @@ test("backup and restore round-trip includes Cards and their persistent image re
   assert.equal(summary.cardsImported, 1);
   assert.equal(persistedCalls.length, 1);
   assert.deepEqual(persistedCalls[0].cards, backup.cards);
+  assert.deepEqual(persistedCalls[0].tagVocabularies, backup.tagVocabularies);
   assert.equal(paperPacks[0].id, paperPack.id);
   assert.equal(colorsById[color.id].name, color.name);
   assert.equal(cardsRestoredEvents, 1);
+});
+
+test("legacy backup without tag vocabularies reconstructs them from records and the Paper seed", async () => {
+  const { color, paperPack, card } = createCatalogRecords();
+  paperPack.keywords = ["Legacy Paper Assignment"];
+  card.tags = ["Legacy Card Assignment"];
+  const backup = createCatalogBackupSnapshot({
+    paperPacks: [paperPack],
+    colorsById: { [color.id]: color },
+    cards: [card]
+  });
+  delete backup.tagVocabularies;
+  const persistedCalls = [];
+
+  const summary = await restoreCatalogBackup({
+    backup,
+    paperPacks: [],
+    colorsById: {},
+    services: {
+      loadSavedCards: async () => [],
+      loadPaperTagVocabulary: async () => [],
+      loadCardTagVocabulary: async () => [],
+      preparePaperPack: async (record) => ({ paperPack: record }),
+      restoreCatalogRecords: async (records) => persistedCalls.push(records),
+      dispatchCardsRestored: () => {}
+    }
+  });
+
+  assert.deepEqual(summary.errors, []);
+  assert.equal(persistedCalls[0].tagVocabularies.paper.includes("Illustration"), true);
+  assert.equal(persistedCalls[0].tagVocabularies.paper.includes("Legacy Paper Assignment"), true);
+  assert.deepEqual(persistedCalls[0].tagVocabularies.card, ["Legacy Card Assignment"]);
 });
 
 test("malformed import is rejected before reading or writing catalog storage", async () => {
@@ -97,6 +139,8 @@ test("malformed import is rejected before reading or writing catalog storage", a
     colorsById: {},
     services: {
       loadSavedCards: async () => { storageCalls += 1; return []; },
+      loadPaperTagVocabulary: async () => { storageCalls += 1; return []; },
+      loadCardTagVocabulary: async () => { storageCalls += 1; return []; },
       restoreCatalogRecords: async () => { storageCalls += 1; }
     }
   });
@@ -122,6 +166,8 @@ test("failed atomic restore leaves all in-memory catalog collections unchanged",
     colorsById,
     services: {
       loadSavedCards: async () => [],
+      loadPaperTagVocabulary: async () => [],
+      loadCardTagVocabulary: async () => [],
       preparePaperPack: async (record) => ({ paperPack: record }),
       restoreCatalogRecords: async () => {
         atomicWrites += 1;
