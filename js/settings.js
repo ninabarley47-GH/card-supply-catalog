@@ -4,7 +4,7 @@ import {
   migratePaperPackImagesToLocalFolder,
   repairBrokenPaperPackImageLinks
 } from "./images.js";
-import { loadCatalogSetting, saveCatalogSetting, savePaperPack, savePaperPacks } from "./storage.js";
+import { loadCatalogSetting, loadSavedCards, saveCatalogSetting, savePaperPack, savePaperPacks } from "./storage.js";
 
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
 const CARD_IMAGE_LIBRARY_SETTING_ID = "cardImageLibrary";
@@ -14,11 +14,11 @@ const LAST_BACKUP_IMPORT_SETTING_ID = "lastBackupImportedAt";
 export function initializeSettings(options = {}) {
   initializeSetupStatus(options);
   initializeImageLibrarySettings(options);
-  initializeCardImageLibrarySettings();
+  initializeCardImageLibrarySettings(options);
   initializeBulkOwnerSettings(options);
 }
 
-async function initializeCardImageLibrarySettings() {
+async function initializeCardImageLibrarySettings({ paperPacks = [] } = {}) {
   const chooseButton = document.querySelector("[data-choose-card-image-library]");
   const reconnectButton = document.querySelector("[data-reconnect-card-image-library]");
   const status = document.querySelector("[data-card-image-library-status]");
@@ -43,15 +43,15 @@ async function initializeCardImageLibrarySettings() {
   await renderSavedCardImageLibraryStatus(status);
 
   chooseButton.addEventListener("click", async () => {
-    await selectCardImageLibraryFolder(status, "Card image folder selected");
+    await selectCardImageLibraryFolder(status, "Card image folder selected", paperPacks);
   });
 
   reconnectButton?.addEventListener("click", async () => {
-    await selectCardImageLibraryFolder(status, "Card image folder reconnected");
+    await selectCardImageLibraryFolder(status, "Card image folder reconnected", paperPacks);
   });
 }
 
-async function selectCardImageLibraryFolder(status, successPrefix) {
+async function selectCardImageLibraryFolder(status, successPrefix, paperPacks) {
   try {
     const directoryHandle = await window.showDirectoryPicker({
       id: "csc-card-image-library",
@@ -66,6 +66,7 @@ async function selectCardImageLibraryFolder(status, successPrefix) {
 
     renderImageLibraryStatus(status, `${successPrefix}: ${directoryHandle.name}.`, "success");
     document.dispatchEvent(new CustomEvent("catalog:card-image-library-selected"));
+    renderSetupStatus(document.querySelector("[data-setup-status]"), paperPacks);
     return true;
   } catch (error) {
     if (error?.name === "AbortError") {
@@ -385,19 +386,24 @@ async function renderSetupStatus(container, paperPacks = []) {
     return;
   }
 
-  const [imageLibrary, lastBackupExportedAt, lastBackupImportedAt] = await Promise.all([
+  const [imageLibrary, cardImageLibrary, cards, lastBackupExportedAt, lastBackupImportedAt] = await Promise.all([
     loadCatalogSetting(IMAGE_LIBRARY_SETTING_ID),
+    loadCatalogSetting(CARD_IMAGE_LIBRARY_SETTING_ID),
+    loadSavedCards(),
     loadCatalogSetting(LAST_BACKUP_EXPORT_SETTING_ID),
     loadCatalogSetting(LAST_BACKUP_IMPORT_SETTING_ID)
   ]);
   const directoryHandle = imageLibrary?.directoryHandle;
+  const cardDirectoryHandle = cardImageLibrary?.directoryHandle;
   const folderPermission = directoryHandle ? await getDirectoryPermissionState(directoryHandle) : "";
+  const cardFolderPermission = cardDirectoryHandle ? await getDirectoryPermissionState(cardDirectoryHandle) : "";
   const imageHealth =
     directoryHandle && folderPermission === "granted" ? await checkImageLibraryHealth(paperPacks).catch(() => null) : null;
   const folderImages = imageHealth?.summary.folderImages ?? countFolderImageReferences(paperPacks);
   const missingImages = imageHealth?.summary.imagesMissing ?? 0;
   const missingImageFolders = getMissingImageFolders(imageHealth?.summary.missingImages);
   const imageReferencesChecked = Boolean(imageHealth);
+  const cardFolderImages = countCardFolderImageReferences(cards);
 
   container.replaceChildren(
     createSetupStatusItem({
@@ -413,13 +419,19 @@ async function renderSetupStatus(container, paperPacks = []) {
       status: lastBackupExportedAt ? "ready" : "neutral"
     }),
     createSetupStatusItem({
-      title: "Image folder",
-      detail: getImageFolderStatusDetail(directoryHandle, folderPermission),
+      title: "Paper Pack image folder",
+      detail: getImageFolderStatusDetail(directoryHandle, folderPermission, "Paper Pack image"),
       badge: getImageFolderStatusBadge(directoryHandle, folderPermission),
       status: getImageFolderStatusTone(directoryHandle, folderPermission)
     }),
     createSetupStatusItem({
-      title: "Image references",
+      title: "Card image folder",
+      detail: getImageFolderStatusDetail(cardDirectoryHandle, cardFolderPermission, "Card image"),
+      badge: getImageFolderStatusBadge(cardDirectoryHandle, cardFolderPermission),
+      status: getImageFolderStatusTone(cardDirectoryHandle, cardFolderPermission)
+    }),
+    createSetupStatusItem({
+      title: "Paper Pack image references",
       detail: getImageReferenceStatusDetail(
         folderImages,
         missingImages,
@@ -429,6 +441,12 @@ async function renderSetupStatus(container, paperPacks = []) {
       ),
       badge: getImageReferenceStatusBadge(folderImages, missingImages, imageReferencesChecked),
       status: getImageReferenceStatusTone(missingImages, imageReferencesChecked)
+    }),
+    createSetupStatusItem({
+      title: "Card image references",
+      detail: getCardImageReferenceStatusDetail(cardFolderImages, cardDirectoryHandle, cardFolderPermission),
+      badge: getCardImageReferenceStatusBadge(cardFolderImages, cardDirectoryHandle, cardFolderPermission),
+      status: getImageFolderStatusTone(cardDirectoryHandle, cardFolderPermission)
     })
   );
 }
@@ -464,13 +482,13 @@ function getBackupStatusDetail(lastBackupExportedAt, lastBackupImportedAt) {
   return "Export a backup after setup or after cataloging several packs.";
 }
 
-function getImageFolderStatusDetail(directoryHandle, permissionState) {
+function getImageFolderStatusDetail(directoryHandle, permissionState, imageType = "image") {
   if (!isDirectoryPickerSupported()) {
-    return "This browser does not support choosing an image library folder.";
+    return `This browser does not support choosing a ${imageType} library folder.`;
   }
 
   if (!directoryHandle) {
-    return "No image folder selected. Images will use fallback browser storage.";
+    return `No ${imageType} folder selected. Images will use fallback browser storage.`;
   }
 
   if (permissionState === "granted") {
@@ -554,6 +572,34 @@ function countFolderImageReferences(paperPacks) {
       (paperPack.patterns || []).filter((pattern) => pattern && typeof pattern === "object" && pattern.imagePath).length,
     0
   );
+}
+
+function countCardFolderImageReferences(cards) {
+  return cards.filter((card) => card && typeof card === "object" && card.imagePath).length;
+}
+
+function getCardImageReferenceStatusDetail(folderImages, directoryHandle, permissionState) {
+  if (folderImages === 0) {
+    return "No folder-backed Card image references found yet.";
+  }
+
+  if (!directoryHandle) {
+    return `${folderImages} Card image reference${folderImages === 1 ? "" : "s"} need a Card image folder connection.`;
+  }
+
+  if (permissionState !== "granted") {
+    return `Reconnect the Card image folder to access ${folderImages} Card image reference${folderImages === 1 ? "" : "s"}.`;
+  }
+
+  return `${folderImages} folder-backed Card image reference${folderImages === 1 ? "" : "s"} connected.`;
+}
+
+function getCardImageReferenceStatusBadge(folderImages, directoryHandle, permissionState) {
+  if (folderImages === 0) {
+    return "OK";
+  }
+
+  return directoryHandle && permissionState === "granted" ? "Connected" : "Reconnect";
 }
 
 function formatDateTime(value) {
