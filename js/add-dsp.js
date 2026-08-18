@@ -240,7 +240,7 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
     );
 
     try {
-      const saveResult = await saveDetail.saveComplete;
+      const saveResult = await waitForPaperPackPersistence(saveDetail.saveComplete);
 
       if (!saveResult.ok) {
         renderFormMessage(message, saveResult.message, "error");
@@ -267,12 +267,28 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
         formState
       });
       window.location.hash = "library";
-    } catch {
-      renderFormMessage(message, "The paper pack could not be saved in this browser.", "error");
     } finally {
       submitButton.disabled = false;
     }
   });
+}
+
+export async function waitForPaperPackPersistence(saveComplete) {
+  try {
+    const saveResult = await saveComplete;
+
+    return saveResult?.ok
+      ? saveResult
+      : {
+          ok: false,
+          message: saveResult?.message || "The paper pack could not be saved in this browser."
+        };
+  } catch {
+    return {
+      ok: false,
+      message: "The paper pack could not be saved in this browser."
+    };
+  }
 }
 
 function openAddDspPanel(panel, form, selectedImages, imagePreviewList, imagePreviewCount, controls) {

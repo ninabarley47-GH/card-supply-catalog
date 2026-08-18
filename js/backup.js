@@ -255,6 +255,22 @@ async function createCatalogBackup({ paperPacks, colorsById }) {
     loadCatalogSetting(CARD_IMAGE_LIBRARY_SETTING_ID),
     loadSavedCards()
   ]);
+  return createCatalogBackupSnapshot({
+    paperPacks,
+    colorsById,
+    cards,
+    imageLibrary,
+    cardImageLibrary
+  });
+}
+
+export function createCatalogBackupSnapshot({
+  paperPacks,
+  colorsById,
+  cards = [],
+  imageLibrary = null,
+  cardImageLibrary = null
+}) {
   const imageSummary = summarizeImageStorage(paperPacks, cards);
 
   return {
@@ -470,12 +486,13 @@ async function readBackupFile(backupFile) {
   return JSON.parse(await backupFile.text());
 }
 
-async function restoreCatalogBackup({
+export async function restoreCatalogBackup({
   backup,
   paperPacks,
   colorsById,
   overwriteExisting = false,
-  diagnosticContext = null
+  diagnosticContext = null,
+  services = {}
 }) {
   const summary = {
     packsImported: 0,
@@ -501,7 +518,7 @@ async function restoreCatalogBackup({
   const importedColorsById = backup?.colors || {};
   const importedPaperPacks = Array.isArray(backup?.paperPacks) ? backup.paperPacks : [];
   const importedCards = Array.isArray(backup?.cards) ? backup.cards : [];
-  const savedCards = await loadSavedCards();
+  const savedCards = await (services.loadSavedCards || loadSavedCards)();
   const colorPlan = createImportPlan(
     importedColorsById ? Object.values(importedColorsById) : [],
     Object.values(colorsById),
@@ -538,7 +555,7 @@ async function restoreCatalogBackup({
 
   for (const paperPack of paperPackPlan.recordsToImport) {
     try {
-      const reconnectResult = await reconnectPaperPackImagesToExistingFolder(paperPack);
+      const reconnectResult = await (services.preparePaperPack || reconnectPaperPackImagesToExistingFolder)(paperPack);
       preparedPaperPacks.push(addCatalogSchemaVersion(reconnectResult.paperPack));
     } catch (error) {
       logImportError("Paper-pack preparation failed", error, { paperPackId: paperPack?.id });
@@ -551,7 +568,7 @@ async function restoreCatalogBackup({
   }
 
   try {
-    await restoreCatalogRecords({
+    await (services.restoreCatalogRecords || restoreCatalogRecords)({
       paperPacks: preparedPaperPacks,
       colors: colorPlan.recordsToImport,
       cards: preparedCards
@@ -589,7 +606,11 @@ async function restoreCatalogBackup({
   summary.cardsImported = preparedCards.length;
 
   if (summary.cardsImported > 0) {
-    document.dispatchEvent(new CustomEvent("catalog:cards-restored"));
+    if (services.dispatchCardsRestored) {
+      services.dispatchCardsRestored();
+    } else {
+      document.dispatchEvent(new CustomEvent("catalog:cards-restored"));
+    }
   }
 
   summary.diagnosticReport = await reportImportDiagnostic(importDiagnostic);
@@ -794,7 +815,8 @@ async function reportImportDiagnostic(diagnostic) {
 }
 
 function isImportDiagnosticEnabled() {
-  return new URLSearchParams(window.location.search).get(IMPORT_DIAGNOSTIC_QUERY_PARAMETER) === "1";
+  return typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get(IMPORT_DIAGNOSTIC_QUERY_PARAMETER) === "1";
 }
 
 function isStandaloneDisplayMode() {
