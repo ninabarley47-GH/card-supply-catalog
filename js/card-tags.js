@@ -14,9 +14,12 @@ export function createTagVocabularyStore({ loadVocabulary, saveVocabulary, build
     },
     async create(value) {
       const tag = normalizeTagName(value);
-      const existing = persistedVocabulary.find((candidate) => getTagKey(candidate) === getTagKey(tag));
+      const currentVocabulary = Array.isArray(persistedVocabulary)
+        ? persistedVocabulary
+        : buildVocabulary(persistedVocabulary, []);
+      const existing = currentVocabulary.find((candidate) => getTagKey(candidate) === getTagKey(tag));
       if (existing) return existing;
-      const nextVocabulary = addTag(persistedVocabulary, tag);
+      const nextVocabulary = addTag(currentVocabulary, tag);
       await saveVocabulary(nextVocabulary);
       persistedVocabulary = nextVocabulary;
       onVocabularyChanged(nextVocabulary);

@@ -4,7 +4,7 @@ import {
   migratePaperPackImagesToLocalFolder,
   repairBrokenPaperPackImageLinks
 } from "./images.js";
-import { loadCardTagVocabulary, loadCatalogSetting, loadPaperTagVocabulary, loadSavedCards, saveCard, saveCardTagVocabulary, saveCatalogSetting, savePaperPack, savePaperPacks, savePaperTagVocabulary } from "./storage.js";
+import { deleteTagEverywhere, loadCardTagVocabulary, loadCatalogSetting, loadPaperTagVocabulary, loadSavedCards, saveCard, saveCardTagVocabulary, saveCatalogSetting, savePaperPack, savePaperPacks, savePaperTagVocabulary } from "./storage.js";
 import { PAPER_TAG_SEED, addTag, buildEffectiveCardTagVocabulary, buildEffectivePaperTagVocabulary, countTagAssignments, getTagKey, normalizeTagName, removeTag, renameTag, replaceTagAssignments } from "./tag-utils.js";
 
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
@@ -23,7 +23,7 @@ export function initializeSettings(options = {}) {
 async function initializeTagSettings({ paperPacks = [] } = {}) {
   const cards = await loadSavedCards().catch(() => []);
   await Promise.all([
-    initializeTagManager({ kind: "paper", records: paperPacks, fieldName: "keywords", loadVocabulary: loadPaperTagVocabulary, saveVocabulary: savePaperTagVocabulary, saveRecord: savePaperPack, buildVocabulary: buildEffectivePaperTagVocabulary, protectedTags: PAPER_TAG_SEED }),
+    initializeTagManager({ kind: "paper", records: paperPacks, fieldName: "keywords", loadVocabulary: loadPaperTagVocabulary, saveVocabulary: savePaperTagVocabulary, saveRecord: savePaperPack, buildVocabulary: (persisted, records) => buildEffectivePaperTagVocabulary(persisted, records, persisted === null), protectedTags: PAPER_TAG_SEED }),
     initializeTagManager({ kind: "card", records: cards, fieldName: "tags", loadVocabulary: loadCardTagVocabulary, saveVocabulary: saveCardTagVocabulary, saveRecord: saveCard, buildVocabulary: buildEffectiveCardTagVocabulary, protectedTags: [] })
   ]);
 }
@@ -61,10 +61,23 @@ async function initializeTagManager(config) {
     announce(`Renamed “${tag}” to “${result.tag}”.`, "success");
   }, async () => {
     const assigned = countTagAssignments(config.records, config.fieldName, tag);
-    if (assigned > 0) { announce(`“${tag}” cannot be deleted because it is assigned to ${assigned} record${assigned === 1 ? "" : "s"}.`, "error"); return; }
-    if (config.protectedTags.some((value) => getTagKey(value) === getTagKey(tag))) { announce(`“${tag}” is a built-in Paper tag and cannot be deleted.`, "error"); return; }
-    await persist(removeTag(vocabulary, tag));
-    announce(`Deleted “${tag}”.`, "success");
+    const recordName = config.kind === "paper" ? "pack" : "card";
+    if (!await confirmTagDeletion(tag, assigned, recordName)) return;
+
+    const updatedRecords = replaceTagAssignments(config.records, config.fieldName, tag, "");
+    const affectedRecords = updatedRecords.filter((record, index) => record[config.fieldName].length !== config.records[index][config.fieldName].length);
+    const nextVocabulary = removeTag(vocabulary, tag);
+
+    try {
+      await deleteTagEverywhere({ kind: config.kind, records: affectedRecords, vocabulary: nextVocabulary });
+      config.records.splice(0, config.records.length, ...updatedRecords);
+      vocabulary = nextVocabulary;
+      document.dispatchEvent(new CustomEvent(`catalog:${config.kind}-tags-updated`));
+      render();
+      announce(`Deleted “${tag}” from ${assigned} ${recordName}${assigned === 1 ? "" : "s"} and removed it from the vocabulary.`, "success");
+    } catch (error) {
+      announce(`“${tag}” could not be deleted. No changes were saved.`, "error");
+    }
     })));
   };
   form.addEventListener("submit", async (event) => {
@@ -80,6 +93,65 @@ async function initializeTagManager(config) {
   document.addEventListener(`catalog:${config.kind}-tags-updated`, async () => {
     vocabulary = config.buildVocabulary(await config.loadVocabulary(), config.records);
     render();
+  });
+}
+
+function confirmTagDeletion(tag, assignmentCount, recordName) {
+  const dialog = document.createElement("dialog");
+  const title = document.createElement("h4");
+  const message = document.createElement("p");
+  const warning = document.createElement("p");
+  const actions = document.createElement("div");
+  const cancelButton = document.createElement("button");
+  const deleteButton = document.createElement("button");
+  const titleId = `delete-tag-title-${Date.now()}`;
+  const descriptionId = `delete-tag-description-${Date.now()}`;
+
+  dialog.className = "tag-delete-dialog";
+  dialog.setAttribute("aria-labelledby", titleId);
+  dialog.setAttribute("aria-describedby", descriptionId);
+  title.id = titleId;
+  title.textContent = `Delete “${tag}”?`;
+  message.id = descriptionId;
+  message.textContent = assignmentCount > 0
+    ? `This tag will be removed from ${assignmentCount} ${recordName}${assignmentCount === 1 ? "" : "s"}, then removed from the tag vocabulary.`
+    : "This tag will be removed from the tag vocabulary.";
+  warning.className = "tag-delete-warning";
+  warning.textContent = "This action cannot be undone.";
+  actions.className = "tag-delete-actions";
+  cancelButton.className = "button";
+  cancelButton.type = "button";
+  cancelButton.textContent = "Cancel";
+  deleteButton.className = "button button-danger";
+  deleteButton.type = "button";
+  deleteButton.textContent = "Delete Tag";
+  actions.append(cancelButton, deleteButton);
+  dialog.append(title, message, warning, actions);
+  document.body.append(dialog);
+
+  if (typeof dialog.showModal !== "function") {
+    dialog.remove();
+    return Promise.resolve(window.confirm(`${title.textContent}\n\n${message.textContent}`));
+  }
+
+  return new Promise((resolve) => {
+    let approved = false;
+    const close = (shouldDelete) => {
+      approved = shouldDelete;
+      dialog.close();
+    };
+
+    cancelButton.addEventListener("click", () => close(false));
+    deleteButton.addEventListener("click", () => close(true));
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) close(false);
+    });
+    dialog.addEventListener("close", () => {
+      dialog.remove();
+      resolve(approved);
+    }, { once: true });
+    dialog.showModal();
+    cancelButton.focus();
   });
 }
 

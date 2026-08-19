@@ -100,6 +100,47 @@ export async function saveCard(card) {
   });
 }
 
+export async function deleteTagEverywhere({ kind, records = [], vocabulary = [] }) {
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
+
+  if (kind === "paper") {
+    await writeTransaction(database, [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE, SETTINGS_STORE], (transaction) => {
+      const paperPackStore = transaction.objectStore(PAPER_PACKS_STORE);
+      const deletedPaperPackIdStore = transaction.objectStore(DELETED_PAPER_PACK_IDS_STORE);
+
+      for (const paperPack of records) {
+        paperPackStore.put(normalizePaperPackForStorage(paperPack));
+        deletedPaperPackIdStore.delete(paperPack.id);
+      }
+
+      transaction.objectStore(SETTINGS_STORE).put({
+        id: PAPER_TAG_VOCABULARY_SETTING_ID,
+        value: uniqueTags(vocabulary)
+      });
+    });
+    return;
+  }
+
+  if (kind === "card") {
+    await writeTransaction(database, [CARDS_STORE, SETTINGS_STORE], (transaction) => {
+      const cardStore = transaction.objectStore(CARDS_STORE);
+
+      for (const card of records) {
+        cardStore.put(addCatalogSchemaVersion(normalizeCardForRuntime(card)));
+      }
+
+      transaction.objectStore(SETTINGS_STORE).put({
+        id: CARD_TAG_VOCABULARY_SETTING_ID,
+        value: uniqueTags(vocabulary)
+      });
+    });
+    return;
+  }
+
+  throw new Error(`Unsupported tag vocabulary kind: ${kind}`);
+}
+
 export async function restoreCatalogRecords({ paperPacks = [], colors = [], cards = [], tagVocabularies = null }) {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
@@ -405,7 +446,7 @@ function writeTransaction(database, storeNames, writeCallback) {
 }
 
 export function loadPaperTagVocabulary() {
-  return loadCatalogSetting(PAPER_TAG_VOCABULARY_SETTING_ID).then((value) => uniqueTags(value));
+  return loadCatalogSetting(PAPER_TAG_VOCABULARY_SETTING_ID).then((value) => value === null ? null : uniqueTags(value));
 }
 
 export function savePaperTagVocabulary(tags) {

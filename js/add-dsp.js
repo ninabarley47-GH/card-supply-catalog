@@ -43,7 +43,7 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
   const paperTagVocabulary = createTagVocabularyStore({
     loadVocabulary: loadPaperTagVocabulary,
     saveVocabulary: savePaperTagVocabulary,
-    buildVocabulary: buildEffectivePaperTagVocabulary,
+    buildVocabulary: (persisted, records) => buildEffectivePaperTagVocabulary(persisted, records, persisted === null),
     onVocabularyChanged: () => document.dispatchEvent(new CustomEvent("catalog:paper-tags-updated"))
   });
   const loadPaperTags = async () => tagPicker.setVocabulary(await paperTagVocabulary.load(paperPacks));

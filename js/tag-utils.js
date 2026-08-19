@@ -106,10 +106,10 @@ export function findMatchingTags(values, query) {
   return tags.filter((tag) => getTagKey(tag).includes(queryKey));
 }
 
-export function buildEffectivePaperTagVocabulary(persistedVocabulary = [], paperPacks = []) {
+export function buildEffectivePaperTagVocabulary(persistedVocabulary = [], paperPacks = [], includeSeed = true) {
   return mergeTagVocabularies(
     persistedVocabulary,
-    PAPER_TAG_SEED,
+    includeSeed ? PAPER_TAG_SEED : [],
     paperPacks.flatMap((paperPack) => paperPack?.keywords || [])
   );
 }
