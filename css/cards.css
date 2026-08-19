@@ -395,13 +395,11 @@
 }
 
 .card-add-selected-packs,
-.tag-picker-selected,
 .card-add-selected-stamp-sets {
   grid-template-columns: repeat(auto-fit, minmax(10rem, max-content));
 }
 
 .card-add-selected-packs li,
-.tag-picker-selected li,
 .card-add-selected-stamp-sets li {
   display: flex;
   align-items: center;
@@ -416,8 +414,27 @@
   font-weight: 650;
 }
 
+.tag-picker-selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.tag-picker-selected li {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.9rem;
+  border: 1px solid rgba(82, 120, 109, 0.7);
+  border-radius: 999px;
+  padding: 0.15rem 0.2rem 0.15rem 0.6rem;
+  background: var(--color-accent);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
 .card-add-selected-packs button,
-.tag-picker-selected button,
 .card-add-selected-stamp-sets button {
   display: grid;
   width: 1.65rem;
@@ -433,11 +450,36 @@
   font-size: 1rem;
 }
 
+.tag-picker-selected button {
+  display: grid;
+  width: 1.45rem;
+  height: 1.45rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.95rem;
+}
+
 .card-add-selected-packs button:hover,
-.tag-picker-selected button:hover,
 .card-add-selected-stamp-sets button:hover {
   background: var(--color-page);
   color: var(--color-text);
+}
+
+.tag-picker-selected button:hover,
+.tag-picker-selected button:focus-visible {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.tag-picker-selected button:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 1px;
 }
 
 .card-add-actions {
