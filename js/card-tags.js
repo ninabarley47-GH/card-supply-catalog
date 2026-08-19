@@ -5,7 +5,7 @@ export function createCardTagVocabularyStore({ loadVocabulary = loadCardTagVocab
   return createTagVocabularyStore({ loadVocabulary, saveVocabulary, buildVocabulary: buildEffectiveCardTagVocabulary });
 }
 
-export function createTagVocabularyStore({ loadVocabulary, saveVocabulary, buildVocabulary }) {
+export function createTagVocabularyStore({ loadVocabulary, saveVocabulary, buildVocabulary, onVocabularyChanged = () => {} }) {
   let persistedVocabulary = [];
   return {
     async load(records = []) {
@@ -19,6 +19,7 @@ export function createTagVocabularyStore({ loadVocabulary, saveVocabulary, build
       const nextVocabulary = addTag(persistedVocabulary, tag);
       await saveVocabulary(nextVocabulary);
       persistedVocabulary = nextVocabulary;
+      onVocabularyChanged(nextVocabulary);
       return tag;
     }
   };

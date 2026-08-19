@@ -73,6 +73,10 @@ async function initializeTagManager(config) {
     announce(`Added “${tag}”.`, "success");
   });
   render();
+  document.addEventListener(`catalog:${config.kind}-tags-updated`, async () => {
+    vocabulary = config.buildVocabulary(await config.loadVocabulary(), config.records);
+    render();
+  });
 }
 
 function createTagSettingsRow(tag, config, onRename, onDelete) {

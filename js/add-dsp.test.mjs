@@ -38,10 +38,13 @@ test("legacy Paper keyword replacements remain active", () => {
 
 test("Paper tag creation prevents case-insensitive duplicates", async () => {
   const writes = [];
-  const store = createTagVocabularyStore({ loadVocabulary: async () => ["Floral"], saveVocabulary: async (tags) => writes.push(tags), buildVocabulary: buildEffectivePaperTagVocabulary });
+  const updates = [];
+  const store = createTagVocabularyStore({ loadVocabulary: async () => ["Floral"], saveVocabulary: async (tags) => writes.push(tags), buildVocabulary: buildEffectivePaperTagVocabulary, onVocabularyChanged: (tags) => updates.push(tags) });
   await store.load([]);
   assert.equal(await store.create(" floral "), "Floral");
   assert.equal(writes.length, 0);
+  await store.create("New Paper Tag");
+  assert.deepEqual(updates, [["Floral", "New Paper Tag"]]);
 });
 
 test("Paper and Card vocabulary stores remain isolated", async () => {

@@ -40,7 +40,12 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
     return;
   }
 
-  const paperTagVocabulary = createTagVocabularyStore({ loadVocabulary: loadPaperTagVocabulary, saveVocabulary: savePaperTagVocabulary, buildVocabulary: buildEffectivePaperTagVocabulary });
+  const paperTagVocabulary = createTagVocabularyStore({
+    loadVocabulary: loadPaperTagVocabulary,
+    saveVocabulary: savePaperTagVocabulary,
+    buildVocabulary: buildEffectivePaperTagVocabulary,
+    onVocabularyChanged: () => document.dispatchEvent(new CustomEvent("catalog:paper-tags-updated"))
+  });
   const loadPaperTags = async () => tagPicker.setVocabulary(await paperTagVocabulary.load(paperPacks));
   let paperTagsReady;
   const tagPicker = createTagPicker({ label: "Paper Tags", inputLabel: "Search or create Paper tags", placeholder: "Search Paper tags", onCreateTag: async (tag) => { await paperTagsReady; return paperTagVocabulary.create(tag); } });
