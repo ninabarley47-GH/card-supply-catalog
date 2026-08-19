@@ -2,11 +2,15 @@ import { loadCardTagVocabulary, saveCardTagVocabulary } from './storage.js';
 import { addTag, buildEffectiveCardTagVocabulary, getTagKey, normalizeTagName } from './tag-utils.js';
 
 export function createCardTagVocabularyStore({ loadVocabulary = loadCardTagVocabulary, saveVocabulary = saveCardTagVocabulary } = {}) {
+  return createTagVocabularyStore({ loadVocabulary, saveVocabulary, buildVocabulary: buildEffectiveCardTagVocabulary });
+}
+
+export function createTagVocabularyStore({ loadVocabulary, saveVocabulary, buildVocabulary }) {
   let persistedVocabulary = [];
   return {
-    async load(cards = []) {
+    async load(records = []) {
       persistedVocabulary = await loadVocabulary();
-      return buildEffectiveCardTagVocabulary(persistedVocabulary, cards);
+      return buildVocabulary(persistedVocabulary, records);
     },
     async create(value) {
       const tag = normalizeTagName(value);

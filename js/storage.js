@@ -337,7 +337,7 @@ function removeTransientPatternImageFields(patternEntry) {
   return persistentPattern;
 }
 
-function normalizePaperPackKeywords(paperPack) {
+export function normalizePaperPackKeywords(paperPack) {
   const keywords = [];
   const seenKeywords = new Set();
 

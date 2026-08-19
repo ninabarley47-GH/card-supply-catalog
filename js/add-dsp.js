@@ -6,7 +6,10 @@ import {
   loadPatternImagesForPaperPackName
 } from "./images.js";
 import { addCatalogSchemaVersion } from "./schema.js";
-import { loadCatalogSetting, saveCatalogSetting } from "./storage.js";
+import { loadCatalogSetting, loadPaperTagVocabulary, saveCatalogSetting, savePaperTagVocabulary } from "./storage.js";
+import { buildEffectivePaperTagVocabulary } from "./tag-utils.js";
+import { createTagPicker } from "./tag-picker.js";
+import { createTagVocabularyStore } from "./card-tags.js";
 
 const ADD_DSP_DEFAULTS_SETTING_ID = "addDspDefaults";
 
@@ -23,17 +26,28 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
   const libraryPickerButton = document.querySelector("[data-pattern-library-picker]");
   const imagePreviewList = document.querySelector("[data-image-preview-list]");
   const imagePreviewCount = document.querySelector("[data-image-preview-count]");
+  const tagPickerMount = document.querySelector("[data-paper-tag-picker]");
   const selectedImages = [];
   const formState = {
     editingPaperPack: null,
     autoLoadedPaperPackId: "",
     isLoadingLibraryImages: false,
-    addDspDefaults: null
+    addDspDefaults: null,
+    tagPicker: null
   };
 
   if (!panel || !form) {
     return;
   }
+
+  const paperTagVocabulary = createTagVocabularyStore({ loadVocabulary: loadPaperTagVocabulary, saveVocabulary: savePaperTagVocabulary, buildVocabulary: buildEffectivePaperTagVocabulary });
+  const loadPaperTags = async () => tagPicker.setVocabulary(await paperTagVocabulary.load(paperPacks));
+  let paperTagsReady;
+  const tagPicker = createTagPicker({ label: "Paper Tags", inputLabel: "Search or create Paper tags", placeholder: "Search Paper tags", onCreateTag: async (tag) => { await paperTagsReady; return paperTagVocabulary.create(tag); } });
+  formState.tagPicker = tagPicker;
+  tagPickerMount?.replaceChildren(tagPicker.element);
+  paperTagsReady = loadPaperTags();
+  document.addEventListener("catalog:paper-tags-updated", () => void loadPaperTags());
 
   const defaultsReady = loadCatalogSetting(ADD_DSP_DEFAULTS_SETTING_ID)
     .then((defaults) => {
@@ -77,7 +91,7 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
 
   for (const button of openButtons) {
     button.addEventListener("click", async () => {
-      await defaultsReady;
+      await Promise.all([defaultsReady, paperTagsReady]);
       openAddDspPanel(panel, form, selectedImages, imagePreviewList, imagePreviewCount, {
         title,
         summary,
@@ -174,7 +188,7 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
       return;
     }
 
-    await defaultsReady;
+    await Promise.all([defaultsReady, paperTagsReady]);
     openAddDspPanel(panel, form, selectedImages, imagePreviewList, imagePreviewCount, {
       title,
       summary,
@@ -199,7 +213,8 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
       new FormData(form),
       colorsById,
       selectedImages,
-      formState.editingPaperPack
+      formState.editingPaperPack,
+      tagPicker.getSelected()
     );
 
     if (!result.ok) {
@@ -349,6 +364,7 @@ function openEditDspPanel(panel, form, paperPack, colorsById, selectedImages, im
   controls.submitButton.textContent = "Save Changes";
 
   fillPaperPackForm(form, paperPack, colorsById);
+  controls.formState.tagPicker?.setSelected(paperPack.keywords || []);
   selectedImages.push(...getImageEntriesFromPatterns(paperPack.patterns));
   renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount);
 
@@ -364,6 +380,7 @@ function closeAddDspPanel(panel, form, message, selectedImages, imagePreviewList
 
 function resetAddDspForm(form, selectedImages, imagePreviewList, imagePreviewCount, controls) {
   form?.reset();
+  controls.formState.tagPicker?.reset();
   selectedImages.splice(0, selectedImages.length);
   renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount);
   controls.formState.editingPaperPack = null;
@@ -374,13 +391,13 @@ function resetAddDspForm(form, selectedImages, imagePreviewList, imagePreviewCou
   controls.submitButton.textContent = "Save Paper Pack";
 }
 
-function buildPaperPackFromForm(formData, colorsById, selectedImages = [], editingPaperPack = null) {
+export function buildPaperPackFromForm(formData, colorsById, selectedImages = [], editingPaperPack = null, selectedKeywords = []) {
   const name = cleanText(formData.get("name"));
   const owner = cleanText(formData.get("owner"));
   const releaseYear = Number.parseInt(formData.get("releaseYear"), 10);
   const patternCount = Number.parseInt(formData.get("patternCount"), 10);
   const colorResult = resolveColorIds(parseList(formData.get("colors")), colorsById);
-  const keywords = formData.getAll("keywords").map(cleanText).filter(Boolean);
+  const keywords = selectedKeywords.map(cleanText).filter(Boolean);
 
   if (!name || !owner || Number.isNaN(releaseYear) || !Number.isInteger(patternCount) || patternCount < 1) {
     return {
@@ -482,11 +499,6 @@ function fillPaperPackForm(form, paperPack, colorsById) {
     .map((colorId) => colorsById[colorId]?.name || colorId)
     .join(", ");
 
-  const keywords = new Set(paperPack.keywords || []);
-
-  for (const keywordInput of form.querySelectorAll('input[name="keywords"]')) {
-    keywordInput.checked = keywords.has(keywordInput.value);
-  }
 }
 
 async function addSelectedImageFiles(files, selectedImages) {
