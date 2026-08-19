@@ -300,7 +300,7 @@
 }
 
 .card-add-paper-packs,
-.card-add-tags,
+.tag-picker,
 .card-add-stamp-sets {
   display: grid;
   gap: var(--space-3);
@@ -309,19 +309,18 @@
 }
 
 .card-add-paper-packs h4,
-.card-add-tags h4,
+.tag-picker h4,
 .card-add-stamp-sets h4 {
   margin-bottom: 0;
 }
 
-.card-add-tag-input-row,
 .card-add-stamp-set-input-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-2);
 }
 
-.card-add-tag-input-row input,
+.tag-picker > input,
 .card-add-stamp-set-input-row input {
   min-width: 0;
   border: 1px solid var(--color-border);
@@ -332,7 +331,7 @@
   font: inherit;
 }
 
-.card-add-tag-help,
+.tag-picker-status,
 .card-add-stamp-set-help {
   margin: 0;
   color: var(--color-muted);
@@ -358,7 +357,8 @@
 
 .card-add-paper-pack-results,
 .card-add-selected-packs,
-.card-add-selected-tags,
+.tag-picker-results,
+.tag-picker-selected,
 .card-add-selected-stamp-sets {
   display: grid;
   gap: var(--space-2);
@@ -367,12 +367,14 @@
   list-style: none;
 }
 
-.card-add-paper-pack-results {
+.card-add-paper-pack-results,
+.tag-picker-results {
   max-height: 11rem;
   overflow-y: auto;
 }
 
-.card-add-paper-pack-results button {
+.card-add-paper-pack-results button,
+.tag-picker-results button {
   width: 100%;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-small);
@@ -385,18 +387,21 @@
 }
 
 .card-add-paper-pack-results button:hover,
-.card-add-paper-pack-results button:focus-visible {
+.card-add-paper-pack-results button:focus-visible,
+.tag-picker-results [aria-selected="true"] button,
+.tag-picker-results button:hover,
+.tag-picker-results button:focus-visible {
   border-color: rgba(82, 120, 109, 0.62);
 }
 
 .card-add-selected-packs,
-.card-add-selected-tags,
+.tag-picker-selected,
 .card-add-selected-stamp-sets {
   grid-template-columns: repeat(auto-fit, minmax(10rem, max-content));
 }
 
 .card-add-selected-packs li,
-.card-add-selected-tags li,
+.tag-picker-selected li,
 .card-add-selected-stamp-sets li {
   display: flex;
   align-items: center;
@@ -412,7 +417,7 @@
 }
 
 .card-add-selected-packs button,
-.card-add-selected-tags button,
+.tag-picker-selected button,
 .card-add-selected-stamp-sets button {
   display: grid;
   width: 1.65rem;
@@ -429,7 +434,7 @@
 }
 
 .card-add-selected-packs button:hover,
-.card-add-selected-tags button:hover,
+.tag-picker-selected button:hover,
 .card-add-selected-stamp-sets button:hover {
   background: var(--color-page);
   color: var(--color-text);

@@ -7,6 +7,8 @@ import {
   hydrateCardImageSources,
   prepareCardImageForSave
 } from './card-images.js';
+import { createCardTagVocabularyStore } from './card-tags.js';
+import { createTagPicker } from './tag-picker.js';
 
 const CARD_SIZE_PRESETS = {
   'a2-portrait': { label: 'A2 Portrait — 4.25 × 5.5 inches', width: 4.25, height: 5.5 },
@@ -26,7 +28,8 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
   }
 
   const detailView = createCardDetailView();
-  const addCardView = createAddCardView();
+  const cardTagVocabulary = createCardTagVocabularyStore();
+  const addCardView = createAddCardView({ onCreateTag: (tag) => cardTagVocabulary.create(tag) });
   const addCardButton = createAddCardButton();
   const cards = [];
   let activeTile = null;
@@ -41,6 +44,7 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
     await hydrateCardImageSources(savedCards);
     sortCards(savedCards);
     cards.splice(0, cards.length, ...savedCards);
+    addCardView.tagPicker.setVocabulary(await cardTagVocabulary.load(cards));
     renderCardLibrary(gallery, cards);
   };
 
@@ -134,7 +138,6 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
 
   addCardView.form.addEventListener('submit', async () => {
     addStampSetsFromInput(addCardView, false);
-    addCardTagsFromInput(addCardView, false);
     const card = createCardRecord(addCardView);
     addCardView.save.disabled = true;
 
@@ -184,7 +187,7 @@ function createAddCardButton() {
   return button;
 }
 
-function createAddCardView() {
+function createAddCardView({ onCreateTag } = {}) {
   const overlay = document.createElement('div');
   overlay.className = 'card-add-overlay';
   overlay.hidden = true;
@@ -252,8 +255,13 @@ function createAddCardView() {
   );
   const stampSetPicker = createStampSetPicker();
   controls.append(stampSetPicker.section);
-  const tagPicker = createCardTagPicker();
-  controls.append(tagPicker.section);
+  const tagPicker = createTagPicker({
+    label: 'Tags',
+    inputLabel: 'Search or create Card tags',
+    placeholder: 'Search Card tags',
+    onCreateTag
+  });
+  controls.append(tagPicker.element);
   const paperPackPicker = createPaperPackPicker();
   controls.append(paperPackPicker.section);
   layout.append(imagePicker.container, controls);
@@ -290,9 +298,7 @@ function createAddCardView() {
     stampSetInput: stampSetPicker.input,
     stampSetList: stampSetPicker.selected,
     stampSets: [],
-    tagInput: tagPicker.input,
-    tagList: tagPicker.selected,
-    tags: [],
+    tagPicker,
     imageChooseButton: imagePicker.choose,
     imagePreview: imagePicker.preview,
     imagePlaceholder: imagePicker.placeholder,
@@ -320,20 +326,6 @@ function createAddCardView() {
 
     if (button) {
       removeStampSet(addCardView, button.dataset.removeStampSet);
-    }
-  });
-  tagPicker.add.addEventListener('click', () => addCardTagsFromInput(addCardView));
-  tagPicker.input.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ',') {
-      event.preventDefault();
-      addCardTagsFromInput(addCardView);
-    }
-  });
-  tagPicker.selected.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-remove-card-tag]');
-
-    if (button) {
-      removeCardTag(addCardView, button.dataset.removeCardTag);
     }
   });
   imagePicker.choose.addEventListener('click', async () => {
@@ -384,12 +376,11 @@ function openEditCardView(addCardView, card) {
   addCardView.height.value = card.size.height;
   addCardView.favorite.checked = card.favorite;
   addCardView.stampSets = [...(card.stampSets || [])];
-  addCardView.tags = [...(card.tags || [])];
+  addCardView.tagPicker.setSelected(card.tags || []);
   addCardView.paperPackIds = [...(card.paperPackIds || [])];
   addCardView.existingImageSource = getCardDetailImageSource(card);
   addCardView.imageMessage.textContent = card.imageName || '';
   renderSelectedStampSets(addCardView);
-  renderSelectedCardTags(addCardView);
   renderSelectedPaperPacks(addCardView);
   renderPaperPackSearchResults(addCardView);
   renderSelectedCardImage(addCardView);
@@ -496,77 +487,6 @@ function renderSelectedStampSets(addCardView) {
     remove.textContent = String.fromCodePoint(215);
     item.append(name, remove);
     addCardView.stampSetList.append(item);
-  }
-}
-
-function createCardTagPicker() {
-  const section = document.createElement('section');
-  section.className = 'card-add-tags';
-  const heading = document.createElement('h4');
-  heading.textContent = 'Tags';
-  const inputRow = document.createElement('div');
-  inputRow.className = 'card-add-tag-input-row';
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.placeholder = 'Birthday, floral, fun fold';
-  input.setAttribute('aria-label', 'Add Card tags');
-  const add = document.createElement('button');
-  add.className = 'button';
-  add.type = 'button';
-  add.textContent = 'Add';
-  inputRow.append(input, add);
-  const help = document.createElement('p');
-  help.className = 'card-add-tag-help';
-  help.textContent = 'Separate multiple tags with commas.';
-  const selected = document.createElement('ul');
-  selected.className = 'card-add-selected-tags';
-  selected.setAttribute('aria-label', 'Selected Card tags');
-  section.append(heading, inputRow, help, selected);
-  return { section, input, add, selected };
-}
-
-function addCardTagsFromInput(addCardView, shouldFocus = true) {
-  const candidates = addCardView.tagInput.value
-    .split(',')
-    .map(normalizeCardTag)
-    .filter(Boolean);
-  const existingTags = new Set(addCardView.tags.map((tag) => tag.toLocaleLowerCase()));
-
-  for (const candidate of candidates) {
-    const tagKey = candidate.toLocaleLowerCase();
-
-    if (!existingTags.has(tagKey)) {
-      addCardView.tags.push(candidate);
-      existingTags.add(tagKey);
-    }
-  }
-
-  addCardView.tagInput.value = '';
-  renderSelectedCardTags(addCardView);
-  if (shouldFocus) {
-    addCardView.tagInput.focus();
-  }
-}
-
-function removeCardTag(addCardView, tagKey) {
-  addCardView.tags = addCardView.tags.filter((tag) => tag.toLocaleLowerCase() !== tagKey);
-  renderSelectedCardTags(addCardView);
-}
-
-function renderSelectedCardTags(addCardView) {
-  addCardView.tagList.replaceChildren();
-
-  for (const tag of addCardView.tags) {
-    const item = document.createElement('li');
-    const name = document.createElement('span');
-    name.textContent = tag;
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.dataset.removeCardTag = tag.toLocaleLowerCase();
-    remove.setAttribute('aria-label', `Remove ${tag}`);
-    remove.textContent = String.fromCodePoint(215);
-    item.append(name, remove);
-    addCardView.tagList.append(item);
   }
 }
 
@@ -723,7 +643,7 @@ function resetAddCardForm(addCardView) {
   addCardView.dateCreated.value = getLocalDateValue();
   addCardView.sizePreset.value = 'a2-portrait';
   addCardView.paperPackIds = [];
-  addCardView.tags = [];
+  addCardView.tagPicker.reset();
   addCardView.stampSets = [];
   addCardView.selectedImage = null;
   addCardView.existingCard = null;
@@ -735,7 +655,6 @@ function resetAddCardForm(addCardView) {
   applyCardSizePreset(addCardView);
   renderSelectedPaperPacks(addCardView);
   renderPaperPackSearchResults(addCardView);
-  renderSelectedCardTags(addCardView);
   renderSelectedStampSets(addCardView);
   renderSelectedCardImage(addCardView);
 }
@@ -770,7 +689,7 @@ function createCardRecord(addCardView) {
       width: Number(addCardView.width.value),
       height: Number(addCardView.height.value)
     },
-    tags: [...addCardView.tags],
+    tags: addCardView.tagPicker.getSelected(),
     stampSets: [...addCardView.stampSets],
     paperPackIds: [...addCardView.paperPackIds],
     colorIds: [...(existingCard?.colorIds || [])],
