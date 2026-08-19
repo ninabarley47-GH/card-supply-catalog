@@ -1867,6 +1867,43 @@ button.pattern {
   margin-bottom: var(--space-7);
 }
 
+.settings-quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.settings-quick-links span {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.settings-quick-links a {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.4rem 0.7rem;
+  background: rgba(255, 255, 255, 0.42);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.settings-quick-links a:hover,
+.settings-quick-links a:focus-visible {
+  border-color: var(--color-accent);
+  color: var(--color-accent-dark);
+}
+
+.settings-subsection,
+.tag-settings {
+  scroll-margin-top: var(--space-5);
+}
+
 .settings-actions {
   display: flex;
   flex-wrap: wrap;
