@@ -57,6 +57,44 @@ export function removeTag(values, value) {
   return uniqueTags(values).filter((tag) => getTagKey(tag) !== keyToRemove);
 }
 
+export function renameTag(values, currentValue, nextValue) {
+  const currentKey = getTagKey(currentValue);
+  const nextTag = normalizeTagName(nextValue);
+  const nextKey = getTagKey(nextTag);
+  const tags = uniqueTags(values);
+
+  if (!currentKey || !nextKey || !tags.some((tag) => getTagKey(tag) === currentKey)) {
+    return { ok: false, reason: "invalid", tags };
+  }
+
+  if (currentKey !== nextKey && tags.some((tag) => getTagKey(tag) === nextKey)) {
+    return { ok: false, reason: "duplicate", tags };
+  }
+
+  return {
+    ok: true,
+    tag: nextTag,
+    tags: tags.map((tag) => getTagKey(tag) === currentKey ? nextTag : tag)
+  };
+}
+
+export function countTagAssignments(records, fieldName, value) {
+  const tagKey = getTagKey(value);
+  return (records || []).filter((record) =>
+    (record?.[fieldName] || []).some((tag) => getTagKey(tag) === tagKey)
+  ).length;
+}
+
+export function replaceTagAssignments(records, fieldName, currentValue, nextValue) {
+  const currentKey = getTagKey(currentValue);
+  return (records || []).map((record) => ({
+    ...record,
+    [fieldName]: uniqueTags((record?.[fieldName] || []).map((tag) =>
+      getTagKey(tag) === currentKey ? nextValue : tag
+    ))
+  }));
+}
+
 export function findMatchingTags(values, query) {
   const queryKey = getTagKey(query);
   const tags = uniqueTags(values);

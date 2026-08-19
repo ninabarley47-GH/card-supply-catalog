@@ -1879,6 +1879,13 @@ button.pattern {
   color: var(--color-muted);
 }
 
+.tag-settings-add, .tag-settings-row { display: flex; align-items: center; gap: var(--space-2); }
+.tag-settings-add input { min-width: min(20rem, 70vw); }
+.tag-settings-list { display: grid; gap: var(--space-2); max-width: 44rem; margin-top: var(--space-4); }
+.tag-settings-row { padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border); }
+.tag-settings-row input { flex: 1 1 auto; }
+.tag-settings-count { color: var(--color-muted); font-size: 0.85rem; white-space: nowrap; }
+
 .bulk-owner-form {
   display: flex;
   align-items: end;

@@ -67,6 +67,10 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
     }
   });
 
+  document.addEventListener('catalog:card-tags-updated', async () => {
+    await reloadCards();
+  });
+
   addCardButton.addEventListener('click', () => {
     loadAvailablePaperPacks(addCardView, paperPacks);
     openAddCardView(addCardView);
