@@ -471,7 +471,7 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
       selectedTags: filterState.selectedTags,
       selectedColors: filterState.selectedColors,
       totalCount: paperPacks.length,
-      sortOrder: sortControl?.value || "name-asc"
+      sortOrder: sortControl?.value || "recently-added"
     });
 
     if (clearAllButton) {
@@ -858,7 +858,7 @@ function normalizeFilterText(value) {
 }
 
 function renderPaperPackLibrary(container, paperPacks, colorsById, options = {}) {
-  const sortOrder = options.sortOrder || "name-asc";
+  const sortOrder = options.sortOrder || "recently-added";
   const availablePaperPacks = sortPaperPacks(
     paperPacks.filter((paperPack) => !isPaperPackUsedUp(paperPack)),
     sortOrder
@@ -954,7 +954,16 @@ function createUsedUpPaperPackSection(paperPacks, colorsById) {
   return section;
 }
 
-function sortPaperPacks(paperPacks, sortOrder = "name-asc") {
+function sortPaperPacks(paperPacks, sortOrder = "recently-added") {
+  if (sortOrder === "recently-added") {
+    return [...paperPacks].sort((firstPack, secondPack) => {
+      const recentComparison =
+        Number(isRecentlyAddedPaperPack(secondPack)) - Number(isRecentlyAddedPaperPack(firstPack));
+
+      return recentComparison || compareTextValues(firstPack.name, secondPack.name);
+    });
+  }
+
   const [field, direction] = String(sortOrder).split("-");
   const multiplier = direction === "desc" ? -1 : 1;
 
