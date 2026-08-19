@@ -72,7 +72,7 @@ async function initializeTagManager(config) {
     const tag = normalizeTagName(input.value);
     if (!tag) return;
     if (vocabulary.some((value) => getTagKey(value) === getTagKey(tag))) { announce("That tag already exists.", "error"); return; }
-    await persist(addTag(vocabulary, tag));
+    await persist(addTag(vocabulary, tag).sort((first, second) => first.localeCompare(second, undefined, { sensitivity: "base" })));
     input.value = "";
     announce(`Added “${tag}”.`, "success");
   });
@@ -85,13 +85,15 @@ async function initializeTagManager(config) {
 
 function createTagSettingsRow(tag, config, onRename, onDelete) {
   const row = document.createElement("div");
-  const label = document.createElement("span");
+  const label = document.createElement("button");
   const input = document.createElement("input");
   const count = document.createElement("span");
   const rename = document.createElement("button");
   const remove = document.createElement("button");
   row.className = "tag-settings-row";
   label.className = "tag-settings-name";
+  label.type = "button";
+  label.setAttribute("aria-label", `Rename ${tag}`);
   label.textContent = tag;
   input.value = tag;
   input.setAttribute("aria-label", `Rename ${tag}`);
@@ -107,20 +109,26 @@ function createTagSettingsRow(tag, config, onRename, onDelete) {
   remove.setAttribute("aria-label", `Delete ${tag}`);
   rename.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>';
   remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"/></svg>';
-  rename.addEventListener("click", () => {
+  const beginEditing = () => {
     label.hidden = true;
     input.hidden = false;
     input.focus();
     input.select();
-  });
+  };
+  const cancelEditing = () => {
+    input.value = tag;
+    input.hidden = true;
+    label.hidden = false;
+  };
+  label.addEventListener("click", beginEditing);
+  rename.addEventListener("click", beginEditing);
+  input.addEventListener("blur", cancelEditing);
   input.addEventListener("keydown", async (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
       await onRename(input.value);
     } else if (event.key === "Escape") {
-      input.value = tag;
-      input.hidden = true;
-      label.hidden = false;
+      cancelEditing();
       rename.focus();
     }
   });

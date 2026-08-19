@@ -1896,7 +1896,9 @@ button.pattern {
 .tag-settings-columns { margin-top: var(--space-4); padding: var(--space-2) 0; color: var(--color-muted); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; }
 .tag-settings-list { display: grid; }
 .tag-settings-row { min-height: 2.75rem; border-top: 1px solid var(--color-border); }
-.tag-settings-name { min-width: 0; padding-right: 5.5rem; overflow-wrap: anywhere; }
+.tag-settings-name { min-width: 0; justify-self: start; border: 0; padding: 0 5.5rem 0 0; background: transparent; color: var(--color-text); cursor: pointer; overflow-wrap: anywhere; text-align: left; }
+.tag-settings-name:hover { color: var(--color-accent-dark); }
+.tag-settings-name[hidden] { display: none; }
 .tag-settings-row .tag-settings-name-input { min-width: 0; margin-right: 5.5rem; padding: 0.35rem 0.5rem; color: var(--color-text); }
 .tag-settings-row .tag-settings-name-input[hidden] { display: none; }
 .tag-settings-message { margin-bottom: 0; }
