@@ -393,8 +393,11 @@ function initializeScreenNavigation() {
   }
 
   function showCurrentScreen() {
-    const requestedScreenId = window.location.hash.slice(1) || "library";
-    const activeScreen = screens.find((screen) => screen.id === requestedScreenId) || screens[0];
+    const requestedTargetId = window.location.hash.slice(1) || "library";
+    const requestedTarget = document.getElementById(requestedTargetId);
+    const activeScreen = requestedTarget?.matches("[data-screen]")
+      ? requestedTarget
+      : requestedTarget?.closest("[data-screen]") || screens[0];
 
     for (const screen of screens) {
       screen.hidden = screen !== activeScreen;
@@ -409,6 +412,10 @@ function initializeScreenNavigation() {
       } else {
         link.removeAttribute("aria-current");
       }
+    }
+
+    if (requestedTarget && requestedTarget !== activeScreen) {
+      window.requestAnimationFrame(() => requestedTarget.scrollIntoView());
     }
   }
 
