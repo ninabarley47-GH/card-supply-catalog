@@ -357,7 +357,6 @@
 
 .card-add-paper-pack-results,
 .card-add-selected-packs,
-.tag-picker-results,
 .tag-picker-selected,
 .card-add-selected-stamp-sets {
   display: grid;
@@ -373,8 +372,16 @@
   overflow-y: auto;
 }
 
-.card-add-paper-pack-results button,
-.tag-picker-results button {
+.tag-picker-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.1rem;
+  list-style: none;
+}
+
+.card-add-paper-pack-results button {
   width: 100%;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-small);
@@ -386,12 +393,39 @@
   text-align: left;
 }
 
+.tag-picker-results button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.32rem 0.6rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.2;
+  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
 .card-add-paper-pack-results button:hover,
 .card-add-paper-pack-results button:focus-visible,
 .tag-picker-results [aria-selected="true"] button,
 .tag-picker-results button:hover,
 .tag-picker-results button:focus-visible {
   border-color: rgba(82, 120, 109, 0.62);
+}
+
+.tag-picker-results [aria-selected="true"] button {
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+.tag-picker-results button:focus-visible {
+  outline: 3px solid rgba(82, 120, 109, 0.45);
+  outline-offset: 2px;
 }
 
 .card-add-selected-packs,
