@@ -12,6 +12,13 @@ const CARD_IMAGE_LIBRARY_SETTING_ID = "cardImageLibrary";
 const LAST_BACKUP_EXPORT_SETTING_ID = "lastBackupExportedAt";
 const LAST_BACKUP_IMPORT_SETTING_ID = "lastBackupImportedAt";
 
+function sortTagsAlphabetically(tags = []) {
+  return [...tags].sort((first, second) => first.localeCompare(second, undefined, {
+    numeric: true,
+    sensitivity: "base"
+  }));
+}
+
 export function initializeSettings(options = {}) {
   initializeSetupStatus(options);
   initializeImageLibrarySettings(options);
@@ -36,11 +43,11 @@ async function initializeTagManager(config) {
   const list = root.querySelector("[data-tag-list]");
   const message = root.querySelector("[data-tag-message]");
   const total = root.querySelector("[data-tag-total]");
-  let vocabulary = config.buildVocabulary(await config.loadVocabulary(), config.records);
+  let vocabulary = sortTagsAlphabetically(config.buildVocabulary(await config.loadVocabulary(), config.records));
   const announce = (text, tone = "") => { message.textContent = text; message.dataset.tone = tone; };
   const persist = async (tags) => {
-    vocabulary = tags;
-    await config.saveVocabulary(tags);
+    vocabulary = sortTagsAlphabetically(tags);
+    await config.saveVocabulary(vocabulary);
     document.dispatchEvent(new CustomEvent(`catalog:${config.kind}-tags-updated`));
     render();
   };
@@ -85,13 +92,13 @@ async function initializeTagManager(config) {
     const tag = normalizeTagName(input.value);
     if (!tag) return;
     if (vocabulary.some((value) => getTagKey(value) === getTagKey(tag))) { announce("That tag already exists.", "error"); return; }
-    await persist(addTag(vocabulary, tag).sort((first, second) => first.localeCompare(second, undefined, { sensitivity: "base" })));
+    await persist(addTag(vocabulary, tag));
     input.value = "";
     announce(`Added “${tag}”.`, "success");
   });
   render();
   document.addEventListener(`catalog:${config.kind}-tags-updated`, async () => {
-    vocabulary = config.buildVocabulary(await config.loadVocabulary(), config.records);
+    vocabulary = sortTagsAlphabetically(config.buildVocabulary(await config.loadVocabulary(), config.records));
     render();
   });
 }
