@@ -85,13 +85,18 @@ async function initializeTagManager(config) {
 
 function createTagSettingsRow(tag, config, onRename, onDelete) {
   const row = document.createElement("div");
+  const label = document.createElement("span");
   const input = document.createElement("input");
   const count = document.createElement("span");
   const rename = document.createElement("button");
   const remove = document.createElement("button");
   row.className = "tag-settings-row";
+  label.className = "tag-settings-name";
+  label.textContent = tag;
   input.value = tag;
   input.setAttribute("aria-label", `Rename ${tag}`);
+  input.className = "tag-settings-name-input";
+  input.hidden = true;
   count.className = "tag-settings-count";
   const assignmentCount = countTagAssignments(config.records, config.fieldName, tag);
   const recordName = config.kind === "paper" ? "pack" : "card";
@@ -102,9 +107,25 @@ function createTagSettingsRow(tag, config, onRename, onDelete) {
   remove.setAttribute("aria-label", `Delete ${tag}`);
   rename.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>';
   remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"/></svg>';
-  rename.addEventListener("click", () => onRename(input.value));
+  rename.addEventListener("click", () => {
+    label.hidden = true;
+    input.hidden = false;
+    input.focus();
+    input.select();
+  });
+  input.addEventListener("keydown", async (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      await onRename(input.value);
+    } else if (event.key === "Escape") {
+      input.value = tag;
+      input.hidden = true;
+      label.hidden = false;
+      rename.focus();
+    }
+  });
   remove.addEventListener("click", onDelete);
-  row.append(input, count, rename, remove);
+  row.append(label, input, count, rename, remove);
   return row;
 }
 
