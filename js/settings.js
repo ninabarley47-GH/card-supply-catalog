@@ -35,6 +35,7 @@ async function initializeTagManager(config) {
   const input = root.querySelector("[data-tag-add-input]");
   const list = root.querySelector("[data-tag-list]");
   const message = root.querySelector("[data-tag-message]");
+  const total = root.querySelector("[data-tag-total]");
   let vocabulary = config.buildVocabulary(await config.loadVocabulary(), config.records);
   const announce = (text, tone = "") => { message.textContent = text; message.dataset.tone = tone; };
   const persist = async (tags) => {
@@ -43,7 +44,9 @@ async function initializeTagManager(config) {
     document.dispatchEvent(new CustomEvent(`catalog:${config.kind}-tags-updated`));
     render();
   };
-  const render = () => list.replaceChildren(...vocabulary.map((tag) => createTagSettingsRow(tag, config, async (nextName) => {
+  const render = () => {
+    total.textContent = `${vocabulary.length} tag${vocabulary.length === 1 ? "" : "s"}`;
+    list.replaceChildren(...vocabulary.map((tag) => createTagSettingsRow(tag, config, async (nextName) => {
     if (config.protectedTags.some((value) => getTagKey(value) === getTagKey(tag))) { announce(`“${tag}” is a built-in Paper tag and cannot be renamed.`, "error"); return; }
     const result = renameTag(vocabulary, tag, nextName);
     if (!result.ok) { announce(result.reason === "duplicate" ? "That tag already exists." : "Enter a valid tag name.", "error"); return; }
@@ -62,7 +65,8 @@ async function initializeTagManager(config) {
     if (config.protectedTags.some((value) => getTagKey(value) === getTagKey(tag))) { announce(`“${tag}” is a built-in Paper tag and cannot be deleted.`, "error"); return; }
     await persist(removeTag(vocabulary, tag));
     announce(`Deleted “${tag}”.`, "success");
-  })));
+    })));
+  };
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const tag = normalizeTagName(input.value);
@@ -89,11 +93,15 @@ function createTagSettingsRow(tag, config, onRename, onDelete) {
   input.value = tag;
   input.setAttribute("aria-label", `Rename ${tag}`);
   count.className = "tag-settings-count";
-  count.textContent = `${countTagAssignments(config.records, config.fieldName, tag)} assigned`;
-  rename.className = remove.className = "button";
+  const assignmentCount = countTagAssignments(config.records, config.fieldName, tag);
+  const recordName = config.kind === "paper" ? "pack" : "card";
+  count.textContent = `${assignmentCount} ${recordName}${assignmentCount === 1 ? "" : "s"}`;
+  rename.className = remove.className = "tag-settings-action";
   rename.type = remove.type = "button";
-  rename.textContent = "Rename";
-  remove.textContent = "Delete";
+  rename.setAttribute("aria-label", `Rename ${tag}`);
+  remove.setAttribute("aria-label", `Delete ${tag}`);
+  rename.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>';
+  remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"/></svg>';
   rename.addEventListener("click", () => onRename(input.value));
   remove.addEventListener("click", onDelete);
   row.append(input, count, rename, remove);

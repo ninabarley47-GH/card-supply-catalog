@@ -208,17 +208,29 @@
               <p>Manage storage, backups, and setup readiness here.</p>
             </div>
 
-            <section class="settings-subsection" aria-labelledby="paper-tags-settings-title" data-tag-settings="paper">
-              <div class="section-heading"><div><p class="eyebrow">Paper vocabulary</p><h4 id="paper-tags-settings-title">Paper Tags</h4></div><p>Manage tags used by Designer Series Paper packs. Built-in Paper tags cannot be removed.</p></div>
-              <form class="tag-settings-add" data-tag-add-form><label class="visually-hidden" for="paper-tag-add">New Paper tag</label><input id="paper-tag-add" type="text" autocomplete="off" placeholder="New Paper tag" data-tag-add-input required><button class="button button-primary" type="submit">Add tag</button></form>
-              <div class="tag-settings-list" data-tag-list aria-live="polite"></div><p class="settings-message" data-tag-message aria-live="polite"></p>
-            </section>
+            <details class="settings-subsection tag-settings" data-tag-settings="paper">
+              <summary class="tag-settings-summary">
+                <span class="tag-settings-summary-text"><strong id="paper-tags-settings-title">Paper Tags</strong><span>Tags used to describe Designer Series Paper packs.</span></span>
+                <span class="tag-settings-total" data-tag-total>0 tags</span>
+              </summary>
+              <div class="tag-settings-body" role="region" aria-labelledby="paper-tags-settings-title">
+                <form class="tag-settings-add" data-tag-add-form><label class="visually-hidden" for="paper-tag-add">New Paper tag</label><input id="paper-tag-add" type="text" autocomplete="off" placeholder="Add a new paper tag..." data-tag-add-input required><button class="button button-primary" type="submit">Add Tag</button></form>
+                <div class="tag-settings-columns" aria-hidden="true"><span>Tag</span><span>Used by</span></div>
+                <div class="tag-settings-list" data-tag-list aria-live="polite"></div><p class="settings-message" data-tag-message aria-live="polite"></p>
+              </div>
+            </details>
 
-            <section class="settings-subsection" aria-labelledby="card-tags-settings-title" data-tag-settings="card">
-              <div class="section-heading"><div><p class="eyebrow">Card vocabulary</p><h4 id="card-tags-settings-title">Card Tags</h4></div><p>Manage tags used by Cards.</p></div>
-              <form class="tag-settings-add" data-tag-add-form><label class="visually-hidden" for="card-tag-add">New Card tag</label><input id="card-tag-add" type="text" autocomplete="off" placeholder="New Card tag" data-tag-add-input required><button class="button button-primary" type="submit">Add tag</button></form>
-              <div class="tag-settings-list" data-tag-list aria-live="polite"></div><p class="settings-message" data-tag-message aria-live="polite"></p>
-            </section>
+            <details class="settings-subsection tag-settings" data-tag-settings="card">
+              <summary class="tag-settings-summary">
+                <span class="tag-settings-summary-text"><strong id="card-tags-settings-title">Card Tags</strong><span>Tags used to organize your cards.</span></span>
+                <span class="tag-settings-total" data-tag-total>0 tags</span>
+              </summary>
+              <div class="tag-settings-body" role="region" aria-labelledby="card-tags-settings-title">
+                <form class="tag-settings-add" data-tag-add-form><label class="visually-hidden" for="card-tag-add">New Card tag</label><input id="card-tag-add" type="text" autocomplete="off" placeholder="Add a new card tag..." data-tag-add-input required><button class="button button-primary" type="submit">Add Tag</button></form>
+                <div class="tag-settings-columns" aria-hidden="true"><span>Tag</span><span>Used by</span></div>
+                <div class="tag-settings-list" data-tag-list aria-live="polite"></div><p class="settings-message" data-tag-message aria-live="polite"></p>
+              </div>
+            </details>
 
             <section class="settings-subsection" aria-labelledby="image-library-title">
               <div class="section-heading">
