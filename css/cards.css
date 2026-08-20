@@ -707,24 +707,26 @@
   font-weight: 650;
 }
 
-.card-detail-chip-link {
-  margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-3));
-  padding: var(--space-1) var(--space-3);
+.card-detail-relationship-metadata {
+  padding: 0;
+  border-top: 0;
+}
+
+.card-detail-metadata-link {
   border: 0;
-  border-radius: inherit;
+  padding: 0;
   background: transparent;
   color: inherit;
   font: inherit;
   cursor: pointer;
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.16em;
+  text-align: left;
 }
 
-.card-detail-chip-link:hover,
-.card-detail-chip-link:focus-visible {
-  color: var(--color-text);
-  background: var(--color-page);
+.card-detail-metadata-link:hover,
+.card-detail-metadata-link:focus-visible {
+  color: var(--color-accent-dark);
+  text-decoration: underline;
+  text-underline-offset: 0.14em;
 }
 
 .card-detail-empty {

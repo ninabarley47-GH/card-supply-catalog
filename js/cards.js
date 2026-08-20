@@ -1159,9 +1159,8 @@ function createCardDetailContent(card, index, paperPacks) {
   metadata.className = 'card-detail-metadata';
   metadata.append(
     createCardFacts(card),
-    createChipSection('Stamp sets', card.stampSets || []),
+    createCardDetailRelationshipMetadata(card, paperPacks),
     createChipSection('Tags', card.tags),
-    createPaperPackChipSection(card.paperPackIds, paperPacks),
     createChipSection('Colors', card.colorIds),
     createCardDetailActions(card)
   );
@@ -1334,24 +1333,47 @@ function createChipSection(label, values) {
   return section;
 }
 
-function createPaperPackChipSection(paperPackIds = [], paperPacks = []) {
-  const references = resolvePaperPackReferences(paperPackIds, paperPacks);
-  const section = createChipSection('Paper packs', references.map((reference) => reference.label));
-  const chips = section.querySelectorAll('.card-detail-chips li');
+function createCardDetailRelationshipMetadata(card, paperPacks) {
+  const metadata = document.createElement('dl');
+  metadata.className = 'card-library-metadata card-detail-relationship-metadata';
+  appendPaperPackDetailMetadata(
+    metadata,
+    'Paper Packs',
+    resolvePaperPackReferences(card.paperPackIds, paperPacks)
+  );
+  appendCardLibraryMetadata(metadata, 'Stamp Sets', card.stampSets || []);
+  return metadata;
+}
+
+function appendPaperPackDetailMetadata(metadata, label, references) {
+  if (references.length === 0) {
+    return;
+  }
+
+  const group = document.createElement('div');
+  const term = document.createElement('dt');
+  const description = document.createElement('dd');
+  term.textContent = label;
 
   references.forEach((reference, index) => {
+    if (index > 0) {
+      description.append(', ');
+    }
+
     if (!reference.resolved) {
+      description.append(reference.label);
       return;
     }
 
     const button = document.createElement('button');
-    button.className = 'card-detail-chip-link';
+    button.className = 'card-detail-metadata-link';
     button.type = 'button';
     button.dataset.cardDetailPaperPack = reference.id;
     button.setAttribute('aria-label', `Open ${reference.label}`);
     button.textContent = reference.label;
-    chips[index].replaceChildren(button);
+    description.append(button);
   });
 
-  return section;
+  group.append(term, description);
+  metadata.append(group);
 }
