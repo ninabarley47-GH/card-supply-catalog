@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { findCardsUsingPaperPack } from "./library.js";
-import { applyCardDetailSourceState } from "./cards.js";
+import { applyCardDetailSourceState, resolvePaperPackDisplayNames } from "./cards.js";
 
 const cards = [
   { id: "one", paperPackIds: ["pack-a"] },
@@ -44,4 +44,23 @@ test("Card Detail preserves and clears its source paper-pack ID in transient UI 
   assert.equal("sourcePaperPackId" in overlay.dataset, false);
   assert.equal(back.hidden, true);
   assert.equal(back.textContent, "");
+});
+
+test("Card Detail resolves one paper-pack ID to its display name", () => {
+  assert.deepEqual(
+    resolvePaperPackDisplayNames(["beautiful-gallery"], [
+      { id: "beautiful-gallery", name: "Beautiful Gallery" }
+    ]),
+    ["Beautiful Gallery"]
+  );
+});
+
+test("Card Detail resolves all paper-pack IDs and retains an unresolved ID as a fallback", () => {
+  assert.deepEqual(
+    resolvePaperPackDisplayNames(["pack-a", "missing-pack", "pack-b"], [
+      { id: "pack-a", name: "Paper Pack A" },
+      { id: "pack-b", name: "Paper Pack B" }
+    ]),
+    ["Paper Pack A", "missing-pack", "Paper Pack B"]
+  );
 });

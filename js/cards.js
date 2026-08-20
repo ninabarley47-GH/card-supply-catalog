@@ -1101,7 +1101,7 @@ function openCardDetail(detailView, card, tile, cards, paperPacks, sourcePaperPa
   }
 
   const cardIndex = cards.indexOf(card);
-  detailView.body.replaceChildren(createCardDetailContent(card, cardIndex));
+  detailView.body.replaceChildren(createCardDetailContent(card, cardIndex, paperPacks));
   const sourcePaperPack = paperPacks.find((paperPack) => paperPack.id === sourcePaperPackId);
   applyCardDetailSourceState(detailView.overlay, sourcePaperPack?.id, detailView.back, sourcePaperPack?.name);
   detailView.overlay.hidden = false;
@@ -1122,7 +1122,7 @@ function closeCardDetail(detailView, tile) {
   }
 }
 
-function createCardDetailContent(card, index) {
+function createCardDetailContent(card, index, paperPacks) {
   const content = document.createElement('div');
   content.className = 'card-detail-content';
 
@@ -1143,13 +1143,18 @@ function createCardDetailContent(card, index) {
     createCardFacts(card),
     createChipSection('Stamp sets', card.stampSets || []),
     createChipSection('Tags', card.tags),
-    createChipSection('Paper packs', card.paperPackIds),
+    createChipSection('Paper packs', resolvePaperPackDisplayNames(card.paperPackIds, paperPacks)),
     createChipSection('Colors', card.colorIds),
     createCardDetailActions(card)
   );
 
   content.append(image, metadata);
   return content;
+}
+
+export function resolvePaperPackDisplayNames(paperPackIds = [], paperPacks = []) {
+  const namesById = new Map(paperPacks.map((paperPack) => [paperPack.id, paperPack.name]));
+  return paperPackIds.map((paperPackId) => namesById.get(paperPackId) || paperPackId);
 }
 
 export function applyCardDetailSourceState(overlay, sourcePaperPackId, backControl = null, sourcePaperPackName = '') {
