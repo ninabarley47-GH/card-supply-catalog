@@ -595,7 +595,8 @@ h6 {
 }
 
 .filter-clear-icon[hidden],
-[data-library-filter-options][hidden] {
+[data-library-filter-options][hidden],
+[data-card-tag-filter-options][hidden] {
   display: none;
 }
 

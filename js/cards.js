@@ -37,6 +37,9 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
   const favoritesInput = document.querySelector('[data-card-library-favorites]');
   const sortControl = document.querySelector('[data-card-library-sort]');
   const clearFiltersButton = document.querySelector('[data-card-library-clear]');
+  const tagFilter = document.querySelector('[data-card-library-tag-filters]');
+  const clearTagsButton = document.querySelector('[data-card-library-clear-tags]');
+  const toggleTagsButton = document.querySelector('[data-card-library-toggle-tags]');
   const paperPackNamesById = new Map(paperPacks.map((paperPack) => [paperPack.id, paperPack.name]));
   let activeTile = null;
 
@@ -44,6 +47,7 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
     const visibleCards = filterAndSortCards(cards, {
       query: searchInput?.value,
       favoritesOnly: favoritesInput?.checked,
+      selectedTags: getSelectedCardTags(tagFilter),
       sortOrder: sortControl?.value,
       paperPackNamesById
     });
@@ -51,7 +55,12 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
     renderCardLibrary(gallery, visibleCards, cards.length);
 
     if (clearFiltersButton) {
-      clearFiltersButton.hidden = !searchInput?.value && !favoritesInput?.checked;
+      clearFiltersButton.hidden =
+        !searchInput?.value && !favoritesInput?.checked && getSelectedCardTags(tagFilter).length === 0;
+    }
+
+    if (clearTagsButton) {
+      clearTagsButton.hidden = getSelectedCardTags(tagFilter).length === 0;
     }
   };
 
@@ -65,7 +74,9 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
     await hydrateCardImageSources(savedCards);
     sortCards(savedCards);
     cards.splice(0, cards.length, ...savedCards);
-    addCardView.tagPicker.setVocabulary(await cardTagVocabulary.load(cards));
+    const tagVocabulary = await cardTagVocabulary.load(cards);
+    addCardView.tagPicker.setVocabulary(tagVocabulary);
+    refreshCardTagFilters(tagFilter, tagVocabulary);
     renderCurrent();
   };
 
@@ -98,13 +109,30 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
   });
   searchInput?.addEventListener('input', renderCurrent);
   favoritesInput?.addEventListener('change', renderCurrent);
+  tagFilter?.addEventListener('change', renderCurrent);
   sortControl?.addEventListener('change', renderCurrent);
   filterForm?.addEventListener('submit', (event) => event.preventDefault());
   clearFiltersButton?.addEventListener('click', () => {
     searchInput.value = '';
     favoritesInput.checked = false;
+    clearSelectedCardTags(tagFilter);
     renderCurrent();
     searchInput.focus();
+  });
+  clearTagsButton?.addEventListener('click', () => {
+    clearSelectedCardTags(tagFilter);
+    renderCurrent();
+  });
+  toggleTagsButton?.addEventListener('click', () => {
+    const options = tagFilter?.querySelector('[data-card-tag-filter-options]');
+
+    if (!options) {
+      return;
+    }
+
+    const isExpanded = toggleTagsButton.getAttribute('aria-expanded') === 'true';
+    toggleTagsButton.setAttribute('aria-expanded', String(!isExpanded));
+    options.hidden = isExpanded;
   });
   addCardView.close.addEventListener('click', () => closeAddCardView(addCardView, addCardButton));
   addCardView.cancel.addEventListener('click', () => closeAddCardView(addCardView, addCardButton));
@@ -754,8 +782,15 @@ function createCardId(createdAt) {
 
 function filterAndSortCards(cards, options = {}) {
   const query = String(options.query || '').trim().toLocaleLowerCase();
+  const selectedTags = (options.selectedTags || []).map((tag) => tag.toLocaleLowerCase());
   const filteredCards = cards.filter((card) => {
     if (options.favoritesOnly && !card.favorite) {
+      return false;
+    }
+
+    const cardTags = (card.tags || []).map((tag) => tag.toLocaleLowerCase());
+
+    if (!selectedTags.every((tag) => cardTags.includes(tag))) {
       return false;
     }
 
@@ -774,6 +809,55 @@ function filterAndSortCards(cards, options = {}) {
   });
 
   return sortCards(filteredCards, options.sortOrder);
+}
+
+function getSelectedCardTags(container) {
+  if (!container) {
+    return [];
+  }
+
+  return [...container.querySelectorAll('input[name="card-library-tags"]:checked')].map(
+    (input) => input.value
+  );
+}
+
+function clearSelectedCardTags(container) {
+  for (const input of container?.querySelectorAll('input[name="card-library-tags"]:checked') || []) {
+    input.checked = false;
+  }
+}
+
+function refreshCardTagFilters(container, tags = []) {
+  if (!container) {
+    return;
+  }
+
+  const selectedTags = new Set(getSelectedCardTags(container));
+  const existingOptions = container.querySelector('[data-card-tag-filter-options]');
+  const optionsWereHidden = existingOptions?.hidden || false;
+  const options = document.createElement('div');
+
+  options.className = 'keyword-picker-options library-tag-filter-options';
+  options.dataset.cardTagFilterOptions = '';
+  options.hidden = optionsWereHidden;
+
+  options.append(...tags.map((tag) => {
+    const label = document.createElement('label');
+    const input = document.createElement('input');
+    const text = document.createElement('span');
+
+    label.className = 'keyword-option library-tag-option';
+    input.type = 'checkbox';
+    input.name = 'card-library-tags';
+    input.value = tag;
+    input.checked = selectedTags.has(tag);
+    text.textContent = tag;
+    label.append(input, text);
+    return label;
+  }));
+
+  existingOptions?.remove();
+  container.append(options);
 }
 
 function sortCards(cards, sortOrder = 'date-desc') {
