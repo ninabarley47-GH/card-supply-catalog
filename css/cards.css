@@ -637,7 +637,7 @@
 
 .card-detail-image {
   display: block;
-  width: auto;
+  width: min(100%, calc(var(--card-width) * 7rem));
   height: auto;
   max-width: 100%;
   max-height: min(70vh, 38rem);
