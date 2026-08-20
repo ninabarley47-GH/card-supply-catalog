@@ -960,7 +960,7 @@ function createCardTile(card, index, paperPackNamesById) {
     tagList.append(item);
   });
 
-  tile.append(image, metadata, tagList);
+  tile.append(image, tagList, metadata);
   return tile;
 }
 
@@ -971,8 +971,8 @@ function createCardLibraryMetadata(card, paperPackNamesById) {
     .filter(Boolean);
 
   metadata.className = 'card-library-metadata';
-  appendCardLibraryMetadata(metadata, 'Paper packs', paperPackNames);
-  appendCardLibraryMetadata(metadata, 'Stamp sets', card.stampSets || []);
+  appendCardLibraryMetadata(metadata, 'Paper Packs', paperPackNames);
+  appendCardLibraryMetadata(metadata, 'Stamp Sets', card.stampSets || []);
   return metadata;
 }
 
