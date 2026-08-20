@@ -221,10 +221,12 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
     if (paperPackLink) {
       event.stopPropagation();
       const paperPackId = paperPackLink.dataset.cardDetailPaperPack;
+      const sourceCardId = detailView.overlay.dataset.selectedCardId;
+      const sourcePaperPackId = detailView.overlay.dataset.sourcePaperPackId;
       closeCardDetail(detailView, activeTile);
       document.dispatchEvent(
         new CustomEvent('paper-pack:detail-request', {
-          detail: { paperPackId }
+          detail: { paperPackId, sourceCardId, sourcePaperPackId }
         })
       );
       return;
@@ -1116,6 +1118,7 @@ function openCardDetail(detailView, card, tile, cards, paperPacks, sourcePaperPa
 
   const cardIndex = cards.indexOf(card);
   detailView.body.replaceChildren(createCardDetailContent(card, cardIndex, paperPacks));
+  detailView.overlay.dataset.selectedCardId = card.id;
   const sourcePaperPack = paperPacks.find((paperPack) => paperPack.id === sourcePaperPackId);
   applyCardDetailSourceState(detailView.overlay, sourcePaperPack?.id, detailView.back, sourcePaperPack?.name);
   detailView.overlay.hidden = false;
@@ -1129,6 +1132,7 @@ function closeCardDetail(detailView, tile) {
 
   detailView.overlay.hidden = true;
   detailView.body.replaceChildren();
+  delete detailView.overlay.dataset.selectedCardId;
   applyCardDetailSourceState(detailView.overlay, '', detailView.back);
 
   if (tile?.isConnected) {

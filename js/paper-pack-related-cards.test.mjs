@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { findCardsUsingPaperPack } from "./library.js";
+import { applyPaperPackDetailCardSourceState, findCardsUsingPaperPack } from "./library.js";
 import {
   applyCardDetailSourceState,
   resolvePaperPackDisplayNames,
@@ -81,4 +81,19 @@ test("Card Detail paper-pack references retain IDs and only mark existing packs 
       { id: "pack-b", label: "Paper Pack B", resolved: true }
     ]
   );
+});
+
+test("Paper Pack Detail stores and clears its transient Card return context", () => {
+  const panel = { dataset: {} };
+  const back = { hidden: true };
+
+  applyPaperPackDetailCardSourceState(panel, back, "card-1", "pack-a");
+  assert.equal(panel.dataset.sourceCardId, "card-1");
+  assert.equal(panel.dataset.sourceCardPaperPackId, "pack-a");
+  assert.equal(back.hidden, false);
+
+  applyPaperPackDetailCardSourceState(panel, back);
+  assert.equal("sourceCardId" in panel.dataset, false);
+  assert.equal("sourceCardPaperPackId" in panel.dataset, false);
+  assert.equal(back.hidden, true);
 });

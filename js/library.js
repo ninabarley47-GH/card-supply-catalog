@@ -1244,6 +1244,7 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
   const detailTitle = document.querySelector("[data-detail-title]");
   const detailBody = document.querySelector("[data-detail-body]");
   const detailClose = document.querySelector("[data-detail-close]");
+  const detailBack = document.querySelector("[data-detail-back]");
 
   if (!detailPanel || !detailTitle || !detailBody) {
     return;
@@ -1468,12 +1469,31 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
 
   detailClose?.addEventListener("click", () => closeDetailPanel(detailPanel));
 
+  detailBack?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const cardId = detailPanel.dataset.sourceCardId;
+
+    if (!cardId) {
+      return;
+    }
+
+    const sourcePaperPackId = detailPanel.dataset.sourceCardPaperPackId;
+    document.dispatchEvent(
+      new CustomEvent("card:detail-request", {
+        detail: { cardId, sourcePaperPackId }
+      })
+    );
+  });
+
   document.addEventListener("paper-pack:detail-request", (event) => {
     const paperPack = paperPacks.find((pack) => pack.id === event.detail?.paperPackId);
 
     if (paperPack) {
       window.location.hash = "library";
-      openDetailPanel(detailPanel, detailTitle, detailBody, paperPack, paperPacks, colorsById);
+      openDetailPanel(detailPanel, detailTitle, detailBody, paperPack, paperPacks, colorsById, null, {
+        cardId: event.detail?.sourceCardId,
+        sourcePaperPackId: event.detail?.sourcePaperPackId
+      });
     }
   });
 
@@ -1544,10 +1564,17 @@ function openDetailPanel(
   paperPack,
   paperPacks,
   colorsById,
-  coordinatingColor = null
+  coordinatingColor = null,
+  cardReturn = null
 ) {
   detailPanel.hidden = false;
   detailPanel.dataset.selectedPackId = paperPack.id;
+  applyPaperPackDetailCardSourceState(
+    detailPanel,
+    detailPanel.querySelector("[data-detail-back]"),
+    cardReturn?.cardId,
+    cardReturn?.sourcePaperPackId
+  );
   detailTitle.textContent = paperPack.name;
   detailBody.replaceChildren(createDetailContent(paperPack, paperPacks, colorsById));
   detailBody.scrollTop = 0;
@@ -1566,6 +1593,33 @@ function openDetailPanel(
 function closeDetailPanel(detailPanel) {
   detailPanel.hidden = true;
   delete detailPanel.dataset.selectedPackId;
+  applyPaperPackDetailCardSourceState(
+    detailPanel,
+    detailPanel.querySelector("[data-detail-back]")
+  );
+}
+
+export function applyPaperPackDetailCardSourceState(
+  detailPanel,
+  backControl,
+  sourceCardId = "",
+  sourcePaperPackId = ""
+) {
+  if (sourceCardId) {
+    detailPanel.dataset.sourceCardId = sourceCardId;
+  } else {
+    delete detailPanel.dataset.sourceCardId;
+  }
+
+  if (sourcePaperPackId) {
+    detailPanel.dataset.sourceCardPaperPackId = sourcePaperPackId;
+  } else {
+    delete detailPanel.dataset.sourceCardPaperPackId;
+  }
+
+  if (backControl) {
+    backControl.hidden = !sourceCardId;
+  }
 }
 
 function createDetailContent(paperPack, paperPacks, colorsById) {
