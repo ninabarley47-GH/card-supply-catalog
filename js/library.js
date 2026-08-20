@@ -1472,6 +1472,7 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
     const paperPack = paperPacks.find((pack) => pack.id === event.detail?.paperPackId);
 
     if (paperPack) {
+      window.location.hash = "library";
       openDetailPanel(detailPanel, detailTitle, detailBody, paperPack, paperPacks, colorsById);
     }
   });

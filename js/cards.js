@@ -219,6 +219,7 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
     const paperPackLink = event.target.closest('[data-card-detail-paper-pack]');
 
     if (paperPackLink) {
+      event.stopPropagation();
       const paperPackId = paperPackLink.dataset.cardDetailPaperPack;
       closeCardDetail(detailView, activeTile);
       document.dispatchEvent(
