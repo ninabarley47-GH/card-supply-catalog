@@ -188,6 +188,17 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
       closeCardDetail(detailView, activeTile);
     }
   });
+
+  document.addEventListener('card:detail-request', (event) => {
+    const card = findCard(cards, event.detail?.cardId);
+
+    if (!card) {
+      return;
+    }
+
+    activeTile = event.detail?.sourceElement || null;
+    openCardDetail(detailView, card, activeTile, cards, event.detail?.sourcePaperPackId);
+  });
   detailView.body.addEventListener('click', (event) => {
     const deleteButton = event.target.closest('[data-delete-card]');
 
@@ -1064,13 +1075,14 @@ function createCardDetailView() {
   return { overlay, panel, close, body };
 }
 
-function openCardDetail(detailView, card, tile, cards) {
+function openCardDetail(detailView, card, tile, cards, sourcePaperPackId = '') {
   if (!card) {
     return;
   }
 
   const cardIndex = cards.indexOf(card);
   detailView.body.replaceChildren(createCardDetailContent(card, cardIndex));
+  applyCardDetailSourceState(detailView.overlay, sourcePaperPackId);
   detailView.overlay.hidden = false;
   detailView.close.focus();
 }
@@ -1082,6 +1094,7 @@ function closeCardDetail(detailView, tile) {
 
   detailView.overlay.hidden = true;
   detailView.body.replaceChildren();
+  applyCardDetailSourceState(detailView.overlay, '');
 
   if (tile?.isConnected) {
     tile.focus();
@@ -1116,6 +1129,14 @@ function createCardDetailContent(card, index) {
 
   content.append(image, metadata);
   return content;
+}
+
+export function applyCardDetailSourceState(overlay, sourcePaperPackId) {
+  if (sourcePaperPackId) {
+    overlay.dataset.sourcePaperPackId = sourcePaperPackId;
+  } else {
+    delete overlay.dataset.sourcePaperPackId;
+  }
 }
 
 function createCardDetailActions(card) {

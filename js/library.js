@@ -1356,6 +1356,21 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
   detailBody.addEventListener("click", (event) => {
     event.stopPropagation();
 
+    const relatedCard = event.target.closest("[data-related-card-id]");
+
+    if (relatedCard) {
+      document.dispatchEvent(
+        new CustomEvent("card:detail-request", {
+          detail: {
+            cardId: relatedCard.dataset.relatedCardId,
+            sourcePaperPackId: detailPanel.dataset.selectedPackId,
+            sourceElement: relatedCard
+          }
+        })
+      );
+      return;
+    }
+
     const patternPreviewButton = event.target.closest("[data-detail-pattern-preview]");
 
     if (patternPreviewButton) {
@@ -1630,12 +1645,18 @@ function createRelatedCardsSection(paperPack, cards) {
 
   for (const card of relatedCards) {
     const imageSource = getCardLibraryImageSource(card);
+    const button = document.createElement("button");
+    button.className = "related-card-link";
+    button.type = "button";
+    button.dataset.relatedCardId = card.id;
+    button.setAttribute("aria-label", "Open card details");
 
     if (!imageSource) {
       const placeholder = document.createElement("div");
       placeholder.className = "related-card-thumbnail related-card-thumbnail-missing";
       placeholder.textContent = "No image yet";
-      grid.append(placeholder);
+      button.append(placeholder);
+      grid.append(button);
       continue;
     }
 
@@ -1644,7 +1665,8 @@ function createRelatedCardsSection(paperPack, cards) {
     image.src = imageSource;
     image.alt = "Handmade card using this paper";
     image.decoding = "async";
-    grid.append(image);
+    button.append(image);
+    grid.append(button);
   }
 
   section.append(heading, grid);

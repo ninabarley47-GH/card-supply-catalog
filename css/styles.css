@@ -1360,6 +1360,19 @@ h6 {
   gap: var(--space-3);
 }
 
+.related-card-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.related-card-link:hover .related-card-thumbnail,
+.related-card-link:focus-visible .related-card-thumbnail {
+  border-color: rgba(82, 120, 109, 0.7);
+  box-shadow: 0 6px 16px rgba(47, 44, 40, 0.12);
+}
+
 .related-card-thumbnail {
   display: block;
   width: 100%;
