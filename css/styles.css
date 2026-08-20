@@ -1795,6 +1795,34 @@ button.pattern {
   font-size: 1.05rem;
 }
 
+.paper-pack-favorite {
+  flex: 0 0 auto;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #aaa39a;
+  cursor: pointer;
+  font: inherit;
+  font-size: 1.45rem;
+  line-height: 1;
+  transition: color 140ms ease, transform 140ms ease;
+}
+
+.paper-pack-favorite[data-favorite="true"] {
+  color: #9b5364;
+}
+
+.paper-pack-favorite:hover,
+.paper-pack-favorite:focus-visible {
+  color: #9b5364;
+  transform: scale(1.08);
+}
+
+.paper-pack-favorite:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .card-meta,
 .keywords,
 .keyword-list {

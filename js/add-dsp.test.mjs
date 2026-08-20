@@ -25,10 +25,11 @@ test("Add DSP stores shared-picker selections in keywords", () => {
   assert.deepEqual(result.paperPack.keywords, ["Floral", "Fun Fold"]);
 });
 
-test("Edit DSP round-trips the existing id and selected keywords", () => {
-  const existing = { id: "original-id", recentlyAdded: true, patterns: [], keywords: ["Floral"] };
+test("Edit DSP round-trips the existing id, favorite, and selected keywords", () => {
+  const existing = { id: "original-id", recentlyAdded: true, favorite: true, patterns: [], keywords: ["Floral"] };
   const result = buildPaperPackFromForm(createValidPaperPackForm(), colorsById, [], existing, existing.keywords);
   assert.equal(result.paperPack.id, "original-id");
+  assert.equal(result.paperPack.favorite, true);
   assert.deepEqual(result.paperPack.keywords, ["Floral"]);
 });
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { applyPaperPackDetailCardSourceState, findCardsUsingPaperPack } from "./library.js";
+import { applyPaperPackDetailCardSourceState, findCardsUsingPaperPack, sortPaperPacks } from "./library.js";
 import {
   applyCardDetailSourceState,
   resolvePaperPackDisplayNames,
@@ -29,6 +29,19 @@ test("finds all cards using a paper pack", () => {
 test("a card with multiple paper packs matches each pack", () => {
   assert.deepEqual(findCardsUsingPaperPack(cards, "pack-b").map((card) => card.id), ["two"]);
   assert.deepEqual(findCardsUsingPaperPack(cards, "pack-c").map((card) => card.id), ["two", "three"]);
+});
+
+test("Paper Library favorites-first sorting prioritizes favorites then names", () => {
+  const paperPacks = [
+    { id: "b", name: "Bravo", favorite: false },
+    { id: "c", name: "Charlie", favorite: true },
+    { id: "a", name: "Alpha", favorite: true }
+  ];
+
+  assert.deepEqual(
+    sortPaperPacks(paperPacks, "favorite-desc").map((paperPack) => paperPack.id),
+    ["a", "c", "b"]
+  );
 });
 
 test("Card Detail preserves and clears its source paper-pack ID in transient UI state", () => {

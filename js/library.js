@@ -976,7 +976,7 @@ function createUsedUpPaperPackSection(paperPacks, colorsById) {
   return section;
 }
 
-function sortPaperPacks(paperPacks, sortOrder = "recently-added") {
+export function sortPaperPacks(paperPacks, sortOrder = "recently-added") {
   if (sortOrder === "recently-added") {
     return [...paperPacks].sort((firstPack, secondPack) => {
       const recentComparison =
@@ -984,6 +984,13 @@ function sortPaperPacks(paperPacks, sortOrder = "recently-added") {
 
       return recentComparison || compareTextValues(firstPack.name, secondPack.name);
     });
+  }
+
+  if (sortOrder === "favorite-desc") {
+    return [...paperPacks].sort((firstPack, secondPack) =>
+      Number(Boolean(secondPack.favorite)) - Number(Boolean(firstPack.favorite)) ||
+      compareTextValues(firstPack.name, secondPack.name)
+    );
   }
 
   const [field, direction] = String(sortOrder).split("-");
@@ -1153,7 +1160,8 @@ function createPaperPackCard(paperPack, colorsById) {
 
   const title = document.createElement("h4");
   title.textContent = paperPack.name;
-  titleRow.append(title);
+  const favorite = createPaperPackFavoriteButton(paperPack);
+  titleRow.append(title, favorite);
 
   const keywords = createKeywordList(paperPack);
   const colorList = createPackColorList(paperPack, colorsById);
@@ -1197,6 +1205,19 @@ function createEditPaperPackButton(paperPack) {
   editButton.setAttribute("aria-label", `Edit ${paperPack.name}`);
 
   return editButton;
+}
+
+function createPaperPackFavoriteButton(paperPack) {
+  const favorite = document.createElement("button");
+  favorite.className = "paper-pack-favorite";
+  favorite.type = "button";
+  favorite.dataset.togglePackFavorite = paperPack.id;
+  favorite.dataset.favorite = String(Boolean(paperPack.favorite));
+  favorite.setAttribute("aria-label", paperPack.favorite ? "Remove paper pack from favorites" : "Add paper pack to favorites");
+  favorite.setAttribute("aria-pressed", String(Boolean(paperPack.favorite)));
+  favorite.title = paperPack.favorite ? "Remove from favorites" : "Add to favorites";
+  favorite.textContent = "â™¥";
+  return favorite;
 }
 
 function createCardContextBar(paperPack) {
@@ -1251,6 +1272,20 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
   }
 
   paperPackLibrary.addEventListener("click", (event) => {
+    const favoriteButton = event.target.closest("[data-toggle-pack-favorite]");
+
+    if (favoriteButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      togglePaperPackFavorite(
+        favoriteButton.dataset.togglePackFavorite,
+        paperPacks,
+        favoriteButton,
+        renderCurrentLibrary
+      );
+      return;
+    }
+
     const patternToggle = event.target.closest("[data-toggle-pack-patterns]");
 
     if (patternToggle) {
@@ -1339,7 +1374,7 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
     if (
       !card ||
       event.target.closest(
-        "[data-edit-pack], [data-clear-recently-added], [data-mark-used-up], [data-toggle-pack-patterns]"
+        "[data-edit-pack], [data-clear-recently-added], [data-mark-used-up], [data-toggle-pack-patterns], [data-toggle-pack-favorite]"
       )
     ) {
       return;
@@ -1517,6 +1552,31 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
       closeDetailPanel(detailPanel);
     }
   });
+}
+
+async function togglePaperPackFavorite(paperPackId, paperPacks, button, renderCurrentLibrary) {
+  const paperPack = paperPacks.find((pack) => pack.id === paperPackId);
+
+  if (!paperPack) {
+    return;
+  }
+
+  const updatedPaperPack = {
+    ...paperPack,
+    favorite: !paperPack.favorite,
+    updatedAt: new Date().toISOString()
+  };
+  button.disabled = true;
+
+  try {
+    await savePaperPack(updatedPaperPack);
+    replacePaperPack(paperPacks, updatedPaperPack);
+    renderCurrentLibrary();
+    document.querySelector(`[data-toggle-pack-favorite="${CSS.escape(paperPackId)}"]`)?.focus();
+  } catch (error) {
+    button.disabled = false;
+    window.alert("The paper pack favorite status could not be saved.");
+  }
 }
 
 function clearRecentlyAddedStatus(paperPackId, paperPacks, renderCurrentLibrary) {

@@ -447,6 +447,7 @@ export function buildPaperPackFromForm(formData, colorsById, selectedImages = []
       availability: formData.get("availability") || "available",
       refillAvailable: parseOptionalBoolean(formData.get("refillAvailable")),
       recentlyAdded: editingPaperPack?.recentlyAdded === true,
+      favorite: editingPaperPack?.favorite === true,
       keywords,
       colors: colorResult.colorIds,
       patterns
