@@ -1468,6 +1468,14 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
 
   detailClose?.addEventListener("click", () => closeDetailPanel(detailPanel));
 
+  document.addEventListener("paper-pack:detail-request", (event) => {
+    const paperPack = paperPacks.find((pack) => pack.id === event.detail?.paperPackId);
+
+    if (paperPack) {
+      openDetailPanel(detailPanel, detailTitle, detailBody, paperPack, paperPacks, colorsById);
+    }
+  });
+
   document.addEventListener("click", (event) => {
     if (detailPanel.hidden || detailPanel.contains(event.target)) {
       return;

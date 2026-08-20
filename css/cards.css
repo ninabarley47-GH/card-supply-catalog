@@ -21,6 +21,28 @@
   font-weight: 700;
 }
 
+.card-detail-back {
+  display: block;
+  margin: 0 0 var(--space-2);
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-accent-dark);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.card-detail-back[hidden] {
+  display: none;
+}
+
+.card-detail-back:hover,
+.card-detail-back:focus-visible {
+  text-decoration: underline;
+}
+
 .card-library-tile {
   align-self: start;
   overflow: hidden;

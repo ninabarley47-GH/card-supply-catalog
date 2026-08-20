@@ -159,7 +159,7 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
     const tile = event.target.closest('[data-card-id]');
 
     if (tile) {
-      openCardDetail(detailView, findCard(cards, tile.dataset.cardId), tile, cards);
+      openCardDetail(detailView, findCard(cards, tile.dataset.cardId), tile, cards, paperPacks);
       activeTile = tile;
     }
   });
@@ -177,7 +177,7 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
 
     if (tile) {
       event.preventDefault();
-      openCardDetail(detailView, findCard(cards, tile.dataset.cardId), tile, cards);
+      openCardDetail(detailView, findCard(cards, tile.dataset.cardId), tile, cards, paperPacks);
       activeTile = tile;
     }
   });
@@ -197,7 +197,22 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
     }
 
     activeTile = event.detail?.sourceElement || null;
-    openCardDetail(detailView, card, activeTile, cards, event.detail?.sourcePaperPackId);
+    openCardDetail(detailView, card, activeTile, cards, paperPacks, event.detail?.sourcePaperPackId);
+  });
+
+  detailView.back.addEventListener('click', () => {
+    const sourcePaperPackId = detailView.overlay.dataset.sourcePaperPackId;
+
+    if (!sourcePaperPackId) {
+      return;
+    }
+
+    closeCardDetail(detailView, activeTile);
+    document.dispatchEvent(
+      new CustomEvent('paper-pack:detail-request', {
+        detail: { paperPackId: sourcePaperPackId }
+      })
+    );
   });
   detailView.body.addEventListener('click', (event) => {
     const deleteButton = event.target.closest('[data-delete-card]');
@@ -1052,13 +1067,17 @@ function createCardDetailView() {
   header.className = 'card-detail-header';
 
   const heading = document.createElement('div');
+  const back = document.createElement('button');
+  back.className = 'card-detail-back';
+  back.type = 'button';
+  back.hidden = true;
   const eyebrow = document.createElement('p');
   eyebrow.className = 'eyebrow';
   eyebrow.textContent = 'Card Library';
   const title = document.createElement('h3');
   title.id = 'card-detail-title';
   title.textContent = 'Card Details';
-  heading.append(eyebrow, title);
+  heading.append(back, eyebrow, title);
 
   const close = document.createElement('button');
   close.className = 'card-detail-close';
@@ -1072,17 +1091,18 @@ function createCardDetailView() {
   panel.append(header, body);
   overlay.append(panel);
 
-  return { overlay, panel, close, body };
+  return { overlay, panel, close, back, body };
 }
 
-function openCardDetail(detailView, card, tile, cards, sourcePaperPackId = '') {
+function openCardDetail(detailView, card, tile, cards, paperPacks, sourcePaperPackId = '') {
   if (!card) {
     return;
   }
 
   const cardIndex = cards.indexOf(card);
   detailView.body.replaceChildren(createCardDetailContent(card, cardIndex));
-  applyCardDetailSourceState(detailView.overlay, sourcePaperPackId);
+  const sourcePaperPack = paperPacks.find((paperPack) => paperPack.id === sourcePaperPackId);
+  applyCardDetailSourceState(detailView.overlay, sourcePaperPack?.id, detailView.back, sourcePaperPack?.name);
   detailView.overlay.hidden = false;
   detailView.close.focus();
 }
@@ -1094,7 +1114,7 @@ function closeCardDetail(detailView, tile) {
 
   detailView.overlay.hidden = true;
   detailView.body.replaceChildren();
-  applyCardDetailSourceState(detailView.overlay, '');
+  applyCardDetailSourceState(detailView.overlay, '', detailView.back);
 
   if (tile?.isConnected) {
     tile.focus();
@@ -1131,11 +1151,16 @@ function createCardDetailContent(card, index) {
   return content;
 }
 
-export function applyCardDetailSourceState(overlay, sourcePaperPackId) {
+export function applyCardDetailSourceState(overlay, sourcePaperPackId, backControl = null, sourcePaperPackName = '') {
   if (sourcePaperPackId) {
     overlay.dataset.sourcePaperPackId = sourcePaperPackId;
   } else {
     delete overlay.dataset.sourcePaperPackId;
+  }
+
+  if (backControl) {
+    backControl.hidden = !sourcePaperPackId;
+    backControl.textContent = sourcePaperPackId ? `← Back to ${sourcePaperPackName}` : '';
   }
 }
 

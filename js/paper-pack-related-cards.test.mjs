@@ -29,10 +29,19 @@ test("a card with multiple paper packs matches each pack", () => {
 
 test("Card Detail preserves and clears its source paper-pack ID in transient UI state", () => {
   const overlay = { dataset: {} };
+  const back = { hidden: true, textContent: "" };
 
-  applyCardDetailSourceState(overlay, "pack-b");
+  applyCardDetailSourceState(overlay, "pack-a", back, "Paper Pack A");
+  assert.equal(overlay.dataset.sourcePaperPackId, "pack-a");
+  assert.equal(back.hidden, false);
+  assert.equal(back.textContent, "← Back to Paper Pack A");
+
+  applyCardDetailSourceState(overlay, "pack-b", back, "Paper Pack B");
   assert.equal(overlay.dataset.sourcePaperPackId, "pack-b");
+  assert.equal(back.textContent, "← Back to Paper Pack B");
 
-  applyCardDetailSourceState(overlay, "");
+  applyCardDetailSourceState(overlay, "", back);
   assert.equal("sourcePaperPackId" in overlay.dataset, false);
+  assert.equal(back.hidden, true);
+  assert.equal(back.textContent, "");
 });
