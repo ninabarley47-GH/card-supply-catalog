@@ -256,6 +256,8 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
       closeCardDetail(detailView, activeTile);
     }
   });
+
+  return cards;
 }
 
 function createAddCardButton() {

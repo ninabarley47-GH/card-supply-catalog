@@ -11,6 +11,7 @@ import {
   scanImageLibraryPaperPackFolders
 } from "./images.js";
 import { initializeSettings } from "./settings.js";
+import { getCardLibraryImageSource } from "./card-images.js";
 import {
   deletePaperPack,
   loadSavedColors,
@@ -27,6 +28,15 @@ const LIBRARY_PATTERN_PREVIEW_LIMIT = 12;
 const expandedLibraryPaperPacks = new Set();
 const collapsedLibraryPaperPacks = new Set();
 let areAllLibraryPatternsExpanded = false;
+let cardsForPaperPackDetails = [];
+
+export function setCardsForPaperPackDetails(cards) {
+  cardsForPaperPackDetails = Array.isArray(cards) ? cards : [];
+}
+
+export function findCardsUsingPaperPack(cards, paperPackId) {
+  return (cards || []).filter((card) => card?.paperPackIds?.includes(paperPackId));
+}
 
 const COLOR_FAMILY_ORDER = [
   "red",
@@ -1561,6 +1571,8 @@ function createDetailContent(paperPack, paperPacks, colorsById) {
   const colorList = createDetailColorList(paperPack, colorsById);
   colorSection.append(colorHeading, colorList);
 
+  const relatedCardsSection = createRelatedCardsSection(paperPack, cardsForPaperPackDetails);
+
   const tagSection = document.createElement("section");
   tagSection.className = "detail-section";
   tagSection.setAttribute("aria-labelledby", "detail-tags-title");
@@ -1588,10 +1600,55 @@ function createDetailContent(paperPack, paperPacks, colorsById) {
   coordinationResults.append(prompt);
 
   coordinationSection.append(coordinationHeading, coordinationResults);
-  metadata.append(colorSection, tagSection, createDetailMeta(paperPack), coordinationSection, createDetailActions(paperPack));
+  metadata.append(colorSection, tagSection, createDetailMeta(paperPack));
+
+  if (relatedCardsSection) {
+    metadata.append(relatedCardsSection);
+  }
+
+  metadata.append(coordinationSection, createDetailActions(paperPack));
   content.append(preview, metadata, createPatternViewer());
 
   return content;
+}
+
+function createRelatedCardsSection(paperPack, cards) {
+  const relatedCards = findCardsUsingPaperPack(cards, paperPack.id);
+
+  if (relatedCards.length === 0) {
+    return null;
+  }
+
+  const section = document.createElement("section");
+  section.className = "detail-section related-cards-section";
+
+  const heading = document.createElement("h4");
+  heading.textContent = "Cards Using This Paper";
+
+  const grid = document.createElement("div");
+  grid.className = "related-cards-grid";
+
+  for (const card of relatedCards) {
+    const imageSource = getCardLibraryImageSource(card);
+
+    if (!imageSource) {
+      const placeholder = document.createElement("div");
+      placeholder.className = "related-card-thumbnail related-card-thumbnail-missing";
+      placeholder.textContent = "No image yet";
+      grid.append(placeholder);
+      continue;
+    }
+
+    const image = document.createElement("img");
+    image.className = "related-card-thumbnail";
+    image.src = imageSource;
+    image.alt = "Handmade card using this paper";
+    image.decoding = "async";
+    grid.append(image);
+  }
+
+  section.append(heading, grid);
+  return section;
 }
 
 function createPatternViewer() {
