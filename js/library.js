@@ -387,6 +387,7 @@ function getUncatalogedPackScanMessage(folderCount, ignoredCount = 0, showingIgn
 function initializeScreenNavigation() {
   const screens = [...document.querySelectorAll("[data-screen]")];
   const navLinks = [...document.querySelectorAll("[data-nav-link]")];
+  const sidebarControlGroups = [...document.querySelectorAll("[data-sidebar-controls]")];
 
   if (screens.length === 0) {
     return;
@@ -401,6 +402,10 @@ function initializeScreenNavigation() {
 
     for (const screen of screens) {
       screen.hidden = screen !== activeScreen;
+    }
+
+    for (const controlGroup of sidebarControlGroups) {
+      controlGroup.hidden = controlGroup.dataset.sidebarControls !== activeScreen.id;
     }
 
     for (const link of navLinks) {

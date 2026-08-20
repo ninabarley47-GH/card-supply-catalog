@@ -32,9 +32,30 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
   const addCardView = createAddCardView({ onCreateTag: (tag) => cardTagVocabulary.create(tag) });
   const addCardButton = createAddCardButton();
   const cards = [];
+  const filterForm = document.querySelector('[data-card-library-filter-form]');
+  const searchInput = document.querySelector('[data-card-library-search]');
+  const favoritesInput = document.querySelector('[data-card-library-favorites]');
+  const sortControl = document.querySelector('[data-card-library-sort]');
+  const clearFiltersButton = document.querySelector('[data-card-library-clear]');
+  const paperPackNamesById = new Map(paperPacks.map((paperPack) => [paperPack.id, paperPack.name]));
   let activeTile = null;
 
-  renderCardLibrary(gallery, cards);
+  const renderCurrent = () => {
+    const visibleCards = filterAndSortCards(cards, {
+      query: searchInput?.value,
+      favoritesOnly: favoritesInput?.checked,
+      sortOrder: sortControl?.value,
+      paperPackNamesById
+    });
+
+    renderCardLibrary(gallery, visibleCards, cards.length);
+
+    if (clearFiltersButton) {
+      clearFiltersButton.hidden = !searchInput?.value && !favoritesInput?.checked;
+    }
+  };
+
+  renderCurrent();
   toolbar.append(addCardButton);
   document.body.append(detailView.overlay, addCardView.overlay);
   loadAvailablePaperPacks(addCardView, paperPacks);
@@ -45,7 +66,7 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
     sortCards(savedCards);
     cards.splice(0, cards.length, ...savedCards);
     addCardView.tagPicker.setVocabulary(await cardTagVocabulary.load(cards));
-    renderCardLibrary(gallery, cards);
+    renderCurrent();
   };
 
   try {
@@ -56,7 +77,7 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
 
   document.addEventListener('catalog:card-image-library-selected', async () => {
     await hydrateCardImageSources(cards);
-    renderCardLibrary(gallery, cards);
+    renderCurrent();
   });
 
   document.addEventListener('catalog:cards-restored', async () => {
@@ -74,6 +95,16 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
   addCardButton.addEventListener('click', () => {
     loadAvailablePaperPacks(addCardView, paperPacks);
     openAddCardView(addCardView);
+  });
+  searchInput?.addEventListener('input', renderCurrent);
+  favoritesInput?.addEventListener('change', renderCurrent);
+  sortControl?.addEventListener('change', renderCurrent);
+  filterForm?.addEventListener('submit', (event) => event.preventDefault());
+  clearFiltersButton?.addEventListener('click', () => {
+    searchInput.value = '';
+    favoritesInput.checked = false;
+    renderCurrent();
+    searchInput.focus();
   });
   addCardView.close.addEventListener('click', () => closeAddCardView(addCardView, addCardButton));
   addCardView.cancel.addEventListener('click', () => closeAddCardView(addCardView, addCardButton));
@@ -118,7 +149,7 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
     if (deleteButton) {
       const card = findCard(cards, deleteButton.dataset.deleteCard);
 
-      if (card && deleteSelectedCard(card, cards, gallery, detailView, activeTile)) {
+      if (card && deleteSelectedCard(card, cards, detailView, activeTile, renderCurrent)) {
         activeTile = null;
       }
 
@@ -157,7 +188,7 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
         cards.push(imageResult.card);
       }
       sortCards(cards);
-      renderCardLibrary(gallery, cards);
+      renderCurrent();
       closeAddCardView(addCardView, addCardButton);
 
       if (imageResult.usedFallback) {
@@ -721,18 +752,54 @@ function createCardId(createdAt) {
     : `card-${createdAt.replace(/\D/g, '')}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function sortCards(cards) {
-  cards.sort((first, second) =>
-    String(second.dateCreated).localeCompare(String(first.dateCreated)) ||
-    String(second.createdAt || '').localeCompare(String(first.createdAt || ''))
-  );
+function filterAndSortCards(cards, options = {}) {
+  const query = String(options.query || '').trim().toLocaleLowerCase();
+  const filteredCards = cards.filter((card) => {
+    if (options.favoritesOnly && !card.favorite) {
+      return false;
+    }
+
+    if (!query) {
+      return true;
+    }
+
+    const searchableValues = [
+      ...(card.tags || []),
+      ...(card.stampSets || []),
+      ...(card.paperPackIds || []).map((paperPackId) => options.paperPackNamesById?.get(paperPackId)),
+      card.dateCreated
+    ];
+
+    return searchableValues.some((value) => String(value || '').toLocaleLowerCase().includes(query));
+  });
+
+  return sortCards(filteredCards, options.sortOrder);
 }
 
-function renderCardLibrary(gallery, cards) {
+function sortCards(cards, sortOrder = 'date-desc') {
+  const direction = sortOrder === 'date-asc' ? 1 : -1;
+
+  return cards.sort((first, second) => {
+    if (sortOrder === 'favorite-desc') {
+      const favoriteComparison = Number(Boolean(second.favorite)) - Number(Boolean(first.favorite));
+
+      if (favoriteComparison) {
+        return favoriteComparison;
+      }
+    }
+
+    return String(first.dateCreated).localeCompare(String(second.dateCreated)) * direction ||
+      String(first.createdAt || '').localeCompare(String(second.createdAt || '')) * direction;
+  });
+}
+
+function renderCardLibrary(gallery, cards, totalCount = cards.length) {
   if (cards.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'card-library-empty';
-    empty.textContent = 'No cards have been added yet.';
+    empty.textContent = totalCount > 0
+      ? 'No cards match the current filters.'
+      : 'No cards have been added yet.';
     gallery.replaceChildren(empty);
     return;
   }
@@ -906,7 +973,7 @@ function createCardDetailActions(card) {
   return actions;
 }
 
-function deleteSelectedCard(card, cards, gallery, detailView, activeTile) {
+function deleteSelectedCard(card, cards, detailView, activeTile, renderCurrent) {
   const shouldDelete = window.confirm('Delete this Card from the catalog?');
 
   if (!shouldDelete) {
@@ -923,7 +990,7 @@ function deleteSelectedCard(card, cards, gallery, detailView, activeTile) {
     cards.splice(cardIndex, 1);
   }
 
-  renderCardLibrary(gallery, cards);
+  renderCurrent();
   closeCardDetail(detailView, activeTile);
   return true;
 }

@@ -47,6 +47,7 @@
             <a class="nav-link" href="#settings" data-nav-link>Settings</a>
           </div>
 
+          <div data-sidebar-controls="library">
           <section class="library-sort" aria-labelledby="library-sort-heading">
             <h3 id="library-sort-heading">Sort</h3>
             <label for="library-sort-order">Order</label>
@@ -92,6 +93,41 @@
               </div>
             </fieldset>
           </form>
+          </div>
+
+          <div data-sidebar-controls="cards" hidden>
+            <section class="library-sort" aria-labelledby="card-library-sort-heading">
+              <h3 id="card-library-sort-heading">Sort Cards</h3>
+              <label for="card-library-sort-order">Order</label>
+              <select id="card-library-sort-order" data-card-library-sort>
+                <option value="date-desc" selected>Date created: Newest first</option>
+                <option value="date-asc">Date created: Oldest first</option>
+                <option value="favorite-desc">Favorites first</option>
+              </select>
+            </section>
+
+            <form class="search-form nav-search" role="search" aria-label="Filter cards" data-card-library-filter-form>
+              <div class="filter-heading-row">
+                <h3>Filter Cards</h3>
+                <button class="filter-clear-button" type="button" data-card-library-clear hidden>Clear all</button>
+              </div>
+              <label class="search-label" for="card-library-search">Search</label>
+              <div class="search-control">
+                <input
+                  id="card-library-search"
+                  name="card-library-search"
+                  type="search"
+                  placeholder="Search tags, stamp sets, or paper packs"
+                  autocomplete="off"
+                  data-card-library-search
+                >
+              </div>
+              <label class="settings-checkbox-option card-library-favorite-filter">
+                <input type="checkbox" data-card-library-favorites>
+                <span>Favorites only</span>
+              </label>
+            </form>
+          </div>
 
           <details class="app-version" data-app-version>
             <summary data-version-summary>Version 0.1.0 · Build local</summary>

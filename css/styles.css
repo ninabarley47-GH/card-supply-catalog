@@ -203,6 +203,16 @@ h6 {
   border-right: 1px solid var(--color-border);
 }
 
+[data-sidebar-controls] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+[data-sidebar-controls][hidden] {
+  display: none;
+}
+
 .app-version {
   margin-top: auto;
   border-top: 1px solid var(--color-border);
@@ -459,6 +469,10 @@ h6 {
 .nav-search {
   padding-top: var(--space-4);
   border-top: 1px solid var(--color-border);
+}
+
+.card-library-favorite-filter {
+  margin-top: var(--space-4);
 }
 
 .filter-heading-row {
