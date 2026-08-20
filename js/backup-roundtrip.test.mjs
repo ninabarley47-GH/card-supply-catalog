@@ -124,6 +124,33 @@ test("legacy backup without tag vocabularies reconstructs them from records and 
   assert.deepEqual(persistedCalls[0].tagVocabularies.card, ["Legacy Card Assignment"]);
 });
 
+test("restore treats a missing saved Paper tag vocabulary as empty", async () => {
+  const { color, paperPack, card } = createCatalogRecords();
+  const backup = createCatalogBackupSnapshot({
+    paperPacks: [paperPack],
+    colorsById: { [color.id]: color },
+    cards: [card]
+  });
+  const persistedCalls = [];
+
+  const summary = await restoreCatalogBackup({
+    backup,
+    paperPacks: [],
+    colorsById: {},
+    services: {
+      loadSavedCards: async () => [],
+      loadPaperTagVocabulary: async () => null,
+      loadCardTagVocabulary: async () => [],
+      preparePaperPack: async (record) => ({ paperPack: record }),
+      restoreCatalogRecords: async (records) => persistedCalls.push(records),
+      dispatchCardsRestored: () => {}
+    }
+  });
+
+  assert.deepEqual(summary.errors, []);
+  assert.equal(persistedCalls.length, 1);
+});
+
 test("malformed import is rejected before reading or writing catalog storage", async () => {
   const { color, paperPack, card } = createCatalogRecords();
   const backup = createCatalogBackupSnapshot({

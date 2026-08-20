@@ -545,6 +545,12 @@ export async function restoreCatalogBackup({
     (services.loadPaperTagVocabulary || loadPaperTagVocabulary)(),
     (services.loadCardTagVocabulary || loadCardTagVocabulary)()
   ]);
+  const existingPaperTagVocabulary = Array.isArray(savedPaperTagVocabulary)
+    ? savedPaperTagVocabulary
+    : [];
+  const existingCardTagVocabulary = Array.isArray(savedCardTagVocabulary)
+    ? savedCardTagVocabulary
+    : [];
   const colorPlan = createImportPlan(
     importedColorsById ? Object.values(importedColorsById) : [],
     Object.values(colorsById),
@@ -596,11 +602,11 @@ export async function restoreCatalogBackup({
   try {
     const tagVocabularies = {
       paper: buildEffectivePaperTagVocabulary(
-        [...savedPaperTagVocabulary, ...(backup.tagVocabularies?.paper || [])],
+        [...existingPaperTagVocabulary, ...(backup.tagVocabularies?.paper || [])],
         [...paperPacks, ...preparedPaperPacks]
       ),
       card: buildEffectiveCardTagVocabulary(
-        [...savedCardTagVocabulary, ...(backup.tagVocabularies?.card || [])],
+        [...existingCardTagVocabulary, ...(backup.tagVocabularies?.card || [])],
         [...savedCards, ...preparedCards]
       )
     };

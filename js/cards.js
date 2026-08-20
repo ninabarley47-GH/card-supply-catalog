@@ -223,12 +223,26 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
       const paperPackId = paperPackLink.dataset.cardDetailPaperPack;
       const sourceCardId = detailView.overlay.dataset.selectedCardId;
       const sourcePaperPackId = detailView.overlay.dataset.sourcePaperPackId;
-      closeCardDetail(detailView, activeTile);
+      const needsPaperLibraryScreen = window.location.hash !== '#library';
+
+      if (needsPaperLibraryScreen) {
+        window.addEventListener(
+          'hashchange',
+          () => closeCardDetail(detailView, null),
+          { once: true }
+        );
+      }
+
       document.dispatchEvent(
         new CustomEvent('paper-pack:detail-request', {
           detail: { paperPackId, sourceCardId, sourcePaperPackId }
         })
       );
+
+      if (!needsPaperLibraryScreen) {
+        closeCardDetail(detailView, null);
+      }
+
       return;
     }
 
