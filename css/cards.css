@@ -616,7 +616,8 @@
 
 .card-detail-content {
   display: grid;
-  grid-template-columns: minmax(18rem, 1.25fr) minmax(16rem, 0.75fr);
+  grid-template-columns: fit-content(42rem) minmax(16rem, 24rem);
+  justify-content: center;
   align-items: start;
   gap: var(--space-6);
 }
@@ -624,17 +625,22 @@
 .card-detail-placeholder {
   position: sticky;
   top: 0;
-  display: grid;
-  min-height: 30rem;
+  display: inline-grid;
+  justify-self: center;
   place-items: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--space-4);
   border-radius: var(--radius-medium);
   background: linear-gradient(145deg, var(--placeholder-one), var(--placeholder-two));
 }
 
 .card-detail-image {
   display: block;
-  width: var(--card-mockup-width);
-  max-height: 82%;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: min(70vh, 38rem);
   aspect-ratio: var(--card-width) / var(--card-height);
   border: 1px solid rgba(47, 44, 40, 0.16);
   border-radius: var(--radius-small);
@@ -755,7 +761,12 @@
 
   .card-detail-placeholder {
     position: static;
-    min-height: 22rem;
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  .card-detail-image {
+    max-height: min(60vh, 32rem);
   }
 }
 
