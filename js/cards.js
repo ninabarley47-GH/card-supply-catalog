@@ -52,7 +52,7 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
       paperPackNamesById
     });
 
-    renderCardLibrary(gallery, visibleCards, cards.length);
+    renderCardLibrary(gallery, visibleCards, cards.length, paperPackNamesById);
 
     if (clearFiltersButton) {
       clearFiltersButton.hidden =
@@ -142,7 +142,20 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
     }
   });
 
-  gallery.addEventListener('click', (event) => {
+  gallery.addEventListener('click', async (event) => {
+    const favoriteButton = event.target.closest('[data-toggle-card-favorite]');
+
+    if (favoriteButton) {
+      event.stopPropagation();
+      await toggleCardFavorite(
+        findCard(cards, favoriteButton.dataset.toggleCardFavorite),
+        cards,
+        favoriteButton,
+        renderCurrent
+      );
+      return;
+    }
+
     const tile = event.target.closest('[data-card-id]');
 
     if (tile) {
@@ -152,6 +165,10 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
   });
 
   gallery.addEventListener('keydown', (event) => {
+    if (event.target.closest('[data-toggle-card-favorite]')) {
+      return;
+    }
+
     if (event.key !== 'Enter' && event.key !== ' ') {
       return;
     }
@@ -877,7 +894,7 @@ function sortCards(cards, sortOrder = 'date-desc') {
   });
 }
 
-function renderCardLibrary(gallery, cards, totalCount = cards.length) {
+function renderCardLibrary(gallery, cards, totalCount = cards.length, paperPackNamesById = new Map()) {
   if (cards.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'card-library-empty';
@@ -888,7 +905,7 @@ function renderCardLibrary(gallery, cards, totalCount = cards.length) {
     return;
   }
 
-  gallery.replaceChildren(...cards.map(createCardTile));
+  gallery.replaceChildren(...cards.map((card, index) => createCardTile(card, index, paperPackNamesById)));
 }
 
 function renderCardLibraryError(gallery) {
@@ -898,7 +915,7 @@ function renderCardLibraryError(gallery) {
   gallery.replaceChildren(error);
 }
 
-function createCardTile(card, index) {
+function createCardTile(card, index, paperPackNamesById) {
   const tile = document.createElement('article');
   tile.className = 'card-library-tile';
   tile.dataset.cardId = card.id;
@@ -920,13 +937,18 @@ function createCardTile(card, index) {
     image.append(createMissingCardImageMessage());
   }
 
-  if (card.favorite) {
-    const favorite = document.createElement('span');
-    favorite.className = 'card-library-favorite';
-    favorite.setAttribute('aria-label', 'Favorite card');
-    favorite.textContent = '♥';
-    image.append(favorite);
-  }
+  const favorite = document.createElement('button');
+  favorite.className = 'card-library-favorite';
+  favorite.type = 'button';
+  favorite.dataset.toggleCardFavorite = card.id;
+  favorite.dataset.favorite = String(Boolean(card.favorite));
+  favorite.setAttribute('aria-label', card.favorite ? 'Remove card from favorites' : 'Add card to favorites');
+  favorite.setAttribute('aria-pressed', String(Boolean(card.favorite)));
+  favorite.title = card.favorite ? 'Remove from favorites' : 'Add to favorites';
+  favorite.textContent = '♥';
+  image.append(favorite);
+
+  const metadata = createCardLibraryMetadata(card, paperPackNamesById);
 
   const tagList = document.createElement('ul');
   tagList.className = 'card-library-tags';
@@ -938,8 +960,64 @@ function createCardTile(card, index) {
     tagList.append(item);
   });
 
-  tile.append(image, tagList);
+  tile.append(image, metadata, tagList);
   return tile;
+}
+
+function createCardLibraryMetadata(card, paperPackNamesById) {
+  const metadata = document.createElement('dl');
+  const paperPackNames = (card.paperPackIds || [])
+    .map((paperPackId) => paperPackNamesById.get(paperPackId))
+    .filter(Boolean);
+
+  metadata.className = 'card-library-metadata';
+  appendCardLibraryMetadata(metadata, 'Paper packs', paperPackNames);
+  appendCardLibraryMetadata(metadata, 'Stamp sets', card.stampSets || []);
+  return metadata;
+}
+
+function appendCardLibraryMetadata(metadata, label, values) {
+  if (values.length === 0) {
+    return;
+  }
+
+  const group = document.createElement('div');
+  const term = document.createElement('dt');
+  const description = document.createElement('dd');
+
+  term.textContent = label;
+  description.textContent = values.join(', ');
+  group.append(term, description);
+  metadata.append(group);
+}
+
+async function toggleCardFavorite(card, cards, button, renderCurrent) {
+  if (!card) {
+    return;
+  }
+
+  const updatedCard = {
+    ...card,
+    favorite: !card.favorite,
+    updatedAt: new Date().toISOString()
+  };
+
+  button.disabled = true;
+
+  try {
+    await saveCard(updatedCard);
+    const cardIndex = cards.indexOf(card);
+
+    if (cardIndex >= 0) {
+      cards.splice(cardIndex, 1, updatedCard);
+    }
+
+    renderCurrent();
+    document.querySelector(`[data-toggle-card-favorite="${CSS.escape(card.id)}"]`)?.focus();
+  } catch (error) {
+    button.disabled = false;
+    window.alert('The favorite status could not be saved.');
+  }
 }
 
 function findCard(cards, cardId) {
