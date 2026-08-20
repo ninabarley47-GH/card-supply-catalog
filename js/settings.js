@@ -380,6 +380,7 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
   const generateThumbnailsButton = document.querySelector("[data-generate-missing-thumbnails]");
   const migrateButton = document.querySelector("[data-migrate-image-library]");
   const status = document.querySelector("[data-image-library-status]");
+  const maintenanceStatus = document.querySelector("[data-image-maintenance-status]");
   const health = document.querySelector("[data-image-library-health]");
 
   if (!chooseButton || !status) {
@@ -406,6 +407,11 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
     renderImageLibraryStatus(
       status,
       "Image folder selection is not supported in this browser. IndexedDB will remain the fallback for now.",
+      "error"
+    );
+    renderImageLibraryStatus(
+      maintenanceStatus,
+      "Image maintenance is not supported in this browser because a local image folder cannot be connected.",
       "error"
     );
     return;
@@ -457,13 +463,13 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
 
   repairButton?.addEventListener("click", async () => {
     repairButton.disabled = true;
-    renderImageLibraryStatus(status, "Repairing image links and reconnecting fallback images...", "");
+    renderImageLibraryStatus(maintenanceStatus, "Repairing image links and reconnecting fallback images...", "");
 
     try {
       const result = await repairBrokenPaperPackImageLinks(paperPacks);
 
       if (!result.ok) {
-        renderImageLibraryStatus(status, "Reconnect the image folder before repairing image links.", "error");
+        renderImageLibraryStatus(maintenanceStatus, "Reconnect the image folder before repairing image links.", "error");
         return;
       }
 
@@ -476,13 +482,13 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
       const healthResult = await checkImageLibraryHealth(paperPacks);
       renderImageLibraryHealth(health, healthResult.summary);
       renderImageLibraryStatus(
-        status,
+        maintenanceStatus,
         formatImageLinkRepairSummary(result.summary),
         result.summary.packsUnresolved.length > 0 ? "error" : "success"
       );
       renderSetupStatus(document.querySelector("[data-setup-status]"), paperPacks);
     } catch (error) {
-      renderImageLibraryStatus(status, "Image links and fallback images could not be repaired.", "error");
+      renderImageLibraryStatus(maintenanceStatus, "Image links and fallback images could not be repaired.", "error");
     } finally {
       repairButton.disabled = false;
     }
@@ -490,13 +496,13 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
 
   generateThumbnailsButton?.addEventListener("click", async () => {
     generateThumbnailsButton.disabled = true;
-    renderImageLibraryStatus(status, "Scanning the selected folder for missing thumbnails...", "");
+    renderImageLibraryStatus(maintenanceStatus, "Scanning the selected folder for missing thumbnails...", "");
 
     try {
       const result = await generateMissingImageThumbnails(paperPacks);
 
       if (!result.ok) {
-        renderImageLibraryStatus(status, "Reconnect the image folder before generating thumbnails.", "error");
+        renderImageLibraryStatus(maintenanceStatus, "Reconnect the image folder before generating thumbnails.", "error");
         return;
       }
 
@@ -505,13 +511,13 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
         ? ` ${errors.length} image${errors.length === 1 ? "" : "s"} could not be processed.`
         : "";
       renderImageLibraryStatus(
-        status,
+        maintenanceStatus,
         `${imagesScanned} image${imagesScanned === 1 ? "" : "s"} scanned. ${thumbnailsCreated} missing thumbnail${thumbnailsCreated === 1 ? "" : "s"} created; ${thumbnailsRepaired} empty thumbnail${thumbnailsRepaired === 1 ? "" : "s"} repaired; ${thumbnailsSkipped} existing thumbnail${thumbnailsSkipped === 1 ? "" : "s"} left unchanged.${errorMessage}`,
         errors.length > 0 ? "error" : "success"
       );
       await onImagesMigrated?.();
     } catch (error) {
-      renderImageLibraryStatus(status, "Missing thumbnails could not be generated.", "error");
+      renderImageLibraryStatus(maintenanceStatus, "Missing thumbnails could not be generated.", "error");
     } finally {
       generateThumbnailsButton.disabled = false;
     }
@@ -519,16 +525,16 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
 
   migrateButton?.addEventListener("click", async () => {
     migrateButton.disabled = true;
-    renderImageLibraryStatus(status, "Migrating embedded images into the selected folder...", "");
+    renderImageLibraryStatus(maintenanceStatus, "Migrating embedded images into the selected folder...", "");
 
     try {
       const summary = await migrateEmbeddedImages(paperPacks);
 
       onImagesMigrated?.();
-      renderImageLibraryStatus(status, formatMigrationSummary(summary), summary.errors.length > 0 ? "error" : "success");
+      renderImageLibraryStatus(maintenanceStatus, formatMigrationSummary(summary), summary.errors.length > 0 ? "error" : "success");
       renderSetupStatus(document.querySelector("[data-setup-status]"), paperPacks);
     } catch (error) {
-      renderImageLibraryStatus(status, "Existing images could not be migrated.", "error");
+      renderImageLibraryStatus(maintenanceStatus, "Existing images could not be migrated.", "error");
     } finally {
       migrateButton.disabled = false;
     }
