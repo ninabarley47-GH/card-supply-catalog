@@ -716,10 +716,18 @@
   border: 0;
   padding: 0;
   background: transparent;
-  color: inherit;
+  color: var(--color-accent-dark);
   font: inherit;
   cursor: pointer;
   text-align: left;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.14em;
+}
+
+.card-detail-metadata-link:hover {
+  color: var(--color-accent);
+  text-decoration-thickness: 2px;
 }
 
 .card-detail-metadata-link:focus-visible {
