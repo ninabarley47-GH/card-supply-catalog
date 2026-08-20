@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { findCardsUsingPaperPack } from "./library.js";
-import { applyCardDetailSourceState, resolvePaperPackDisplayNames } from "./cards.js";
+import {
+  applyCardDetailSourceState,
+  resolvePaperPackDisplayNames,
+  resolvePaperPackReferences
+} from "./cards.js";
 
 const cards = [
   { id: "one", paperPackIds: ["pack-a"] },
@@ -62,5 +66,19 @@ test("Card Detail resolves all paper-pack IDs and retains an unresolved ID as a 
       { id: "pack-b", name: "Paper Pack B" }
     ]),
     ["Paper Pack A", "missing-pack", "Paper Pack B"]
+  );
+});
+
+test("Card Detail paper-pack references retain IDs and only mark existing packs as resolved", () => {
+  assert.deepEqual(
+    resolvePaperPackReferences(["pack-a", "missing-pack", "pack-b"], [
+      { id: "pack-a", name: "Paper Pack A" },
+      { id: "pack-b", name: "Paper Pack B" }
+    ]),
+    [
+      { id: "pack-a", label: "Paper Pack A", resolved: true },
+      { id: "missing-pack", label: "missing-pack", resolved: false },
+      { id: "pack-b", label: "Paper Pack B", resolved: true }
+    ]
   );
 });

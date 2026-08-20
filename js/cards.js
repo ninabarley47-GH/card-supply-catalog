@@ -216,6 +216,19 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
     );
   });
   detailView.body.addEventListener('click', (event) => {
+    const paperPackLink = event.target.closest('[data-card-detail-paper-pack]');
+
+    if (paperPackLink) {
+      const paperPackId = paperPackLink.dataset.cardDetailPaperPack;
+      closeCardDetail(detailView, activeTile);
+      document.dispatchEvent(
+        new CustomEvent('paper-pack:detail-request', {
+          detail: { paperPackId }
+        })
+      );
+      return;
+    }
+
     const deleteButton = event.target.closest('[data-delete-card]');
 
     if (deleteButton) {
@@ -1143,7 +1156,7 @@ function createCardDetailContent(card, index, paperPacks) {
     createCardFacts(card),
     createChipSection('Stamp sets', card.stampSets || []),
     createChipSection('Tags', card.tags),
-    createChipSection('Paper packs', resolvePaperPackDisplayNames(card.paperPackIds, paperPacks)),
+    createPaperPackChipSection(card.paperPackIds, paperPacks),
     createChipSection('Colors', card.colorIds),
     createCardDetailActions(card)
   );
@@ -1155,6 +1168,18 @@ function createCardDetailContent(card, index, paperPacks) {
 export function resolvePaperPackDisplayNames(paperPackIds = [], paperPacks = []) {
   const namesById = new Map(paperPacks.map((paperPack) => [paperPack.id, paperPack.name]));
   return paperPackIds.map((paperPackId) => namesById.get(paperPackId) || paperPackId);
+}
+
+export function resolvePaperPackReferences(paperPackIds = [], paperPacks = []) {
+  const paperPacksById = new Map(paperPacks.map((paperPack) => [paperPack.id, paperPack]));
+  return paperPackIds.map((paperPackId) => {
+    const paperPack = paperPacksById.get(paperPackId);
+    return {
+      id: paperPackId,
+      label: paperPack?.name || paperPackId,
+      resolved: Boolean(paperPack)
+    };
+  });
 }
 
 export function applyCardDetailSourceState(overlay, sourcePaperPackId, backControl = null, sourcePaperPackName = '') {
@@ -1301,5 +1326,27 @@ function createChipSection(label, values) {
     list.append(item);
   });
   section.append(list);
+  return section;
+}
+
+function createPaperPackChipSection(paperPackIds = [], paperPacks = []) {
+  const references = resolvePaperPackReferences(paperPackIds, paperPacks);
+  const section = createChipSection('Paper packs', references.map((reference) => reference.label));
+  const chips = section.querySelectorAll('.card-detail-chips li');
+
+  references.forEach((reference, index) => {
+    if (!reference.resolved) {
+      return;
+    }
+
+    const button = document.createElement('button');
+    button.className = 'card-detail-chip-link';
+    button.type = 'button';
+    button.dataset.cardDetailPaperPack = reference.id;
+    button.setAttribute('aria-label', `Open ${reference.label}`);
+    button.textContent = reference.label;
+    chips[index].replaceChildren(button);
+  });
+
   return section;
 }
