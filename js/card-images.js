@@ -1,11 +1,98 @@
 import { loadCatalogSetting } from './storage.js';
 import { generateImageThumbnail } from './thumbnails.js';
+import { isUsableThumbnailFile, runTasksWithConcurrency } from './images.js';
 
 const IMAGE_LIBRARY_SETTING_ID = 'imageLibrary';
 const CARD_IMAGE_LIBRARY_SETTING_ID = 'cardImageLibrary';
 const CARD_IMAGE_LIBRARY_MARKER = 'card-images';
 const LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY = 'local-folder';
 const EMBEDDED_IMAGE_STORAGE_STRATEGY = 'embedded-indexed-db';
+const THUMBNAIL_GENERATION_CONCURRENCY = 4;
+
+export function getReferencedCardImagePaths(cards = []) {
+  return new Set(getReferencedCardImageEntries(cards).keys());
+}
+
+export async function generateMissingCardImageThumbnails(cards = []) {
+  const rootDirectory = await getDirectoryHandle(CARD_IMAGE_LIBRARY_SETTING_ID, 'readwrite');
+  const summary = {
+    imagesScanned: 0,
+    thumbnailsCreated: 0,
+    thumbnailsRepaired: 0,
+    thumbnailsSkipped: 0,
+    errors: []
+  };
+
+  if (!rootDirectory) {
+    return { ok: false, summary };
+  }
+
+  const jobs = [];
+
+  for (const imagePath of getReferencedCardImageEntries(cards).values()) {
+    summary.imagesScanned += 1;
+    jobs.push(async () => {
+      try {
+        const { directory } = await getDirectoryFromRelativePath(rootDirectory, imagePath);
+        const imageName = String(imagePath).replace(/\\/g, '/').split('/').filter(Boolean).pop();
+        const thumbnailName = createThumbnailImageFileName(imageName);
+        let existingThumbnailHandle = null;
+
+        try {
+          existingThumbnailHandle = await directory.getFileHandle(thumbnailName);
+        } catch (error) {
+          // Missing thumbnails are created below.
+        }
+
+        if (existingThumbnailHandle && await isUsableThumbnailFile(existingThumbnailHandle)) {
+          summary.thumbnailsSkipped += 1;
+          return;
+        }
+
+        const sourceImage = await (await directory.getFileHandle(imageName)).getFile();
+        await writeFile(directory, thumbnailName, await generateImageThumbnail(sourceImage));
+
+        if (existingThumbnailHandle) {
+          summary.thumbnailsRepaired += 1;
+        } else {
+          summary.thumbnailsCreated += 1;
+        }
+      } catch (error) {
+        summary.errors.push(imagePath);
+      }
+    });
+  }
+
+  await runTasksWithConcurrency(jobs, THUMBNAIL_GENERATION_CONCURRENCY);
+  return { ok: true, summary };
+}
+
+function getReferencedCardImageEntries(cards) {
+  const entries = new Map();
+
+  for (const card of cards) {
+    if (card?.imageLibrary !== CARD_IMAGE_LIBRARY_MARKER || !card.imagePath) {
+      continue;
+    }
+
+    const normalizedPath = normalizeImagePath(card.imagePath);
+
+    if (normalizedPath && !entries.has(normalizedPath)) {
+      entries.set(normalizedPath, card.imagePath);
+    }
+  }
+
+  return entries;
+}
+
+function normalizeImagePath(imagePath) {
+  return String(imagePath || '')
+    .replace(/\\/g, '/')
+    .split('/')
+    .filter(Boolean)
+    .join('/')
+    .toLocaleLowerCase();
+}
 
 export async function chooseCardImageFromLibrary() {
   if (!("showOpenFilePicker" in window)) {

@@ -4,6 +4,7 @@ import {
   migratePaperPackImagesToLocalFolder,
   repairBrokenPaperPackImageLinks
 } from "./images.js";
+import { generateMissingCardImageThumbnails } from "./card-images.js";
 import { deleteTagEverywhere, loadCardTagVocabulary, loadCatalogSetting, loadPaperTagVocabulary, loadSavedCards, saveCard, saveCardTagVocabulary, saveCatalogSetting, savePaperPack, savePaperPacks, savePaperTagVocabulary } from "./storage.js";
 import { PAPER_TAG_SEED, addTag, buildEffectiveCardTagVocabulary, buildEffectivePaperTagVocabulary, countTagAssignments, getTagKey, normalizeTagName, removeTag, renameTag, replaceTagAssignments } from "./tag-utils.js";
 
@@ -219,7 +220,9 @@ function createTagSettingsRow(tag, config, onRename, onDelete) {
 async function initializeCardImageLibrarySettings({ paperPacks = [] } = {}) {
   const chooseButton = document.querySelector("[data-choose-card-image-library]");
   const reconnectButton = document.querySelector("[data-reconnect-card-image-library]");
+  const generateThumbnailsButton = document.querySelector("[data-generate-missing-card-thumbnails]");
   const status = document.querySelector("[data-card-image-library-status]");
+  const maintenanceStatus = document.querySelector("[data-image-maintenance-status]");
 
   if (!chooseButton || !status) {
     return;
@@ -229,6 +232,9 @@ async function initializeCardImageLibrarySettings({ paperPacks = [] } = {}) {
     chooseButton.disabled = true;
     if (reconnectButton) {
       reconnectButton.disabled = true;
+    }
+    if (generateThumbnailsButton) {
+      generateThumbnailsButton.disabled = true;
     }
     renderImageLibraryStatus(
       status,
@@ -246,6 +252,32 @@ async function initializeCardImageLibrarySettings({ paperPacks = [] } = {}) {
 
   reconnectButton?.addEventListener("click", async () => {
     await selectCardImageLibraryFolder(status, "Card image folder reconnected", paperPacks);
+  });
+
+  generateThumbnailsButton?.addEventListener("click", async () => {
+    generateThumbnailsButton.disabled = true;
+    renderImageLibraryStatus(maintenanceStatus, "Scanning catalog Card images for missing thumbnails...", "");
+
+    try {
+      const cards = await loadSavedCards();
+      const result = await generateMissingCardImageThumbnails(cards);
+
+      if (!result.ok) {
+        renderImageLibraryStatus(maintenanceStatus, "Reconnect the Card image folder before generating Card thumbnails.", "error");
+        return;
+      }
+
+      renderImageLibraryStatus(
+        maintenanceStatus,
+        formatThumbnailGenerationSummary(result.summary, "Card"),
+        result.summary.errors.length > 0 ? "error" : "success"
+      );
+      document.dispatchEvent(new CustomEvent("catalog:card-image-library-selected"));
+    } catch (error) {
+      renderImageLibraryStatus(maintenanceStatus, "Missing Card thumbnails could not be generated.", "error");
+    } finally {
+      generateThumbnailsButton.disabled = false;
+    }
   });
 }
 
@@ -506,14 +538,10 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
         return;
       }
 
-      const { imagesScanned, thumbnailsCreated, thumbnailsRepaired, thumbnailsSkipped, errors } = result.summary;
-      const errorMessage = errors.length > 0
-        ? ` ${errors.length} image${errors.length === 1 ? "" : "s"} could not be processed.`
-        : "";
       renderImageLibraryStatus(
         maintenanceStatus,
-        `${imagesScanned} image${imagesScanned === 1 ? "" : "s"} scanned. ${thumbnailsCreated} missing thumbnail${thumbnailsCreated === 1 ? "" : "s"} created; ${thumbnailsRepaired} empty thumbnail${thumbnailsRepaired === 1 ? "" : "s"} repaired; ${thumbnailsSkipped} existing thumbnail${thumbnailsSkipped === 1 ? "" : "s"} left unchanged.${errorMessage}`,
-        errors.length > 0 ? "error" : "success"
+        formatThumbnailGenerationSummary(result.summary, "Paper"),
+        result.summary.errors.length > 0 ? "error" : "success"
       );
       await onImagesMigrated?.();
     } catch (error) {
@@ -539,6 +567,15 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
       migrateButton.disabled = false;
     }
   });
+}
+
+function formatThumbnailGenerationSummary(summary, imageKind) {
+  const { imagesScanned, thumbnailsCreated, thumbnailsRepaired, thumbnailsSkipped, errors } = summary;
+  const errorMessage = errors.length > 0
+    ? ` ${errors.length} image${errors.length === 1 ? "" : "s"} could not be processed.`
+    : "";
+
+  return `${imagesScanned} ${imageKind} image${imagesScanned === 1 ? "" : "s"} scanned. ${thumbnailsCreated} missing thumbnail${thumbnailsCreated === 1 ? "" : "s"} created; ${thumbnailsRepaired} empty thumbnail${thumbnailsRepaired === 1 ? "" : "s"} repaired; ${thumbnailsSkipped} existing thumbnail${thumbnailsSkipped === 1 ? "" : "s"} left unchanged.${errorMessage}`;
 }
 
 function formatImageLinkRepairSummary(summary) {

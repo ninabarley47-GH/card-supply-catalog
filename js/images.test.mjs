@@ -6,6 +6,7 @@ import {
   getPatternImageSource,
   isUsableThumbnailFile
 } from "./images.js";
+import { getReferencedCardImagePaths } from "./card-images.js";
 
 test("Paper Library prefers a hydrated thumbnail while detail keeps the full image", () => {
   const packWithThumbnail = {
@@ -85,4 +86,16 @@ test("thumbnail generation targets only unique catalog-referenced Paper Pack ima
     "dainty flowers/dainty flowers_7.jpg",
     "dainty flowers/dainty flowers_8.jpg"
   ]);
+});
+
+test("Card thumbnail generation targets only unique Card-folder image paths", () => {
+  const paths = getReferencedCardImagePaths([
+    { imageLibrary: "card-images", imagePath: "Birthday/Card One.JPG" },
+    { imageLibrary: "card-images", imagePath: "birthday\\CARD ONE.JPG" },
+    { imageLibrary: "card-images", imagePath: "Card Two.png" },
+    { imageLibrary: "paper-images", imagePath: "legacy-card.jpg" },
+    { imageSrc: "data:image/jpeg;base64,embedded" }
+  ]);
+
+  assert.deepEqual([...paths], ["birthday/card one.jpg", "card two.png"]);
 });

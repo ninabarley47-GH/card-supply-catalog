@@ -320,7 +320,8 @@
 
               <div class="settings-actions" aria-label="Catalog maintenance actions">
                 <button class="button" type="button" data-repair-image-library>Repair Image Links</button>
-                <button class="button" type="button" data-generate-missing-thumbnails>Generate Missing Thumbnails</button>
+                <button class="button" type="button" data-generate-missing-thumbnails>Generate Missing Paper Thumbnails</button>
+                <button class="button" type="button" data-generate-missing-card-thumbnails>Generate Missing Card Thumbnails</button>
                 <button class="button" type="button" data-migrate-image-library>Move Images to Folder</button>
               </div>
               <p class="settings-message" data-image-maintenance-status aria-live="polite"></p>
@@ -342,8 +343,8 @@
                 <p>Rescans matching paper-pack folders, repairs broken image references, and reconnects fallback backup images to files already in the selected folder. It does not copy, overwrite, or delete image files.</p>
               </details>
               <details class="settings-help">
-                <summary>What does Generate Missing Thumbnails do?</summary>
-                <p>Scans the selected folder and its subfolders, leaves every existing <code>.thumb.jpg</code> unchanged, and creates thumbnails only where they are missing.</p>
+                <summary>What do Generate Missing Thumbnails actions do?</summary>
+                <p>Scans catalog-referenced images in the selected Paper or Card folder, leaves every usable <code>.thumb.jpg</code> unchanged, repairs empty thumbnails, and creates thumbnails only where they are missing.</p>
               </details>
             </section>
 
