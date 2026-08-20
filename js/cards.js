@@ -200,7 +200,8 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
     openCardDetail(detailView, card, activeTile, cards, paperPacks, event.detail?.sourcePaperPackId);
   });
 
-  detailView.back.addEventListener('click', () => {
+  detailView.back.addEventListener('click', (event) => {
+    event.stopPropagation();
     const sourcePaperPackId = detailView.overlay.dataset.sourcePaperPackId;
 
     if (!sourcePaperPackId) {
