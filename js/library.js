@@ -1216,7 +1216,7 @@ function createPaperPackFavoriteButton(paperPack) {
   favorite.setAttribute("aria-label", paperPack.favorite ? "Remove paper pack from favorites" : "Add paper pack to favorites");
   favorite.setAttribute("aria-pressed", String(Boolean(paperPack.favorite)));
   favorite.title = paperPack.favorite ? "Remove from favorites" : "Add to favorites";
-  favorite.textContent = "â™¥";
+  favorite.textContent = "\u2665";
   return favorite;
 }
 
