@@ -4,7 +4,7 @@ import {
   migratePaperPackImagesToLocalFolder,
   repairBrokenPaperPackImageLinks
 } from "./images.js";
-import { generateMissingCardImageThumbnails } from "./card-images.js";
+import { checkCardImageLibraryHealth, generateMissingCardImageThumbnails } from "./card-images.js";
 import { deleteTagEverywhere, loadCardTagVocabulary, loadCatalogSetting, loadPaperTagVocabulary, loadSavedCards, saveCard, saveCardTagVocabulary, saveCatalogSetting, savePaperPack, savePaperPacks, savePaperTagVocabulary } from "./storage.js";
 import { PAPER_TAG_SEED, addTag, buildEffectiveCardTagVocabulary, buildEffectivePaperTagVocabulary, countTagAssignments, getTagKey, normalizeTagName, removeTag, renameTag, replaceTagAssignments } from "./tag-utils.js";
 
@@ -407,7 +407,7 @@ function initializeSetupStatus({ paperPacks = [] } = {}) {
 async function initializeImageLibrarySettings({ paperPacks = [], onImageLibrarySelected, onImagesMigrated } = {}) {
   const chooseButton = document.querySelector("[data-choose-image-library]");
   const reconnectButton = document.querySelector("[data-reconnect-image-library]");
-  const checkButton = document.querySelector("[data-check-image-library]");
+  const checkButton = document.querySelector("[data-check-image-libraries]");
   const repairButton = document.querySelector("[data-repair-image-library]");
   const generateThumbnailsButton = document.querySelector("[data-generate-missing-thumbnails]");
   const migrateButton = document.querySelector("[data-migrate-image-library]");
@@ -483,12 +483,13 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
   });
 
   checkButton?.addEventListener("click", async () => {
-    await checkImageLibraryReferences({
+    await checkBothImageLibraries({
       button: checkButton,
-      health,
       paperPacks,
-      status,
-      checkingMessage: "Checking image library references..."
+      paperStatus: status,
+      paperHealth: health,
+      cardStatus: document.querySelector("[data-card-image-library-status]"),
+      cardHealth: document.querySelector("[data-card-image-library-health]")
     });
     renderSetupStatus(document.querySelector("[data-setup-status]"), paperPacks);
   });
@@ -881,6 +882,45 @@ async function checkImageLibraryReferences({ button, health, paperPacks, status,
   }
 }
 
+async function checkBothImageLibraries({
+  button,
+  paperPacks,
+  paperStatus,
+  paperHealth,
+  cardStatus,
+  cardHealth
+}) {
+  button.disabled = true;
+  renderImageLibraryStatus(paperStatus, "Checking Paper image library references...", "");
+  renderImageLibraryStatus(cardStatus, "Checking Card image library references...", "");
+
+  try {
+    const cards = await loadSavedCards();
+    const [paperResult, cardResult] = await Promise.all([
+      checkImageLibraryHealth(paperPacks),
+      checkCardImageLibraryHealth(cards)
+    ]);
+
+    renderImageLibraryStatus(
+      paperStatus,
+      formatHealthStatus(paperResult),
+      paperResult.summary.imagesMissing > 0 || paperResult.needsFolder ? "error" : "success"
+    );
+    renderImageLibraryHealth(paperHealth, paperResult.summary, "paper");
+    renderImageLibraryStatus(
+      cardStatus,
+      formatHealthStatus(cardResult),
+      cardResult.summary.imagesMissing > 0 || cardResult.needsFolder ? "error" : "success"
+    );
+    renderImageLibraryHealth(cardHealth, cardResult.summary, "card");
+  } catch (error) {
+    renderImageLibraryStatus(paperStatus, "Paper image library references could not be checked.", "error");
+    renderImageLibraryStatus(cardStatus, "Card image library references could not be checked.", "error");
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function formatHealthStatus(result) {
   const { summary } = result;
 
@@ -899,7 +939,7 @@ function formatHealthStatus(result) {
   return `${summary.imagesFound} folder image${summary.imagesFound === 1 ? "" : "s"} found. No missing folder images.`;
 }
 
-function renderImageLibraryHealth(container, summary) {
+function renderImageLibraryHealth(container, summary, imageKind = "paper") {
   if (!container) {
     return;
   }
@@ -913,7 +953,7 @@ function renderImageLibraryHealth(container, summary) {
   overview.className = "image-library-health-list";
 
   overview.append(
-    createHealthItem("Packs checked", summary.packsChecked),
+    createHealthItem(imageKind === "card" ? "Cards checked" : "Packs checked", imageKind === "card" ? summary.cardsChecked : summary.packsChecked),
     createHealthItem("Folder images", summary.folderImages),
     createHealthItem("Images found", summary.imagesFound),
     createHealthItem("Missing images", summary.imagesMissing),
@@ -922,7 +962,7 @@ function renderImageLibraryHealth(container, summary) {
 
   const children = [overview];
 
-  if ((summary.fallbackPaperPacks || []).length > 0) {
+  if (imageKind === "paper" && (summary.fallbackPaperPacks || []).length > 0) {
     const fallback = document.createElement("div");
     fallback.className = "image-library-fallback";
 
@@ -952,10 +992,18 @@ function renderImageLibraryHealth(container, summary) {
     const list = document.createElement("ul");
     list.className = "image-library-missing-list";
 
-    for (const paperPack of groupMissingImagesByPaperPack(summary.missingImages)) {
-      const item = document.createElement("li");
-      item.textContent = `${paperPack.packName} (${paperPack.imageCount} missing image${paperPack.imageCount === 1 ? "" : "s"})`;
-      list.append(item);
+    if (imageKind === "card") {
+      for (const missingCard of summary.missingImages) {
+        const item = document.createElement("li");
+        item.textContent = `${missingCard.cardLabel}: ${missingCard.imagePath}`;
+        list.append(item);
+      }
+    } else {
+      for (const paperPack of groupMissingImagesByPaperPack(summary.missingImages)) {
+        const item = document.createElement("li");
+        item.textContent = `${paperPack.packName} (${paperPack.imageCount} missing image${paperPack.imageCount === 1 ? "" : "s"})`;
+        list.append(item);
+      }
     }
 
     missing.append(title, list);

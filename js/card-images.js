@@ -67,6 +67,55 @@ export async function generateMissingCardImageThumbnails(cards = []) {
   return { ok: true, summary };
 }
 
+export async function checkCardImageLibraryHealth(cards = []) {
+  const directoryHandle = await getDirectoryHandle(CARD_IMAGE_LIBRARY_SETTING_ID, 'read');
+  const summary = {
+    folderName: directoryHandle?.name || '',
+    cardsChecked: cards.length,
+    folderImages: 0,
+    imagesFound: 0,
+    imagesMissing: 0,
+    embeddedImages: 0,
+    missingImages: []
+  };
+
+  for (const card of cards) {
+    if (card?.imageLibrary === CARD_IMAGE_LIBRARY_MARKER && card.imagePath) {
+      summary.folderImages += 1;
+
+      if (!directoryHandle) {
+        summary.imagesMissing += 1;
+        summary.missingImages.push(createMissingCardImageEntry(card));
+        continue;
+      }
+
+      try {
+        await getFileFromRelativePath(directoryHandle, card.imagePath);
+        summary.imagesFound += 1;
+      } catch (error) {
+        summary.imagesMissing += 1;
+        summary.missingImages.push(createMissingCardImageEntry(card));
+      }
+    } else if (card?.imageSrc) {
+      summary.embeddedImages += 1;
+    }
+  }
+
+  return {
+    ok: Boolean(directoryHandle) || summary.folderImages === 0,
+    needsFolder: !directoryHandle && summary.folderImages > 0,
+    summary
+  };
+}
+
+function createMissingCardImageEntry(card) {
+  return {
+    cardId: card.id,
+    cardLabel: card.dateCreated ? `Card created ${card.dateCreated}` : card.id || 'Untitled Card',
+    imagePath: card.imagePath
+  };
+}
+
 function getReferencedCardImageEntries(cards) {
   const entries = new Map();
 
