@@ -44,23 +44,28 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
   let activeTile = null;
 
   const renderCurrent = () => {
+    const selectedTags = getSelectedCardTags(tagFilter);
+    const hasActiveFilters = Boolean(
+      searchInput?.value.trim() || favoritesInput?.checked || selectedTags.length > 0
+    );
     const visibleCards = filterAndSortCards(cards, {
       query: searchInput?.value,
       favoritesOnly: favoritesInput?.checked,
-      selectedTags: getSelectedCardTags(tagFilter),
+      selectedTags,
       sortOrder: sortControl?.value,
       paperPackNamesById
     });
 
+    gallery.classList.toggle('card-library-grid-filtered', hasActiveFilters);
     renderCardLibrary(gallery, visibleCards, cards.length, paperPackNamesById);
 
     if (clearFiltersButton) {
       clearFiltersButton.hidden =
-        !searchInput?.value && !favoritesInput?.checked && getSelectedCardTags(tagFilter).length === 0;
+        !searchInput?.value && !favoritesInput?.checked && selectedTags.length === 0;
     }
 
     if (clearTagsButton) {
-      clearTagsButton.hidden = getSelectedCardTags(tagFilter).length === 0;
+      clearTagsButton.hidden = selectedTags.length === 0;
     }
   };
 

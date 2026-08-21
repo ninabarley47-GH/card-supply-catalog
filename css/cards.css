@@ -1,9 +1,13 @@
 .card-library-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 24rem));
-  justify-content: start;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
   align-items: start;
   gap: var(--space-5);
+}
+
+.card-library-grid-filtered {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 24rem));
+  justify-content: start;
 }
 
 .card-library-empty {
