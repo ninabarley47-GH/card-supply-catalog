@@ -35,6 +35,7 @@ const LAST_BACKUP_EXPORT_SETTING_ID = "lastBackupExportedAt";
 const LAST_BACKUP_IMPORT_SETTING_ID = "lastBackupImportedAt";
 const APP_VERSION = "2026.08.03-import-diagnostic";
 const IMPORT_DIAGNOSTIC_QUERY_PARAMETER = "importDiagnostics";
+const IMPORT_DIAGNOSTIC_STORAGE_KEY = "card-supply-catalog.import-diagnostic";
 const SUPPORTED_EMBEDDED_IMAGE_PREFIX_PATTERN = /^data:image\/(jpeg|png|webp|gif);base64,/i;
 
 export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
@@ -62,6 +63,20 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
     diagnosticSummary.textContent = `${report.summary?.failures || 0} import failure${report.summary?.failures === 1 ? "" : "s"}, ${runtimeErrors.length} browser error${runtimeErrors.length === 1 ? "" : "s"}`;
     diagnosticPanel.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
   };
+
+  const recoveredDiagnostic = recoverImportDiagnostic();
+  if (recoveredDiagnostic) {
+    latestDiagnosticReport = recoveredDiagnostic;
+    showDiagnosticReport(recoveredDiagnostic);
+    if (downloadDiagnosticButton) downloadDiagnosticButton.disabled = false;
+    renderBackupMessage(
+      message,
+      recoveredDiagnostic.interrupted
+        ? "The previous diagnostic was interrupted when the browser reloaded. The recovered report is shown below."
+        : "The most recent diagnostic report was recovered.",
+      recoveredDiagnostic.interrupted ? "error" : "success"
+    );
+  }
 
   if (exportButton) {
     exportButton.addEventListener("click", async () => {
@@ -172,6 +187,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
       latestDiagnosticReport = null;
       if (downloadDiagnosticButton) downloadDiagnosticButton.disabled = true;
       renderBackupMessage(message, "Running import diagnostic. This may take several minutes...", "");
+      checkpointImportDiagnostic(createPendingDiagnosticReport(backupFile), "reading-backup");
 
       try {
         const backup = await readBackupFile(backupFile);
@@ -203,6 +219,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
           latestDiagnosticReport.postRestoreVerification = restoreSummary.postRestoreVerification;
         }
         showDiagnosticReport(latestDiagnosticReport);
+        checkpointImportDiagnostic(latestDiagnosticReport, "complete", true);
         reportPostRestoreVerification(restoreSummary.postRestoreVerification);
         renderBackupMessage(
           message,
@@ -212,6 +229,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
       } catch (error) {
         latestDiagnosticReport = await createFailedDiagnosticReport(backupFile, error);
         showDiagnosticReport(latestDiagnosticReport);
+        checkpointImportDiagnostic(latestDiagnosticReport, "failed", true);
         if (downloadDiagnosticButton) downloadDiagnosticButton.disabled = false;
         renderBackupMessage(message, "Import diagnostic completed with an error. Copy the debug report below and send it to the app developer.", "error");
       } finally {
@@ -239,6 +257,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
   clearDiagnosticButton?.addEventListener("click", () => {
     latestDiagnosticReport = null;
     runtimeErrors.length = 0;
+    clearImportDiagnosticCheckpoint();
     if (diagnosticOutput) diagnosticOutput.value = "";
     if (diagnosticPanel) diagnosticPanel.hidden = true;
     if (downloadDiagnosticButton) downloadDiagnosticButton.disabled = true;
@@ -267,6 +286,65 @@ function captureRuntimeErrors() {
   }));
   window.addEventListener("unhandledrejection", (event) => add("unhandledrejection", event.reason));
   return errors;
+}
+
+function createPendingDiagnosticReport(backupFile) {
+  return {
+    reportVersion: 2,
+    startedAt: new Date().toISOString(),
+    appVersion: APP_VERSION,
+    backup: {
+      fileName: backupFile?.name || "unknown",
+      fileSize: backupFile?.size ?? null,
+      paperPackCount: null,
+      embeddedImageCount: null
+    },
+    images: [],
+    storageErrors: [],
+    progress: { stage: "reading-backup", imagesChecked: 0 }
+  };
+}
+
+function checkpointImportDiagnostic(report, stage, complete = false) {
+  if (!report || typeof localStorage === "undefined") return;
+  report.progress = {
+    ...(report.progress || {}),
+    stage,
+    updatedAt: new Date().toISOString()
+  };
+  try {
+    localStorage.setItem(IMPORT_DIAGNOSTIC_STORAGE_KEY, JSON.stringify({ complete, report }));
+  } catch (error) {
+    // The live report remains available when local storage is unavailable or full.
+  }
+}
+
+function recoverImportDiagnostic() {
+  if (typeof localStorage === "undefined") return null;
+  try {
+    const saved = JSON.parse(localStorage.getItem(IMPORT_DIAGNOSTIC_STORAGE_KEY) || "null");
+    if (!saved?.report) return null;
+    if (!saved.complete) {
+      saved.report.interrupted = true;
+      saved.report.fatalError = saved.report.fatalError || {
+        errorName: "BrowserReload",
+        errorMessage: "The diagnostic stopped before completion. iPadOS may have reloaded the app because of memory pressure."
+      };
+      saved.report.completedAt = new Date().toISOString();
+      saved.report.summary = createDiagnosticSummary(saved.report, 1);
+    }
+    return saved.report;
+  } catch (error) {
+    return null;
+  }
+}
+
+function clearImportDiagnosticCheckpoint() {
+  try {
+    localStorage.removeItem(IMPORT_DIAGNOSTIC_STORAGE_KEY);
+  } catch (error) {
+    // Nothing else is required when local storage is unavailable.
+  }
 }
 
 async function copyDiagnosticText(text, textarea) {
@@ -638,6 +716,7 @@ export async function restoreCatalogBackup({
     paperPackPlan.recordsToImport,
     diagnosticContext
   );
+  checkpointImportDiagnostic(importDiagnostic, "preparing-records");
 
   if (backup.schemaVersion !== BACKUP_SCHEMA_VERSION) {
     summary.warnings.push(
@@ -673,6 +752,7 @@ export async function restoreCatalogBackup({
   }
 
   try {
+    checkpointImportDiagnostic(importDiagnostic, "saving-to-indexeddb");
     const tagVocabularies = {
       paper: buildEffectivePaperTagVocabulary(
         [...existingPaperTagVocabulary, ...(backup.tagVocabularies?.paper || [])],
@@ -708,6 +788,7 @@ export async function restoreCatalogBackup({
   for (const paperPack of preparedPaperPacks) {
     upsertPaperPack(paperPacks, paperPack);
     await verifySavedPaperPackImages(importDiagnostic, paperPack);
+    checkpointImportDiagnostic(importDiagnostic, "verifying-indexeddb");
     summary.importedPaperPackIds.push(paperPack.id);
     summary.imagesImported += countEmbeddedPatternImages(paperPack);
     summary.folderImageReferencesImported += countFolderImageReferences(paperPack);
@@ -765,7 +846,7 @@ async function createImportDiagnostic(paperPacks, diagnosticContext = null) {
   }
 
   const diagnostic = {
-    reportVersion: 1,
+    reportVersion: 2,
     startedAt: new Date().toISOString(),
     appVersion: APP_VERSION,
     environment: {
@@ -788,6 +869,7 @@ async function createImportDiagnostic(paperPacks, diagnosticContext = null) {
     quotaBefore: await getStorageQuotaDiagnostic(),
     quotaAfter: null
   };
+  checkpointImportDiagnostic(diagnostic, "checking-embedded-images");
 
   for (const paperPack of paperPacks) {
     for (const [patternIndex, pattern] of (paperPack.patterns || []).entries()) {
@@ -803,7 +885,7 @@ async function createImportDiagnostic(paperPacks, diagnosticContext = null) {
         entry.failures.push("Unsupported or malformed data:image/...;base64, value.");
       } else {
         try {
-          entry.decodedByteLength = window.atob(pattern.imageSrc.slice(match[0].length)).length;
+          entry.decodedByteLength = await decodeBase64LengthInChunks(pattern.imageSrc, match[0].length);
           entry.base64Decoded = entry.decodedByteLength > 0;
           if (!entry.base64Decoded) entry.failures.push("Base64 decoded to an empty value.");
         } catch (error) {
@@ -821,6 +903,8 @@ async function createImportDiagnostic(paperPacks, diagnosticContext = null) {
       }
 
       diagnostic.images.push(entry);
+      diagnostic.progress.imagesChecked = diagnostic.images.length;
+      checkpointImportDiagnostic(diagnostic, "checking-embedded-images");
     }
   }
 
@@ -902,16 +986,7 @@ async function reportImportDiagnostic(diagnostic) {
 
   diagnostic.quotaAfter = await getStorageQuotaDiagnostic();
   diagnostic.completedAt = new Date().toISOString();
-  const summary = {
-    imagesReceived: diagnostic.images.length,
-    base64StringsDecoded: diagnostic.images.filter((image) => image.base64Decoded).length,
-    imagesRenderedBeforeStorage: diagnostic.images.filter((image) => image.renderedBeforeStorage).length,
-    imagesMatchedAfterIndexedDbReadBack: diagnostic.images.filter((image) => image.matchedAfterReadBack).length,
-    failures: diagnostic.images.reduce((count, image) => count + image.failures.length, 0) +
-      diagnostic.storageErrors.filter(
-        (error) => !diagnostic.images.some((image) => image.paperPackId === error.paperPackId)
-      ).length
-  };
+  const summary = createDiagnosticSummary(diagnostic);
 
   console.group("[Backup import diagnostic] Embedded image import report");
   console.info("Environment", diagnostic.environment);
@@ -931,6 +1006,19 @@ async function reportImportDiagnostic(diagnostic) {
   return diagnostic;
 }
 
+function createDiagnosticSummary(diagnostic, additionalFailures = 0) {
+  return {
+    imagesReceived: diagnostic.images.length,
+    base64StringsDecoded: diagnostic.images.filter((image) => image.base64Decoded).length,
+    imagesRenderedBeforeStorage: diagnostic.images.filter((image) => image.renderedBeforeStorage).length,
+    imagesMatchedAfterIndexedDbReadBack: diagnostic.images.filter((image) => image.matchedAfterReadBack).length,
+    failures: diagnostic.images.reduce((count, image) => count + image.failures.length, 0) +
+      diagnostic.storageErrors.filter(
+        (error) => !diagnostic.images.some((image) => image.paperPackId === error.paperPackId)
+      ).length + additionalFailures
+  };
+}
+
 function isImportDiagnosticEnabled() {
   return typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get(IMPORT_DIAGNOSTIC_QUERY_PARAMETER) === "1";
@@ -943,10 +1031,26 @@ function isStandaloneDisplayMode() {
 function loadDiagnosticImage(imageSrc) {
   return new Promise((resolve, reject) => {
     const image = new Image();
-    image.addEventListener("load", () => resolve(image), { once: true });
+    image.addEventListener("load", () => {
+      const result = { naturalWidth: image.naturalWidth, naturalHeight: image.naturalHeight };
+      image.src = "";
+      resolve(result);
+    }, { once: true });
     image.addEventListener("error", () => reject(new Error("The image element emitted an error event.")), { once: true });
     image.src = imageSrc;
   });
+}
+
+async function decodeBase64LengthInChunks(imageSrc, prefixLength) {
+  const chunkSize = 32768;
+  let decodedByteLength = 0;
+
+  for (let offset = prefixLength; offset < imageSrc.length; offset += chunkSize) {
+    decodedByteLength += window.atob(imageSrc.slice(offset, offset + chunkSize)).length;
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+  }
+
+  return decodedByteLength;
 }
 
 async function getServiceWorkerVersion() {
