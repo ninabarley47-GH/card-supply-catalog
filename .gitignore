@@ -6,6 +6,10 @@ build/
 *.png
 !assets/logo/CSC-logo.png
 !assets/icons/csc-favicon-32x32.png
+!assets/icons/favicon-32.png
+!assets/icons/apple-touch-icon.png
+!assets/icons/icon-192.png
+!assets/icons/icon-512.png
 *.jpeg
 *.webp
 !assets/cards/
