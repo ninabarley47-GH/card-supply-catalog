@@ -33,7 +33,7 @@ const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
 const CARD_IMAGE_LIBRARY_SETTING_ID = "cardImageLibrary";
 const LAST_BACKUP_EXPORT_SETTING_ID = "lastBackupExportedAt";
 const LAST_BACKUP_IMPORT_SETTING_ID = "lastBackupImportedAt";
-const APP_VERSION = "2026.08.03-import-diagnostic";
+const APP_VERSION = "2026.08.22-low-memory-diagnostic";
 const IMPORT_DIAGNOSTIC_QUERY_PARAMETER = "importDiagnostics";
 const IMPORT_DIAGNOSTIC_STORAGE_KEY = "card-supply-catalog.import-diagnostic";
 const SUPPORTED_EMBEDDED_IMAGE_PREFIX_PATTERN = /^data:image\/(jpeg|png|webp|gif);base64,/i;
@@ -60,7 +60,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
     report.runtimeErrors = [...runtimeErrors];
     diagnosticOutput.value = JSON.stringify(report, null, 2);
     diagnosticPanel.hidden = false;
-    diagnosticSummary.textContent = `${report.summary?.failures || 0} import failure${report.summary?.failures === 1 ? "" : "s"}, ${runtimeErrors.length} browser error${runtimeErrors.length === 1 ? "" : "s"}`;
+    diagnosticSummary.textContent = `${report.summary?.failures || 0} issue${report.summary?.failures === 1 ? "" : "s"}, ${runtimeErrors.length} browser error${runtimeErrors.length === 1 ? "" : "s"}`;
     diagnosticPanel.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
   };
 
@@ -186,44 +186,20 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
 
       latestDiagnosticReport = null;
       if (downloadDiagnosticButton) downloadDiagnosticButton.disabled = true;
-      renderBackupMessage(message, "Running import diagnostic. This may take several minutes...", "");
-      checkpointImportDiagnostic(createPendingDiagnosticReport(backupFile), "reading-backup");
+      renderBackupMessage(message, "Scanning backup without importing it: 0%", "");
+      checkpointImportDiagnostic(createPendingDiagnosticReport(backupFile), "streaming-backup");
 
       try {
-        const backup = await readBackupFile(backupFile);
-        const overwriteExisting = overwriteExistingInput?.checked === true;
-        const overwriteSummary = await summarizeBackupOverwrites(backup, paperPacks, colorsById);
-        if (overwriteExisting && overwriteSummary.requiresConfirmation && !window.confirm(overwriteSummary.message)) {
-          renderBackupMessage(message, "Import diagnostic cancelled. No catalog changes were made.", "");
-          return;
-        }
-
-        const restoreSummary = await restoreCatalogBackup({
-          backup,
-          paperPacks,
-          colorsById,
-          overwriteExisting,
-          diagnosticContext: {
-            backupFileName: backupFile.name,
-            backupFileSize: backupFile.size
-          }
+        latestDiagnosticReport = await scanBackupFileLowMemory(backupFile, ({ percent, report }) => {
+          renderBackupMessage(message, `Scanning backup without importing it: ${percent}%`, "");
+          checkpointImportDiagnostic(report, "streaming-backup");
         });
-        latestDiagnosticReport = restoreSummary.diagnosticReport;
         if (downloadDiagnosticButton) downloadDiagnosticButton.disabled = !latestDiagnosticReport;
-        await onRestore?.();
-        restoreSummary.postRestoreVerification = await verifyPostRestoreCatalog(
-          getImportedPaperPacksForVerification(backup.paperPacks, restoreSummary),
-          paperPacks
-        );
-        if (latestDiagnosticReport) {
-          latestDiagnosticReport.postRestoreVerification = restoreSummary.postRestoreVerification;
-        }
         showDiagnosticReport(latestDiagnosticReport);
         checkpointImportDiagnostic(latestDiagnosticReport, "complete", true);
-        reportPostRestoreVerification(restoreSummary.postRestoreVerification);
         renderBackupMessage(
           message,
-          "Import diagnostic completed. Copy the debug report below and send it to the app developer.",
+          "Low-memory scan completed. No catalog data was imported or changed. Copy the debug report below.",
           latestDiagnosticReport ? "success" : "error"
         );
       } catch (error) {
@@ -301,8 +277,199 @@ function createPendingDiagnosticReport(backupFile) {
     },
     images: [],
     storageErrors: [],
-    progress: { stage: "reading-backup", imagesChecked: 0 }
+    progress: { stage: "streaming-backup", bytesRead: 0, percent: 0, imagesChecked: 0 }
   };
+}
+
+export async function scanBackupFileLowMemory(backupFile, onProgress = null) {
+  const report = createPendingDiagnosticReport(backupFile);
+  report.diagnosticMode = "read-only-streaming-scan";
+  report.environment = {
+    userAgent: navigator.userAgent,
+    browser: getBrowserDescription(navigator.userAgent),
+    operatingSystem: getOperatingSystemDescription(navigator.userAgent),
+    origin: window.location.origin,
+    pageUrl: window.location.href,
+    standalone: isStandaloneDisplayMode(),
+    serviceWorkerVersion: await getServiceWorkerVersion()
+  };
+  report.quotaBefore = await getStorageQuotaDiagnostic();
+  report.backup.imageStorageStrategy = "not parsed";
+  const scanner = createEmbeddedImageStreamScanner();
+  const reader = backupFile.stream().getReader();
+  const decoder = new TextDecoder();
+  const progressInterval = Math.max(1024 * 1024, Math.floor((backupFile.size || 1) / 100));
+  let bytesRead = 0;
+  let nextProgressAt = 0;
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    bytesRead += value.byteLength;
+    scanner.push(decoder.decode(value, { stream: true }));
+
+    if (bytesRead >= nextProgressAt) {
+      report.images = scanner.getImages();
+      report.progress = createStreamProgress(bytesRead, backupFile.size, report.images.length);
+      await onProgress?.({ percent: report.progress.percent, report });
+      nextProgressAt = bytesRead + progressInterval;
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+    }
+  }
+
+  scanner.push(decoder.decode());
+  scanner.finish();
+  report.images = scanner.getImages();
+  report.progress = createStreamProgress(bytesRead, backupFile.size, report.images.length);
+  report.progress.stage = "complete";
+  report.completedAt = new Date().toISOString();
+  report.summary = createLowMemoryDiagnosticSummary(report);
+  report.backup.embeddedImageCount = report.images.length;
+  report.quotaAfter = await getStorageQuotaDiagnostic();
+  return report;
+}
+
+function createStreamProgress(bytesRead, totalBytes, imagesChecked) {
+  return {
+    stage: "streaming-backup",
+    bytesRead,
+    totalBytes,
+    percent: totalBytes > 0 ? Math.min(100, Math.floor((bytesRead / totalBytes) * 100)) : 100,
+    imagesChecked
+  };
+}
+
+function createLowMemoryDiagnosticSummary(report) {
+  const malformedImages = report.images.filter((image) => !image.supportedPrefix || image.invalidBase64Characters > 0);
+  return {
+    imagesReceived: report.images.length,
+    totalEncodedImageCharacters: report.images.reduce((sum, image) => sum + image.base64CharacterCount, 0),
+    estimatedDecodedImageBytes: report.images.reduce((sum, image) => sum + image.estimatedDecodedBytes, 0),
+    largestEncodedImageCharacters: report.images.reduce((largest, image) => Math.max(largest, image.base64CharacterCount), 0),
+    malformedImages: malformedImages.length,
+    failures: malformedImages.length,
+    catalogChanged: false
+  };
+}
+
+export function createEmbeddedImageStreamScanner() {
+  const key = '"imageSrc"';
+  const images = [];
+  let buffer = "";
+  let activeImage = null;
+
+  const consumeValue = (segment) => {
+    activeImage.valueLength += segment.length;
+    if (!activeImage.commaFound) {
+      const prefixLengthBeforeSegment = activeImage.prefix.length;
+      const consumedFromSegment = Math.min(segment.length, Math.max(0, 96 - prefixLengthBeforeSegment));
+      const combined = activeImage.prefix + segment.slice(0, consumedFromSegment);
+      const commaIndex = combined.indexOf(",");
+      if (commaIndex >= 0) {
+        activeImage.header = combined.slice(0, commaIndex);
+        activeImage.prefix = combined.slice(0, commaIndex + 1);
+        activeImage.commaFound = true;
+        consumeBase64(combined.slice(commaIndex + 1));
+        consumeBase64(segment.slice(consumedFromSegment));
+      } else {
+        activeImage.prefix = combined;
+      }
+      return;
+    }
+    consumeBase64(segment);
+  };
+
+  const consumeBase64 = (segment) => {
+    if (!segment) return;
+    activeImage.base64CharacterCount += segment.length;
+    activeImage.invalidBase64Characters += countInvalidBase64Characters(segment);
+    activeImage.lastBase64Characters = (activeImage.lastBase64Characters + segment).slice(-2);
+  };
+
+  const finishImage = () => {
+    const padding = activeImage.lastBase64Characters.endsWith("==") ? 2 : activeImage.lastBase64Characters.endsWith("=") ? 1 : 0;
+    activeImage.supportedPrefix = /^data:image\/(jpeg|png|webp|gif);base64$/i.test(activeImage.header);
+    activeImage.mimeType = activeImage.header.match(/^data:([^;]+)/i)?.[1] || "unknown";
+    activeImage.estimatedDecodedBytes = Math.max(0, Math.floor(activeImage.base64CharacterCount * 3 / 4) - padding);
+    delete activeImage.header;
+    delete activeImage.prefix;
+    delete activeImage.commaFound;
+    delete activeImage.lastBase64Characters;
+    images.push(activeImage);
+    activeImage = null;
+  };
+
+  return {
+    push(text) {
+      buffer += text;
+      while (buffer.length > 0) {
+        if (activeImage) {
+          const endIndex = buffer.indexOf('"');
+          if (endIndex < 0) {
+            consumeValue(buffer);
+            buffer = "";
+            break;
+          }
+          consumeValue(buffer.slice(0, endIndex));
+          finishImage();
+          buffer = buffer.slice(endIndex + 1);
+          continue;
+        }
+
+        const keyIndex = buffer.indexOf(key);
+        if (keyIndex < 0) {
+          buffer = buffer.slice(-(key.length - 1));
+          break;
+        }
+        const remainder = buffer.slice(keyIndex + key.length);
+        const valueStart = remainder.match(/^\s*:\s*"/);
+        if (!valueStart) {
+          if (remainder.length < 12) {
+            buffer = buffer.slice(keyIndex);
+            break;
+          }
+          buffer = remainder;
+          continue;
+        }
+        activeImage = {
+          imageIndex: images.length + 1,
+          valueLength: 0,
+          mimeType: "unknown",
+          supportedPrefix: false,
+          base64CharacterCount: 0,
+          estimatedDecodedBytes: 0,
+          invalidBase64Characters: 0,
+          header: "",
+          prefix: "",
+          commaFound: false,
+          lastBase64Characters: ""
+        };
+        buffer = remainder.slice(valueStart[0].length);
+      }
+    },
+    finish() {
+      if (activeImage) {
+        consumeValue(buffer);
+        activeImage.invalidBase64Characters += 1;
+        finishImage();
+      }
+      buffer = "";
+    },
+    getImages() {
+      return images.map((image) => ({ ...image }));
+    }
+  };
+}
+
+function countInvalidBase64Characters(value) {
+  let count = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    const valid = (code >= 65 && code <= 90) || (code >= 97 && code <= 122) ||
+      (code >= 48 && code <= 57) || code === 43 || code === 47 || code === 61;
+    if (!valid) count += 1;
+  }
+  return count;
 }
 
 function checkpointImportDiagnostic(report, stage, complete = false) {
@@ -331,7 +498,12 @@ function recoverImportDiagnostic() {
         errorMessage: "The diagnostic stopped before completion. iPadOS may have reloaded the app because of memory pressure."
       };
       saved.report.completedAt = new Date().toISOString();
-      saved.report.summary = createDiagnosticSummary(saved.report, 1);
+      if (saved.report.diagnosticMode === "read-only-streaming-scan") {
+        saved.report.summary = createLowMemoryDiagnosticSummary(saved.report);
+        saved.report.summary.failures += 1;
+      } else {
+        saved.report.summary = createDiagnosticSummary(saved.report, 1);
+      }
     }
     return saved.report;
   } catch (error) {

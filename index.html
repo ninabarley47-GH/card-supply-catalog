@@ -364,7 +364,7 @@
                 <button class="button" type="button" data-export-ipad-catalog>Export iPad Backup</button>
                 <label class="button file-button" for="catalog-backup-import">Import Backup</label>
                 <input id="catalog-backup-import" class="visually-hidden" type="file" accept="application/json,.json" data-import-catalog>
-                <label class="button file-button" for="catalog-diagnostic-import">Import Diagnostic</label>
+                <label class="button file-button" for="catalog-diagnostic-import">Low-Memory Diagnostic</label>
                 <input id="catalog-diagnostic-import" class="visually-hidden" type="file" accept="application/json,.json" data-import-catalog-diagnostic>
                 <button class="button" type="button" data-download-import-diagnostic disabled>Download Diagnostic Report</button>
               </div>
@@ -385,7 +385,7 @@
                 <span>Replace existing catalog entries during import</span>
               </label>
               <p class="settings-help">By default, incremental import adds paper packs, colors, and Cards whose IDs are missing and leaves matching IDs unchanged. Select this option for an overlay import that replaces matching IDs while retaining unrelated catalog entries. Cards that look alike but have different IDs remain separate.</p>
-              <p class="settings-help">If an imported backup is missing images, choose <strong>Import Diagnostic</strong> and select the same backup. When it finishes, use <strong>Copy Debug Report</strong> and send the copied text to the app developer.</p>
+              <p class="settings-help">If an imported backup is missing images, choose <strong>Low-Memory Diagnostic</strong> and select the same backup. It scans the file in small pieces without importing or changing the catalog. When it finishes, use <strong>Copy Debug Report</strong> and send the copied text to the app developer.</p>
               <details class="settings-help">
                 <summary>How do I share this catalog with an iPad or another computer?</summary>
                 <ol>
