@@ -44,8 +44,24 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
   const diagnosticImportInput = document.querySelector("[data-import-catalog-diagnostic]");
   const overwriteExistingInput = document.querySelector("[data-import-overwrite-existing]");
   const downloadDiagnosticButton = document.querySelector("[data-download-import-diagnostic]");
+  const diagnosticPanel = document.querySelector("[data-import-diagnostic-panel]");
+  const diagnosticOutput = document.querySelector("[data-import-diagnostic-output]");
+  const diagnosticSummary = document.querySelector("[data-import-diagnostic-summary]");
+  const diagnosticMessage = document.querySelector("[data-import-diagnostic-message]");
+  const copyDiagnosticButton = document.querySelector("[data-copy-import-diagnostic]");
+  const clearDiagnosticButton = document.querySelector("[data-clear-import-diagnostic]");
   const message = document.querySelector("[data-backup-message]");
   let latestDiagnosticReport = null;
+  const runtimeErrors = captureRuntimeErrors();
+
+  const showDiagnosticReport = (report) => {
+    if (!report || !diagnosticPanel || !diagnosticOutput) return;
+    report.runtimeErrors = [...runtimeErrors];
+    diagnosticOutput.value = JSON.stringify(report, null, 2);
+    diagnosticPanel.hidden = false;
+    diagnosticSummary.textContent = `${report.summary?.failures || 0} import failure${report.summary?.failures === 1 ? "" : "s"}, ${runtimeErrors.length} browser error${runtimeErrors.length === 1 ? "" : "s"}`;
+    diagnosticPanel.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+  };
 
   if (exportButton) {
     exportButton.addEventListener("click", async () => {
@@ -186,16 +202,18 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
         if (latestDiagnosticReport) {
           latestDiagnosticReport.postRestoreVerification = restoreSummary.postRestoreVerification;
         }
+        showDiagnosticReport(latestDiagnosticReport);
         reportPostRestoreVerification(restoreSummary.postRestoreVerification);
         renderBackupMessage(
           message,
-          "Import diagnostic completed. Please download the report and send it to the app developer.",
+          "Import diagnostic completed. Copy the debug report below and send it to the app developer.",
           latestDiagnosticReport ? "success" : "error"
         );
       } catch (error) {
         latestDiagnosticReport = await createFailedDiagnosticReport(backupFile, error);
+        showDiagnosticReport(latestDiagnosticReport);
         if (downloadDiagnosticButton) downloadDiagnosticButton.disabled = false;
-        renderBackupMessage(message, "Import diagnostic completed with an error. Please download the report and send it to the app developer.", "error");
+        renderBackupMessage(message, "Import diagnostic completed with an error. Copy the debug report below and send it to the app developer.", "error");
       } finally {
         diagnosticImportInput.value = "";
       }
@@ -205,6 +223,61 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
   downloadDiagnosticButton?.addEventListener("click", () => {
     if (latestDiagnosticReport) downloadImportDiagnosticReport(latestDiagnosticReport);
   });
+
+  copyDiagnosticButton?.addEventListener("click", async () => {
+    if (!diagnosticOutput?.value) return;
+    try {
+      await copyDiagnosticText(diagnosticOutput.value, diagnosticOutput);
+      renderBackupMessage(diagnosticMessage, "Debug report copied. Paste it into your message to the developer.", "success");
+    } catch (error) {
+      diagnosticOutput.focus();
+      diagnosticOutput.select();
+      renderBackupMessage(diagnosticMessage, "Copy was blocked. The report is selected; use Copy from the iPad menu.", "error");
+    }
+  });
+
+  clearDiagnosticButton?.addEventListener("click", () => {
+    latestDiagnosticReport = null;
+    runtimeErrors.length = 0;
+    if (diagnosticOutput) diagnosticOutput.value = "";
+    if (diagnosticPanel) diagnosticPanel.hidden = true;
+    if (downloadDiagnosticButton) downloadDiagnosticButton.disabled = true;
+    renderBackupMessage(diagnosticMessage, "", "");
+  });
+}
+
+function captureRuntimeErrors() {
+  const errors = [];
+  const add = (type, error, details = {}) => {
+    errors.push({
+      at: new Date().toISOString(),
+      type,
+      errorName: error?.name || "Error",
+      errorMessage: error?.message || String(error || details.message || "Unknown error"),
+      stack: error?.stack || "",
+      ...details
+    });
+  };
+
+  window.addEventListener("error", (event) => add("error", event.error, {
+    message: event.message || "",
+    source: event.filename || "",
+    line: event.lineno || 0,
+    column: event.colno || 0
+  }));
+  window.addEventListener("unhandledrejection", (event) => add("unhandledrejection", event.reason));
+  return errors;
+}
+
+async function copyDiagnosticText(text, textarea) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  textarea.focus();
+  textarea.select();
+  if (!document.execCommand?.("copy")) throw new Error("Clipboard copy is unavailable.");
 }
 
 async function summarizeBackupOverwrites(backup, paperPacks, colorsById) {

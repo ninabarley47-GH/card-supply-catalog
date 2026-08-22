@@ -2020,6 +2020,32 @@ button.pattern {
   color: var(--color-muted);
 }
 
+.import-diagnostic-panel {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  padding: var(--space-4);
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.import-diagnostic-panel[hidden] { display: none; }
+.import-diagnostic-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); }
+.import-diagnostic-heading h5 { margin: 0; font-size: 1rem; }
+.import-diagnostic-heading span { color: var(--color-muted); font-size: 0.85rem; font-weight: 700; }
+.import-diagnostic-output {
+  width: 100%;
+  min-height: 16rem;
+  resize: vertical;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: 0.75rem/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
 .tag-settings { overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-medium); padding-top: 0; background: rgba(255, 255, 255, 0.42); }
 .tag-settings + .tag-settings { margin-top: var(--space-4); }
 .tag-settings-summary { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-4); min-height: 4.5rem; padding: var(--space-3) var(--space-5); cursor: pointer; list-style: none; }

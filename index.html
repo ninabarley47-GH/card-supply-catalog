@@ -368,12 +368,24 @@
                 <input id="catalog-diagnostic-import" class="visually-hidden" type="file" accept="application/json,.json" data-import-catalog-diagnostic>
                 <button class="button" type="button" data-download-import-diagnostic disabled>Download Diagnostic Report</button>
               </div>
+              <section class="import-diagnostic-panel" data-import-diagnostic-panel hidden aria-labelledby="import-diagnostic-title">
+                <div class="import-diagnostic-heading">
+                  <h5 id="import-diagnostic-title">iPad Import Diagnostic Report</h5>
+                  <span data-import-diagnostic-summary></span>
+                </div>
+                <textarea class="import-diagnostic-output" data-import-diagnostic-output readonly spellcheck="false" aria-label="Import diagnostic report"></textarea>
+                <div class="settings-actions">
+                  <button class="button button-primary" type="button" data-copy-import-diagnostic>Copy Debug Report</button>
+                  <button class="button" type="button" data-clear-import-diagnostic>Clear Report</button>
+                </div>
+                <p class="settings-message" data-import-diagnostic-message aria-live="polite"></p>
+              </section>
               <label class="settings-checkbox-option">
                 <input type="checkbox" data-import-overwrite-existing>
                 <span>Replace existing catalog entries during import</span>
               </label>
               <p class="settings-help">By default, incremental import adds paper packs, colors, and Cards whose IDs are missing and leaves matching IDs unchanged. Select this option for an overlay import that replaces matching IDs while retaining unrelated catalog entries. Cards that look alike but have different IDs remain separate.</p>
-              <p class="settings-help">If an imported backup is missing images, choose <strong>Import Diagnostic</strong>, select the same backup, then download the report to send to the app developer.</p>
+              <p class="settings-help">If an imported backup is missing images, choose <strong>Import Diagnostic</strong> and select the same backup. When it finishes, use <strong>Copy Debug Report</strong> and send the copied text to the app developer.</p>
               <details class="settings-help">
                 <summary>How do I share this catalog with an iPad or another computer?</summary>
                 <ol>
