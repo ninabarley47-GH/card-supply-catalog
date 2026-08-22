@@ -167,7 +167,7 @@ Before using the app for real catalog data, run the backup/restore round-trip in
 
 For normal backup instructions, see `BACKUP_GUIDE.md`.
 
-Use Export iPad Backup when sharing a self-contained catalog with an iPad user who cannot connect to the desktop image folder.
+Use Export Compact iPad Backup when sharing a self-contained catalog with an iPad user who cannot connect to the desktop image folder.
 
 ## Image Library Verification
 

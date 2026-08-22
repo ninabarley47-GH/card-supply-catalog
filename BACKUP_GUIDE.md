@@ -9,7 +9,7 @@ Card Supply Catalog keeps your data under your control. A complete backup can in
 ## Backup Types
 
 - Export Backup creates a compact catalog backup. Folder-backed images stay as image folder references, so the image folder must be backed up or shared separately.
-- Export iPad Backup creates a larger self-contained backup with compressed images embedded in the JSON. Use this when an iPad user needs to see images without connecting an image folder.
+- Export Compact iPad Backup creates a self-contained backup with iPad-sized compressed images embedded in the JSON. Use this when an iPad user needs to see images without connecting an image folder.
 
 ## Export the Catalog
 

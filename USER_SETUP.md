@@ -137,7 +137,7 @@ On the computer that has access to the image folder:
 2. Go to Settings.
 3. Choose or reconnect the image library folder.
 4. Run Check Image Library and resolve missing images if needed.
-5. Choose Export iPad Backup.
+5. Choose Export Compact iPad Backup.
 6. Share the JSON file from the selected image folder, or from browser downloads when no folder is selected, with the iPad user.
 
 On the iPad:
@@ -152,7 +152,7 @@ The iPad backup embeds compressed images directly in the backup file. It is larg
 ## Important Habits
 
 - Export a backup after cataloging sessions.
-- Use Export iPad Backup when sharing a self-contained catalog with an iPad user.
+- Use Export Compact iPad Backup when sharing a self-contained catalog with an iPad user.
 - Back up or sync the image library folder separately.
 - Keep the catalog backup JSON and image folder together.
 - Reconnect the image folder if the browser asks for permission again.

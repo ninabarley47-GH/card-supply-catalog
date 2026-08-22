@@ -37,6 +37,12 @@ const APP_VERSION = "2026.08.22-low-memory-diagnostic";
 const IMPORT_DIAGNOSTIC_QUERY_PARAMETER = "importDiagnostics";
 const IMPORT_DIAGNOSTIC_STORAGE_KEY = "card-supply-catalog.import-diagnostic";
 const SUPPORTED_EMBEDDED_IMAGE_PREFIX_PATTERN = /^data:image\/(jpeg|png|webp|gif);base64,/i;
+const MAX_SAFE_IPAD_IMPORT_BYTES = 96 * 1024 * 1024;
+export const IPAD_BACKUP_COMPRESSION = Object.freeze({
+  format: "image/jpeg",
+  maxDimension: 400,
+  quality: 0.55
+});
 
 export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
   const exportButton = document.querySelector("[data-export-catalog]");
@@ -58,7 +64,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
   const showDiagnosticReport = (report) => {
     if (!report || !diagnosticPanel || !diagnosticOutput) return;
     report.runtimeErrors = [...runtimeErrors];
-    diagnosticOutput.value = JSON.stringify(report, null, 2);
+    diagnosticOutput.value = JSON.stringify(createShareableDiagnosticReport(report), null, 2);
     diagnosticPanel.hidden = false;
     diagnosticSummary.textContent = `${report.summary?.failures || 0} issue${report.summary?.failures === 1 ? "" : "s"}, ${runtimeErrors.length} browser error${runtimeErrors.length === 1 ? "" : "s"}`;
     diagnosticPanel.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
@@ -100,7 +106,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
   if (exportIpadButton) {
     exportIpadButton.addEventListener("click", async () => {
       exportIpadButton.disabled = true;
-      renderBackupMessage(message, "Creating iPad backup with compressed images...", "");
+      renderBackupMessage(message, "Creating compact iPad backup with compressed images...", "");
 
       try {
         const backupDirectory = await getWritableBackupDirectoryHandle();
@@ -114,7 +120,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
         document.dispatchEvent(new CustomEvent("catalog:backup-exported"));
         renderBackupMessage(message, formatIpadExportSummary(backup, saveResult), backup.imageStorage.missingImages > 0 ? "error" : "success");
       } catch (error) {
-        renderBackupMessage(message, "The iPad backup could not be created.", "error");
+        renderBackupMessage(message, "The compact iPad backup could not be created.", "error");
       } finally {
         exportIpadButton.disabled = false;
       }
@@ -126,6 +132,21 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
       const [backupFile] = importInput.files || [];
 
       if (!backupFile) {
+        return;
+      }
+
+      if (shouldBlockOversizedIpadImport({
+        fileSize: backupFile.size,
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        maxTouchPoints: navigator.maxTouchPoints
+      })) {
+        renderBackupMessage(
+          message,
+          `This ${(backupFile.size / 1024 / 1024).toFixed(0)} MB backup is too large to import safely on an iPad. Create a new iPad Backup with the latest desktop version, then import that smaller file. No catalog data was changed.`,
+          "error"
+        );
+        importInput.value = "";
         return;
       }
 
@@ -352,6 +373,28 @@ function createLowMemoryDiagnosticSummary(report) {
   };
 }
 
+export function createShareableDiagnosticReport(report) {
+  if (report?.diagnosticMode !== "read-only-streaming-scan") return report;
+  const images = Array.isArray(report.images) ? report.images : [];
+  const malformedImages = images.filter((image) => !image.supportedPrefix || image.invalidBase64Characters > 0);
+  const malformedIndexes = new Set(malformedImages.map((image) => image.imageIndex));
+  const largestValidImages = images
+    .filter((image) => !malformedIndexes.has(image.imageIndex))
+    .sort((first, second) => second.estimatedDecodedBytes - first.estimatedDecodedBytes)
+    .slice(0, 10);
+
+  return {
+    ...report,
+    images: undefined,
+    imageEvidence: {
+      totalImagesScanned: images.length,
+      malformedImages,
+      largestValidImages,
+      omittedSuccessfulImages: Math.max(0, images.length - malformedImages.length - largestValidImages.length)
+    }
+  };
+}
+
 export function createEmbeddedImageStreamScanner() {
   const key = '"imageSrc"';
   const images = [];
@@ -480,7 +523,11 @@ function checkpointImportDiagnostic(report, stage, complete = false) {
     updatedAt: new Date().toISOString()
   };
   try {
-    localStorage.setItem(IMPORT_DIAGNOSTIC_STORAGE_KEY, JSON.stringify({ complete, report }));
+    const savedReport = createShareableDiagnosticReport(report);
+    if (report.diagnosticMode === "read-only-streaming-scan" && !savedReport.summary) {
+      savedReport.summary = createLowMemoryDiagnosticSummary(report);
+    }
+    localStorage.setItem(IMPORT_DIAGNOSTIC_STORAGE_KEY, JSON.stringify({ complete, report: savedReport }));
   } catch (error) {
     // The live report remains available when local storage is unavailable or full.
   }
@@ -499,7 +546,7 @@ function recoverImportDiagnostic() {
       };
       saved.report.completedAt = new Date().toISOString();
       if (saved.report.diagnosticMode === "read-only-streaming-scan") {
-        saved.report.summary = createLowMemoryDiagnosticSummary(saved.report);
+        saved.report.summary = saved.report.summary || { failures: 0, catalogChanged: false };
         saved.report.summary.failures += 1;
       } else {
         saved.report.summary = createDiagnosticSummary(saved.report, 1);
@@ -669,7 +716,7 @@ async function createIpadCatalogBackup({ paperPacks, colorsById }) {
     schemaVersion: BACKUP_SCHEMA_VERSION,
     catalogSchemaVersion: CATALOG_SCHEMA_VERSION,
     app: "card-supply-catalog",
-    backupProfile: "ipad-embedded-images",
+    backupProfile: "ipad-compact-embedded-images-v2",
     exportedAt: new Date().toISOString(),
     imageStorage: {
       strategy: "embedded-compressed-images",
@@ -678,9 +725,7 @@ async function createIpadCatalogBackup({ paperPacks, colorsById }) {
       missingImages: imageSummary.missingImages,
       folderImageReferences: imageSummary.folderImageReferences,
       compression: {
-        format: "image/jpeg",
-        maxDimension: 900,
-        quality: 0.72
+        ...IPAD_BACKUP_COMPRESSION
       },
       note:
         "This iPad backup embeds compressed images directly in the JSON file so folder access is not required after import."
@@ -730,7 +775,10 @@ function formatExportSummary(backup, saveResult) {
 function formatIpadExportSummary(backup, saveResult) {
   const compressedImages = backup.imageStorage?.compressedImages || 0;
   const missingImages = backup.imageStorage?.missingImages || 0;
-  const savedMessage = formatBackupSaveDestination(saveResult, "iPad backup");
+  const sizeMessage = Number.isFinite(saveResult?.fileSize)
+    ? ` File size: ${(saveResult.fileSize / 1024 / 1024).toFixed(1)} MB.`
+    : "";
+  const savedMessage = `${formatBackupSaveDestination(saveResult, "Compact iPad backup")}${sizeMessage}`;
 
   if (missingImages > 0) {
     return `${savedMessage} ${compressedImages} embedded image${compressedImages === 1 ? "" : "s"} included. ${missingImages} image${missingImages === 1 ? "" : "s"} could not be embedded.`;
@@ -772,7 +820,8 @@ async function saveJsonBackup(backup, label = "backup", directoryHandle = null) 
       return {
         savedToFolder: true,
         folderName: directoryHandle.name || "the selected folder",
-        fileName
+        fileName,
+        fileSize: blob.size
       };
     } catch (error) {
       // Fall back to a browser download if the selected folder cannot be written.
@@ -783,8 +832,15 @@ async function saveJsonBackup(backup, label = "backup", directoryHandle = null) 
   return {
     savedToFolder: false,
     folderName: "",
-    fileName
+    fileName,
+    fileSize: blob.size
   };
+}
+
+export function shouldBlockOversizedIpadImport({ fileSize, userAgent = "", platform = "", maxTouchPoints = 0 }) {
+  const isIpad = /iPad/i.test(userAgent) ||
+    (/Macintosh|MacIntel/i.test(`${userAgent} ${platform}`) && maxTouchPoints > 1);
+  return isIpad && fileSize > MAX_SAFE_IPAD_IMPORT_BYTES;
 }
 
 function downloadJsonBackup(blob, fileName) {
@@ -1689,7 +1745,11 @@ async function getCompressedPatternImageSource(patternEntry) {
 
 async function compressImageSource(imageSrc) {
   const image = await loadImageElement(imageSrc);
-  const { width, height } = getScaledImageSize(image.naturalWidth || image.width, image.naturalHeight || image.height, 900);
+  const { width, height } = getScaledImageSize(
+    image.naturalWidth || image.width,
+    image.naturalHeight || image.height,
+    IPAD_BACKUP_COMPRESSION.maxDimension
+  );
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
 
@@ -1700,8 +1760,11 @@ async function compressImageSource(imageSrc) {
   canvas.width = width;
   canvas.height = height;
   context.drawImage(image, 0, 0, width, height);
-
-  return canvas.toDataURL("image/jpeg", 0.72);
+  const compressedImage = canvas.toDataURL(IPAD_BACKUP_COMPRESSION.format, IPAD_BACKUP_COMPRESSION.quality);
+  image.src = "";
+  canvas.width = 1;
+  canvas.height = 1;
+  return compressedImage;
 }
 
 function loadImageElement(imageSrc) {

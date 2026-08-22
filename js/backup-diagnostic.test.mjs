@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createEmbeddedImageStreamScanner } from "./backup.js";
+import { createEmbeddedImageStreamScanner, createShareableDiagnosticReport } from "./backup.js";
 
 test("low-memory scanner finds embedded images across arbitrary chunk boundaries", () => {
   const scanner = createEmbeddedImageStreamScanner();
@@ -42,3 +42,22 @@ test("low-memory scanner reports unsupported and malformed image data", () => {
   assert.equal(image.invalidBase64Characters, 1);
 });
 
+test("shareable diagnostic keeps failures and only the ten largest valid images", () => {
+  const images = Array.from({ length: 15 }, (_, index) => ({
+    imageIndex: index + 1,
+    supportedPrefix: index !== 3,
+    invalidBase64Characters: index === 3 ? 1 : 0,
+    estimatedDecodedBytes: (index + 1) * 100
+  }));
+  const compact = createShareableDiagnosticReport({
+    diagnosticMode: "read-only-streaming-scan",
+    images,
+    summary: { failures: 1 }
+  });
+
+  assert.equal("images" in compact, true);
+  assert.equal(compact.images, undefined);
+  assert.deepEqual(compact.imageEvidence.malformedImages.map((image) => image.imageIndex), [4]);
+  assert.deepEqual(compact.imageEvidence.largestValidImages.map((image) => image.imageIndex), [15, 14, 13, 12, 11, 10, 9, 8, 7, 6]);
+  assert.equal(compact.imageEvidence.omittedSuccessfulImages, 4);
+});
