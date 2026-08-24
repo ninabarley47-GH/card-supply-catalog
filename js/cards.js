@@ -1187,14 +1187,37 @@ function createCardLibraryActions(card) {
 
 function createCardLibraryMetadata(card, paperPackNamesById) {
   const metadata = document.createElement('dl');
+  const dateCreated = formatCardLibraryDate(card.dateCreated);
   const paperPackNames = (card.paperPackIds || [])
     .map((paperPackId) => paperPackNamesById.get(paperPackId))
     .filter(Boolean);
 
   metadata.className = 'card-library-metadata';
+  appendCardLibraryMetadata(metadata, 'Created', dateCreated ? [dateCreated] : []);
   appendCardLibraryMetadata(metadata, 'Paper Packs', paperPackNames);
   appendCardLibraryMetadata(metadata, 'Stamp Sets', card.stampSets || []);
   return metadata;
+}
+
+function formatCardLibraryDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || '').trim());
+
+  if (!match) {
+    return '';
+  }
+
+  const [, year, month, day] = match;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+
+  if (
+    date.getUTCFullYear() !== Number(year) ||
+    date.getUTCMonth() !== Number(month) - 1 ||
+    date.getUTCDate() !== Number(day)
+  ) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat([], { dateStyle: 'medium', timeZone: 'UTC' }).format(date);
 }
 
 function appendCardLibraryMetadata(metadata, label, values) {
