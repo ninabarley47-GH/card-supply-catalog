@@ -389,6 +389,9 @@ function createAddCardView({ owners = [], onCreateTag } = {}) {
   const dateCreated = document.createElement('input');
   dateCreated.type = 'date';
   dateCreated.name = 'dateCreated';
+  const status = document.createElement('select');
+  status.name = 'status';
+  status.append(new Option('Available', 'available'), new Option('Sent', 'sent'));
   const owner = document.createElement('select');
   owner.name = 'ownerId';
   owner.required = true;
@@ -420,6 +423,7 @@ function createAddCardView({ owners = [], onCreateTag } = {}) {
   controls.append(
     createAddCardField('Date Created', dateCreated),
     createAddCardField('Owner', owner, newOwner),
+    createAddCardField('Status', status),
     createAddCardField('Card Size', sizePreset),
     dimensions,
     createFavoriteField(favorite)
@@ -463,6 +467,7 @@ function createAddCardView({ owners = [], onCreateTag } = {}) {
     save,
     owners,
     dateCreated,
+    status,
     owner,
     newOwner,
     sizePreset,
@@ -545,6 +550,7 @@ function openEditCardView(addCardView, card) {
   addCardView.title.textContent = 'Edit Card';
   addCardView.save.textContent = 'Save Changes';
   addCardView.dateCreated.value = card.dateCreated;
+  addCardView.status.value = card.status;
   setOwnerPickerValue(addCardView.owner, addCardView.newOwner, card.ownerId, '', addCardView.owners);
   addCardView.sizePreset.value = getCardSizePreset(card.size);
   applyCardSizePreset(addCardView);
@@ -818,6 +824,7 @@ function resetAddCardForm(addCardView) {
   clearSelectedCardImage(addCardView.selectedImage);
   addCardView.form.reset();
   addCardView.dateCreated.value = getLocalDateValue();
+  addCardView.status.value = 'available';
   addCardView.sizePreset.value = 'a2-portrait';
   addCardView.paperPackIds = [];
   addCardView.tagPicker.reset();
@@ -860,6 +867,7 @@ function createCardRecord(addCardView) {
   return {
     ...(existingCard || {}),
     id: existingCard?.id || createCardId(timestamp),
+    status: addCardView.status.value === 'sent' ? 'sent' : 'available',
     dateCreated: addCardView.dateCreated.value,
     size: {
       preset: addCardView.sizePreset.value,
@@ -1361,6 +1369,7 @@ function createCardFacts(card) {
   facts.className = 'card-detail-facts';
   appendFact(facts, 'Date created', card.dateCreated);
   appendFact(facts, 'Card size', `${card.size.width} × ${card.size.height} inches`);
+  appendFact(facts, 'Status', card.status === 'sent' ? 'Sent' : 'Available');
   appendFact(facts, 'Favorite', card.favorite ? 'Yes' : 'No');
   return facts;
 }

@@ -1658,7 +1658,10 @@ function createSerializableCard(card) {
     ...serializableCard
   } = card || {};
 
-  return addCatalogSchemaVersion(cloneJsonSafe(serializableCard));
+  return addCatalogSchemaVersion(cloneJsonSafe({
+    ...serializableCard,
+    status: serializableCard.status === "sent" ? "sent" : "available"
+  }));
 }
 
 async function createSerializableCardWithCompressedImage(card) {

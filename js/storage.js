@@ -537,7 +537,7 @@ export function isCompatiblePaperPack(paperPack) {
   );
 }
 
-function normalizeCardForRuntime(card) {
+export function normalizeCardForRuntime(card) {
   const { selectedImage, imagePreviewSrc, imageThumbnailSrc, ...persistentCard } = card;
   const { stampSet: legacyStampSet, ...cardWithoutLegacyStampSet } = persistentCard;
   const tags = [];
@@ -572,6 +572,7 @@ function normalizeCardForRuntime(card) {
 
   return {
     ...cardWithoutLegacyStampSet,
+    status: cardWithoutLegacyStampSet.status === "sent" ? "sent" : "available",
     tags,
     stampSets
   };
@@ -582,6 +583,7 @@ export function isCard(card) {
     card &&
     typeof card.id === "string" &&
     (card.ownerId === undefined || typeof card.ownerId === "string") &&
+    (card.status === undefined || card.status === "available" || card.status === "sent") &&
     typeof card.dateCreated === "string" &&
     card.size &&
     Number.isFinite(card.size.width) &&
