@@ -20,6 +20,28 @@ Card Supply Catalog keeps your data under your control. A complete backup can in
 
 The JSON backup includes paper packs, Cards, colors, tags, owners, release years, availability, and image references.
 
+Current backups also preserve Card Status. A Card status is either `available` or `sent`; a legacy Card without a status is restored as `available`.
+
+## Backup and Catalog Schema Versions
+
+The backup JSON contains two separate version numbers:
+
+- `schemaVersion` versions the backup envelope: the top-level JSON structure, collection layout, image-storage information, and import contract.
+- `catalogSchemaVersion` versions the catalog records stored inside that envelope, including the fields and allowed values on Cards and Paper Packs.
+
+The current combination is backup envelope version 2 and catalog-record version 3:
+
+```json
+{
+  "schemaVersion": 2,
+  "catalogSchemaVersion": 3
+}
+```
+
+Catalog version 3 records the Card `status` field and its `available` or `sent` values. The backup envelope remains version 2 because the top-level backup structure did not change; only a record inside it evolved. Keeping these versions independent avoids declaring otherwise compatible backups to be a new format whenever a catalog record gains a migrated field.
+
+For future changes, increment `catalogSchemaVersion` for record fields, validation rules, or record migrations. Increment the backup `schemaVersion` only for changes to the top-level envelope or its import contract. If a change affects both, increment and document both versions.
+
 ## Back Up Images
 
 If your images are stored in the browser fallback, they are included in the JSON backup as embedded image data.

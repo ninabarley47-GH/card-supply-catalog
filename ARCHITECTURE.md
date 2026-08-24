@@ -5,7 +5,7 @@ Version: 1.1
 
 Status: Maintained
 
-Last Updated: 2026-08-02
+Last Updated: 2026-08-24
 
 1. Architectural Goals
 
@@ -135,6 +135,17 @@ Backups are explicit, user-triggered JSON exports rather than automatic rolling 
 - Import: validates every color, paper pack, and Card before writing; prepares image references; then persists the complete selected import in one IndexedDB transaction. Any validation, preparation, or transaction failure leaves the catalog unchanged. Import warns before overwriting matching records and reports missing folder-image requirements.
 - Destination: if the selected image-library folder is writable, export saves there; otherwise it uses a browser download.
 
+## Schema Version Boundaries
+
+Catalog-record schema and backup-envelope schema are versioned independently in `js/schema.js` because they protect different compatibility boundaries.
+
+- `CATALOG_SCHEMA_VERSION` describes the structure and interpretation of catalog records such as Paper Packs, Cards, and colors. Increment it when persisted record fields, allowed values, validation, or record migration behavior changes.
+- `BACKUP_SCHEMA_VERSION` describes the top-level backup envelope: its identifying fields, collection layout, image-storage metadata, and import contract. Increment it only when that envelope structure or its interpretation changes incompatibly.
+
+The Card Status change raised the catalog schema to version 3. Cards now persist `status` as either `available` or `sent`; legacy Cards without a status are normalized to `available` when loaded or imported. Exported records carry catalog schema version 3, and exported backup envelopes declare `catalogSchemaVersion: 3`.
+
+The backup envelope remains version 2 because Card Status changes the contents of a Card record, not the top-level backup format. A current export therefore has `schemaVersion: 2` for the envelope and `catalogSchemaVersion: 3` for its records. Older version-2 app backups that do not declare `catalogSchemaVersion` remain importable through the legacy compatibility path, with their Card records normalized to the current catalog schema.
+
 # Error Handling
 Never lose user data.
 Validate before saving.
@@ -173,6 +184,12 @@ Catalog Compatibility
 Future versions should migrate existing catalog data whenever possible.
 
 Changes to the JSON structure should preserve existing user data automatically.
+
+For future version changes, identify the boundary before incrementing a version:
+
+1. A record-only change increments the catalog schema and supplies normalization or migration for older records; it does not automatically increment the backup envelope.
+2. A top-level backup-format or import-contract change increments the backup-envelope schema and must define how older envelopes are recognized or rejected.
+3. A change that affects both boundaries increments both versions and documents both compatibility paths.
 
 # Git Workflow
 
