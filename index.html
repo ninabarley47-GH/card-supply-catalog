@@ -68,6 +68,29 @@
                 data-library-search-input
               >
             </div>
+            <fieldset class="card-library-quick-filters" data-library-quick-filters>
+              <legend>Quick Filters</legend>
+              <div class="card-library-quick-filter-grid">
+                <button class="card-library-quick-filter card-library-favorites-filter" type="button" aria-pressed="false" data-library-favorites>
+                  <span class="card-library-favorites-icon" aria-hidden="true">♡</span>
+                  <span>Favorites</span>
+                </button>
+                <label class="card-library-quick-filter card-library-select-filter">
+                  <span class="card-library-quick-filter-label">Owner</span>
+                  <select aria-label="Filter paper packs by owner" data-library-owner>
+                    <option value="">All</option>
+                  </select>
+                </label>
+                <label class="card-library-quick-filter card-library-select-filter">
+                  <span class="card-library-quick-filter-label">Holiday</span>
+                  <select aria-label="Filter paper packs by Holiday tag" data-library-holiday>
+                    <option value="">All</option>
+                    <option value="only">Holiday</option>
+                    <option value="exclude">No Holiday</option>
+                  </select>
+                </label>
+              </div>
+            </fieldset>
             <fieldset class="library-tag-filter" data-library-tag-filters>
               <legend class="visually-hidden">Tags</legend>
               <div class="library-tag-filter-header">

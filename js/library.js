@@ -12,6 +12,7 @@ import {
 } from "./images.js";
 import { initializeSettings } from "./settings.js";
 import { getCardLibraryImageSource } from "./card-images.js";
+import { isActiveOwner } from "./owners.js";
 import {
   deletePaperPack,
   loadSavedColors,
@@ -132,7 +133,7 @@ export async function initializeLibraryShell() {
 
     if (paperPackLibrary) {
       renderPaperPackLibrary(paperPackLibrary, paperPacks, colorsById);
-      const librarySearch = initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById);
+      const librarySearch = initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById, owners);
       initializePatternExpansionControls(librarySearch.renderCurrent);
       initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, librarySearch.renderCurrent);
       initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById, librarySearch.renderCurrent);
@@ -472,9 +473,12 @@ async function loadPaperPacks() {
   return { paperPacks: await hydratePaperPackImageSources(paperPacks), owners: ownership.owners };
 }
 
-function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
+function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById, owners = []) {
   const form = document.querySelector("[data-library-search-form]");
   const input = document.querySelector("[data-library-search-input]");
+  const favoritesButton = document.querySelector("[data-library-favorites]");
+  const ownerFilter = document.querySelector("[data-library-owner]");
+  const holidayFilter = document.querySelector("[data-library-holiday]");
   const clearAllButton = document.querySelector("[data-library-clear-all]");
   const clearTagsButton = document.querySelector("[data-library-clear-tags]");
   const clearColorsButton = document.querySelector("[data-library-clear-colors]");
@@ -483,8 +487,16 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
   const colorFilter = document.querySelector("[data-library-color-filters]");
 
   function renderCurrent() {
-    const filterState = getLibraryFilterState(input, tagFilter, colorFilter);
+    const filterState = getLibraryFilterState(
+      input,
+      tagFilter,
+      colorFilter,
+      favoritesButton,
+      ownerFilter,
+      holidayFilter
+    );
     const filteredPaperPacks = applyPaperPackFilters(paperPacks, filterState, colorsById);
+    const hasActiveFilters = hasActivePaperPackFilters(filterState);
 
     refreshLibraryTagFilters(
       tagFilter,
@@ -499,15 +511,13 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
       query: filterState.query,
       selectedTags: filterState.selectedTags,
       selectedColors: filterState.selectedColors,
+      hasActiveFilters,
       totalCount: paperPacks.length,
       sortOrder: sortControl?.value || "recently-added"
     });
 
     if (clearAllButton) {
-      clearAllButton.hidden =
-        filterState.query.length === 0 &&
-        filterState.selectedTags.length === 0 &&
-        filterState.selectedColors.length === 0;
+      clearAllButton.hidden = !hasActiveFilters;
     }
 
     if (clearTagsButton) {
@@ -517,6 +527,8 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
     if (clearColorsButton) {
       clearColorsButton.hidden = filterState.selectedColors.length === 0;
     }
+
+    updatePaperQuickFilterStates({ favoritesButton, ownerFilter, holidayFilter });
   }
 
   if (!form || !input) {
@@ -527,10 +539,23 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
 
   refreshLibraryTagFilters(tagFilter, getAvailableTags(paperPacks));
   refreshLibraryColorFilters(colorFilter, getAvailableColors(paperPacks, colorsById));
+  refreshPaperOwnerFilter(ownerFilter, owners);
   initializeLibraryColorTypeahead(colorFilter, renderCurrent);
   input.addEventListener("input", renderCurrent);
+  favoritesButton?.addEventListener("click", () => {
+    favoritesButton.setAttribute(
+      "aria-pressed",
+      String(favoritesButton.getAttribute("aria-pressed") !== "true")
+    );
+    renderCurrent();
+  });
+  ownerFilter?.addEventListener("change", renderCurrent);
+  holidayFilter?.addEventListener("change", renderCurrent);
   clearAllButton?.addEventListener("click", () => {
     input.value = "";
+    favoritesButton?.setAttribute("aria-pressed", "false");
+    if (ownerFilter) ownerFilter.value = "";
+    if (holidayFilter) holidayFilter.value = "";
     clearSelectedLibraryTags(tagFilter);
     clearSelectedLibraryColors(colorFilter);
     renderCurrent();
@@ -549,6 +574,10 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
   });
   tagFilter?.addEventListener("change", renderCurrent);
   sortControl?.addEventListener("change", renderCurrent);
+  document.addEventListener("catalog:owners-updated", () => {
+    refreshPaperOwnerFilter(ownerFilter, owners);
+    renderCurrent();
+  });
   form.addEventListener("submit", (event) => event.preventDefault());
 
   return {
@@ -556,12 +585,58 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
   };
 }
 
-function getLibraryFilterState(input, tagFilter, colorFilter) {
+function getLibraryFilterState(input, tagFilter, colorFilter, favoritesButton, ownerFilter, holidayFilter) {
   return {
     query: input?.value || "",
+    favoritesOnly: favoritesButton?.getAttribute("aria-pressed") === "true",
+    ownerId: ownerFilter?.value || "",
+    holiday: holidayFilter?.value || "",
     selectedTags: getSelectedLibraryTags(tagFilter),
     selectedColors: getSelectedLibraryColors(colorFilter)
   };
+}
+
+function hasActivePaperPackFilters(filterState) {
+  return Boolean(
+    filterState.query.trim() ||
+    filterState.favoritesOnly ||
+    filterState.ownerId ||
+    filterState.holiday ||
+    filterState.selectedTags.length > 0 ||
+    filterState.selectedColors.length > 0
+  );
+}
+
+function refreshPaperOwnerFilter(select, owners = []) {
+  if (!select) {
+    return;
+  }
+
+  const selectedOwnerId = select.value;
+  select.replaceChildren(
+    new Option("All", ""),
+    ...owners
+      .filter(isActiveOwner)
+      .slice()
+      .sort((first, second) => first.name.localeCompare(second.name, undefined, { sensitivity: "base" }))
+      .map((owner) => new Option(owner.name, owner.id))
+  );
+  select.value = [...select.options].some((option) => option.value === selectedOwnerId)
+    ? selectedOwnerId
+    : "";
+}
+
+function updatePaperQuickFilterStates({ favoritesButton, ownerFilter, holidayFilter }) {
+  const favoritesOnly = favoritesButton?.getAttribute("aria-pressed") === "true";
+  const favoritesIcon = favoritesButton?.querySelector(".card-library-favorites-icon");
+
+  if (favoritesIcon) {
+    favoritesIcon.textContent = favoritesOnly ? "♥" : "♡";
+  }
+
+  for (const control of [ownerFilter, holidayFilter]) {
+    control?.closest(".card-library-quick-filter")?.classList.toggle("is-active", Boolean(control.value));
+  }
 }
 
 function applyPaperPackFilters(paperPacks, filterState, colorsById) {
@@ -933,6 +1008,24 @@ function matchesPaperPackFilters(paperPack, filterState, colorsById) {
     selectedColors.length === 0 ||
     selectedColors.some((colorId) => (paperPack.colors || []).includes(colorId));
 
+  if (filterState.favoritesOnly && !paperPack.favorite) {
+    return false;
+  }
+
+  if (filterState.ownerId && paperPack.ownerId !== filterState.ownerId) {
+    return false;
+  }
+
+  const hasHolidayTag = normalizedPackKeywords.includes("holiday");
+
+  if (filterState.holiday === "only" && !hasHolidayTag) {
+    return false;
+  }
+
+  if (filterState.holiday === "exclude" && hasHolidayTag) {
+    return false;
+  }
+
   if (!matchesSelectedTags) {
     return false;
   }
@@ -1010,7 +1103,8 @@ function renderPaperPackLibrary(container, paperPacks, colorsById, options = {})
       options.query,
       options.selectedTags || [],
       options.selectedColors || [],
-      options.totalCount
+      options.totalCount,
+      options.hasActiveFilters
     );
     return;
   }
@@ -1150,10 +1244,11 @@ function renderEmptyPaperPackLibrary(
   query,
   selectedTags = [],
   selectedColors = [],
-  totalCount = 0
+  totalCount = 0,
+  hasActiveFilters = false
 ) {
   const message = document.createElement("p");
-  const hasFilters = query || selectedTags.length > 0 || selectedColors.length > 0;
+  const hasFilters = hasActiveFilters || query || selectedTags.length > 0 || selectedColors.length > 0;
 
   message.className = "loading-message";
 
