@@ -388,14 +388,8 @@ function applyAddDspDefaults(form, defaults) {
 }
 
 export function applyDefaultOwner(form, defaultOwnerId, owners = []) {
-  if (!defaultOwnerId) {
-    return;
-  }
-
   const defaultOwner = owners.find((owner) => owner.id === defaultOwnerId);
-  if (defaultOwner) {
-    form.elements.owner.value = defaultOwner.name;
-  }
+  form.elements.owner.value = defaultOwner?.name || "";
 }
 
 function openEditDspPanel(panel, form, paperPack, colorsById, selectedImages, imagePreviewList, imagePreviewCount, controls) {

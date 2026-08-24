@@ -29,12 +29,13 @@ test("Add DSP applies the configured device-local Default Owner", () => {
   assert.equal(form.elements.owner.value, "Nina");
 });
 
-test("Add DSP preserves its current owner default when no valid Default Owner is set", () => {
+test("Add DSP leaves owner unselected when no valid Default Owner is set", () => {
   const form = { elements: { owner: { value: "Previous owner" } } };
   applyDefaultOwner(form, "", owners);
-  assert.equal(form.elements.owner.value, "Previous owner");
+  assert.equal(form.elements.owner.value, "");
+  form.elements.owner.value = "Previous owner";
   applyDefaultOwner(form, "owner-missing", owners);
-  assert.equal(form.elements.owner.value, "Previous owner");
+  assert.equal(form.elements.owner.value, "");
 });
 
 test("Add DSP saves a user-changed owner using that owner's stable ID", () => {
