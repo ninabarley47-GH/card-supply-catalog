@@ -6,6 +6,6 @@ import { initializeVersionDisplay } from './version.js';
 initializePwaInstall();
 initializeVersionDisplay();
 
-const { paperPacks } = await initializeLibraryShell();
-const cards = await initializeCardLibrary({ paperPacks });
+const { paperPacks, owners } = await initializeLibraryShell();
+const cards = await initializeCardLibrary({ paperPacks, owners });
 setCardsForPaperPackDetails(cards);

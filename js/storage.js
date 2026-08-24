@@ -581,6 +581,7 @@ export function isCard(card) {
   return (
     card &&
     typeof card.id === "string" &&
+    (card.ownerId === undefined || typeof card.ownerId === "string") &&
     typeof card.dateCreated === "string" &&
     card.size &&
     Number.isFinite(card.size.width) &&
