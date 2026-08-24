@@ -1,10 +1,16 @@
 {
-  "catalogSchemaVersion": 1,
+  "catalogSchemaVersion": 2,
+  "owners": [
+    {
+      "id": "owner-nina-51an7t",
+      "name": "Nina"
+    }
+  ],
   "paperPacks": [
     {
       "id": "velvet-meadow",
       "name": "Velvet Meadow",
-      "owner": "Nina",
+      "ownerId": "owner-nina-51an7t",
       "releaseYear": 2026,
       "patternCount": 12,
       "availability": "available",

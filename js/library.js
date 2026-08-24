@@ -16,6 +16,7 @@ import {
   deletePaperPack,
   loadSavedColors,
   loadSavedPaperPacks,
+  migrateCatalogOwnership,
   mergeColors,
   mergePaperPacks,
   loadCatalogSetting,
@@ -122,10 +123,11 @@ export async function initializeLibraryShell() {
   }
 
   try {
-    const [colorsById, paperPacks] = await Promise.all([loadColors(), loadPaperPacks()]);
+    const [colorsById, ownership] = await Promise.all([loadColors(), loadPaperPacks()]);
+    const { paperPacks, owners } = ownership;
     const colors = Object.values(colorsById);
     initializeAddColorWorkflow(colorsById);
-    initializeAddDspWorkflow(colorsById, paperPacks);
+    initializeAddDspWorkflow(colorsById, paperPacks, owners);
     initializeUncatalogedPackFinder(paperPacks);
 
     if (paperPackLibrary) {
@@ -136,6 +138,7 @@ export async function initializeLibraryShell() {
       initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById, librarySearch.renderCurrent);
       initializeSettings({
         paperPacks,
+        owners,
         onImageLibrarySelected: () => {
           hydratePaperPackImageSources(paperPacks).then(librarySearch.renderCurrent);
         },
@@ -148,6 +151,7 @@ export async function initializeLibraryShell() {
       });
       initializeCatalogBackup({
         paperPacks,
+        owners,
         colorsById,
         onRestore: async () => {
           await hydratePaperPackImageSources(paperPacks);
@@ -460,9 +464,12 @@ async function loadPaperPacks() {
 
   const data = await response.json();
   const basePaperPacks = data.paperPacks || [];
+  const seedOwners = data.owners || [];
   const savedPaperPacks = await loadSavedPaperPacks();
+  const ownership = await migrateCatalogOwnership(basePaperPacks, savedPaperPacks, seedOwners);
+  const paperPacks = await mergePaperPacks(ownership.basePaperPacks, ownership.savedPaperPacks);
 
-  return await hydratePaperPackImageSources(await mergePaperPacks(basePaperPacks, savedPaperPacks));
+  return { paperPacks: await hydratePaperPackImageSources(paperPacks), owners: ownership.owners };
 }
 
 function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {

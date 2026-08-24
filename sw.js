@@ -20,6 +20,7 @@ const APP_SHELL = [
   "./js/images.js",
   "./js/import-mode.js",
   "./js/library.js",
+  "./js/owners.js",
   "./js/pwa.js",
   "./js/schema.js",
   "./js/settings.js",

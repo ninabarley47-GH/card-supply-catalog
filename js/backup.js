@@ -6,10 +6,11 @@ import {
   loadSavedPaperPack,
   isCard,
   isColor,
-  isPaperPack,
+  isCompatiblePaperPack,
   restoreCatalogRecords,
   saveCatalogSetting
 } from "./storage.js";
+import { buildOwnerRegistry, isOwner, migratePaperPackOwners, serializePaperPackOwner } from "./owners.js";
 import {
   buildEffectiveCardTagVocabulary,
   buildEffectivePaperTagVocabulary
@@ -44,7 +45,7 @@ export const IPAD_BACKUP_COMPRESSION = Object.freeze({
   quality: 0.55
 });
 
-export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
+export function initializeCatalogBackup({ paperPacks, colorsById, owners = [], onRestore }) {
   const exportButton = document.querySelector("[data-export-catalog]");
   const exportIpadButton = document.querySelector("[data-export-ipad-catalog]");
   const importInput = document.querySelector("[data-import-catalog]");
@@ -90,7 +91,8 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
         const backupDirectory = await getWritableBackupDirectoryHandle();
         const backup = await createCatalogBackup({
           paperPacks,
-          colorsById
+          colorsById,
+          owners
         });
 
         const saveResult = await saveJsonBackup(backup, "backup", backupDirectory);
@@ -112,7 +114,8 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
         const backupDirectory = await getWritableBackupDirectoryHandle();
         const backup = await createIpadCatalogBackup({
           paperPacks,
-          colorsById
+          colorsById,
+          owners
         });
 
         const saveResult = await saveJsonBackup(backup, "ipad-backup", backupDirectory);
@@ -174,6 +177,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
           backup,
           paperPacks,
           colorsById,
+          owners,
           overwriteExisting
         });
 
@@ -637,7 +641,7 @@ async function summarizeBackupOverwrites(backup, paperPacks, colorsById) {
     ].join("\n")
   };
 }
-async function createCatalogBackup({ paperPacks, colorsById }) {
+async function createCatalogBackup({ paperPacks, colorsById, owners = [] }) {
   const [imageLibrary, cardImageLibrary, cards, paperTagVocabulary, cardTagVocabulary] = await Promise.all([
     loadCatalogSetting(IMAGE_LIBRARY_SETTING_ID),
     loadCatalogSetting(CARD_IMAGE_LIBRARY_SETTING_ID),
@@ -649,6 +653,7 @@ async function createCatalogBackup({ paperPacks, colorsById }) {
     paperPacks,
     colorsById,
     cards,
+    owners,
     imageLibrary,
     cardImageLibrary,
     tagVocabularies: { paper: paperTagVocabulary, card: cardTagVocabulary }
@@ -659,11 +664,14 @@ export function createCatalogBackupSnapshot({
   paperPacks,
   colorsById,
   cards = [],
+  owners = [],
   imageLibrary = null,
   cardImageLibrary = null,
   tagVocabularies = {}
 }) {
-  const imageSummary = summarizeImageStorage(paperPacks, cards);
+  const effectiveOwners = buildOwnerRegistry(owners, paperPacks);
+  const ownedPaperPacks = migratePaperPackOwners(paperPacks, effectiveOwners);
+  const imageSummary = summarizeImageStorage(ownedPaperPacks, cards);
 
   return {
     schemaVersion: BACKUP_SCHEMA_VERSION,
@@ -680,16 +688,19 @@ export function createCatalogBackupSnapshot({
         "Backup stores folder-backed images as relative imagePath references. Back up or share the Paper and Card image folders separately, then reconnect them after import."
     },
     colors: sortObjectByKey(colorsById),
-    paperPacks: paperPacks.map(createSerializablePaperPack),
+    owners: effectiveOwners.map(({ id, name }) => ({ id, name })),
+    paperPacks: ownedPaperPacks.map(createSerializablePaperPack),
     cards: cards.map(createSerializableCard),
     tagVocabularies: {
-      paper: buildEffectivePaperTagVocabulary(tagVocabularies.paper, paperPacks),
+      paper: buildEffectivePaperTagVocabulary(tagVocabularies.paper, ownedPaperPacks),
       card: buildEffectiveCardTagVocabulary(tagVocabularies.card, cards)
     }
   };
 }
 
-async function createIpadCatalogBackup({ paperPacks, colorsById }) {
+async function createIpadCatalogBackup({ paperPacks, colorsById, owners = [] }) {
+  const effectiveOwners = buildOwnerRegistry(owners, paperPacks);
+  const ownedPaperPacks = migratePaperPackOwners(paperPacks, effectiveOwners);
   const compressedPaperPacks = [];
   const [cards, paperTagVocabulary, cardTagVocabulary] = await Promise.all([
     loadSavedCards(),
@@ -705,7 +716,7 @@ async function createIpadCatalogBackup({ paperPacks, colorsById }) {
     folderImageReferences: 0
   };
 
-  for (const paperPack of paperPacks) {
+  for (const paperPack of ownedPaperPacks) {
     const result = await createSerializablePaperPackWithCompressedImages(paperPack);
 
     compressedPaperPacks.push(result.paperPack);
@@ -743,10 +754,11 @@ async function createIpadCatalogBackup({ paperPacks, colorsById }) {
         "This iPad backup embeds compressed images directly in the JSON file so folder access is not required after import."
     },
     colors: sortObjectByKey(colorsById),
+    owners: effectiveOwners.map(({ id, name }) => ({ id, name })),
     paperPacks: compressedPaperPacks,
     cards: compressedCards,
     tagVocabularies: {
-      paper: buildEffectivePaperTagVocabulary(paperTagVocabulary, paperPacks),
+      paper: buildEffectivePaperTagVocabulary(paperTagVocabulary, ownedPaperPacks),
       card: buildEffectiveCardTagVocabulary(cardTagVocabulary, cards)
     }
   };
@@ -911,6 +923,7 @@ export async function restoreCatalogBackup({
   backup,
   paperPacks,
   colorsById,
+  owners = [],
   overwriteExisting = false,
   diagnosticContext = null,
   services = {}
@@ -937,7 +950,12 @@ export async function restoreCatalogBackup({
   }
 
   const importedColorsById = backup?.colors || {};
-  const importedPaperPacks = Array.isArray(backup?.paperPacks) ? backup.paperPacks : [];
+  const rawImportedPaperPacks = Array.isArray(backup?.paperPacks) ? backup.paperPacks : [];
+  const importedOwners = buildOwnerRegistry(
+    [...owners, ...(Array.isArray(backup?.owners) ? backup.owners : [])],
+    rawImportedPaperPacks
+  );
+  const importedPaperPacks = migratePaperPackOwners(rawImportedPaperPacks, importedOwners);
   const importedCards = Array.isArray(backup?.cards) ? backup.cards : [];
   const [savedCards, savedPaperTagVocabulary, savedCardTagVocabulary] = await Promise.all([
     (services.loadSavedCards || loadSavedCards)(),
@@ -1016,6 +1034,7 @@ export async function restoreCatalogBackup({
       paperPacks: preparedPaperPacks,
       colors: colorPlan.recordsToImport,
       cards: preparedCards,
+      owners: importedOwners,
       tagVocabularies
     });
   } catch (error) {
@@ -1041,6 +1060,8 @@ export async function restoreCatalogBackup({
     summary.imagesImported += countEmbeddedPatternImages(paperPack);
     summary.folderImageReferencesImported += countFolderImageReferences(paperPack);
   }
+
+  owners.splice(0, owners.length, ...importedOwners);
 
   for (const card of preparedCards) {
     summary.imagesImported += card.imageSrc ? 1 : 0;
@@ -1472,11 +1493,21 @@ export function validateBackup(backup) {
     };
   }
 
+  if (
+    backup.owners !== undefined &&
+    (!Array.isArray(backup.owners) || backup.owners.some((owner) => !isOwner(owner)))
+  ) {
+    return {
+      ok: false,
+      message: "Nothing was imported because the owner registry is invalid."
+    };
+  }
+
   const colors = Object.values(backup.colors);
   const cards = backup.cards || [];
   const recordCollections = [
     { label: "color", records: colors, validator: isColor },
-    { label: "paper pack", records: backup.paperPacks, validator: isPaperPack },
+    { label: "paper pack", records: backup.paperPacks, validator: isCompatiblePaperPack },
     { label: "Card", records: cards, validator: isCard }
   ];
 
@@ -1506,6 +1537,19 @@ export function validateBackup(backup) {
         ok: false,
         message: `Nothing was imported because color key "${colorId}" does not match its record ID.`
       };
+    }
+  }
+
+  const owners = Array.isArray(backup.owners) ? backup.owners : [];
+  const duplicateOwnerId = findDuplicateRecordId(owners);
+  if (duplicateOwnerId) {
+    return { ok: false, message: `Nothing was imported because the backup contains duplicate owner ID "${duplicateOwnerId}".` };
+  }
+  if (owners.length > 0) {
+    const ownerIds = new Set(owners.map((owner) => owner.id));
+    const invalidOwnerReference = backup.paperPacks.find((paperPack) => paperPack.ownerId && !ownerIds.has(paperPack.ownerId));
+    if (invalidOwnerReference) {
+      return { ok: false, message: `Nothing was imported because paper pack "${invalidOwnerReference.id}" references an unknown owner.` };
     }
   }
 
@@ -1601,7 +1645,7 @@ function sortObjectByKey(valueByKey) {
 
 function createSerializablePaperPack(paperPack) {
   return addCatalogSchemaVersion({
-    ...cloneJsonSafe(paperPack),
+    ...cloneJsonSafe(serializePaperPackOwner(paperPack)),
     patterns: (paperPack.patterns || []).map(createSerializablePattern)
   });
 }
@@ -1703,7 +1747,7 @@ async function createSerializablePaperPackWithCompressedImages(paperPack) {
 
   return {
     paperPack: addCatalogSchemaVersion({
-      ...cloneJsonSafe(paperPack),
+      ...cloneJsonSafe(serializePaperPackOwner(paperPack)),
       imageStorageStrategy: "embedded-compressed-images",
       patterns
     }),

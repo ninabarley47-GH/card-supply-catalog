@@ -259,6 +259,7 @@
 
             <nav class="settings-quick-links" aria-label="Settings sections">
               <span>Quick links</span>
+              <a href="#owner-settings">Owners</a>
               <a href="#paper-tags-settings">Paper Tags</a>
               <a href="#card-tags-settings">Card Tags</a>
               <a href="#image-storage-settings">Image Storage</a>
@@ -266,6 +267,19 @@
               <a href="#catalog-backup-settings">Catalog Backup and Restore</a>
               <a href="#setup-status-settings">Setup Status</a>
             </nav>
+
+            <section class="settings-subsection" id="owner-settings" aria-labelledby="owner-settings-title">
+              <div class="section-heading">
+                <div><p class="eyebrow">Ownership</p><h4 id="owner-settings-title">Owners</h4></div>
+                <p>Owner names are shared with the catalog. The Default Owner selection applies only to this browser.</p>
+              </div>
+              <div class="form-field device-default-field">
+                <label for="default-owner">Default owner</label>
+                <select id="default-owner" data-default-owner><option value="">Not selected</option></select>
+              </div>
+              <p class="settings-message" data-default-owner-message aria-live="polite"></p>
+              <div class="owner-settings-list" data-owner-settings-list></div>
+            </section>
 
             <details class="settings-subsection tag-settings" id="paper-tags-settings" data-tag-settings="paper">
               <summary class="tag-settings-summary">

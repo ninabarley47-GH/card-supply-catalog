@@ -5,13 +5,28 @@ import {
   repairBrokenPaperPackImageLinks
 } from "./images.js";
 import { checkCardImageLibraryHealth, generateMissingCardImageThumbnails } from "./card-images.js";
-import { deleteTagEverywhere, loadCardTagVocabulary, loadCatalogSetting, loadPaperTagVocabulary, loadSavedCards, saveCard, saveCardTagVocabulary, saveCatalogSetting, savePaperPack, savePaperPacks, savePaperTagVocabulary } from "./storage.js";
+import { deleteTagEverywhere, loadCardTagVocabulary, loadCatalogSetting, loadPaperTagVocabulary, loadSavedCards, saveCard, saveCardTagVocabulary, saveCatalogSetting, saveOwner, savePaperPack, savePaperPacks, savePaperTagVocabulary } from "./storage.js";
 import { PAPER_TAG_SEED, addTag, buildEffectiveCardTagVocabulary, buildEffectivePaperTagVocabulary, countTagAssignments, getTagKey, normalizeTagName, removeTag, renameTag, replaceTagAssignments } from "./tag-utils.js";
+import { createLegacyOwnerId, getOwnerNameKey, normalizeOwnerName } from "./owners.js";
 
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
 const CARD_IMAGE_LIBRARY_SETTING_ID = "cardImageLibrary";
 const LAST_BACKUP_EXPORT_SETTING_ID = "lastBackupExportedAt";
 const LAST_BACKUP_IMPORT_SETTING_ID = "lastBackupImportedAt";
+export const DEFAULT_OWNER_SETTING_ID = "defaultOwnerId";
+
+export async function loadDefaultOwnerId(services = {}) {
+  const loadSetting = services.loadCatalogSetting || loadCatalogSetting;
+  const ownerId = await loadSetting(DEFAULT_OWNER_SETTING_ID);
+  return typeof ownerId === "string" ? ownerId : "";
+}
+
+export async function saveDefaultOwnerId(ownerId, services = {}) {
+  const saveSetting = services.saveCatalogSetting || saveCatalogSetting;
+  const normalizedOwnerId = typeof ownerId === "string" ? ownerId : "";
+  await saveSetting(DEFAULT_OWNER_SETTING_ID, normalizedOwnerId || null);
+  return normalizedOwnerId;
+}
 
 function sortTagsAlphabetically(tags = []) {
   return [...tags].sort((first, second) => first.localeCompare(second, undefined, {
@@ -21,11 +36,72 @@ function sortTagsAlphabetically(tags = []) {
 }
 
 export function initializeSettings(options = {}) {
+  initializeOwnerSettings(options);
   initializeSetupStatus(options);
   initializeImageLibrarySettings(options);
   initializeCardImageLibrarySettings(options);
   initializeBulkOwnerSettings(options);
   initializeTagSettings(options);
+}
+
+async function initializeOwnerSettings({ owners = [], paperPacks = [], onPaperPacksUpdated } = {}) {
+  const select = document.querySelector("[data-default-owner]");
+  const message = document.querySelector("[data-default-owner-message]");
+  const list = document.querySelector("[data-owner-settings-list]");
+  if (!select || !message || !list) return;
+
+  const render = () => {
+    const selectedId = select.value;
+    const options = owners.slice().sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+      .map((owner) => new Option(owner.name, owner.id));
+    select.replaceChildren(new Option("Not selected", ""), ...options);
+    select.value = owners.some((owner) => owner.id === selectedId) ? selectedId : "";
+    list.replaceChildren(...owners.map((owner) => createOwnerSettingsRow(owner, owners, paperPacks, message, render, onPaperPacksUpdated)));
+  };
+
+  const savedOwnerId = await loadDefaultOwnerId().catch(() => "");
+  render();
+  select.value = owners.some((owner) => owner.id === savedOwnerId) ? savedOwnerId : "";
+  renderDefaultOwnerMessage(message, owners, select.value);
+  select.addEventListener("change", async () => {
+    await saveDefaultOwnerId(select.value);
+    renderDefaultOwnerMessage(message, owners, select.value);
+    message.dataset.tone = "success";
+  });
+}
+
+function createOwnerSettingsRow(owner, owners, paperPacks, message, render, onPaperPacksUpdated) {
+  const row = document.createElement("div");
+  const input = document.createElement("input");
+  const button = document.createElement("button");
+  row.className = "owner-settings-row";
+  input.value = owner.name;
+  input.setAttribute("aria-label", `Owner name for ${owner.name}`);
+  button.className = "button button-compact";
+  button.type = "button";
+  button.textContent = "Rename";
+  button.addEventListener("click", async () => {
+    const name = normalizeOwnerName(input.value);
+    if (!name || owners.some((candidate) => candidate.id !== owner.id && getOwnerNameKey(candidate.name) === getOwnerNameKey(name))) {
+      message.textContent = "Enter a unique owner name.";
+      message.dataset.tone = "error";
+      return;
+    }
+    await saveOwner({ id: owner.id, name });
+    owner.name = name;
+    paperPacks.filter((pack) => pack.ownerId === owner.id).forEach((pack) => { pack.owner = name; });
+    message.textContent = `Owner renamed to ${name}. Existing ownership links were preserved.`;
+    message.dataset.tone = "success";
+    render();
+    onPaperPacksUpdated?.();
+  });
+  row.append(input, button);
+  return row;
+}
+
+function renderDefaultOwnerMessage(message, owners, ownerId) {
+  const owner = owners.find((candidate) => candidate.id === ownerId);
+  message.textContent = owner ? `Default owner for this device: ${owner.name}.` : "No default owner selected for this device.";
 }
 
 async function initializeTagSettings({ paperPacks = [] } = {}) {
@@ -336,7 +412,7 @@ async function renderSavedCardImageLibraryStatus(status) {
   );
 }
 
-function initializeBulkOwnerSettings({ paperPacks = [], onPaperPacksUpdated } = {}) {
+function initializeBulkOwnerSettings({ paperPacks = [], owners = [], onPaperPacksUpdated } = {}) {
   const form = document.querySelector("[data-bulk-owner-form]");
   const ownerInput = document.querySelector("[data-bulk-owner-input]");
   const submitButton = document.querySelector("[data-bulk-owner-submit]");
@@ -356,7 +432,13 @@ function initializeBulkOwnerSettings({ paperPacks = [], onPaperPacksUpdated } = 
       return;
     }
 
-    const affectedPacks = paperPacks.filter((paperPack) => paperPack.owner !== newOwner);
+    let owner = owners.find((candidate) => getOwnerNameKey(candidate.name) === getOwnerNameKey(newOwner));
+    if (!owner) {
+      owner = { id: createLegacyOwnerId(newOwner), name: newOwner };
+      await saveOwner(owner);
+      owners.push(owner);
+    }
+    const affectedPacks = paperPacks.filter((paperPack) => paperPack.ownerId !== owner.id);
 
     if (affectedPacks.length === 0) {
       renderBulkOwnerMessage(message, `All paper packs are already owned by ${newOwner}.`, "");
@@ -368,7 +450,7 @@ function initializeBulkOwnerSettings({ paperPacks = [], onPaperPacksUpdated } = 
       return;
     }
 
-    const updatedPaperPacks = paperPacks.map((paperPack) => ({ ...paperPack, owner: newOwner }));
+    const updatedPaperPacks = paperPacks.map((paperPack) => ({ ...paperPack, ownerId: owner.id, owner: owner.name }));
     submitButton.disabled = true;
     renderBulkOwnerMessage(message, "Updating paper pack owners...", "");
 

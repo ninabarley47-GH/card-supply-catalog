@@ -1,5 +1,5 @@
-export const CATALOG_SCHEMA_VERSION = 1;
-export const BACKUP_SCHEMA_VERSION = 1;
+export const CATALOG_SCHEMA_VERSION = 2;
+export const BACKUP_SCHEMA_VERSION = 2;
 
 export function addCatalogSchemaVersion(record) {
   return {

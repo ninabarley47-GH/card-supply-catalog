@@ -1,13 +1,15 @@
 import { addCatalogSchemaVersion } from "./schema.js";
 import { uniqueTags } from "./tag-utils.js";
+import { buildOwnerRegistry, isOwner, migratePaperPackOwners, serializePaperPackOwner } from "./owners.js";
 
 const DATABASE_NAME = "card-supply-catalog";
-const DATABASE_VERSION = 4;
+const DATABASE_VERSION = 5;
 const PAPER_PACKS_STORE = "paperPacks";
 const DELETED_PAPER_PACK_IDS_STORE = "deletedPaperPackIds";
 const COLORS_STORE = "colors";
 const SETTINGS_STORE = "settings";
 const CARDS_STORE = "cards";
+const OWNERS_STORE = "owners";
 export const PAPER_TAG_VOCABULARY_SETTING_ID = "paperTagVocabulary";
 export const CARD_TAG_VOCABULARY_SETTING_ID = "cardTagVocabulary";
 const LEGACY_PAPER_PACKS_STORAGE_KEY = "card-supply-catalog.paperPacks";
@@ -30,7 +32,35 @@ export async function loadSavedPaperPacks() {
   await migrateLegacyLocalStorage(database);
   const paperPacks = await getAllFromStore(database, PAPER_PACKS_STORE);
 
-  return paperPacks.filter(isPaperPack).map(normalizePaperPackForRuntime);
+  return paperPacks.filter(isCompatiblePaperPack).map(normalizePaperPackForRuntime);
+}
+
+export async function loadOwners() {
+  const database = await openCatalogDatabase();
+  return (await getAllFromStore(database, OWNERS_STORE)).filter(isOwner);
+}
+
+export async function saveOwner(owner) {
+  if (!isOwner(owner)) throw new Error("Invalid owner record.");
+  const database = await openCatalogDatabase();
+  await writeTransaction(database, [OWNERS_STORE], (transaction) => transaction.objectStore(OWNERS_STORE).put(owner));
+}
+
+export async function migrateCatalogOwnership(basePaperPacks = [], savedPaperPacks = [], seedOwners = []) {
+  const database = await openCatalogDatabase();
+  const existingOwners = (await getAllFromStore(database, OWNERS_STORE)).filter(isOwner);
+  const owners = buildOwnerRegistry([...seedOwners, ...existingOwners], [...basePaperPacks, ...savedPaperPacks]);
+  const migratedBasePacks = migratePaperPackOwners(basePaperPacks, owners);
+  const migratedSavedPacks = migratePaperPackOwners(savedPaperPacks, owners);
+
+  await writeTransaction(database, [OWNERS_STORE, PAPER_PACKS_STORE], (transaction) => {
+    const ownerStore = transaction.objectStore(OWNERS_STORE);
+    const paperPackStore = transaction.objectStore(PAPER_PACKS_STORE);
+    owners.forEach((owner) => ownerStore.put(owner));
+    migratedSavedPacks.forEach((paperPack) => paperPackStore.put(normalizePaperPackForStorage(paperPack)));
+  });
+
+  return { owners, basePaperPacks: migratedBasePacks, savedPaperPacks: migratedSavedPacks };
 }
 
 export async function loadSavedPaperPack(paperPackId) {
@@ -38,7 +68,7 @@ export async function loadSavedPaperPack(paperPackId) {
   await migrateLegacyLocalStorage(database);
   const paperPack = await getFromStore(database, PAPER_PACKS_STORE, paperPackId);
 
-  return isPaperPack(paperPack) ? normalizePaperPackForRuntime(paperPack) : null;
+  return isCompatiblePaperPack(paperPack) ? normalizePaperPackForRuntime(paperPack) : null;
 }
 
 export async function savePaperPack(paperPack) {
@@ -141,19 +171,22 @@ export async function deleteTagEverywhere({ kind, records = [], vocabulary = [] 
   throw new Error(`Unsupported tag vocabulary kind: ${kind}`);
 }
 
-export async function restoreCatalogRecords({ paperPacks = [], colors = [], cards = [], tagVocabularies = null }) {
+export async function restoreCatalogRecords({ paperPacks = [], colors = [], cards = [], owners = [], tagVocabularies = null }) {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
 
   await writeTransaction(
     database,
-    [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE, COLORS_STORE, CARDS_STORE, SETTINGS_STORE],
+    [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE, COLORS_STORE, CARDS_STORE, OWNERS_STORE, SETTINGS_STORE],
     (transaction) => {
       const paperPackStore = transaction.objectStore(PAPER_PACKS_STORE);
       const deletedPaperPackIdStore = transaction.objectStore(DELETED_PAPER_PACK_IDS_STORE);
       const colorStore = transaction.objectStore(COLORS_STORE);
       const cardStore = transaction.objectStore(CARDS_STORE);
       const settingsStore = transaction.objectStore(SETTINGS_STORE);
+      const ownerStore = transaction.objectStore(OWNERS_STORE);
+
+      owners.forEach((owner) => ownerStore.put(owner));
 
       for (const paperPack of paperPacks) {
         paperPackStore.put(normalizePaperPackForStorage(paperPack));
@@ -270,6 +303,10 @@ function openCatalogDatabase() {
       if (!database.objectStoreNames.contains(CARDS_STORE)) {
         database.createObjectStore(CARDS_STORE, { keyPath: "id" });
       }
+
+      if (!database.objectStoreNames.contains(OWNERS_STORE)) {
+        database.createObjectStore(OWNERS_STORE, { keyPath: "id" });
+      }
     });
 
     request.addEventListener("success", () => resolve(request.result));
@@ -290,7 +327,7 @@ async function migrateLegacyLocalStorage(database) {
   }
 
   const legacyPaperPacks = readLegacyJsonArray(LEGACY_PAPER_PACKS_STORAGE_KEY)
-    .filter(isPaperPack)
+    .filter(isCompatiblePaperPack)
     .map(normalizePaperPackKeywords);
   const legacyDeletedPaperPackIds = readLegacyJsonArray(LEGACY_DELETED_PAPER_PACK_IDS_STORAGE_KEY).filter(
     (paperPackId) => typeof paperPackId === "string"
@@ -352,7 +389,7 @@ function markLegacyMigrationComplete() {
 }
 
 function normalizePaperPackForStorage(paperPack) {
-  return addCatalogSchemaVersion(normalizePaperPackForRuntime(paperPack));
+  return addCatalogSchemaVersion(serializePaperPackOwner(normalizePaperPackForRuntime(paperPack)));
 }
 
 function normalizePaperPackForRuntime(paperPack) {
@@ -466,7 +503,7 @@ export function isPaperPack(paperPack) {
     paperPack &&
     typeof paperPack.id === "string" &&
     typeof paperPack.name === "string" &&
-    typeof paperPack.owner === "string" &&
+    typeof paperPack.ownerId === "string" &&
     Number.isInteger(paperPack.releaseYear) &&
     Number.isInteger(paperPack.patternCount) &&
     Array.isArray(paperPack.colors) &&
@@ -488,6 +525,15 @@ export function isColor(color) {
     Array.isArray(color.aliases) &&
     color.products &&
     typeof color.products === "object"
+  );
+}
+
+export function isCompatiblePaperPack(paperPack) {
+  return isPaperPack(paperPack) || (
+    paperPack && typeof paperPack.id === "string" && typeof paperPack.name === "string" &&
+    typeof paperPack.owner === "string" && Number.isInteger(paperPack.releaseYear) &&
+    Number.isInteger(paperPack.patternCount) && Array.isArray(paperPack.colors) &&
+    Array.isArray(paperPack.keywords) && Array.isArray(paperPack.patterns)
   );
 }
 

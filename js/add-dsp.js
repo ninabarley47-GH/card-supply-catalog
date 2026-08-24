@@ -6,14 +6,15 @@ import {
   loadPatternImagesForPaperPackName
 } from "./images.js";
 import { addCatalogSchemaVersion } from "./schema.js";
-import { loadCatalogSetting, loadPaperTagVocabulary, saveCatalogSetting, savePaperTagVocabulary } from "./storage.js";
+import { loadCatalogSetting, loadPaperTagVocabulary, saveCatalogSetting, saveOwner, savePaperTagVocabulary } from "./storage.js";
+import { createLegacyOwnerId, getOwnerNameKey } from "./owners.js";
 import { buildEffectivePaperTagVocabulary } from "./tag-utils.js";
 import { createTagPicker } from "./tag-picker.js";
 import { createTagVocabularyStore } from "./card-tags.js";
 
 const ADD_DSP_DEFAULTS_SETTING_ID = "addDspDefaults";
 
-export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
+export function initializeAddDspWorkflow(colorsById, paperPacks = [], owners = []) {
   const panel = document.querySelector("[data-add-dsp-panel]");
   const form = document.querySelector("[data-add-dsp-form]");
   const message = document.querySelector("[data-add-dsp-message]");
@@ -219,7 +220,8 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
       colorsById,
       selectedImages,
       formState.editingPaperPack,
-      tagPicker.getSelected()
+      tagPicker.getSelected(),
+      owners
     );
 
     if (!result.ok) {
@@ -242,6 +244,16 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = []) {
     if (duplicateResult.requiresConfirmation && !window.confirm(duplicateResult.message)) {
       renderFormMessage(message, "Save cancelled. No catalog changes were made.", "");
       return;
+    }
+
+    const owner = owners.find((candidate) => candidate.id === result.paperPack.ownerId) || {
+      id: result.paperPack.ownerId,
+      name: result.paperPack.owner
+    };
+
+    if (!owners.some((candidate) => candidate.id === owner.id)) {
+      await saveOwner(owner);
+      owners.push(owner);
     }
 
     const saveDetail = {
@@ -396,9 +408,12 @@ function resetAddDspForm(form, selectedImages, imagePreviewList, imagePreviewCou
   controls.submitButton.textContent = "Save Paper Pack";
 }
 
-export function buildPaperPackFromForm(formData, colorsById, selectedImages = [], editingPaperPack = null, selectedKeywords = []) {
+export function buildPaperPackFromForm(formData, colorsById, selectedImages = [], editingPaperPack = null, selectedKeywords = [], owners = []) {
   const name = cleanText(formData.get("name"));
   const owner = cleanText(formData.get("owner"));
+  const ownerRecord = owners.find((candidate) => getOwnerNameKey(candidate.name) === getOwnerNameKey(owner));
+  const keepsExistingOwner = editingPaperPack?.ownerId && getOwnerNameKey(editingPaperPack.owner) === getOwnerNameKey(owner);
+  const ownerId = ownerRecord?.id || (keepsExistingOwner ? editingPaperPack.ownerId : createLegacyOwnerId(owner));
   const releaseYear = Number.parseInt(formData.get("releaseYear"), 10);
   const patternCount = Number.parseInt(formData.get("patternCount"), 10);
   const colorResult = resolveColorIds(parseList(formData.get("colors")), colorsById);
@@ -442,6 +457,7 @@ export function buildPaperPackFromForm(formData, colorsById, selectedImages = []
       id: editingPaperPack?.id || createId(name),
       name,
       owner,
+      ownerId,
       releaseYear,
       patternCount,
       availability: formData.get("availability") || "available",
