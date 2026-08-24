@@ -26,10 +26,15 @@ export function isOwner(owner) {
   return Boolean(owner && typeof owner.id === "string" && owner.id && normalizeOwnerName(owner.name));
 }
 
+export function isActiveOwner(owner) {
+  return isOwner(owner) && owner.archived !== true;
+}
+
 export function buildOwnerRegistry(existingOwners = [], paperPacks = []) {
   const ownersById = new Map(existingOwners.filter(isOwner).map((owner) => [owner.id, {
     id: owner.id,
-    name: normalizeOwnerName(owner.name)
+    name: normalizeOwnerName(owner.name),
+    ...(owner.archived === true ? { archived: true } : {})
   }]));
   const ownersByName = new Map();
 

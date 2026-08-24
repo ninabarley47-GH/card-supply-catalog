@@ -688,7 +688,7 @@ export function createCatalogBackupSnapshot({
         "Backup stores folder-backed images as relative imagePath references. Back up or share the Paper and Card image folders separately, then reconnect them after import."
     },
     colors: sortObjectByKey(colorsById),
-    owners: effectiveOwners.map(({ id, name }) => ({ id, name })),
+    owners: effectiveOwners.map(({ id, name, archived }) => ({ id, name, ...(archived === true ? { archived: true } : {}) })),
     paperPacks: ownedPaperPacks.map(createSerializablePaperPack),
     cards: cards.map(createSerializableCard),
     tagVocabularies: {
@@ -754,7 +754,7 @@ async function createIpadCatalogBackup({ paperPacks, colorsById, owners = [] }) 
         "This iPad backup embeds compressed images directly in the JSON file so folder access is not required after import."
     },
     colors: sortObjectByKey(colorsById),
-    owners: effectiveOwners.map(({ id, name }) => ({ id, name })),
+    owners: effectiveOwners.map(({ id, name, archived }) => ({ id, name, ...(archived === true ? { archived: true } : {}) })),
     paperPacks: compressedPaperPacks,
     cards: compressedCards,
     tagVocabularies: {

@@ -30,6 +30,15 @@ test("Paper Pack persistence strips the runtime owner display name", () => {
   });
 });
 
+test("archived owners remain available for existing ownership links", () => {
+  const owner = { id: "owner-1", name: "Nina", archived: true };
+  const registry = buildOwnerRegistry([owner], []);
+  const [paperPack] = migratePaperPackOwners([{ id: "one", ownerId: owner.id }], registry);
+  assert.deepEqual(registry, [owner]);
+  assert.equal(paperPack.ownerId, owner.id);
+  assert.equal(paperPack.owner, owner.name);
+});
+
 test("shared backups include owners and store Paper Pack ownership by ownerId", () => {
   const owner = { id: "owner-1", name: "Nina" };
   const backup = createCatalogBackupSnapshot({

@@ -7,7 +7,7 @@ import {
 } from "./images.js";
 import { addCatalogSchemaVersion } from "./schema.js";
 import { loadCatalogSetting, loadPaperTagVocabulary, saveCatalogSetting, saveOwner, savePaperTagVocabulary } from "./storage.js";
-import { createLegacyOwnerId, getOwnerNameKey } from "./owners.js";
+import { createLegacyOwnerId, getOwnerNameKey, isActiveOwner } from "./owners.js";
 import { loadDefaultOwnerId } from "./settings.js";
 import { initializeOwnerPicker, notifyOwnerRegistryUpdated, refreshOwnerOptions, setOwnerPickerValue } from "./owner-picker.js";
 import { buildEffectivePaperTagVocabulary } from "./tag-utils.js";
@@ -262,14 +262,16 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = [], owners = [
       return;
     }
 
-    const owner = owners.find((candidate) => candidate.id === result.paperPack.ownerId) || {
+    const owner = owners.find((candidate) => isActiveOwner(candidate) && candidate.id === result.paperPack.ownerId) || {
       id: result.paperPack.ownerId,
       name: result.paperPack.owner
     };
 
-    if (!owners.some((candidate) => candidate.id === owner.id)) {
+    const existingOwnerIndex = owners.findIndex((candidate) => candidate.id === owner.id);
+    if (existingOwnerIndex < 0 || !isActiveOwner(owners[existingOwnerIndex])) {
       await saveOwner(owner);
-      owners.push(owner);
+      if (existingOwnerIndex >= 0) owners.splice(existingOwnerIndex, 1, owner);
+      else owners.push(owner);
       refreshOwnerOptions(owners);
       notifyOwnerRegistryUpdated();
     }
@@ -395,7 +397,7 @@ function applyAddDspDefaults(form, defaults, owners = []) {
 }
 
 export function applyDefaultOwner(form, defaultOwnerId, owners = []) {
-  const defaultOwner = owners.find((owner) => owner.id === defaultOwnerId);
+  const defaultOwner = owners.find((owner) => isActiveOwner(owner) && owner.id === defaultOwnerId);
   if (defaultOwner) {
     if (form.elements.ownerId) {
       setOwnerPickerValue(form.elements.ownerId, form.elements.owner, defaultOwner.id, defaultOwner.name, owners);
@@ -443,9 +445,9 @@ function resetAddDspForm(form, selectedImages, imagePreviewList, imagePreviewCou
 export function buildPaperPackFromForm(formData, colorsById, selectedImages = [], editingPaperPack = null, selectedKeywords = [], owners = []) {
   const name = cleanText(formData.get("name"));
   const selectedOwnerId = cleanText(formData.get("ownerId"));
-  const selectedOwner = owners.find((candidate) => candidate.id === selectedOwnerId);
+  const selectedOwner = owners.find((candidate) => isActiveOwner(candidate) && candidate.id === selectedOwnerId);
   const owner = selectedOwner?.name || cleanText(formData.get("owner"));
-  const ownerRecord = selectedOwner || owners.find((candidate) => getOwnerNameKey(candidate.name) === getOwnerNameKey(owner));
+  const ownerRecord = selectedOwner || owners.find((candidate) => isActiveOwner(candidate) && getOwnerNameKey(candidate.name) === getOwnerNameKey(owner));
   const keepsExistingOwner = editingPaperPack?.ownerId && getOwnerNameKey(editingPaperPack.owner) === getOwnerNameKey(owner);
   const ownerId = ownerRecord?.id || (keepsExistingOwner ? editingPaperPack.ownerId : createLegacyOwnerId(owner));
   const releaseYear = Number.parseInt(formData.get("releaseYear"), 10);

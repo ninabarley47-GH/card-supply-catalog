@@ -2128,7 +2128,7 @@ button.pattern {
 
 .device-default-field { max-width: 24rem; margin-bottom: 0; }
 .owner-settings-list { display: grid; gap: var(--space-2); max-width: 32rem; margin-top: var(--space-4); }
-.owner-settings-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); align-items: center; }
+.owner-settings-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--space-2); align-items: center; }
 .owner-settings-row input { min-width: 0; }
 
 .import-diagnostic-panel {

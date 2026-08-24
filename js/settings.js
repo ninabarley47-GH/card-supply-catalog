@@ -7,7 +7,7 @@ import {
 import { checkCardImageLibraryHealth, generateMissingCardImageThumbnails } from "./card-images.js";
 import { deleteTagEverywhere, loadCardTagVocabulary, loadCatalogSetting, loadPaperTagVocabulary, loadSavedCards, saveCard, saveCardTagVocabulary, saveCatalogSetting, saveOwner, savePaperPack, savePaperPacks, savePaperTagVocabulary } from "./storage.js";
 import { PAPER_TAG_SEED, addTag, buildEffectiveCardTagVocabulary, buildEffectivePaperTagVocabulary, countTagAssignments, getTagKey, normalizeTagName, removeTag, renameTag, replaceTagAssignments } from "./tag-utils.js";
-import { createLegacyOwnerId, getOwnerNameKey, normalizeOwnerName } from "./owners.js";
+import { createLegacyOwnerId, getOwnerNameKey, isActiveOwner, normalizeOwnerName } from "./owners.js";
 
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
 const CARD_IMAGE_LIBRARY_SETTING_ID = "cardImageLibrary";
@@ -52,16 +52,17 @@ async function initializeOwnerSettings({ owners = [], paperPacks = [], onPaperPa
 
   const render = () => {
     const selectedId = select.value;
-    const options = owners.slice().sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+    const activeOwners = owners.filter(isActiveOwner);
+    const options = activeOwners.slice().sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
       .map((owner) => new Option(owner.name, owner.id));
     select.replaceChildren(new Option("Not selected", ""), ...options);
-    select.value = owners.some((owner) => owner.id === selectedId) ? selectedId : "";
-    list.replaceChildren(...owners.map((owner) => createOwnerSettingsRow(owner, owners, paperPacks, message, render, onPaperPacksUpdated)));
+    select.value = activeOwners.some((owner) => owner.id === selectedId) ? selectedId : "";
+    list.replaceChildren(...activeOwners.map((owner) => createOwnerSettingsRow(owner, owners, paperPacks, message, render, onPaperPacksUpdated)));
   };
 
   const savedOwnerId = await loadDefaultOwnerId().catch(() => "");
   render();
-  select.value = owners.some((owner) => owner.id === savedOwnerId) ? savedOwnerId : "";
+  select.value = owners.some((owner) => isActiveOwner(owner) && owner.id === savedOwnerId) ? savedOwnerId : "";
   renderDefaultOwnerMessage(message, owners, select.value);
   select.addEventListener("change", async () => {
     await saveDefaultOwnerId(select.value);
@@ -78,12 +79,16 @@ function createOwnerSettingsRow(owner, owners, paperPacks, message, render, onPa
   const row = document.createElement("div");
   const input = document.createElement("input");
   const button = document.createElement("button");
+  const deleteButton = document.createElement("button");
   row.className = "owner-settings-row";
   input.value = owner.name;
   input.setAttribute("aria-label", `Owner name for ${owner.name}`);
   button.className = "button button-compact";
   button.type = "button";
   button.textContent = "Rename";
+  deleteButton.className = "button button-compact";
+  deleteButton.type = "button";
+  deleteButton.textContent = "Delete";
   button.addEventListener("click", async () => {
     const name = normalizeOwnerName(input.value);
     if (!name || owners.some((candidate) => candidate.id !== owner.id && getOwnerNameKey(candidate.name) === getOwnerNameKey(name))) {
@@ -99,12 +104,27 @@ function createOwnerSettingsRow(owner, owners, paperPacks, message, render, onPa
     render();
     onPaperPacksUpdated?.();
   });
-  row.append(input, button);
+  deleteButton.addEventListener("click", async () => {
+    if (!window.confirm(`Delete ${owner.name} from the owner list? Existing Paper Packs and Cards will keep their owner.`)) return;
+    const wasDefault = selectDefaultOwnerId(owner.id);
+    await saveOwner({ id: owner.id, name: owner.name, archived: true });
+    owner.archived = true;
+    if (wasDefault) await saveDefaultOwnerId("");
+    render();
+    document.dispatchEvent(new CustomEvent("catalog:owners-updated"));
+    message.textContent = `${owner.name} was deleted from the owner list. Existing ownership was unchanged.`;
+    message.dataset.tone = "success";
+  });
+  row.append(input, button, deleteButton);
   return row;
 }
 
+function selectDefaultOwnerId(ownerId) {
+  return document.querySelector("[data-default-owner]")?.value === ownerId;
+}
+
 function renderDefaultOwnerMessage(message, owners, ownerId) {
-  const owner = owners.find((candidate) => candidate.id === ownerId);
+  const owner = owners.find((candidate) => isActiveOwner(candidate) && candidate.id === ownerId);
   message.textContent = owner ? `Default owner for this device: ${owner.name}.` : "No default owner selected for this device.";
 }
 

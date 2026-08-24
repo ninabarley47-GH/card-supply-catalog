@@ -1,4 +1,5 @@
 import { createLegacyOwnerId, getOwnerNameKey, normalizeOwnerName } from './owners.js';
+import { isActiveOwner } from './owners.js';
 
 export const NEW_OWNER_VALUE = '__new_owner__';
 
@@ -8,6 +9,7 @@ export function initializeOwnerPicker(select, newOwnerInput, owners = []) {
   newOwnerInput.dataset.newOwnerInput = '';
   if (!select.dataset.ownerPickerReady) {
     select.addEventListener('change', () => updateNewOwnerInput(select, newOwnerInput));
+    document.addEventListener('catalog:owners-updated', () => refreshOwnerPicker(select, owners));
     select.dataset.ownerPickerReady = 'true';
   }
   refreshOwnerPicker(select, owners);
@@ -23,8 +25,8 @@ export function refreshOwnerOptions(owners = []) {
 }
 
 export function setOwnerPickerValue(select, newOwnerInput, ownerId, ownerName, owners = []) {
-  const existingOwner = owners.find((owner) => owner.id === ownerId) ||
-    owners.find((owner) => getOwnerNameKey(owner.name) === getOwnerNameKey(ownerName));
+  const existingOwner = owners.find((owner) => isActiveOwner(owner) && owner.id === ownerId) ||
+    owners.find((owner) => isActiveOwner(owner) && getOwnerNameKey(owner.name) === getOwnerNameKey(ownerName));
   if (existingOwner) {
     select.value = existingOwner.id;
     newOwnerInput.value = '';
@@ -42,9 +44,9 @@ export function resolveOwnerPicker(select, newOwnerInput, owners = []) {
   if (select.value === NEW_OWNER_VALUE) {
     const name = normalizeOwnerName(newOwnerInput.value);
     if (!name) return null;
-    return owners.find((owner) => getOwnerNameKey(owner.name) === getOwnerNameKey(name)) || { id: createLegacyOwnerId(name), name };
+    return owners.find((owner) => isActiveOwner(owner) && getOwnerNameKey(owner.name) === getOwnerNameKey(name)) || { id: createLegacyOwnerId(name), name };
   }
-  return owners.find((owner) => owner.id === select.value) || null;
+  return owners.find((owner) => isActiveOwner(owner) && owner.id === select.value) || null;
 }
 
 export function notifyOwnerRegistryUpdated() {
@@ -53,7 +55,7 @@ export function notifyOwnerRegistryUpdated() {
 
 function refreshOwnerPicker(select, owners) {
   const selectedValue = select.value;
-  const options = owners.slice()
+  const options = owners.filter(isActiveOwner)
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
     .map((owner) => new Option(owner.name, owner.id));
   select.replaceChildren(new Option('Select owner…', ''), ...options, new Option('Add new owner…', NEW_OWNER_VALUE));

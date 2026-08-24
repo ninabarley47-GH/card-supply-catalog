@@ -1,6 +1,7 @@
 import { deleteCard, loadCatalogSetting, loadSavedCards, saveCard, saveCatalogSetting, saveOwner } from './storage.js';
 import { loadDefaultOwnerId } from './settings.js';
 import { initializeOwnerPicker, notifyOwnerRegistryUpdated, refreshOwnerOptions, resolveOwnerPicker, setOwnerPickerValue } from './owner-picker.js';
+import { isActiveOwner } from './owners.js';
 import {
   clearSelectedCardImage,
   chooseCardImageFromLibrary,
@@ -296,9 +297,11 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     addCardView.save.disabled = true;
 
     try {
-      if (!owners.some((candidate) => candidate.id === owner.id)) {
+      const existingOwnerIndex = owners.findIndex((candidate) => candidate.id === owner.id);
+      if (existingOwnerIndex < 0 || !isActiveOwner(owners[existingOwnerIndex])) {
         await saveOwner(owner);
-        owners.push(owner);
+        if (existingOwnerIndex >= 0) owners.splice(existingOwnerIndex, 1, owner);
+        else owners.push(owner);
         refreshOwnerOptions(owners);
         notifyOwnerRegistryUpdated();
       }
@@ -874,7 +877,7 @@ function createCardRecord(addCardView) {
 }
 
 export function selectNewCardOwnerId(defaultOwnerId, lastOwnerId, owners = []) {
-  const ownerIds = new Set(owners.map((owner) => owner.id));
+  const ownerIds = new Set(owners.filter(isActiveOwner).map((owner) => owner.id));
   if (ownerIds.has(defaultOwnerId)) return defaultOwnerId;
   if (ownerIds.has(lastOwnerId)) return lastOwnerId;
   return '';
