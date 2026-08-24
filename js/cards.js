@@ -39,7 +39,10 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   const cards = [];
   const filterForm = document.querySelector('[data-card-library-filter-form]');
   const searchInput = document.querySelector('[data-card-library-search]');
-  const favoritesInput = document.querySelector('[data-card-library-favorites]');
+  const favoritesButton = document.querySelector('[data-card-library-favorites]');
+  const ownerFilter = document.querySelector('[data-card-library-owner]');
+  const holidayFilter = document.querySelector('[data-card-library-holiday]');
+  const statusFilter = document.querySelector('[data-card-library-status]');
   const sortControl = document.querySelector('[data-card-library-sort]');
   const clearFiltersButton = document.querySelector('[data-card-library-clear]');
   const tagFilter = document.querySelector('[data-card-library-tag-filters]');
@@ -48,14 +51,21 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   const paperPackNamesById = new Map(paperPacks.map((paperPack) => [paperPack.id, paperPack.name]));
   let activeTile = null;
 
+  refreshCardOwnerFilter(ownerFilter, owners);
+
   const renderCurrent = () => {
     const selectedTags = getSelectedCardTags(tagFilter);
+    const favoritesOnly = favoritesButton?.getAttribute('aria-pressed') === 'true';
     const hasActiveFilters = Boolean(
-      searchInput?.value.trim() || favoritesInput?.checked || selectedTags.length > 0
+      searchInput?.value.trim() || favoritesOnly || ownerFilter?.value || holidayFilter?.value ||
+      statusFilter?.value || selectedTags.length > 0
     );
     const visibleCards = filterAndSortCards(cards, {
       query: searchInput?.value,
-      favoritesOnly: favoritesInput?.checked,
+      favoritesOnly,
+      ownerId: ownerFilter?.value,
+      holiday: holidayFilter?.value,
+      status: statusFilter?.value,
       selectedTags,
       sortOrder: sortControl?.value,
       paperPackNamesById
@@ -64,10 +74,10 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     gallery.classList.toggle('card-library-grid-filtered', hasActiveFilters);
     renderCardLibrary(gallery, visibleCards, cards.length, paperPackNamesById);
     updateCardLibraryResultCount(resultCount, visibleCards.length, cards.length);
+    updateCardQuickFilterStates({ favoritesButton, ownerFilter, holidayFilter, statusFilter });
 
     if (clearFiltersButton) {
-      clearFiltersButton.hidden =
-        !searchInput?.value && !favoritesInput?.checked && selectedTags.length === 0;
+      clearFiltersButton.hidden = !hasActiveFilters;
     }
 
     if (clearTagsButton) {
@@ -122,16 +132,32 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     openAddCardView(addCardView, selectNewCardOwnerId(defaultOwnerId, lastOwnerId, owners));
   });
   searchInput?.addEventListener('input', renderCurrent);
-  favoritesInput?.addEventListener('change', renderCurrent);
+  favoritesButton?.addEventListener('click', () => {
+    favoritesButton.setAttribute(
+      'aria-pressed',
+      String(favoritesButton.getAttribute('aria-pressed') !== 'true')
+    );
+    renderCurrent();
+  });
+  ownerFilter?.addEventListener('change', renderCurrent);
+  holidayFilter?.addEventListener('change', renderCurrent);
+  statusFilter?.addEventListener('change', renderCurrent);
   tagFilter?.addEventListener('change', renderCurrent);
   sortControl?.addEventListener('change', renderCurrent);
   filterForm?.addEventListener('submit', (event) => event.preventDefault());
   clearFiltersButton?.addEventListener('click', () => {
     searchInput.value = '';
-    favoritesInput.checked = false;
+    favoritesButton?.setAttribute('aria-pressed', 'false');
+    if (ownerFilter) ownerFilter.value = '';
+    if (holidayFilter) holidayFilter.value = '';
+    if (statusFilter) statusFilter.value = '';
     clearSelectedCardTags(tagFilter);
     renderCurrent();
     searchInput.focus();
+  });
+  document.addEventListener('catalog:owners-updated', () => {
+    refreshCardOwnerFilter(ownerFilter, owners);
+    renderCurrent();
   });
   clearTagsButton?.addEventListener('click', () => {
     clearSelectedCardTags(tagFilter);
@@ -909,7 +935,7 @@ function createCardId(createdAt) {
     : `card-${createdAt.replace(/\D/g, '')}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function filterAndSortCards(cards, options = {}) {
+export function filterAndSortCards(cards, options = {}) {
   const query = String(options.query || '').trim().toLocaleLowerCase();
   const selectedTags = (options.selectedTags || []).map((tag) => tag.toLocaleLowerCase());
   const filteredCards = cards.filter((card) => {
@@ -917,7 +943,23 @@ function filterAndSortCards(cards, options = {}) {
       return false;
     }
 
+    if (options.ownerId && card.ownerId !== options.ownerId) {
+      return false;
+    }
+
+    if (options.status && card.status !== options.status) {
+      return false;
+    }
+
     const cardTags = (card.tags || []).map((tag) => tag.toLocaleLowerCase());
+
+    if (options.holiday === 'only' && !cardTags.includes('holiday')) {
+      return false;
+    }
+
+    if (options.holiday === 'exclude' && cardTags.includes('holiday')) {
+      return false;
+    }
 
     if (!selectedTags.every((tag) => cardTags.includes(tag))) {
       return false;
@@ -938,6 +980,32 @@ function filterAndSortCards(cards, options = {}) {
   });
 
   return sortCards(filteredCards, options.sortOrder);
+}
+
+function refreshCardOwnerFilter(select, owners = []) {
+  if (!select) return;
+
+  const selectedOwnerId = select.value;
+  select.replaceChildren(
+    new Option('Owner', ''),
+    ...owners.filter(isActiveOwner)
+      .slice()
+      .sort((first, second) => first.name.localeCompare(second.name, undefined, { sensitivity: 'base' }))
+      .map((owner) => new Option(owner.name, owner.id))
+  );
+  select.value = [...select.options].some((option) => option.value === selectedOwnerId)
+    ? selectedOwnerId
+    : '';
+}
+
+function updateCardQuickFilterStates({ favoritesButton, ownerFilter, holidayFilter, statusFilter }) {
+  const favoritesOnly = favoritesButton?.getAttribute('aria-pressed') === 'true';
+  const favoritesIcon = favoritesButton?.querySelector('.card-library-favorites-icon');
+  if (favoritesIcon) favoritesIcon.textContent = favoritesOnly ? '♥' : '♡';
+
+  for (const control of [ownerFilter, holidayFilter, statusFilter]) {
+    control?.closest('.card-library-quick-filter')?.classList.toggle('is-active', Boolean(control.value));
+  }
 }
 
 function getSelectedCardTags(container) {

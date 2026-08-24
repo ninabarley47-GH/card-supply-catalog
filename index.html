@@ -108,6 +108,37 @@
                   data-card-library-search
                 >
               </div>
+              <fieldset class="card-library-quick-filters" data-card-library-quick-filters>
+                <legend>Quick Filters</legend>
+                <div class="card-library-quick-filter-grid">
+                  <button class="card-library-quick-filter card-library-favorites-filter" type="button" aria-pressed="false" data-card-library-favorites>
+                    <span class="card-library-favorites-icon" aria-hidden="true">♡</span>
+                    <span>Favorites</span>
+                  </button>
+                  <label class="card-library-quick-filter card-library-select-filter">
+                    <span class="visually-hidden">Owner</span>
+                    <select aria-label="Filter cards by owner" data-card-library-owner>
+                      <option value="">Owner</option>
+                    </select>
+                  </label>
+                  <label class="card-library-quick-filter card-library-select-filter">
+                    <span class="visually-hidden">Holiday</span>
+                    <select aria-label="Filter cards by Holiday tag" data-card-library-holiday>
+                      <option value="">Holiday</option>
+                      <option value="only">Holiday only</option>
+                      <option value="exclude">Exclude Holiday</option>
+                    </select>
+                  </label>
+                  <label class="card-library-quick-filter card-library-select-filter">
+                    <span class="visually-hidden">Status</span>
+                    <select aria-label="Filter cards by status" data-card-library-status>
+                      <option value="">Status</option>
+                      <option value="available">Available</option>
+                      <option value="sent">Sent</option>
+                    </select>
+                  </label>
+                </div>
+              </fieldset>
               <fieldset class="library-tag-filter" data-card-library-tag-filters>
                 <legend class="visually-hidden">Card tags</legend>
                 <div class="library-tag-filter-header">
@@ -115,10 +146,6 @@
                   <button class="filter-clear-icon" type="button" data-card-library-clear-tags aria-label="Clear Card tag filters" hidden>&times;</button>
                 </div>
               </fieldset>
-              <label class="settings-checkbox-option card-library-favorite-filter">
-                <input type="checkbox" data-card-library-favorites>
-                <span>Favorites only</span>
-              </label>
             </form>
           </div>
 
