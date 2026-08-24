@@ -589,7 +589,26 @@ h6 {
 }
 
 .card-library-select-filter {
+  position: relative;
   display: grid;
+}
+
+.card-library-quick-filter-label {
+  position: absolute;
+  z-index: 1;
+  top: 0.3rem;
+  left: 0.6rem;
+  color: var(--color-muted);
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.card-library-quick-filter.is-active .card-library-quick-filter-label {
+  color: var(--color-accent-dark);
 }
 
 .search-form .card-library-select-filter select {
@@ -597,7 +616,7 @@ h6 {
   min-width: 0;
   height: 100%;
   border: 0;
-  padding: 0.45rem 1.6rem 0.45rem 0.6rem;
+  padding: 1rem 1.6rem 0.2rem 0.6rem;
   background-color: transparent;
   color: inherit;
   font: inherit;
