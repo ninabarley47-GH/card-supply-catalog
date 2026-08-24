@@ -71,7 +71,6 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
       paperPackNamesById
     });
 
-    gallery.classList.toggle('card-library-grid-filtered', hasActiveFilters);
     renderCardLibrary(gallery, visibleCards, cards.length, paperPackNamesById);
     updateCardLibraryResultCount(resultCount, visibleCards.length, cards.length);
     updateCardQuickFilterStates({ favoritesButton, ownerFilter, holidayFilter, statusFilter });
