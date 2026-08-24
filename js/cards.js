@@ -1,5 +1,6 @@
-import { deleteCard, loadCatalogSetting, loadSavedCards, saveCard, saveCatalogSetting } from './storage.js';
+import { deleteCard, loadCatalogSetting, loadSavedCards, saveCard, saveCatalogSetting, saveOwner } from './storage.js';
 import { loadDefaultOwnerId } from './settings.js';
+import { getOwnerNameForId, initializeOwnerInput, refreshOwnerOptions, resolveOwnerInput } from './owner-picker.js';
 import {
   clearSelectedCardImage,
   chooseCardImageFromLibrary,
@@ -117,7 +118,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
       loadCatalogSetting(ADD_CARD_LAST_OWNER_SETTING_ID).catch(() => '')
     ]);
     loadAvailablePaperPacks(addCardView, paperPacks);
-    openAddCardView(addCardView, selectNewCardOwnerId(defaultOwnerId, lastOwnerId, owners));
+    openAddCardView(addCardView, getOwnerNameForId(selectNewCardOwnerId(defaultOwnerId, lastOwnerId, owners), owners));
   });
   searchInput?.addEventListener('input', renderCurrent);
   favoritesInput?.addEventListener('change', renderCurrent);
@@ -288,10 +289,18 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   addCardView.form.addEventListener('submit', async () => {
     addStampSetsFromInput(addCardView, false);
     const isNewCard = !addCardView.existingCard;
+    const owner = resolveOwnerInput(addCardView.owner.value, owners);
+    if (!owner) return;
     const card = createCardRecord(addCardView);
+    card.ownerId = owner.id;
     addCardView.save.disabled = true;
 
     try {
+      if (!owners.some((candidate) => candidate.id === owner.id)) {
+        await saveOwner(owner);
+        owners.push(owner);
+        refreshOwnerOptions(owners);
+      }
       const imageResult = await prepareCardImageForSave(card, addCardView.selectedImage);
       await saveCard(imageResult.card);
       await hydrateCardImageSources([imageResult.card]);
@@ -373,10 +382,10 @@ function createAddCardView({ owners = [], onCreateTag } = {}) {
   const dateCreated = document.createElement('input');
   dateCreated.type = 'date';
   dateCreated.name = 'dateCreated';
-  const owner = document.createElement('select');
-  owner.name = 'ownerId';
-  owner.required = true;
-  owner.append(new Option('Select owner…', ''), ...owners.map((candidate) => new Option(candidate.name, candidate.id)));
+  const owner = document.createElement('input');
+  owner.type = 'text';
+  owner.name = 'owner';
+  initializeOwnerInput(owner, owners);
   const sizePreset = document.createElement('select');
   sizePreset.name = 'cardSize';
   Object.entries(CARD_SIZE_PRESETS).forEach(([value, preset]) => {
@@ -441,6 +450,7 @@ function createAddCardView({ owners = [], onCreateTag } = {}) {
     close,
     cancel,
     save,
+    owners,
     dateCreated,
     owner,
     sizePreset,
@@ -510,9 +520,9 @@ function createAddCardView({ owners = [], onCreateTag } = {}) {
   return addCardView;
 }
 
-function openAddCardView(addCardView, ownerId = '') {
+function openAddCardView(addCardView, ownerName = '') {
   resetAddCardForm(addCardView);
-  addCardView.owner.value = ownerId;
+  addCardView.owner.value = ownerName;
   addCardView.overlay.hidden = false;
   addCardView.close.focus();
 }
@@ -523,7 +533,7 @@ function openEditCardView(addCardView, card) {
   addCardView.title.textContent = 'Edit Card';
   addCardView.save.textContent = 'Save Changes';
   addCardView.dateCreated.value = card.dateCreated;
-  addCardView.owner.value = card.ownerId || '';
+  addCardView.owner.value = getOwnerNameForId(card.ownerId, addCardView.owners) || '';
   addCardView.sizePreset.value = getCardSizePreset(card.size);
   applyCardSizePreset(addCardView);
   addCardView.width.value = card.size.width;
@@ -837,7 +847,6 @@ function createCardRecord(addCardView) {
   return {
     ...(existingCard || {}),
     id: existingCard?.id || createCardId(timestamp),
-    ownerId: addCardView.owner.value,
     dateCreated: addCardView.dateCreated.value,
     size: {
       preset: addCardView.sizePreset.value,

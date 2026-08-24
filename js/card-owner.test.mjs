@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { selectNewCardOwnerId } from './cards.js';
+import { getOwnerNameForId, resolveOwnerInput } from './owner-picker.js';
 
 const owners = [
   { id: 'owner-nina', name: 'Nina' },
@@ -20,4 +21,12 @@ test('Add Card falls back to the last used owner', () => {
 test('Add Card leaves owner unselected when neither owner exists', () => {
   assert.equal(selectNewCardOwnerId('', '', owners), '');
   assert.equal(selectNewCardOwnerId('owner-missing', 'owner-also-missing', owners), '');
+});
+
+test('shared owner picker resolves existing owners and creates stable new owner records', () => {
+  assert.equal(getOwnerNameForId('owner-nina', owners), 'Nina');
+  assert.deepEqual(resolveOwnerInput(' amanda ', owners), owners[1]);
+  const newOwner = resolveOwnerInput('Jordan', owners);
+  assert.equal(newOwner.name, 'Jordan');
+  assert.match(newOwner.id, /^owner-jordan-/);
 });

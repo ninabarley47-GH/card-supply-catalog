@@ -9,6 +9,7 @@ import { addCatalogSchemaVersion } from "./schema.js";
 import { loadCatalogSetting, loadPaperTagVocabulary, saveCatalogSetting, saveOwner, savePaperTagVocabulary } from "./storage.js";
 import { createLegacyOwnerId, getOwnerNameKey } from "./owners.js";
 import { loadDefaultOwnerId } from "./settings.js";
+import { initializeOwnerInput, refreshOwnerOptions } from "./owner-picker.js";
 import { buildEffectivePaperTagVocabulary } from "./tag-utils.js";
 import { createTagPicker } from "./tag-picker.js";
 import { createTagVocabularyStore } from "./card-tags.js";
@@ -41,6 +42,8 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = [], owners = [
   if (!panel || !form) {
     return;
   }
+
+  initializeOwnerInput(form.elements.owner, owners);
 
   const paperTagVocabulary = createTagVocabularyStore({
     loadVocabulary: loadPaperTagVocabulary,
@@ -267,6 +270,7 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = [], owners = [
     if (!owners.some((candidate) => candidate.id === owner.id)) {
       await saveOwner(owner);
       owners.push(owner);
+      refreshOwnerOptions(owners);
     }
 
     const saveDetail = {
