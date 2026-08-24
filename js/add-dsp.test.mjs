@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildPaperPackFromForm, waitForPaperPackPersistence } from "./add-dsp.js";
+import { applyDefaultOwner, buildPaperPackFromForm, waitForPaperPackPersistence } from "./add-dsp.js";
 import { createTagVocabularyStore } from "./card-tags.js";
 import { normalizePaperPackKeywords } from "./storage.js";
 import { buildEffectiveCardTagVocabulary, buildEffectivePaperTagVocabulary } from "./tag-utils.js";
@@ -18,6 +18,33 @@ function createValidPaperPackForm() {
 }
 
 const colorsById = { red: { id: "red", name: "Red" } };
+const owners = [
+  { id: "owner-nina", name: "Nina" },
+  { id: "owner-amanda", name: "Amanda" }
+];
+
+test("Add DSP applies the configured device-local Default Owner", () => {
+  const form = { elements: { owner: { value: "Previous owner" } } };
+  applyDefaultOwner(form, "owner-nina", owners);
+  assert.equal(form.elements.owner.value, "Nina");
+});
+
+test("Add DSP preserves its current owner default when no valid Default Owner is set", () => {
+  const form = { elements: { owner: { value: "Previous owner" } } };
+  applyDefaultOwner(form, "", owners);
+  assert.equal(form.elements.owner.value, "Previous owner");
+  applyDefaultOwner(form, "owner-missing", owners);
+  assert.equal(form.elements.owner.value, "Previous owner");
+});
+
+test("Add DSP saves a user-changed owner using that owner's stable ID", () => {
+  const form = createValidPaperPackForm();
+  form.set("owner", "Amanda");
+  const result = buildPaperPackFromForm(form, colorsById, [], null, [], owners);
+  assert.equal(result.ok, true);
+  assert.equal(result.paperPack.owner, "Amanda");
+  assert.equal(result.paperPack.ownerId, "owner-amanda");
+});
 
 test("Add DSP stores shared-picker selections in keywords", () => {
   const result = buildPaperPackFromForm(createValidPaperPackForm(), colorsById, [], null, ["Floral", "Fun Fold"]);

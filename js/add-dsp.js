@@ -8,6 +8,7 @@ import {
 import { addCatalogSchemaVersion } from "./schema.js";
 import { loadCatalogSetting, loadPaperTagVocabulary, saveCatalogSetting, saveOwner, savePaperTagVocabulary } from "./storage.js";
 import { createLegacyOwnerId, getOwnerNameKey } from "./owners.js";
+import { loadDefaultOwnerId } from "./settings.js";
 import { buildEffectivePaperTagVocabulary } from "./tag-utils.js";
 import { createTagPicker } from "./tag-picker.js";
 import { createTagVocabularyStore } from "./card-tags.js";
@@ -97,12 +98,18 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = [], owners = [
 
   for (const button of openButtons) {
     button.addEventListener("click", async () => {
-      await Promise.all([defaultsReady, paperTagsReady]);
+      const [, , defaultOwnerId] = await Promise.all([
+        defaultsReady,
+        paperTagsReady,
+        loadDefaultOwnerId().catch(() => "")
+      ]);
       openAddDspPanel(panel, form, selectedImages, imagePreviewList, imagePreviewCount, {
         title,
         summary,
         submitButton,
-        formState
+        formState,
+        defaultOwnerId,
+        owners
       });
     });
   }
@@ -194,12 +201,18 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = [], owners = [
       return;
     }
 
-    await Promise.all([defaultsReady, paperTagsReady]);
+    const [, , defaultOwnerId] = await Promise.all([
+      defaultsReady,
+      paperTagsReady,
+      loadDefaultOwnerId().catch(() => "")
+    ]);
     openAddDspPanel(panel, form, selectedImages, imagePreviewList, imagePreviewCount, {
       title,
       summary,
       submitButton,
-      formState
+      formState,
+      defaultOwnerId,
+      owners
     });
     form.elements.name.value = paperPackName;
     await autoLoadImagesForCurrentPaperPackName(
@@ -326,6 +339,7 @@ export async function waitForPaperPackPersistence(saveComplete) {
 function openAddDspPanel(panel, form, selectedImages, imagePreviewList, imagePreviewCount, controls) {
   resetAddDspForm(form, selectedImages, imagePreviewList, imagePreviewCount, controls);
   applyAddDspDefaults(form, controls.formState.addDspDefaults);
+  applyDefaultOwner(form, controls.defaultOwnerId, controls.owners);
   panel.hidden = false;
   panel.querySelector("input, select, textarea, button")?.focus();
 }
@@ -371,6 +385,17 @@ function applyAddDspDefaults(form, defaults) {
   form.elements.releaseYear.value = `${defaults.releaseYear}`;
   form.elements.availability.value = defaults.availability;
   form.elements.refillAvailable.value = formatOptionalBoolean(defaults.refillAvailable);
+}
+
+export function applyDefaultOwner(form, defaultOwnerId, owners = []) {
+  if (!defaultOwnerId) {
+    return;
+  }
+
+  const defaultOwner = owners.find((owner) => owner.id === defaultOwnerId);
+  if (defaultOwner) {
+    form.elements.owner.value = defaultOwner.name;
+  }
 }
 
 function openEditDspPanel(panel, form, paperPack, colorsById, selectedImages, imagePreviewList, imagePreviewCount, controls) {
