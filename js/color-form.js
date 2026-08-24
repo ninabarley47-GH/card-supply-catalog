@@ -81,6 +81,7 @@ export function initializeAddColorWorkflow(colorsById) {
 
     saveColor(result.color)
       .then(() => {
+        const source = formState.source;
         colorsById[result.color.id] = result.color;
         document.dispatchEvent(
           new CustomEvent("color:saved", {
@@ -91,6 +92,9 @@ export function initializeAddColorWorkflow(colorsById) {
           })
         );
         closeColorPanel(panel, form, message, idPreview, swatchPreview, formState);
+        if (source !== "add-dsp") {
+          window.location.hash = "color-library";
+        }
       })
       .catch(() => {
         renderColorMessage(message, "The color could not be saved in this browser.", "error");

@@ -318,6 +318,9 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
         saveCatalogSetting(ADD_CARD_LAST_OWNER_SETTING_ID, card.ownerId).catch(() => {});
       }
       closeAddCardView(addCardView, addCardButton);
+      if (isNewCard) {
+        window.location.hash = 'cards';
+      }
 
       if (imageResult.usedFallback) {
         window.alert('The card was saved, but its image was kept in browser storage because the Card image folder was unavailable.');
