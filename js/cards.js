@@ -52,6 +52,10 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   let activeTile = null;
 
   refreshCardOwnerFilter(ownerFilter, owners);
+  const defaultOwnerId = await loadDefaultOwnerId().catch(() => '');
+  if (ownerFilter && owners.some((owner) => isActiveOwner(owner) && owner.id === defaultOwnerId)) {
+    ownerFilter.value = defaultOwnerId;
+  }
 
   const renderCurrent = () => {
     const selectedTags = getSelectedCardTags(tagFilter);
@@ -986,7 +990,7 @@ function refreshCardOwnerFilter(select, owners = []) {
 
   const selectedOwnerId = select.value;
   select.replaceChildren(
-    new Option('Owner', ''),
+    new Option('All', ''),
     ...owners.filter(isActiveOwner)
       .slice()
       .sort((first, second) => first.name.localeCompare(second.name, undefined, { sensitivity: 'base' }))
