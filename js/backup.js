@@ -135,6 +135,16 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
         return;
       }
 
+      if (backupFile.size === 0) {
+        renderBackupMessage(
+          message,
+          "This backup file is empty (0 bytes). Create and transfer the compact iPad backup again. No catalog data was changed.",
+          "error"
+        );
+        importInput.value = "";
+        return;
+      }
+
       if (shouldBlockOversizedIpadImport({
         fileSize: backupFile.size,
         userAgent: navigator.userAgent,
@@ -221,7 +231,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, onRestore }) {
         renderBackupMessage(
           message,
           "Low-memory scan completed. No catalog data was imported or changed. Copy the debug report below.",
-          latestDiagnosticReport ? "success" : "error"
+          latestDiagnosticReport?.summary?.failures === 0 ? "success" : "error"
         );
       } catch (error) {
         latestDiagnosticReport = await createFailedDiagnosticReport(backupFile, error);
@@ -360,15 +370,17 @@ function createStreamProgress(bytesRead, totalBytes, imagesChecked) {
   };
 }
 
-function createLowMemoryDiagnosticSummary(report) {
+export function createLowMemoryDiagnosticSummary(report) {
   const malformedImages = report.images.filter((image) => !image.supportedPrefix || image.invalidBase64Characters > 0);
+  const emptyBackupFile = report.backup?.fileSize === 0;
   return {
     imagesReceived: report.images.length,
     totalEncodedImageCharacters: report.images.reduce((sum, image) => sum + image.base64CharacterCount, 0),
     estimatedDecodedImageBytes: report.images.reduce((sum, image) => sum + image.estimatedDecodedBytes, 0),
     largestEncodedImageCharacters: report.images.reduce((largest, image) => Math.max(largest, image.base64CharacterCount), 0),
     malformedImages: malformedImages.length,
-    failures: malformedImages.length,
+    emptyBackupFile,
+    failures: malformedImages.length + (emptyBackupFile ? 1 : 0),
     catalogChanged: false
   };
 }
@@ -844,14 +856,22 @@ export function shouldBlockOversizedIpadImport({ fileSize, userAgent = "", platf
 }
 
 function downloadJsonBackup(blob, fileName) {
+  if (blob.size === 0) {
+    throw new Error("The generated backup file is empty.");
+  }
+
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
 
   link.href = url;
   link.download = fileName;
+  link.hidden = true;
+  document.body.append(link);
   link.click();
+  link.remove();
 
-  URL.revokeObjectURL(url);
+  // Safari may still be reading the object URL after the click handler returns.
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 async function getWritableBackupDirectoryHandle() {

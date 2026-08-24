@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createEmbeddedImageStreamScanner, createShareableDiagnosticReport } from "./backup.js";
+import {
+  createEmbeddedImageStreamScanner,
+  createLowMemoryDiagnosticSummary,
+  createShareableDiagnosticReport
+} from "./backup.js";
 
 test("low-memory scanner finds embedded images across arbitrary chunk boundaries", () => {
   const scanner = createEmbeddedImageStreamScanner();
@@ -60,4 +64,15 @@ test("shareable diagnostic keeps failures and only the ten largest valid images"
   assert.deepEqual(compact.imageEvidence.malformedImages.map((image) => image.imageIndex), [4]);
   assert.deepEqual(compact.imageEvidence.largestValidImages.map((image) => image.imageIndex), [15, 14, 13, 12, 11, 10, 9, 8, 7, 6]);
   assert.equal(compact.imageEvidence.omittedSuccessfulImages, 4);
+});
+
+test("low-memory diagnostic treats a zero-byte backup as a failure", () => {
+  const summary = createLowMemoryDiagnosticSummary({
+    backup: { fileSize: 0 },
+    images: []
+  });
+
+  assert.equal(summary.emptyBackupFile, true);
+  assert.equal(summary.failures, 1);
+  assert.equal(summary.catalogChanged, false);
 });
