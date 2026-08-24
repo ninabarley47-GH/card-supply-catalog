@@ -541,7 +541,6 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
     toggle.addEventListener("click", () => toggleFilterSection(toggle));
   });
   tagFilter?.addEventListener("change", renderCurrent);
-  colorFilter?.addEventListener("change", renderCurrent);
   sortControl?.addEventListener("change", renderCurrent);
   form.addEventListener("submit", (event) => event.preventDefault());
 
@@ -650,22 +649,25 @@ function initializeLibraryColorTypeahead(container, renderCurrent) {
     }
   });
   container.addEventListener("click", (event) => {
-    const option = event.target.closest("[data-library-color-option]");
     const removeButton = event.target.closest("[data-remove-library-color]");
-
-    if (option) {
-      addSelectedLibraryColor(container, option.dataset.libraryColorOption);
-      searchInput.value = "";
-      renderCurrent();
-      searchInput.focus();
-      return;
-    }
 
     if (removeButton) {
       removeSelectedLibraryColor(container, removeButton.dataset.removeLibraryColor);
       renderCurrent();
       searchInput.focus();
     }
+  });
+  container.addEventListener("change", (event) => {
+    const option = event.target.closest("[data-library-color-option]");
+
+    if (!option || !event.target.checked) {
+      return;
+    }
+
+    addSelectedLibraryColor(container, option.dataset.libraryColorOption);
+    searchInput.value = "";
+    renderCurrent();
+    searchInput.focus();
   });
 }
 
@@ -699,13 +701,22 @@ export function filterLibraryColorOptions(colors, query = "", selectedColors = [
 }
 
 function createLibraryColorMatch(color) {
-  const button = document.createElement("button");
-  button.className = "library-color-result";
-  button.type = "button";
-  button.dataset.libraryColorOption = color.id;
-  button.setAttribute("role", "option");
-  button.append(createLibraryColorSwatch(color), document.createTextNode(color.name));
-  return button;
+  const label = document.createElement("label");
+  label.className = "library-color-option";
+  label.dataset.libraryColorOption = color.id;
+
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.name = "library-color-suggestions";
+  input.value = color.id;
+
+  const marker = document.createElement("span");
+  const name = document.createElement("span");
+  name.textContent = color.name;
+
+  marker.append(createLibraryColorSwatch(color), name);
+  label.append(input, marker);
+  return label;
 }
 
 function renderSelectedLibraryColors(container) {
