@@ -186,6 +186,20 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   });
 
   gallery.addEventListener('click', async (event) => {
+    const editButton = event.target.closest('[data-edit-card]');
+
+    if (editButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      const card = findCard(cards, editButton.dataset.editCard);
+
+      if (card) {
+        loadAvailablePaperPacks(addCardView, paperPacks);
+        openEditCardView(addCardView, card);
+      }
+      return;
+    }
+
     const favoriteButton = event.target.closest('[data-toggle-card-favorite]');
 
     if (favoriteButton) {
@@ -208,7 +222,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   });
 
   gallery.addEventListener('keydown', (event) => {
-    if (event.target.closest('[data-toggle-card-favorite]')) {
+    if (event.target.closest('[data-toggle-card-favorite], [data-edit-card]')) {
       return;
     }
 
@@ -1141,6 +1155,7 @@ function createCardTile(card, index, paperPackNamesById) {
   image.append(favorite);
 
   const metadata = createCardLibraryMetadata(card, paperPackNamesById);
+  const actions = createCardLibraryActions(card);
 
   const tagList = document.createElement('ul');
   tagList.className = 'card-library-tags';
@@ -1152,8 +1167,22 @@ function createCardTile(card, index, paperPackNamesById) {
     tagList.append(item);
   });
 
-  tile.append(image, tagList, metadata);
+  tile.append(image, tagList, metadata, actions);
   return tile;
+}
+
+function createCardLibraryActions(card) {
+  const actions = document.createElement('div');
+  const editButton = document.createElement('button');
+
+  actions.className = 'card-library-actions';
+  editButton.className = 'card-edit-button card-library-edit-button';
+  editButton.type = 'button';
+  editButton.dataset.editCard = card.id;
+  editButton.textContent = 'Edit';
+  editButton.setAttribute('aria-label', `Edit card created ${card.dateCreated}`);
+  actions.append(editButton);
+  return actions;
 }
 
 function createCardLibraryMetadata(card, paperPackNamesById) {

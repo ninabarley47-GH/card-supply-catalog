@@ -1977,6 +1977,22 @@ button.pattern {
   color: var(--color-text);
 }
 
+.card-library-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.card-library-metadata:empty + .card-library-actions {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-4);
+}
+
+.card-library-edit-button {
+  position: static;
+  flex: 0 0 auto;
+}
+
 .card-title-row {
   display: flex;
   align-items: start;
