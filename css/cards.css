@@ -153,6 +153,20 @@
   line-height: 1.35;
 }
 
+.card-library-metadata .card-library-created-date {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.card-library-created-date dt,
+.card-library-created-date dd {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  font-weight: 400;
+  line-height: 1.35;
+  text-transform: none;
+}
+
 .card-library-tags {
   display: flex;
   flex-wrap: wrap;

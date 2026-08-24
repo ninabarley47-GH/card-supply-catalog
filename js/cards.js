@@ -1193,10 +1193,26 @@ function createCardLibraryMetadata(card, paperPackNamesById) {
     .filter(Boolean);
 
   metadata.className = 'card-library-metadata';
-  appendCardLibraryMetadata(metadata, 'Created', dateCreated ? [dateCreated] : []);
   appendCardLibraryMetadata(metadata, 'Paper Packs', paperPackNames);
   appendCardLibraryMetadata(metadata, 'Stamp Sets', card.stampSets || []);
+  appendCardLibraryCreatedDate(metadata, dateCreated);
   return metadata;
+}
+
+function appendCardLibraryCreatedDate(metadata, dateCreated) {
+  if (!dateCreated) {
+    return;
+  }
+
+  const group = document.createElement('div');
+  const term = document.createElement('dt');
+  const description = document.createElement('dd');
+
+  group.className = 'card-library-created-date';
+  term.textContent = 'Created:';
+  description.textContent = dateCreated;
+  group.append(term, description);
+  metadata.append(group);
 }
 
 function formatCardLibraryDate(value) {
@@ -1217,7 +1233,12 @@ function formatCardLibraryDate(value) {
     return '';
   }
 
-  return new Intl.DateTimeFormat([], { dateStyle: 'medium', timeZone: 'UTC' }).format(date);
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    timeZone: 'UTC'
+  }).format(date);
 }
 
 function appendCardLibraryMetadata(metadata, label, values) {
