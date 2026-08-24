@@ -22,8 +22,10 @@ const CARD_SIZE_PRESETS = {
 export async function initializeCardLibrary({ paperPacks = [] } = {}) {
   const gallery = document.querySelector('[data-card-library]');
   const toolbar = gallery?.closest('#cards')?.querySelector('.library-toolbar');
+  const headerActions = toolbar?.querySelector('[data-card-library-header-actions]');
+  const resultCount = toolbar?.querySelector('[data-card-library-result-count]');
 
-  if (!gallery || !toolbar) {
+  if (!gallery || !toolbar || !headerActions) {
     return;
   }
 
@@ -58,6 +60,7 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
 
     gallery.classList.toggle('card-library-grid-filtered', hasActiveFilters);
     renderCardLibrary(gallery, visibleCards, cards.length, paperPackNamesById);
+    updateCardLibraryResultCount(resultCount, visibleCards.length, cards.length);
 
     if (clearFiltersButton) {
       clearFiltersButton.hidden =
@@ -70,7 +73,7 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
   };
 
   renderCurrent();
-  toolbar.append(addCardButton);
+  headerActions.append(addCardButton);
   document.body.append(detailView.overlay, addCardView.overlay);
   loadAvailablePaperPacks(addCardView, paperPacks);
 
@@ -970,6 +973,15 @@ function renderCardLibrary(gallery, cards, totalCount = cards.length, paperPackN
   }
 
   gallery.replaceChildren(...cards.map((card, index) => createCardTile(card, index, paperPackNamesById)));
+}
+
+function updateCardLibraryResultCount(resultCount, visibleCount, totalCount) {
+  if (!resultCount) {
+    return;
+  }
+
+  const cardLabel = totalCount === 1 ? 'card' : 'cards';
+  resultCount.textContent = `Showing ${visibleCount} of ${totalCount} ${cardLabel}`;
 }
 
 function renderCardLibraryError(gallery) {

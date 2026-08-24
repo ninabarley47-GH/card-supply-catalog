@@ -48,20 +48,6 @@
           </div>
 
           <div data-sidebar-controls="library">
-          <section class="library-sort" aria-labelledby="library-sort-heading">
-            <h3 id="library-sort-heading">Sort</h3>
-            <label for="library-sort-order">Order</label>
-            <select id="library-sort-order" data-library-sort>
-              <option value="recently-added" selected>Recently Added</option>
-              <option value="name-asc">Name: A–Z</option>
-              <option value="name-desc">Name: Z–A</option>
-              <option value="release-asc">Release date: Oldest first</option>
-              <option value="release-desc">Release date: Newest first</option>
-              <option value="owner-asc">Owner: A–Z</option>
-              <option value="owner-desc">Owner: Z–A</option>
-            </select>
-          </section>
-
           <form class="search-form nav-search" role="search" aria-label="Search catalog" data-library-search-form>
             <div class="filter-heading-row">
               <h3>Filter</h3>
@@ -96,16 +82,6 @@
           </div>
 
           <div data-sidebar-controls="cards" hidden>
-            <section class="library-sort" aria-labelledby="card-library-sort-heading">
-              <h3 id="card-library-sort-heading">Sort Cards</h3>
-              <label for="card-library-sort-order">Order</label>
-              <select id="card-library-sort-order" data-card-library-sort>
-                <option value="date-desc" selected>Date created: Newest first</option>
-                <option value="date-asc">Date created: Oldest first</option>
-                <option value="favorite-desc">Favorites first</option>
-              </select>
-            </section>
-
             <form class="search-form nav-search" role="search" aria-label="Filter cards" data-card-library-filter-form>
               <div class="filter-heading-row">
                 <h3>Filter Cards</h3>
@@ -158,8 +134,7 @@
                 <p class="result-count" data-library-result-count aria-live="polite">Showing 0 of 0 packs</p>
               </div>
               <div class="library-toolbar-actions">
-                <button class="button button-accent-outline" type="button" data-find-uncataloged-packs>Find Uncataloged Packs</button>
-                <button class="button button-accent-outline" type="button" data-expand-all-patterns aria-pressed="false">Show All Patterns</button>
+                <button class="button button-quiet" type="button" data-find-uncataloged-packs>Find Uncataloged Packs</button>
               </div>
             </section>
 
@@ -181,6 +156,21 @@
 
             <section class="library-section" aria-labelledby="library-grid-title">
               <h3 class="visually-hidden" id="library-grid-title">DSP Packs</h3>
+              <div class="gallery-toolbar" aria-label="Paper gallery controls">
+                <button class="button button-accent-outline button-compact" type="button" data-expand-all-patterns aria-pressed="false">Show All Patterns</button>
+                <label class="gallery-toolbar-control" for="library-sort-order">
+                  <span>Sort</span>
+                  <select id="library-sort-order" data-library-sort>
+                    <option value="recently-added" selected>Recently Added</option>
+                    <option value="name-asc">Name: A–Z</option>
+                    <option value="name-desc">Name: Z–A</option>
+                    <option value="release-asc">Release date: Oldest first</option>
+                    <option value="release-desc">Release date: Newest first</option>
+                    <option value="owner-asc">Owner: A–Z</option>
+                    <option value="owner-desc">Owner: Z–A</option>
+                  </select>
+                </label>
+              </div>
               <div class="dsp-grid dsp-grid-balanced" data-paper-pack-library aria-live="polite">
                 <p class="loading-message">Loading paper packs...</p>
               </div>
@@ -233,10 +223,22 @@
             <section class="library-toolbar" aria-labelledby="cards-title">
               <div>
                 <h2 id="cards-title">Cards</h2>
+                <p class="result-count" data-card-library-result-count aria-live="polite">Showing 0 of 0 cards</p>
               </div>
+              <div class="library-toolbar-actions" data-card-library-header-actions></div>
             </section>
 
             <section class="library-section" aria-label="Card gallery">
+              <div class="gallery-toolbar" aria-label="Card gallery controls">
+                <label class="gallery-toolbar-control" for="card-library-sort-order">
+                  <span>Sort</span>
+                  <select id="card-library-sort-order" data-card-library-sort>
+                    <option value="date-desc" selected>Date created: Newest first</option>
+                    <option value="date-asc">Date created: Oldest first</option>
+                    <option value="favorite-desc">Favorites first</option>
+                  </select>
+                </label>
+              </div>
               <div class="card-library-grid" data-card-library></div>
             </section>
           </section>
