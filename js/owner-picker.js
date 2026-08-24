@@ -1,38 +1,69 @@
 import { createLegacyOwnerId, getOwnerNameKey, normalizeOwnerName } from './owners.js';
 
-const OWNER_DATALIST_ID = 'catalog-owner-options';
+export const NEW_OWNER_VALUE = '__new_owner__';
 
-export function initializeOwnerInput(input, owners = []) {
-  if (!input) return;
-  input.setAttribute('list', OWNER_DATALIST_ID);
-  input.setAttribute('autocomplete', 'off');
-  input.placeholder = 'Select owner…';
-  input.required = true;
-  refreshOwnerOptions(owners);
+export function initializeOwnerPicker(select, newOwnerInput, owners = []) {
+  if (!select || !newOwnerInput) return;
+  select.dataset.ownerPicker = '';
+  newOwnerInput.dataset.newOwnerInput = '';
+  if (!select.dataset.ownerPickerReady) {
+    select.addEventListener('change', () => updateNewOwnerInput(select, newOwnerInput));
+    select.dataset.ownerPickerReady = 'true';
+  }
+  refreshOwnerPicker(select, owners);
+  updateNewOwnerInput(select, newOwnerInput);
 }
 
 export function refreshOwnerOptions(owners = []) {
-  let datalist = document.getElementById(OWNER_DATALIST_ID);
-  if (!datalist) {
-    datalist = document.createElement('datalist');
-    datalist.id = OWNER_DATALIST_ID;
-    document.body.append(datalist);
+  document.querySelectorAll('[data-owner-picker]').forEach((select) => {
+    refreshOwnerPicker(select, owners);
+    const input = select.parentElement?.querySelector('[data-new-owner-input]');
+    if (input) updateNewOwnerInput(select, input);
+  });
+}
+
+export function setOwnerPickerValue(select, newOwnerInput, ownerId, ownerName, owners = []) {
+  const existingOwner = owners.find((owner) => owner.id === ownerId) ||
+    owners.find((owner) => getOwnerNameKey(owner.name) === getOwnerNameKey(ownerName));
+  if (existingOwner) {
+    select.value = existingOwner.id;
+    newOwnerInput.value = '';
+  } else if (normalizeOwnerName(ownerName)) {
+    select.value = NEW_OWNER_VALUE;
+    newOwnerInput.value = normalizeOwnerName(ownerName);
+  } else {
+    select.value = '';
+    newOwnerInput.value = '';
   }
-  datalist.replaceChildren(...owners
-    .slice()
+  updateNewOwnerInput(select, newOwnerInput);
+}
+
+export function resolveOwnerPicker(select, newOwnerInput, owners = []) {
+  if (select.value === NEW_OWNER_VALUE) {
+    const name = normalizeOwnerName(newOwnerInput.value);
+    if (!name) return null;
+    return owners.find((owner) => getOwnerNameKey(owner.name) === getOwnerNameKey(name)) || { id: createLegacyOwnerId(name), name };
+  }
+  return owners.find((owner) => owner.id === select.value) || null;
+}
+
+export function notifyOwnerRegistryUpdated() {
+  document.dispatchEvent(new CustomEvent('catalog:owners-updated'));
+}
+
+function refreshOwnerPicker(select, owners) {
+  const selectedValue = select.value;
+  const options = owners.slice()
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
-    .map((owner) => new Option(owner.name)));
+    .map((owner) => new Option(owner.name, owner.id));
+  select.replaceChildren(new Option('Select owner…', ''), ...options, new Option('Add new owner…', NEW_OWNER_VALUE));
+  select.value = [...select.options].some((option) => option.value === selectedValue) ? selectedValue : '';
 }
 
-export function getOwnerNameForId(ownerId, owners = []) {
-  return owners.find((owner) => owner.id === ownerId)?.name || '';
-}
-
-export function resolveOwnerInput(value, owners = []) {
-  const name = normalizeOwnerName(value);
-  if (!name) return null;
-  return owners.find((owner) => getOwnerNameKey(owner.name) === getOwnerNameKey(name)) || {
-    id: createLegacyOwnerId(name),
-    name
-  };
+function updateNewOwnerInput(select, input) {
+  const addingOwner = select.value === NEW_OWNER_VALUE;
+  input.hidden = !addingOwner;
+  input.disabled = !addingOwner;
+  input.required = addingOwner;
+  if (!addingOwner) input.value = '';
 }

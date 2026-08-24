@@ -68,6 +68,10 @@ async function initializeOwnerSettings({ owners = [], paperPacks = [], onPaperPa
     renderDefaultOwnerMessage(message, owners, select.value);
     message.dataset.tone = "success";
   });
+  document.addEventListener("catalog:owners-updated", () => {
+    render();
+    renderDefaultOwnerMessage(message, owners, select.value);
+  });
 }
 
 function createOwnerSettingsRow(owner, owners, paperPacks, message, render, onPaperPacksUpdated) {

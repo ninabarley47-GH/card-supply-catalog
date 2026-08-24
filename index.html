@@ -453,7 +453,8 @@
 
             <div class="form-field">
               <label for="dsp-owner">Owner</label>
-              <input id="dsp-owner" name="owner" type="text" list="catalog-owner-options" autocomplete="off" placeholder="Select owner…" required>
+              <select id="dsp-owner" name="ownerId" required data-owner-picker></select>
+              <input name="owner" type="text" autocomplete="off" placeholder="New owner name" data-new-owner-input hidden disabled>
             </div>
 
             <div class="form-grid-two">

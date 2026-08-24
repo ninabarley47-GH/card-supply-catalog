@@ -9,7 +9,7 @@ import { addCatalogSchemaVersion } from "./schema.js";
 import { loadCatalogSetting, loadPaperTagVocabulary, saveCatalogSetting, saveOwner, savePaperTagVocabulary } from "./storage.js";
 import { createLegacyOwnerId, getOwnerNameKey } from "./owners.js";
 import { loadDefaultOwnerId } from "./settings.js";
-import { initializeOwnerInput, refreshOwnerOptions } from "./owner-picker.js";
+import { initializeOwnerPicker, notifyOwnerRegistryUpdated, refreshOwnerOptions, setOwnerPickerValue } from "./owner-picker.js";
 import { buildEffectivePaperTagVocabulary } from "./tag-utils.js";
 import { createTagPicker } from "./tag-picker.js";
 import { createTagVocabularyStore } from "./card-tags.js";
@@ -43,7 +43,7 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = [], owners = [
     return;
   }
 
-  initializeOwnerInput(form.elements.owner, owners);
+  initializeOwnerPicker(form.elements.ownerId, form.elements.owner, owners);
 
   const paperTagVocabulary = createTagVocabularyStore({
     loadVocabulary: loadPaperTagVocabulary,
@@ -271,6 +271,7 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = [], owners = [
       await saveOwner(owner);
       owners.push(owner);
       refreshOwnerOptions(owners);
+      notifyOwnerRegistryUpdated();
     }
 
     const saveDetail = {
@@ -342,7 +343,7 @@ export async function waitForPaperPackPersistence(saveComplete) {
 
 function openAddDspPanel(panel, form, selectedImages, imagePreviewList, imagePreviewCount, controls) {
   resetAddDspForm(form, selectedImages, imagePreviewList, imagePreviewCount, controls);
-  applyAddDspDefaults(form, controls.formState.addDspDefaults);
+  applyAddDspDefaults(form, controls.formState.addDspDefaults, controls.owners);
   applyDefaultOwner(form, controls.defaultOwnerId, controls.owners);
   panel.hidden = false;
   panel.querySelector("input, select, textarea, button")?.focus();
@@ -351,6 +352,7 @@ function openAddDspPanel(panel, form, selectedImages, imagePreviewList, imagePre
 function createAddDspDefaults(paperPack) {
   return {
     owner: paperPack.owner,
+    ownerId: paperPack.ownerId,
     releaseYear: paperPack.releaseYear,
     availability: paperPack.availability,
     refillAvailable: paperPack.refillAvailable
@@ -371,6 +373,7 @@ function normalizeAddDspDefaults(defaults) {
 
   return {
     owner,
+    ownerId: cleanText(defaults.ownerId),
     releaseYear,
     availability: defaults.availability === "used-up" ? "used-up" : "available",
     refillAvailable:
@@ -380,12 +383,12 @@ function normalizeAddDspDefaults(defaults) {
   };
 }
 
-function applyAddDspDefaults(form, defaults) {
+function applyAddDspDefaults(form, defaults, owners = []) {
   if (!defaults) {
     return;
   }
 
-  form.elements.owner.value = defaults.owner;
+  setOwnerPickerValue(form.elements.ownerId, form.elements.owner, defaults.ownerId, defaults.owner, owners);
   form.elements.releaseYear.value = `${defaults.releaseYear}`;
   form.elements.availability.value = defaults.availability;
   form.elements.refillAvailable.value = formatOptionalBoolean(defaults.refillAvailable);
@@ -394,7 +397,11 @@ function applyAddDspDefaults(form, defaults) {
 export function applyDefaultOwner(form, defaultOwnerId, owners = []) {
   const defaultOwner = owners.find((owner) => owner.id === defaultOwnerId);
   if (defaultOwner) {
-    form.elements.owner.value = defaultOwner.name;
+    if (form.elements.ownerId) {
+      setOwnerPickerValue(form.elements.ownerId, form.elements.owner, defaultOwner.id, defaultOwner.name, owners);
+    } else {
+      form.elements.owner.value = defaultOwner.name;
+    }
   }
 }
 
@@ -405,7 +412,7 @@ function openEditDspPanel(panel, form, paperPack, colorsById, selectedImages, im
   controls.summary.textContent = "Update this Designer Series Paper pack.";
   controls.submitButton.textContent = "Save Changes";
 
-  fillPaperPackForm(form, paperPack, colorsById);
+  fillPaperPackForm(form, paperPack, colorsById, controls.owners);
   controls.formState.tagPicker?.setSelected(paperPack.keywords || []);
   selectedImages.push(...getImageEntriesFromPatterns(paperPack.patterns));
   renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount);
@@ -435,8 +442,10 @@ function resetAddDspForm(form, selectedImages, imagePreviewList, imagePreviewCou
 
 export function buildPaperPackFromForm(formData, colorsById, selectedImages = [], editingPaperPack = null, selectedKeywords = [], owners = []) {
   const name = cleanText(formData.get("name"));
-  const owner = cleanText(formData.get("owner"));
-  const ownerRecord = owners.find((candidate) => getOwnerNameKey(candidate.name) === getOwnerNameKey(owner));
+  const selectedOwnerId = cleanText(formData.get("ownerId"));
+  const selectedOwner = owners.find((candidate) => candidate.id === selectedOwnerId);
+  const owner = selectedOwner?.name || cleanText(formData.get("owner"));
+  const ownerRecord = selectedOwner || owners.find((candidate) => getOwnerNameKey(candidate.name) === getOwnerNameKey(owner));
   const keepsExistingOwner = editingPaperPack?.ownerId && getOwnerNameKey(editingPaperPack.owner) === getOwnerNameKey(owner);
   const ownerId = ownerRecord?.id || (keepsExistingOwner ? editingPaperPack.ownerId : createLegacyOwnerId(owner));
   const releaseYear = Number.parseInt(formData.get("releaseYear"), 10);
@@ -535,9 +544,9 @@ function validatePaperPackDuplicate(paperPack, paperPacks, editingPaperPack = nu
     message: ""
   };
 }
-function fillPaperPackForm(form, paperPack, colorsById) {
+function fillPaperPackForm(form, paperPack, colorsById, owners = []) {
   form.elements.name.value = paperPack.name || "";
-  form.elements.owner.value = paperPack.owner || "";
+  setOwnerPickerValue(form.elements.ownerId, form.elements.owner, paperPack.ownerId, paperPack.owner, owners);
   form.elements.releaseYear.value = paperPack.releaseYear || "";
   form.elements.patternCount.value = paperPack.patternCount || 1;
   form.elements.availability.value = paperPack.availability || "available";

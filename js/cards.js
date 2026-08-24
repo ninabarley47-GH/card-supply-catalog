@@ -1,6 +1,6 @@
 import { deleteCard, loadCatalogSetting, loadSavedCards, saveCard, saveCatalogSetting, saveOwner } from './storage.js';
 import { loadDefaultOwnerId } from './settings.js';
-import { getOwnerNameForId, initializeOwnerInput, refreshOwnerOptions, resolveOwnerInput } from './owner-picker.js';
+import { initializeOwnerPicker, notifyOwnerRegistryUpdated, refreshOwnerOptions, resolveOwnerPicker, setOwnerPickerValue } from './owner-picker.js';
 import {
   clearSelectedCardImage,
   chooseCardImageFromLibrary,
@@ -118,7 +118,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
       loadCatalogSetting(ADD_CARD_LAST_OWNER_SETTING_ID).catch(() => '')
     ]);
     loadAvailablePaperPacks(addCardView, paperPacks);
-    openAddCardView(addCardView, getOwnerNameForId(selectNewCardOwnerId(defaultOwnerId, lastOwnerId, owners), owners));
+    openAddCardView(addCardView, selectNewCardOwnerId(defaultOwnerId, lastOwnerId, owners));
   });
   searchInput?.addEventListener('input', renderCurrent);
   favoritesInput?.addEventListener('change', renderCurrent);
@@ -289,7 +289,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   addCardView.form.addEventListener('submit', async () => {
     addStampSetsFromInput(addCardView, false);
     const isNewCard = !addCardView.existingCard;
-    const owner = resolveOwnerInput(addCardView.owner.value, owners);
+    const owner = resolveOwnerPicker(addCardView.owner, addCardView.newOwner, owners);
     if (!owner) return;
     const card = createCardRecord(addCardView);
     card.ownerId = owner.id;
@@ -300,6 +300,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
         await saveOwner(owner);
         owners.push(owner);
         refreshOwnerOptions(owners);
+        notifyOwnerRegistryUpdated();
       }
       const imageResult = await prepareCardImageForSave(card, addCardView.selectedImage);
       await saveCard(imageResult.card);
@@ -382,10 +383,14 @@ function createAddCardView({ owners = [], onCreateTag } = {}) {
   const dateCreated = document.createElement('input');
   dateCreated.type = 'date';
   dateCreated.name = 'dateCreated';
-  const owner = document.createElement('input');
-  owner.type = 'text';
-  owner.name = 'owner';
-  initializeOwnerInput(owner, owners);
+  const owner = document.createElement('select');
+  owner.name = 'ownerId';
+  owner.required = true;
+  const newOwner = document.createElement('input');
+  newOwner.type = 'text';
+  newOwner.name = 'owner';
+  newOwner.placeholder = 'New owner name';
+  initializeOwnerPicker(owner, newOwner, owners);
   const sizePreset = document.createElement('select');
   sizePreset.name = 'cardSize';
   Object.entries(CARD_SIZE_PRESETS).forEach(([value, preset]) => {
@@ -408,7 +413,7 @@ function createAddCardView({ owners = [], onCreateTag } = {}) {
   );
   controls.append(
     createAddCardField('Date Created', dateCreated),
-    createAddCardField('Owner', owner),
+    createAddCardField('Owner', owner, newOwner),
     createAddCardField('Card Size', sizePreset),
     dimensions,
     createFavoriteField(favorite)
@@ -453,6 +458,7 @@ function createAddCardView({ owners = [], onCreateTag } = {}) {
     owners,
     dateCreated,
     owner,
+    newOwner,
     sizePreset,
     width,
     height,
@@ -520,9 +526,9 @@ function createAddCardView({ owners = [], onCreateTag } = {}) {
   return addCardView;
 }
 
-function openAddCardView(addCardView, ownerName = '') {
+function openAddCardView(addCardView, ownerId = '') {
   resetAddCardForm(addCardView);
-  addCardView.owner.value = ownerName;
+  setOwnerPickerValue(addCardView.owner, addCardView.newOwner, ownerId, '', addCardView.owners);
   addCardView.overlay.hidden = false;
   addCardView.close.focus();
 }
@@ -533,7 +539,7 @@ function openEditCardView(addCardView, card) {
   addCardView.title.textContent = 'Edit Card';
   addCardView.save.textContent = 'Save Changes';
   addCardView.dateCreated.value = card.dateCreated;
-  addCardView.owner.value = getOwnerNameForId(card.ownerId, addCardView.owners) || '';
+  setOwnerPickerValue(addCardView.owner, addCardView.newOwner, card.ownerId, '', addCardView.owners);
   addCardView.sizePreset.value = getCardSizePreset(card.size);
   applyCardSizePreset(addCardView);
   addCardView.width.value = card.size.width;
@@ -562,12 +568,13 @@ function closeAddCardView(addCardView, addCardButton) {
   addCardButton.focus();
 }
 
-function createAddCardField(labelText, control) {
+function createAddCardField(labelText, control, secondaryControl = null) {
   const label = document.createElement('label');
   label.className = 'card-add-field';
   const text = document.createElement('span');
   text.textContent = labelText;
   label.append(text, control);
+  if (secondaryControl) label.append(secondaryControl);
   return label;
 }
 
