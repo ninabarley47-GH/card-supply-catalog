@@ -77,6 +77,12 @@
                 <button class="filter-toggle" type="button" aria-expanded="true" data-library-toggle-filter>Colors</button>
                 <button class="filter-clear-icon" type="button" data-library-clear-colors aria-label="Clear color filters" hidden>&times;</button>
               </div>
+              <div class="library-color-typeahead" data-library-filter-options>
+                <label class="visually-hidden" for="library-color-search">Search colors</label>
+                <input id="library-color-search" type="search" placeholder="Search colors…" autocomplete="off" data-library-color-search>
+                <div class="library-color-selected" data-library-color-selected aria-label="Selected colors"></div>
+                <div class="library-color-results" data-library-color-results role="listbox" aria-label="Matching colors" hidden></div>
+              </div>
             </fieldset>
           </form>
           </div>

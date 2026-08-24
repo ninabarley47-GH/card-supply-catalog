@@ -520,6 +520,7 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById) {
 
   refreshLibraryTagFilters(tagFilter, getAvailableTags(paperPacks));
   refreshLibraryColorFilters(colorFilter, getAvailableColors(paperPacks, colorsById));
+  initializeLibraryColorTypeahead(colorFilter, renderCurrent);
   input.addEventListener("input", renderCurrent);
   clearAllButton?.addEventListener("click", () => {
     input.value = "";
@@ -617,40 +618,157 @@ function refreshLibraryTagFilters(container, tags) {
   }
 }
 
-function renderLibraryColorFilters(container, colors) {
-  if (!container || colors.length === 0) {
-    return;
-  }
-
-  const options = document.createElement("div");
-  options.className = "library-color-filter-options";
-  options.dataset.libraryFilterOptions = "";
-
-  options.append(...colors.map(createLibraryColorOption));
-  container.append(options);
-}
-
 function refreshLibraryColorFilters(container, colors) {
   if (!container) {
     return;
   }
 
-  const selectedColors = new Set(getSelectedLibraryColors(container));
-  const existingOptions = container.querySelector("[data-library-filter-options]");
-  const optionsWereHidden = existingOptions?.hidden || false;
+  container.libraryColorOptions = [...colors].sort(compareColorNames);
+  renderSelectedLibraryColors(container);
+  renderLibraryColorMatches(container);
+}
 
-  existingOptions?.remove();
-  renderLibraryColorFilters(container, colors);
+function initializeLibraryColorTypeahead(container, renderCurrent) {
+  const searchInput = container?.querySelector("[data-library-color-search]");
+  const results = container?.querySelector("[data-library-color-results]");
 
-  const refreshedOptions = container.querySelector("[data-library-filter-options]");
-
-  if (refreshedOptions) {
-    refreshedOptions.hidden = optionsWereHidden;
+  if (!container || !searchInput || !results) {
+    return;
   }
 
-  for (const input of container.querySelectorAll('input[name="library-colors"]')) {
-    input.checked = selectedColors.has(input.value);
+  searchInput.addEventListener("input", () => renderLibraryColorMatches(container, true));
+  searchInput.addEventListener("focus", () => renderLibraryColorMatches(container, true));
+  searchInput.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      results.hidden = true;
+      searchInput.blur();
+    }
+  });
+  container.addEventListener("focusout", (event) => {
+    if (!container.contains(event.relatedTarget)) {
+      results.hidden = true;
+    }
+  });
+  container.addEventListener("click", (event) => {
+    const option = event.target.closest("[data-library-color-option]");
+    const removeButton = event.target.closest("[data-remove-library-color]");
+
+    if (option) {
+      addSelectedLibraryColor(container, option.dataset.libraryColorOption);
+      searchInput.value = "";
+      renderCurrent();
+      searchInput.focus();
+      return;
+    }
+
+    if (removeButton) {
+      removeSelectedLibraryColor(container, removeButton.dataset.removeLibraryColor);
+      renderCurrent();
+      searchInput.focus();
+    }
+  });
+}
+
+function renderLibraryColorMatches(container, showResults = false) {
+  const searchInput = container?.querySelector("[data-library-color-search]");
+  const results = container?.querySelector("[data-library-color-results]");
+
+  if (!searchInput || !results) {
+    return;
   }
+
+  const selectedColors = getSelectedLibraryColors(container);
+  const matches = filterLibraryColorOptions(
+    container.libraryColorOptions || [],
+    searchInput.value,
+    selectedColors
+  );
+
+  results.replaceChildren(...matches.map(createLibraryColorMatch));
+  results.hidden = !showResults || matches.length === 0;
+}
+
+export function filterLibraryColorOptions(colors, query = "", selectedColors = []) {
+  const normalizedQuery = normalizeFilterText(query);
+  const selectedColorIds = new Set(selectedColors);
+
+  return colors
+    .filter((color) => !selectedColorIds.has(color.id))
+    .filter((color) => !normalizedQuery || normalizeFilterText(color.name).includes(normalizedQuery))
+    .sort(compareColorNames);
+}
+
+function createLibraryColorMatch(color) {
+  const button = document.createElement("button");
+  button.className = "library-color-result";
+  button.type = "button";
+  button.dataset.libraryColorOption = color.id;
+  button.setAttribute("role", "option");
+  button.append(createLibraryColorSwatch(color), document.createTextNode(color.name));
+  return button;
+}
+
+function renderSelectedLibraryColors(container) {
+  const selectedContainer = container?.querySelector("[data-library-color-selected]");
+
+  if (!selectedContainer) {
+    return;
+  }
+
+  const selectedColorIds = getSelectedLibraryColors(container);
+  const colorsById = new Map((container.libraryColorOptions || []).map((color) => [color.id, color]));
+  const selectedColors = selectedColorIds.map((colorId) => colorsById.get(colorId)).filter(Boolean);
+
+  selectedContainer.replaceChildren(...selectedColors.map(createSelectedLibraryColor));
+}
+
+function createSelectedLibraryColor(color) {
+  const chip = document.createElement("span");
+  chip.className = "library-color-chip";
+
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.name = "library-colors";
+  input.value = color.id;
+  input.checked = true;
+  input.hidden = true;
+
+  const name = document.createElement("span");
+  name.textContent = color.name;
+
+  const removeButton = document.createElement("button");
+  removeButton.type = "button";
+  removeButton.dataset.removeLibraryColor = color.id;
+  removeButton.setAttribute("aria-label", `Remove ${color.name}`);
+  removeButton.textContent = "×";
+
+  chip.append(input, createLibraryColorSwatch(color), name, removeButton);
+  return chip;
+}
+
+function createLibraryColorSwatch(color) {
+  const swatch = document.createElement("span");
+  swatch.className = "pack-color-dot";
+  swatch.style.backgroundColor = color.hex;
+  swatch.setAttribute("aria-hidden", "true");
+  return swatch;
+}
+
+function addSelectedLibraryColor(container, colorId) {
+  const selectedContainer = container?.querySelector("[data-library-color-selected]");
+  const color = (container?.libraryColorOptions || []).find((option) => option.id === colorId);
+
+  if (!selectedContainer || !color || getSelectedLibraryColors(container).includes(colorId)) {
+    return;
+  }
+
+  selectedContainer.append(createSelectedLibraryColor(color));
+}
+
+function removeSelectedLibraryColor(container, colorId) {
+  const input = [...(container?.querySelectorAll('input[name="library-colors"]') || [])]
+    .find((candidate) => candidate.value === colorId);
+  input?.closest(".library-color-chip")?.remove();
 }
 
 function toggleFilterSection(toggle) {
@@ -665,31 +783,6 @@ function toggleFilterSection(toggle) {
 
   toggle.setAttribute("aria-expanded", `${!isExpanded}`);
   filterOptions.hidden = isExpanded;
-}
-
-function createLibraryColorOption(color) {
-  const label = document.createElement("label");
-  label.className = "library-color-option";
-
-  const input = document.createElement("input");
-  input.type = "checkbox";
-  input.name = "library-colors";
-  input.value = color.id;
-
-  const marker = document.createElement("span");
-
-  const swatch = document.createElement("span");
-  swatch.className = "pack-color-dot";
-  swatch.style.backgroundColor = color.hex;
-  swatch.setAttribute("aria-hidden", "true");
-
-  const name = document.createElement("span");
-  name.textContent = color.name;
-
-  marker.append(swatch, name);
-  label.append(input, marker);
-
-  return label;
 }
 
 function getAvailableTags(paperPacks) {
