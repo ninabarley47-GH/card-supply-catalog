@@ -22,17 +22,16 @@ const CARD_SIZE_PRESETS = {
 export async function initializeCardLibrary({ paperPacks = [] } = {}) {
   const gallery = document.querySelector('[data-card-library]');
   const toolbar = gallery?.closest('#cards')?.querySelector('.library-toolbar');
-  const headerActions = toolbar?.querySelector('[data-card-library-header-actions]');
+  const addCardButton = document.querySelector('[data-add-card-open]');
   const resultCount = toolbar?.querySelector('[data-card-library-result-count]');
 
-  if (!gallery || !toolbar || !headerActions) {
+  if (!gallery || !toolbar || !addCardButton) {
     return;
   }
 
   const detailView = createCardDetailView();
   const cardTagVocabulary = createCardTagVocabularyStore();
   const addCardView = createAddCardView({ onCreateTag: (tag) => cardTagVocabulary.create(tag) });
-  const addCardButton = createAddCardButton();
   const cards = [];
   const filterForm = document.querySelector('[data-card-library-filter-form]');
   const searchInput = document.querySelector('[data-card-library-search]');
@@ -73,7 +72,6 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
   };
 
   renderCurrent();
-  headerActions.append(addCardButton);
   document.body.append(detailView.overlay, addCardView.overlay);
   loadAvailablePaperPacks(addCardView, paperPacks);
 
@@ -323,15 +321,6 @@ export async function initializeCardLibrary({ paperPacks = [] } = {}) {
   });
 
   return cards;
-}
-
-function createAddCardButton() {
-  const button = document.createElement('button');
-  button.className = 'button button-primary';
-  button.type = 'button';
-  button.textContent = '+ Add Card';
-  button.setAttribute('aria-haspopup', 'dialog');
-  return button;
 }
 
 function createAddCardView({ onCreateTag } = {}) {
