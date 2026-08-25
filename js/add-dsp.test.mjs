@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { applyDefaultOwner, buildPaperPackFromForm, shouldShowPatternLibraryPicker, waitForPaperPackPersistence } from "./add-dsp.js";
 import { createTagVocabularyStore } from "./card-tags.js";
 import { normalizePaperPackKeywords } from "./storage.js";
@@ -123,4 +124,15 @@ test("Add From Library is shown only when the open-file picker is supported", ()
   assert.equal(shouldShowPatternLibraryPicker({ showOpenFilePicker() {} }), true);
   assert.equal(shouldShowPatternLibraryPicker({}), false);
   assert.equal(shouldShowPatternLibraryPicker(null), false);
+});
+
+test("DSP image actions prioritize the library picker and use one multiple-file fallback", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const libraryPickerIndex = html.indexOf("data-pattern-library-picker");
+  const fileInputIndex = html.indexOf('id="dsp-pattern-images"');
+
+  assert.ok(libraryPickerIndex >= 0);
+  assert.ok(fileInputIndex > libraryPickerIndex);
+  assert.match(html, /id="dsp-pattern-images"[^>]*\smultiple(?:\s|>)/);
+  assert.doesNotMatch(html, /id="dsp-pattern-image"(?:\s|>)/);
 });
