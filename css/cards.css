@@ -210,6 +210,7 @@
   grid-template-rows: auto minmax(0, 1fr);
   width: min(76rem, calc(100vw - 2rem));
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   border-left: 1px solid var(--color-border);
   background: var(--color-page);
@@ -225,6 +226,7 @@
   grid-template-rows: auto minmax(0, 1fr);
   width: min(60rem, calc(100vw - 2rem));
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   border-left: 1px solid var(--color-border);
   background: var(--color-page);
