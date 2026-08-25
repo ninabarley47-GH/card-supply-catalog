@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { applyDefaultOwner, buildPaperPackFromForm, shouldShowPatternLibraryPicker, waitForPaperPackPersistence } from "./add-dsp.js";
+import { applyDefaultOwner, buildPaperPackFromForm, getPatternImageHelpText, shouldShowPatternLibraryPicker, waitForPaperPackPersistence } from "./add-dsp.js";
 import { createTagVocabularyStore } from "./card-tags.js";
 import { normalizePaperPackKeywords } from "./storage.js";
 import { buildEffectiveCardTagVocabulary, buildEffectivePaperTagVocabulary } from "./tag-utils.js";
@@ -135,4 +135,15 @@ test("DSP image actions prioritize the library picker and use one multiple-file 
   assert.ok(fileInputIndex > libraryPickerIndex);
   assert.match(html, /id="dsp-pattern-images"[^>]*\smultiple(?:\s|>)/);
   assert.doesNotMatch(html, /id="dsp-pattern-image"(?:\s|>)/);
+});
+
+test("DSP image help matches directory capability", () => {
+  assert.match(
+    getPatternImageHelpText({ showDirectoryPicker() {} }),
+    /image library folder is selected in Settings/
+  );
+  assert.equal(
+    getPatternImageHelpText({}),
+    "Choose one or more images from this device. They will be stored with this browser's catalog."
+  );
 });

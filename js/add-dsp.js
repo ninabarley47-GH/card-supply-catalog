@@ -28,6 +28,7 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = [], owners = [
   const closeButtons = [...document.querySelectorAll("[data-add-dsp-close]")];
   const imageInputs = [...document.querySelectorAll("[data-pattern-image-input]")];
   const libraryPickerButton = document.querySelector("[data-pattern-library-picker]");
+  const patternImageHelp = document.querySelector("[data-pattern-image-help]");
   const imagePreviewList = document.querySelector("[data-image-preview-list]");
   const imagePreviewCount = document.querySelector("[data-image-preview-count]");
   const tagPickerMount = document.querySelector("[data-paper-tag-picker]");
@@ -46,6 +47,10 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = [], owners = [
 
   if (libraryPickerButton) {
     libraryPickerButton.hidden = !shouldShowPatternLibraryPicker(window);
+  }
+
+  if (patternImageHelp) {
+    patternImageHelp.textContent = getPatternImageHelpText(window);
   }
 
   initializeOwnerPicker(form.elements.ownerId, form.elements.owner, owners);
@@ -332,6 +337,12 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = [], owners = [
 
 export function shouldShowPatternLibraryPicker(environment = globalThis) {
   return supportsOpenFilePicker(environment);
+}
+
+export function getPatternImageHelpText(environment = globalThis) {
+  return supportsDirectoryPicker(environment)
+    ? "If an image library folder is selected in Settings, images load automatically from a folder matching the DSP name. Use these controls only as a fallback."
+    : "Choose one or more images from this device. They will be stored with this browser's catalog.";
 }
 
 export async function waitForPaperPackPersistence(saveComplete) {
