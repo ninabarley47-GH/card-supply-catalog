@@ -5,7 +5,9 @@ import { isActiveOwner } from './owners.js';
 import {
   clearSelectedCardImage,
   chooseCardImageFromLibrary,
+  createCardImageFromFile,
   getCardDetailImageSource,
+  getCardImageSelectionMode,
   getCardLibraryImageSource,
   hydrateCardImageSources,
   prepareCardImageForSave
@@ -348,6 +350,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
         refreshOwnerOptions(owners);
         notifyOwnerRegistryUpdated();
       }
+      const usedStandardImageInput = addCardView.selectedImage?.imageSelectionStrategy === 'standard-file-input';
       const imageResult = await prepareCardImageForSave(card, addCardView.selectedImage);
       await saveCard(imageResult.card);
       await hydrateCardImageSources([imageResult.card]);
@@ -368,7 +371,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
         window.location.hash = 'cards';
       }
 
-      if (imageResult.usedFallback) {
+      if (imageResult.usedFallback && !usedStandardImageInput) {
         window.alert('The card was saved, but its image was kept in browser storage because the Card image folder was unavailable.');
       }
     } catch (error) {
@@ -551,7 +554,28 @@ function createAddCardView({ owners = [], onCreateTag } = {}) {
     }
   });
   imagePicker.choose.addEventListener('click', async () => {
+    if (imagePicker.selectionMode === 'standard-file-input') {
+      imagePicker.fileInput.click();
+      return;
+    }
+
     const result = await chooseCardImageFromLibrary();
+
+    if (result.image) {
+      clearSelectedCardImage(addCardView.selectedImage);
+      addCardView.selectedImage = result.image;
+      renderSelectedCardImage(addCardView);
+    }
+
+    imagePicker.message.textContent = result.message || result.image?.name || '';
+  });
+  imagePicker.fileInput.addEventListener('change', async () => {
+    const [file] = imagePicker.fileInput.files || [];
+    imagePicker.fileInput.value = '';
+
+    if (!file) return;
+
+    const result = await createCardImageFromFile(file, window);
 
     if (result.image) {
       clearSelectedCardImage(addCardView.selectedImage);
@@ -738,12 +762,18 @@ function createCardImagePicker() {
   choose.className = 'button';
   choose.type = 'button';
   choose.textContent = 'Choose Card Image';
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = '.jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif';
+  fileInput.className = 'visually-hidden';
+  const selectionMode = getCardImageSelectionMode(window);
+  choose.disabled = selectionMode === 'unavailable';
   const message = document.createElement('p');
   message.className = 'card-add-image-message';
   message.setAttribute('aria-live', 'polite');
-  container.append(previewFrame, choose, message);
+  container.append(previewFrame, choose, fileInput, message);
 
-  return { container, choose, preview, placeholder, message };
+  return { container, choose, fileInput, message, placeholder, preview, selectionMode };
 }
 
 function renderSelectedCardImage(addCardView) {

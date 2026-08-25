@@ -1,7 +1,7 @@
 import { loadCatalogSetting } from './storage.js';
 import { generateImageThumbnail } from './thumbnails.js';
 import { isUsableThumbnailFile, runTasksWithConcurrency } from './images.js';
-import { supportsOpenFilePicker } from './browser-capabilities.js';
+import { supportsOpenFilePicker, supportsOrdinaryImageFileFallback } from './browser-capabilities.js';
 
 const IMAGE_LIBRARY_SETTING_ID = 'imageLibrary';
 const CARD_IMAGE_LIBRARY_SETTING_ID = 'cardImageLibrary';
@@ -9,6 +9,46 @@ const CARD_IMAGE_LIBRARY_MARKER = 'card-images';
 const LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY = 'local-folder';
 const EMBEDDED_IMAGE_STORAGE_STRATEGY = 'embedded-indexed-db';
 const THUMBNAIL_GENERATION_CONCURRENCY = 4;
+const SUPPORTED_CARD_IMAGE_FILE_PATTERN = /\.(?:jpe?g|png|webp|gif)$/i;
+const SUPPORTED_CARD_IMAGE_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif'
+]);
+
+export function getCardImageSelectionMode(environment = globalThis) {
+  if (supportsOpenFilePicker(environment)) return 'open-file-picker';
+  if (supportsOrdinaryImageFileFallback(environment)) return 'standard-file-input';
+  return 'unavailable';
+}
+
+export function createCardImageFromFile(file, environment = globalThis) {
+  if (!file || (!SUPPORTED_CARD_IMAGE_MIME_TYPES.has(file.type) && !SUPPORTED_CARD_IMAGE_FILE_PATTERN.test(file.name || ''))) {
+    return Promise.resolve({ ok: false, image: null, message: 'Choose a supported Card image file.' });
+  }
+
+  return new Promise((resolve) => {
+    const reader = new environment.FileReader();
+    reader.addEventListener('load', () => resolve({
+      ok: true,
+      image: {
+        file,
+        name: file.name,
+        imagePath: '',
+        previewSrc: reader.result,
+        imageSelectionStrategy: 'standard-file-input'
+      },
+      message: ''
+    }));
+    reader.addEventListener('error', () => resolve({
+      ok: false,
+      image: null,
+      message: 'The Card image could not be selected.'
+    }));
+    reader.readAsDataURL(file);
+  });
+}
 
 export function getReferencedCardImagePaths(cards = []) {
   return new Set(getReferencedCardImageEntries(cards).keys());
@@ -188,28 +228,31 @@ export function clearSelectedCardImage(selectedImage) {
   }
 }
 
-export async function prepareCardImageForSave(card, selectedImage) {
+export async function prepareCardImageForSave(card, selectedImage, services = {}) {
   if (!selectedImage?.file) {
     return { card, usedFallback: false };
   }
 
-  const directoryHandle = await getDirectoryHandle(CARD_IMAGE_LIBRARY_SETTING_ID, 'readwrite');
+  const loadDirectoryHandle = services.getDirectoryHandle || getDirectoryHandle;
+  const prepareEmbeddedImage = services.prepareEmbeddedCardImage || prepareEmbeddedCardImage;
+  const prepareFolderImage = services.prepareFolderBackedCardImage || prepareFolderBackedCardImage;
+  const directoryHandle = await loadDirectoryHandle(CARD_IMAGE_LIBRARY_SETTING_ID, 'readwrite');
 
   if (!directoryHandle) {
     return {
-      card: await prepareEmbeddedCardImage(card, selectedImage.file),
+      card: await prepareEmbeddedImage(card, selectedImage.file),
       usedFallback: true
     };
   }
 
   try {
     return {
-      card: await prepareFolderBackedCardImage(card, selectedImage, directoryHandle),
+      card: await prepareFolderImage(card, selectedImage, directoryHandle),
       usedFallback: false
     };
   } catch (error) {
     return {
-      card: await prepareEmbeddedCardImage(card, selectedImage.file),
+      card: await prepareEmbeddedImage(card, selectedImage.file),
       usedFallback: true
     };
   }
