@@ -4,7 +4,8 @@ import {
   getReferencedPaperPackImagePaths,
   getPaperLibraryImageSource,
   getPatternImageSource,
-  isUsableThumbnailFile
+  isUsableThumbnailFile,
+  loadPatternImagesForPaperPackName
 } from "./images.js";
 import { getReferencedCardImagePaths } from "./card-images.js";
 
@@ -98,4 +99,41 @@ test("Card thumbnail generation targets only unique Card-folder image paths", ()
   ]);
 
   assert.deepEqual([...paths], ["birthday/card one.jpg", "card two.png"]);
+});
+
+test("unsupported browsers skip automatic DSP folder lookup without folder messaging", async () => {
+  let folderLookupStarted = false;
+  const result = await loadPatternImagesForPaperPackName("Test Pack", {}, {
+    getReadableImageLibraryDirectoryHandle: async () => {
+      folderLookupStarted = true;
+      return null;
+    }
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    images: [],
+    message: "",
+    skipped: true
+  });
+  assert.equal(folderLookupStarted, false);
+});
+
+test("supported browsers preserve automatic DSP folder lookup and reconnect messaging", async () => {
+  let folderLookupStarted = false;
+  const result = await loadPatternImagesForPaperPackName(
+    "Test Pack",
+    { showDirectoryPicker() {} },
+    {
+      getReadableImageLibraryDirectoryHandle: async () => {
+        folderLookupStarted = true;
+        return null;
+      }
+    }
+  );
+
+  assert.equal(folderLookupStarted, true);
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.images, []);
+  assert.match(result.message, /Reconnect the image folder in Settings/);
 });

@@ -11,6 +11,7 @@ import { createLegacyOwnerId, getOwnerNameKey, isActiveOwner } from "./owners.js
 import { loadDefaultOwnerId } from "./settings.js";
 import { initializeOwnerPicker, notifyOwnerRegistryUpdated, refreshOwnerOptions, setOwnerPickerValue } from "./owner-picker.js";
 import { buildEffectivePaperTagVocabulary } from "./tag-utils.js";
+import { supportsDirectoryPicker } from "./browser-capabilities.js";
 import { createTagPicker } from "./tag-picker.js";
 import { createTagVocabularyStore } from "./card-tags.js";
 
@@ -579,6 +580,7 @@ async function autoLoadImagesForCurrentPaperPackName(
   if (
     !paperPackName ||
     !paperPackId ||
+    !supportsDirectoryPicker(window) ||
     formState.editingPaperPack ||
     formState.isLoadingLibraryImages ||
     selectedImages.length > 0 ||

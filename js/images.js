@@ -198,7 +198,7 @@ export async function choosePatternImagesFromLibrary() {
   }
 }
 
-export async function loadPatternImagesForPaperPackName(paperPackName) {
+export async function loadPatternImagesForPaperPackName(paperPackName, environment = globalThis, services = {}) {
   const paperPackId = createId(paperPackName);
 
   if (!paperPackId) {
@@ -209,10 +209,20 @@ export async function loadPatternImagesForPaperPackName(paperPackName) {
     };
   }
 
+  if (!supportsDirectoryPicker(environment)) {
+    return {
+      ok: true,
+      images: [],
+      message: "",
+      skipped: true
+    };
+  }
+
   // This lookup is started by the user's change/blur action in the DSP form, so
   // it can restore access to a previously selected folder. Saved directory
   // handles commonly return to the "prompt" state after the browser reopens.
-  const directoryHandle = await getReadableImageLibraryDirectoryHandle();
+  const loadDirectoryHandle = services.getReadableImageLibraryDirectoryHandle || getReadableImageLibraryDirectoryHandle;
+  const directoryHandle = await loadDirectoryHandle();
 
   if (!directoryHandle) {
     return {
