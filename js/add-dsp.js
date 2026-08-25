@@ -11,7 +11,7 @@ import { createLegacyOwnerId, getOwnerNameKey, isActiveOwner } from "./owners.js
 import { loadDefaultOwnerId } from "./settings.js";
 import { initializeOwnerPicker, notifyOwnerRegistryUpdated, refreshOwnerOptions, setOwnerPickerValue } from "./owner-picker.js";
 import { buildEffectivePaperTagVocabulary } from "./tag-utils.js";
-import { supportsDirectoryPicker } from "./browser-capabilities.js";
+import { supportsDirectoryPicker, supportsOpenFilePicker } from "./browser-capabilities.js";
 import { createTagPicker } from "./tag-picker.js";
 import { createTagVocabularyStore } from "./card-tags.js";
 
@@ -42,6 +42,10 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = [], owners = [
 
   if (!panel || !form) {
     return;
+  }
+
+  if (libraryPickerButton) {
+    libraryPickerButton.hidden = !shouldShowPatternLibraryPicker(window);
   }
 
   initializeOwnerPicker(form.elements.ownerId, form.elements.owner, owners);
@@ -324,6 +328,10 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = [], owners = [
       submitButton.disabled = false;
     }
   });
+}
+
+export function shouldShowPatternLibraryPicker(environment = globalThis) {
+  return supportsOpenFilePicker(environment);
 }
 
 export async function waitForPaperPackPersistence(saveComplete) {

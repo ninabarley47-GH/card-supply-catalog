@@ -1331,6 +1331,10 @@ h6 {
   gap: var(--space-2);
 }
 
+[data-pattern-library-picker][hidden] {
+  display: none;
+}
+
 .file-button {
   cursor: pointer;
   justify-content: center;

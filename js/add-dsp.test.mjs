@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyDefaultOwner, buildPaperPackFromForm, waitForPaperPackPersistence } from "./add-dsp.js";
+import { applyDefaultOwner, buildPaperPackFromForm, shouldShowPatternLibraryPicker, waitForPaperPackPersistence } from "./add-dsp.js";
 import { createTagVocabularyStore } from "./card-tags.js";
 import { normalizePaperPackKeywords } from "./storage.js";
 import { buildEffectiveCardTagVocabulary, buildEffectivePaperTagVocabulary } from "./tag-utils.js";
@@ -117,4 +117,10 @@ test("Add DSP converts failed and rejected persistence into non-success results"
     await waitForPaperPackPersistence(Promise.reject(new Error("database unavailable"))),
     { ok: false, message: "The paper pack could not be saved in this browser." }
   );
+});
+
+test("Add From Library is shown only when the open-file picker is supported", () => {
+  assert.equal(shouldShowPatternLibraryPicker({ showOpenFilePicker() {} }), true);
+  assert.equal(shouldShowPatternLibraryPicker({}), false);
+  assert.equal(shouldShowPatternLibraryPicker(null), false);
 });
