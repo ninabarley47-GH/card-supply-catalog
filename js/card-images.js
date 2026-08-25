@@ -1,6 +1,7 @@
 import { loadCatalogSetting } from './storage.js';
 import { generateImageThumbnail } from './thumbnails.js';
 import { isUsableThumbnailFile, runTasksWithConcurrency } from './images.js';
+import { supportsOpenFilePicker } from './browser-capabilities.js';
 
 const IMAGE_LIBRARY_SETTING_ID = 'imageLibrary';
 const CARD_IMAGE_LIBRARY_SETTING_ID = 'cardImageLibrary';
@@ -144,7 +145,7 @@ function normalizeImagePath(imagePath) {
 }
 
 export async function chooseCardImageFromLibrary() {
-  if (!("showOpenFilePicker" in window)) {
+  if (!supportsOpenFilePicker(window)) {
     return { ok: false, image: null, message: 'Choosing Card library images is not supported in this browser.' };
   }
 

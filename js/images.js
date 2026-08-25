@@ -1,5 +1,6 @@
 import { loadCatalogSetting } from "./storage.js";
 import { generateImageThumbnail } from "./thumbnails.js";
+import { supportsDirectoryIteration, supportsOpenFilePicker } from "./browser-capabilities.js";
 
 const EMBEDDED_IMAGE_STORAGE_STRATEGY = "embedded-indexed-db";
 const LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY = "local-folder";
@@ -138,7 +139,7 @@ export async function isUsableThumbnailFile(fileHandle) {
 }
 
 export async function choosePatternImagesFromLibrary() {
-  if (!("showOpenFilePicker" in window)) {
+  if (!supportsOpenFilePicker(window)) {
     return {
       ok: false,
       images: [],
@@ -262,7 +263,7 @@ export async function scanImageLibraryPaperPackFolders() {
     };
   }
 
-  if (!directoryHandle.entries) {
+  if (!supportsDirectoryIteration(directoryHandle)) {
     return {
       ok: false,
       folders: [],

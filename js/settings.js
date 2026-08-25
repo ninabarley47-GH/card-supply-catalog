@@ -8,6 +8,7 @@ import { checkCardImageLibraryHealth, generateMissingCardImageThumbnails } from 
 import { deleteTagEverywhere, loadCardTagVocabulary, loadCatalogSetting, loadPaperTagVocabulary, loadSavedCards, saveCard, saveCardTagVocabulary, saveCatalogSetting, saveOwner, savePaperPack, savePaperPacks, savePaperTagVocabulary } from "./storage.js";
 import { PAPER_TAG_SEED, addTag, buildEffectiveCardTagVocabulary, buildEffectivePaperTagVocabulary, countTagAssignments, getTagKey, normalizeTagName, removeTag, renameTag, replaceTagAssignments } from "./tag-utils.js";
 import { createLegacyOwnerId, getOwnerNameKey, isActiveOwner, normalizeOwnerName } from "./owners.js";
+import { supportsDirectoryPicker } from "./browser-capabilities.js";
 
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
 const CARD_IMAGE_LIBRARY_SETTING_ID = "cardImageLibrary";
@@ -328,7 +329,7 @@ async function initializeCardImageLibrarySettings({ paperPacks = [] } = {}) {
     return;
   }
 
-  if (!isDirectoryPickerSupported()) {
+  if (!supportsDirectoryPicker(window)) {
     chooseButton.disabled = true;
     if (reconnectButton) {
       reconnectButton.disabled = true;
@@ -525,7 +526,7 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
     return;
   }
 
-  if (!isDirectoryPickerSupported()) {
+  if (!supportsDirectoryPicker(window)) {
     chooseButton.disabled = true;
     if (reconnectButton) {
       reconnectButton.disabled = true;
@@ -831,7 +832,7 @@ function getBackupStatusDetail(lastBackupExportedAt, lastBackupImportedAt) {
 }
 
 function getImageFolderStatusDetail(directoryHandle, permissionState, imageType = "image") {
-  if (!isDirectoryPickerSupported()) {
+  if (!supportsDirectoryPicker(window)) {
     return `This browser does not support choosing a ${imageType} library folder.`;
   }
 
@@ -847,7 +848,7 @@ function getImageFolderStatusDetail(directoryHandle, permissionState, imageType 
 }
 
 function getImageFolderStatusBadge(directoryHandle, permissionState) {
-  if (!isDirectoryPickerSupported()) {
+  if (!supportsDirectoryPicker(window)) {
     return "Unsupported";
   }
 
@@ -859,7 +860,7 @@ function getImageFolderStatusBadge(directoryHandle, permissionState) {
 }
 
 function getImageFolderStatusTone(directoryHandle, permissionState) {
-  if (!isDirectoryPickerSupported()) {
+  if (!supportsDirectoryPicker(window)) {
     return "attention";
   }
 
@@ -1287,10 +1288,6 @@ function getFolderSelectionErrorMessage(error) {
 
 function getSelectedImageLibraryMessage(directoryHandle, prefix = "Image folder selected") {
   return `${prefix}: ${directoryHandle.name}. Full local paths are hidden by the browser, but DSP images can be read from this folder.`;
-}
-
-function isDirectoryPickerSupported() {
-  return "showDirectoryPicker" in window;
 }
 
 async function getDirectoryPermissionState(directoryHandle) {
