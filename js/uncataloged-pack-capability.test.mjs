@@ -11,6 +11,8 @@ test("the hidden uncataloged-pack control overrides shared button display styles
   const styles = await readFile(new URL("../css/styles.css", import.meta.url), "utf8");
 
   assert.match(styles, /\[data-find-uncataloged-packs\]\[hidden\][\s\S]*?display:\s*none;/);
+  assert.match(styles, /\[data-find-uncataloged-packs\]:not\(:disabled\)[\s\S]*?color:\s*var\(--color-accent-dark\);/);
+  assert.match(styles, /\[data-find-uncataloged-packs\]:disabled[\s\S]*?cursor:\s*not-allowed;[\s\S]*?opacity:\s*0\.55;/);
 });
 
 test("unsupported browsers hide Find Uncataloged Packs", async () => {

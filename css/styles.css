@@ -325,6 +325,27 @@ h6 {
   display: none;
 }
 
+[data-find-uncataloged-packs]:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-surface);
+  color: var(--color-accent-dark);
+  opacity: 1;
+}
+
+[data-find-uncataloged-packs]:not(:disabled):hover,
+[data-find-uncataloged-packs]:not(:disabled):focus-visible {
+  border-color: var(--color-accent-dark);
+  background: rgba(82, 120, 109, 0.1);
+}
+
+[data-find-uncataloged-packs]:disabled {
+  border-color: var(--color-border);
+  background: var(--color-page);
+  color: var(--color-muted);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .button-quiet {
   min-height: 2.25rem;
   border-color: var(--color-border);
