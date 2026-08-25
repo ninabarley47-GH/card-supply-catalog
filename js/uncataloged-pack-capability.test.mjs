@@ -7,12 +7,12 @@ import { getUncatalogedPackControlPresentation } from "./library.js";
 const pickerEnvironment = { showDirectoryPicker() {} };
 const iterableDirectoryHandle = { entries() {} };
 
-test("the hidden uncataloged-pack control overrides shared button display styles", async () => {
+test("hidden controls and global button states have distinct styles", async () => {
   const styles = await readFile(new URL("../css/styles.css", import.meta.url), "utf8");
 
   assert.match(styles, /\[data-find-uncataloged-packs\]\[hidden\][\s\S]*?display:\s*none;/);
-  assert.match(styles, /\[data-find-uncataloged-packs\]:not\(:disabled\)[\s\S]*?color:\s*var\(--color-accent-dark\);/);
-  assert.match(styles, /\[data-find-uncataloged-packs\]:disabled[\s\S]*?cursor:\s*not-allowed;[\s\S]*?opacity:\s*0\.55;/);
+  assert.match(styles, /\.button\s*\{[\s\S]*?border:\s*1px solid var\(--color-accent\);[\s\S]*?color:\s*var\(--color-accent-dark\);/);
+  assert.match(styles, /\.button:disabled\s*\{[\s\S]*?cursor:\s*not-allowed;[\s\S]*?opacity:\s*0\.55;/);
 });
 
 test("unsupported browsers hide Find Uncataloged Packs", async () => {
