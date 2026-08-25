@@ -1,6 +1,6 @@
 import { loadCatalogSetting } from "./storage.js";
 import { generateImageThumbnail } from "./thumbnails.js";
-import { supportsDirectoryIteration, supportsOpenFilePicker } from "./browser-capabilities.js";
+import { supportsDirectoryIteration, supportsDirectoryPicker, supportsOpenFilePicker } from "./browser-capabilities.js";
 
 const EMBEDDED_IMAGE_STORAGE_STRATEGY = "embedded-indexed-db";
 const LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY = "local-folder";
@@ -310,6 +310,35 @@ export async function scanImageLibraryPaperPackFolders() {
       message: "The image library folders could not be scanned."
     };
   }
+}
+
+export async function getUncatalogedPackDiscoveryAvailability(environment = globalThis, services = {}) {
+  if (!supportsDirectoryPicker(environment)) {
+    return { available: false, reason: "unsupported" };
+  }
+
+  const loadSetting = services.loadCatalogSetting || loadCatalogSetting;
+  const checkPermission = services.hasDirectoryPermission || hasDirectoryPermission;
+  let directoryHandle = null;
+
+  try {
+    directoryHandle = (await loadSetting(IMAGE_LIBRARY_SETTING_ID))?.directoryHandle || null;
+  } catch (error) {
+    return { available: false, reason: "disconnected" };
+  }
+
+  if (!directoryHandle) {
+    return { available: false, reason: "disconnected" };
+  }
+
+  if (!supportsDirectoryIteration(directoryHandle)) {
+    return { available: false, reason: "unsupported" };
+  }
+
+  const hasPermission = await checkPermission(directoryHandle, "read", { requestPermission: false });
+  return hasPermission
+    ? { available: true, reason: "ready" }
+    : { available: false, reason: "disconnected" };
 }
 
 export async function hydratePaperPackImageSources(paperPacks) {

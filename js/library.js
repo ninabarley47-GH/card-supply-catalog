@@ -4,6 +4,7 @@ import { initializeAddColorWorkflow } from "./color-form.js";
 import { createCoverSheetForPack } from "./cover-sheet.js";
 import {
   deletePaperPackImages,
+  getUncatalogedPackDiscoveryAvailability,
   getPaperLibraryImageSource,
   getPatternImageSource,
   hydratePaperPackImageSources,
@@ -129,7 +130,7 @@ export async function initializeLibraryShell() {
     const colors = Object.values(colorsById);
     initializeAddColorWorkflow(colorsById);
     initializeAddDspWorkflow(colorsById, paperPacks, owners);
-    initializeUncatalogedPackFinder(paperPacks);
+    const refreshUncatalogedPackFinder = await initializeUncatalogedPackFinder(paperPacks);
 
     if (paperPackLibrary) {
       renderPaperPackLibrary(paperPackLibrary, paperPacks, colorsById);
@@ -140,8 +141,10 @@ export async function initializeLibraryShell() {
       initializeSettings({
         paperPacks,
         owners,
-        onImageLibrarySelected: () => {
-          hydratePaperPackImageSources(paperPacks).then(librarySearch.renderCurrent);
+        onImageLibrarySelected: async () => {
+          await hydratePaperPackImageSources(paperPacks);
+          librarySearch.renderCurrent();
+          await refreshUncatalogedPackFinder?.();
         },
         onImagesMigrated: () => {
           hydratePaperPackImageSources(paperPacks).then(librarySearch.renderCurrent);
@@ -208,8 +211,9 @@ function updateExpandAllPatternsButton(button) {
   button.setAttribute("aria-pressed", `${areAllLibraryPatternsExpanded}`);
 }
 
-function initializeUncatalogedPackFinder(paperPacks) {
+async function initializeUncatalogedPackFinder(paperPacks) {
   const findButton = document.querySelector("[data-find-uncataloged-packs]");
+  const availabilityMessage = document.querySelector("[data-find-uncataloged-packs-availability]");
   const panel = document.querySelector("[data-uncataloged-packs]");
   const closeButton = document.querySelector("[data-close-uncataloged-packs]");
   const message = document.querySelector("[data-uncataloged-packs-message]");
@@ -219,6 +223,21 @@ function initializeUncatalogedPackFinder(paperPacks) {
   if (!findButton || !panel || !message || !list) {
     return;
   }
+
+  const refreshAvailability = async () => {
+    const availability = await getUncatalogedPackDiscoveryAvailability(window);
+    const presentation = getUncatalogedPackControlPresentation(availability);
+    findButton.hidden = presentation.hidden;
+    findButton.disabled = presentation.disabled;
+    findButton.title = presentation.message;
+
+    if (availabilityMessage) {
+      availabilityMessage.hidden = !presentation.message || presentation.hidden;
+      availabilityMessage.textContent = presentation.message;
+    }
+  };
+
+  await refreshAvailability();
 
   let scannedFolders = [];
   let ignoredFolderIds = new Set();
@@ -269,7 +288,7 @@ function initializeUncatalogedPackFinder(paperPacks) {
       message.textContent = "The image library could not be checked for uncataloged packs.";
       message.dataset.tone = "error";
     } finally {
-      findButton.disabled = false;
+      await refreshAvailability();
     }
   });
 
@@ -328,6 +347,24 @@ function initializeUncatalogedPackFinder(paperPacks) {
       message.dataset.tone = "error";
     }
   });
+
+  return refreshAvailability;
+}
+
+export function getUncatalogedPackControlPresentation(availability) {
+  if (availability?.reason === "unsupported") {
+    return { hidden: true, disabled: true, message: "" };
+  }
+
+  if (!availability?.available) {
+    return {
+      hidden: false,
+      disabled: true,
+      message: "Connect or reconnect a Paper image folder in Settings."
+    };
+  }
+
+  return { hidden: false, disabled: false, message: "" };
 }
 
 function getUncatalogedImageFolderCandidates(folders, paperPacks) {
