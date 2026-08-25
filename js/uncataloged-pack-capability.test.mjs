@@ -1,10 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { getUncatalogedPackDiscoveryAvailability } from "./images.js";
 import { getUncatalogedPackControlPresentation } from "./library.js";
 
 const pickerEnvironment = { showDirectoryPicker() {} };
 const iterableDirectoryHandle = { entries() {} };
+
+test("the hidden uncataloged-pack control overrides shared button display styles", async () => {
+  const styles = await readFile(new URL("../css/styles.css", import.meta.url), "utf8");
+
+  assert.match(styles, /\[data-find-uncataloged-packs\]\[hidden\][\s\S]*?display:\s*none;/);
+});
 
 test("unsupported browsers hide Find Uncataloged Packs", async () => {
   const availability = await getUncatalogedPackDiscoveryAvailability({});
