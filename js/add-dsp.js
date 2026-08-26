@@ -397,7 +397,9 @@ function normalizeAddDspDefaults(defaults) {
     owner,
     ownerId: cleanText(defaults.ownerId),
     releaseYear,
-    availability: defaults.availability === "used-up" ? "used-up" : "available",
+    availability: ["available", "not-bought", "used-up"].includes(defaults.availability)
+      ? defaults.availability
+      : "available",
     refillAvailable:
       defaults.refillAvailable === true || defaults.refillAvailable === false
         ? defaults.refillAvailable

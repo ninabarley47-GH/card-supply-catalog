@@ -1123,7 +1123,11 @@ function normalizeFilterText(value) {
 function renderPaperPackLibrary(container, paperPacks, colorsById, options = {}) {
   const sortOrder = options.sortOrder || "recently-added";
   const availablePaperPacks = sortPaperPacks(
-    paperPacks.filter((paperPack) => !isPaperPackUsedUp(paperPack)),
+    paperPacks.filter((paperPack) => normalizeAvailability(paperPack.availability) === "available"),
+    sortOrder
+  );
+  const notBoughtPaperPacks = sortPaperPacks(
+    paperPacks.filter((paperPack) => normalizeAvailability(paperPack.availability) === "not-bought"),
     sortOrder
   );
   const usedUpPaperPacks = sortPaperPacks(paperPacks.filter(isPaperPackUsedUp), sortOrder);
@@ -1131,7 +1135,8 @@ function renderPaperPackLibrary(container, paperPacks, colorsById, options = {})
   updateLibraryResultCount({
     availableCount: availablePaperPacks.length,
     totalCount: options.totalCount ?? paperPacks.length,
-    usedUpCount: usedUpPaperPacks.length
+    usedUpCount: usedUpPaperPacks.length,
+    notBoughtCount: notBoughtPaperPacks.length
   });
 
   if (paperPacks.length === 0) {
@@ -1155,13 +1160,17 @@ function renderPaperPackLibrary(container, paperPacks, colorsById, options = {})
   }
 
   if (usedUpPaperPacks.length > 0) {
-    sections.push(createUsedUpPaperPackSection(usedUpPaperPacks, colorsById));
+    sections.push(createInactivePaperPackSection(usedUpPaperPacks, colorsById, "Used Up"));
+  }
+
+  if (notBoughtPaperPacks.length > 0) {
+    sections.push(createInactivePaperPackSection(notBoughtPaperPacks, colorsById, "Not Bought"));
   }
 
   container.replaceChildren(...sections);
 }
 
-function updateLibraryResultCount({ availableCount, totalCount, usedUpCount }) {
+function updateLibraryResultCount({ availableCount, totalCount, usedUpCount, notBoughtCount }) {
   const resultCount = document.querySelector("[data-library-result-count]");
 
   if (!resultCount) {
@@ -1173,8 +1182,10 @@ function updateLibraryResultCount({ availableCount, totalCount, usedUpCount }) {
   const packLabel = totalCount === 1 ? "pack" : "packs";
   const usedUpLabel =
     usedUpCount > 0 ? ` ${usedUpCount} used-up ${usedUpCount === 1 ? "pack is" : "packs are"} collapsed below.` : "";
+  const notBoughtLabel =
+    notBoughtCount > 0 ? ` ${notBoughtCount} not-bought ${notBoughtCount === 1 ? "pack is" : "packs are"} collapsed below.` : "";
 
-  resultCount.textContent = `Showing ${visibleLabel} available of ${totalLabel} ${packLabel}.${usedUpLabel}`;
+  resultCount.textContent = `Showing ${visibleLabel} available of ${totalLabel} ${packLabel}.${usedUpLabel}${notBoughtLabel}`;
 }
 
 function createPaperPackGridSection(paperPacks, colorsById) {
@@ -1199,7 +1210,7 @@ function createAvailablePaperPackEmptyMessage(options = {}) {
   return message;
 }
 
-function createUsedUpPaperPackSection(paperPacks, colorsById) {
+function createInactivePaperPackSection(paperPacks, colorsById, label) {
   const section = document.createElement("details");
   const summary = document.createElement("summary");
   const title = document.createElement("span");
@@ -1208,7 +1219,7 @@ function createUsedUpPaperPackSection(paperPacks, colorsById) {
 
   section.className = "used-up-pack-section library-pack-section";
   summary.className = "used-up-pack-summary";
-  title.textContent = `Used Up (${paperPacks.length})`;
+  title.textContent = `${label} (${paperPacks.length})`;
   hint.textContent = "Hidden below available packs";
   grid.className = "library-pack-grid used-up-pack-grid";
   grid.append(...paperPacks.map((paperPack) => createPaperPackCard(paperPack, colorsById)));
@@ -2316,7 +2327,7 @@ function markPaperPackUsedUp(paperPackId, paperPacks, renderCurrentLibrary) {
 }
 
 function normalizeAvailability(availability) {
-  return availability === "used-up" ? "used-up" : "available";
+  return ["not-bought", "used-up"].includes(availability) ? availability : "available";
 }
 
 function isPaperPackUsedUp(paperPack) {
@@ -2324,7 +2335,8 @@ function isPaperPackUsedUp(paperPack) {
 }
 
 function formatAvailabilityLabel(availability) {
-  return normalizeAvailability(availability) === "used-up" ? "Used Up" : "Available";
+  const labels = { available: "Available", "not-bought": "Not Bought", "used-up": "Used Up" };
+  return labels[normalizeAvailability(availability)];
 }
 
 function renderCoordinatingPacks(container, selectedPack, color, paperPacks) {

@@ -67,6 +67,14 @@ test("Edit DSP round-trips the existing id, favorite, and selected keywords", ()
   assert.deepEqual(result.paperPack.keywords, ["Floral"]);
 });
 
+test("Add DSP stores the Not Bought paper-pack status", () => {
+  const form = createValidPaperPackForm();
+  form.set("availability", "not-bought");
+  const result = buildPaperPackFromForm(form, colorsById, [], null, []);
+  assert.equal(result.ok, true);
+  assert.equal(result.paperPack.availability, "not-bought");
+});
+
 test("legacy Paper keyword replacements remain active", () => {
   assert.deepEqual(normalizePaperPackKeywords({ keywords: ["cartoon", "ocean animals", "background"] }).keywords, ["Illustration", "Water Animals"]);
 });
