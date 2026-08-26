@@ -5,6 +5,7 @@ import { validateGlobalTagCatalog } from "./global-tag-catalog.js";
 import {
   GLOBAL_TAG_CATALOG_SETTING_ID,
   GLOBAL_TAG_MIGRATION_SETTING_ID,
+  GLOBAL_TAG_MIGRATION_VERSION,
   dehydrateCardTagNames,
   dehydratePaperTagNames,
   hydrateCardTagNames,
@@ -204,7 +205,8 @@ export async function deleteTagEverywhere({ kind, records = [], vocabulary = [] 
   throw new Error(`Unsupported tag vocabulary kind: ${kind}`);
 }
 
-export async function restoreCatalogRecords({ paperPacks = [], colors = [], cards = [], owners = [], tagVocabularies = null }) {
+export async function restoreCatalogRecords({ paperPacks = [], colors = [], cards = [], owners = [], tagCatalog = null, tagVocabularies = null }) {
+  if (tagCatalog && !validateGlobalTagCatalog(tagCatalog).ok) throw new TypeError("Cannot restore an invalid global tag catalog.");
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
 
@@ -222,7 +224,7 @@ export async function restoreCatalogRecords({ paperPacks = [], colors = [], card
       owners.forEach((owner) => ownerStore.put(owner));
 
       for (const paperPack of paperPacks) {
-        paperPackStore.put(normalizePaperPackForStorage(paperPack));
+        paperPackStore.put(normalizePaperPackForStorage(paperPack, tagCatalog));
         deletedPaperPackIdStore.delete(paperPack.id);
       }
 
@@ -231,12 +233,16 @@ export async function restoreCatalogRecords({ paperPacks = [], colors = [], card
       }
 
       for (const card of cards) {
-        cardStore.put(addCatalogSchemaVersion(normalizeCardForRuntime(card)));
+        cardStore.put(normalizeCardForStorage(card, tagCatalog));
       }
 
       if (tagVocabularies) {
         settingsStore.put({ id: PAPER_TAG_VOCABULARY_SETTING_ID, value: tagVocabularies.paper || [] });
         settingsStore.put({ id: CARD_TAG_VOCABULARY_SETTING_ID, value: tagVocabularies.card || [] });
+      }
+      if (tagCatalog) {
+        settingsStore.put({ id: GLOBAL_TAG_CATALOG_SETTING_ID, value: tagCatalog });
+        settingsStore.put({ id: GLOBAL_TAG_MIGRATION_SETTING_ID, value: GLOBAL_TAG_MIGRATION_VERSION });
       }
     }
   );

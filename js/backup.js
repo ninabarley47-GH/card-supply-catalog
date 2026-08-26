@@ -1,7 +1,6 @@
 import {
   loadCatalogSetting,
-  loadCardTagVocabulary,
-  loadPaperTagVocabulary,
+  loadGlobalTagCatalog,
   loadSavedCards,
   loadSavedPaperPack,
   isCard,
@@ -11,10 +10,9 @@ import {
   saveCatalogSetting
 } from "./storage.js";
 import { buildOwnerRegistry, isOwner, migratePaperPackOwners, serializePaperPackOwner } from "./owners.js";
-import {
-  buildEffectiveCardTagVocabulary,
-  buildEffectivePaperTagVocabulary
-} from "./tag-utils.js";
+import { createEmptyGlobalTagCatalog, migrateLegacyTagData, validateGlobalTagCatalog, validateItemTagAssignments } from "./global-tag-catalog.js";
+import { dehydrateCardTagNames, dehydratePaperTagNames, hydratePaperTagNames } from "./global-tag-persistence.js";
+import { reconcileBackupTagData } from "./tag-backup-reconciliation.js";
 import { getCardDetailImageSource, hydrateCardImageSources } from "./card-images.js";
 import { createImportPlan } from "./import-mode.js";
 import {
@@ -642,12 +640,11 @@ async function summarizeBackupOverwrites(backup, paperPacks, colorsById) {
   };
 }
 async function createCatalogBackup({ paperPacks, colorsById, owners = [] }) {
-  const [imageLibrary, cardImageLibrary, cards, paperTagVocabulary, cardTagVocabulary] = await Promise.all([
+  const [imageLibrary, cardImageLibrary, cards, tagCatalog] = await Promise.all([
     loadCatalogSetting(IMAGE_LIBRARY_SETTING_ID),
     loadCatalogSetting(CARD_IMAGE_LIBRARY_SETTING_ID),
     loadSavedCards(),
-    loadPaperTagVocabulary(),
-    loadCardTagVocabulary()
+    loadGlobalTagCatalog()
   ]);
   return createCatalogBackupSnapshot({
     paperPacks,
@@ -656,7 +653,7 @@ async function createCatalogBackup({ paperPacks, colorsById, owners = [] }) {
     owners,
     imageLibrary,
     cardImageLibrary,
-    tagVocabularies: { paper: paperTagVocabulary, card: cardTagVocabulary }
+    tagCatalog
   });
 }
 
@@ -667,11 +664,13 @@ export function createCatalogBackupSnapshot({
   owners = [],
   imageLibrary = null,
   cardImageLibrary = null,
+  tagCatalog = null,
   tagVocabularies = {}
 }) {
   const effectiveOwners = buildOwnerRegistry(owners, paperPacks);
   const ownedPaperPacks = migratePaperPackOwners(paperPacks, effectiveOwners);
   const imageSummary = summarizeImageStorage(ownedPaperPacks, cards);
+  const taxonomy = prepareBackupTaxonomy({ paperPacks: ownedPaperPacks, cards, tagCatalog, tagVocabularies });
 
   return {
     schemaVersion: BACKUP_SCHEMA_VERSION,
@@ -689,25 +688,21 @@ export function createCatalogBackupSnapshot({
     },
     colors: sortObjectByKey(colorsById),
     owners: effectiveOwners.map(({ id, name, archived }) => ({ id, name, ...(archived === true ? { archived: true } : {}) })),
-    paperPacks: ownedPaperPacks.map(createSerializablePaperPack),
-    cards: cards.map(createSerializableCard),
-    tagVocabularies: {
-      paper: buildEffectivePaperTagVocabulary(tagVocabularies.paper, ownedPaperPacks),
-      card: buildEffectiveCardTagVocabulary(tagVocabularies.card, cards)
-    }
+    paperPacks: taxonomy.paperPacks.map(createSerializablePaperPack),
+    cards: taxonomy.cards.map(createSerializableCard),
+    tagCatalog: taxonomy.tagCatalog
   };
 }
 
-async function createIpadCatalogBackup({ paperPacks, colorsById, owners = [] }) {
+export async function createIpadCatalogBackup({ paperPacks, colorsById, owners = [], services = {} }) {
   const effectiveOwners = buildOwnerRegistry(owners, paperPacks);
   const ownedPaperPacks = migratePaperPackOwners(paperPacks, effectiveOwners);
   const compressedPaperPacks = [];
-  const [cards, paperTagVocabulary, cardTagVocabulary] = await Promise.all([
-    loadSavedCards(),
-    loadPaperTagVocabulary(),
-    loadCardTagVocabulary()
+  const [cards, tagCatalog] = await Promise.all([
+    (services.loadSavedCards || loadSavedCards)(),
+    (services.loadGlobalTagCatalog || loadGlobalTagCatalog)()
   ]);
-  await hydrateCardImageSources(cards);
+  await (services.hydrateCardImageSources || hydrateCardImageSources)(cards);
   const compressedCards = [];
   const imageSummary = {
     embeddedImages: 0,
@@ -735,6 +730,7 @@ async function createIpadCatalogBackup({ paperPacks, colorsById, owners = [] }) 
     imageSummary.folderImageReferences += result.folderImageReferences;
   }
 
+  const taxonomy = prepareBackupTaxonomy({ paperPacks: compressedPaperPacks, cards: compressedCards, tagCatalog });
   return {
     schemaVersion: BACKUP_SCHEMA_VERSION,
     catalogSchemaVersion: CATALOG_SCHEMA_VERSION,
@@ -755,13 +751,45 @@ async function createIpadCatalogBackup({ paperPacks, colorsById, owners = [] }) 
     },
     colors: sortObjectByKey(colorsById),
     owners: effectiveOwners.map(({ id, name, archived }) => ({ id, name, ...(archived === true ? { archived: true } : {}) })),
-    paperPacks: compressedPaperPacks,
-    cards: compressedCards,
-    tagVocabularies: {
-      paper: buildEffectivePaperTagVocabulary(paperTagVocabulary, ownedPaperPacks),
-      card: buildEffectiveCardTagVocabulary(cardTagVocabulary, cards)
-    }
+    paperPacks: taxonomy.paperPacks,
+    cards: taxonomy.cards,
+    tagCatalog: taxonomy.tagCatalog
   };
+}
+
+function prepareBackupTaxonomy({ paperPacks = [], cards = [], tagCatalog, tagVocabularies = {} }) {
+  if (tagCatalog) {
+    if (!validateGlobalTagCatalog(tagCatalog).ok) throw new TypeError("Cannot export an invalid global tag catalog.");
+    const migrated = migrateLegacyTagData({ catalog: tagCatalog, paperRecords: paperPacks, cardRecords: cards });
+    const paperIds = new Map(migrated.paperAssignments.map((entry) => [entry.recordId, entry.tagIds]));
+    const cardIds = new Map(migrated.cardAssignments.map((entry) => [entry.recordId, entry.tagIds]));
+    return {
+      tagCatalog: cloneJsonSafe(migrated.catalog),
+      paperPacks: paperPacks.map((record) => Array.isArray(record.tagIds)
+        ? dehydratePaperTagNames(record, migrated.catalog)
+        : withoutLegacyTags(record, paperIds.get(record.id) || [], "keywords")),
+      cards: cards.map((record) => Array.isArray(record.tagIds)
+        ? dehydrateCardTagNames(record, migrated.catalog)
+        : withoutLegacyTags(record, cardIds.get(record.id) || [], "tags"))
+    };
+  }
+  const migrated = migrateLegacyTagData({
+    paperVocabulary: tagVocabularies.paper || [], cardVocabulary: tagVocabularies.card || [],
+    paperRecords: paperPacks, cardRecords: cards
+  });
+  const paperIds = new Map(migrated.paperAssignments.map((entry) => [entry.recordId, entry.tagIds]));
+  const cardIds = new Map(migrated.cardAssignments.map((entry) => [entry.recordId, entry.tagIds]));
+  return {
+    tagCatalog: migrated.catalog,
+    paperPacks: paperPacks.map((record) => withoutLegacyTags(record, paperIds.get(record.id) || [], "keywords")),
+    cards: cards.map((record) => withoutLegacyTags(record, cardIds.get(record.id) || [], "tags"))
+  };
+}
+
+function withoutLegacyTags(record, tagIds, legacyField) {
+  const normalized = { ...record, tagIds: [...tagIds] };
+  delete normalized[legacyField];
+  return normalized;
 }
 
 function summarizeImageStorage(paperPacks, cards = []) {
@@ -940,7 +968,9 @@ export async function restoreCatalogBackup({
     importedPaperPackIds: [],
     notes: [],
     warnings: [],
-    errors: []
+    errors: [],
+    conflicts: [],
+    tagReconciliation: null
   };
   const validation = validateBackup(backup);
 
@@ -949,25 +979,32 @@ export async function restoreCatalogBackup({
     return summary;
   }
 
+  let reconciliation;
+  try {
+    const localCatalog = services.loadGlobalTagCatalog
+      ? await services.loadGlobalTagCatalog()
+      : typeof window === "undefined" ? createEmptyGlobalTagCatalog() : await loadGlobalTagCatalog();
+    reconciliation = reconcileBackupTagData({ localCatalog, backup });
+  } catch (error) {
+    summary.errors.push(`Nothing was imported because tag reconciliation failed: ${error.message}`);
+    return summary;
+  }
+  summary.tagReconciliation = reconciliation.report;
+  summary.conflicts = reconciliation.conflicts || [];
+  if (!reconciliation.ok) {
+    summary.errors.push("Nothing was imported because tag conflicts require review.");
+    return summary;
+  }
+
   const importedColorsById = backup?.colors || {};
-  const rawImportedPaperPacks = Array.isArray(backup?.paperPacks) ? backup.paperPacks : [];
+  const rawImportedPaperPacks = reconciliation.paperPacks;
   const importedOwners = buildOwnerRegistry(
     [...owners, ...(Array.isArray(backup?.owners) ? backup.owners : [])],
     rawImportedPaperPacks
   );
   const importedPaperPacks = migratePaperPackOwners(rawImportedPaperPacks, importedOwners);
-  const importedCards = Array.isArray(backup?.cards) ? backup.cards : [];
-  const [savedCards, savedPaperTagVocabulary, savedCardTagVocabulary] = await Promise.all([
-    (services.loadSavedCards || loadSavedCards)(),
-    (services.loadPaperTagVocabulary || loadPaperTagVocabulary)(),
-    (services.loadCardTagVocabulary || loadCardTagVocabulary)()
-  ]);
-  const existingPaperTagVocabulary = Array.isArray(savedPaperTagVocabulary)
-    ? savedPaperTagVocabulary
-    : [];
-  const existingCardTagVocabulary = Array.isArray(savedCardTagVocabulary)
-    ? savedCardTagVocabulary
-    : [];
+  const importedCards = reconciliation.cards;
+  const savedCards = await (services.loadSavedCards || loadSavedCards)();
   const colorPlan = createImportPlan(
     importedColorsById ? Object.values(importedColorsById) : [],
     Object.values(colorsById),
@@ -1019,23 +1056,12 @@ export async function restoreCatalogBackup({
 
   try {
     checkpointImportDiagnostic(importDiagnostic, "saving-to-indexeddb");
-    const tagVocabularies = {
-      paper: buildEffectivePaperTagVocabulary(
-        [...existingPaperTagVocabulary, ...(backup.tagVocabularies?.paper || [])],
-        [...paperPacks, ...preparedPaperPacks]
-      ),
-      card: buildEffectiveCardTagVocabulary(
-        [...existingCardTagVocabulary, ...(backup.tagVocabularies?.card || [])],
-        [...savedCards, ...preparedCards]
-      )
-    };
-
     await (services.restoreCatalogRecords || restoreCatalogRecords)({
       paperPacks: preparedPaperPacks,
       colors: colorPlan.recordsToImport,
       cards: preparedCards,
       owners: importedOwners,
-      tagVocabularies
+      tagCatalog: reconciliation.catalog
     });
   } catch (error) {
     logImportError("Atomic catalog restore failed", error, {
@@ -1053,7 +1079,7 @@ export async function restoreCatalogBackup({
   }
 
   for (const paperPack of preparedPaperPacks) {
-    upsertPaperPack(paperPacks, paperPack);
+    upsertPaperPack(paperPacks, hydratePaperTagNames(paperPack, reconciliation.catalog));
     await verifySavedPaperPackImages(importDiagnostic, paperPack);
     checkpointImportDiagnostic(importDiagnostic, "verifying-indexeddb");
     summary.importedPaperPackIds.push(paperPack.id);
@@ -1475,6 +1501,21 @@ export function validateBackup(backup) {
     };
   }
 
+  const isModern = backup.schemaVersion >= 3 || backup.tagCatalog !== undefined;
+  if (isModern) {
+    if (!backup.tagCatalog || !validateGlobalTagCatalog(backup.tagCatalog).ok) {
+      return { ok: false, message: "Nothing was imported because the global tag catalog is invalid." };
+    }
+    if (backup.tagVocabularies !== undefined) {
+      return { ok: false, message: "Nothing was imported because the backup mixes legacy and global tag formats." };
+    }
+    const assignmentError = validateModernBackupAssignments(backup);
+    if (assignmentError) return { ok: false, message: assignmentError };
+  } else {
+    const mixedRecord = [...backup.paperPacks, ...(backup.cards || [])].find((record) => "tagIds" in record);
+    if (mixedRecord) return { ok: false, message: "Nothing was imported because a legacy backup contains new-format tag assignments." };
+  }
+
   if (
     backup.tagVocabularies !== undefined &&
     (
@@ -1569,6 +1610,23 @@ function upsertPaperPack(paperPacks, paperPack) {
 
   clearPaperPackImageObjectUrls(paperPacks[existingIndex]);
   paperPacks.splice(existingIndex, 1, paperPack);
+}
+
+function validateModernBackupAssignments(backup) {
+  for (const { records, productType, legacyField } of [
+    { records: backup.paperPacks, productType: "paper", legacyField: "keywords" },
+    { records: backup.cards || [], productType: "card", legacyField: "tags" }
+  ]) {
+    for (const record of records) {
+      if (!Array.isArray(record.tagIds) || legacyField in record) {
+        return "Nothing was imported because the backup contains malformed mixed legacy/new tag data.";
+      }
+      if (!validateItemTagAssignments({ catalog: backup.tagCatalog, productType, tagIds: record.tagIds }).ok) {
+        return `Nothing was imported because ${productType} record "${record.id}" has invalid tag assignments.`;
+      }
+    }
+  }
+  return "";
 }
 
 async function verifyPostRestoreCatalog(importedPaperPacks, rendererCatalog) {

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createCatalogBackupSnapshot, restoreCatalogBackup } from "./backup.js";
+import { createCatalogBackupSnapshot, createIpadCatalogBackup, restoreCatalogBackup } from "./backup.js";
+import { migrateLegacyTagData } from "./global-tag-catalog.js";
 
 function createCatalogRecords() {
   const color = {
@@ -62,9 +63,11 @@ test("backup and restore round-trip includes Cards and their persistent image re
   assert.equal(backup.cards[0].thumbnailImagePath, card.thumbnailImagePath);
   assert.equal("imagePreviewSrc" in backup.cards[0], false);
   assert.equal(backup.imageStorage.folderImageReferences, 2);
-  assert.equal(backup.tagVocabularies.paper.includes("Saved Paper Tag"), true);
-  assert.equal(backup.tagVocabularies.card.includes("Saved Card Tag"), true);
-  assert.equal(backup.tagVocabularies.card.includes("birthday"), true);
+  assert.equal(backup.tagCatalog.tags.some((tag) => tag.name === "Saved Paper Tag"), true);
+  assert.equal(backup.tagCatalog.tags.some((tag) => tag.name === "Saved Card Tag"), true);
+  assert.equal(backup.tagCatalog.tags.some((tag) => tag.name === "birthday"), true);
+  assert.equal("tags" in backup.cards[0], false);
+  assert.equal(Array.isArray(backup.cards[0].tagIds), true);
 
   const summary = await restoreCatalogBackup({
     backup: JSON.parse(JSON.stringify(backup)),
@@ -86,22 +89,50 @@ test("backup and restore round-trip includes Cards and their persistent image re
   assert.equal(summary.cardsImported, 1);
   assert.equal(persistedCalls.length, 1);
   assert.deepEqual(persistedCalls[0].cards, backup.cards);
-  assert.deepEqual(persistedCalls[0].tagVocabularies, backup.tagVocabularies);
+  assert.deepEqual(persistedCalls[0].tagCatalog, backup.tagCatalog);
   assert.equal(paperPacks[0].id, paperPack.id);
   assert.equal(colorsById[color.id].name, color.name);
   assert.equal(cardsRestoredEvents, 1);
+});
+
+test("compact iPad backup round-trip carries the global catalog and tagIds", async () => {
+  const { color, paperPack, card } = createCatalogRecords();
+  const migrated = migrateLegacyTagData({ paperRecords: [paperPack], cardRecords: [card] });
+  const backup = await createIpadCatalogBackup({
+    paperPacks: [paperPack], colorsById: { [color.id]: color },
+    services: {
+      loadSavedCards: async () => [card], loadGlobalTagCatalog: async () => migrated.catalog,
+      hydrateCardImageSources: async () => {}
+    }
+  });
+  const writes = [];
+  const summary = await restoreCatalogBackup({
+    backup, paperPacks: [], colorsById: {},
+    services: {
+      loadGlobalTagCatalog: async () => ({ schemaVersion: 1, tags: [], categories: [] }),
+      loadSavedCards: async () => [], preparePaperPack: async (record) => ({ paperPack: record }),
+      restoreCatalogRecords: async (records) => writes.push(records), dispatchCardsRestored: () => {}
+    }
+  });
+  assert.deepEqual(summary.errors, []);
+  assert.equal(backup.backupProfile, "ipad-compact-embedded-images-v2");
+  assert.equal("tagVocabularies" in backup, false);
+  assert.equal(Array.isArray(backup.paperPacks[0].tagIds), true);
+  assert.equal(Array.isArray(backup.cards[0].tagIds), true);
+  assert.deepEqual(writes[0].tagCatalog, backup.tagCatalog);
 });
 
 test("legacy backup without tag vocabularies reconstructs them from records and the Paper seed", async () => {
   const { color, paperPack, card } = createCatalogRecords();
   paperPack.keywords = ["Legacy Paper Assignment"];
   card.tags = ["Legacy Card Assignment"];
-  const backup = createCatalogBackupSnapshot({
-    paperPacks: [paperPack],
-    colorsById: { [color.id]: color },
-    cards: [card]
-  });
-  delete backup.tagVocabularies;
+  const backup = createCatalogBackupSnapshot({ paperPacks: [paperPack], colorsById: { [color.id]: color }, cards: [card] });
+  backup.schemaVersion = 2;
+  delete backup.tagCatalog;
+  backup.paperPacks[0].keywords = ["Legacy Paper Assignment"];
+  delete backup.paperPacks[0].tagIds;
+  backup.cards[0].tags = ["Legacy Card Assignment"];
+  delete backup.cards[0].tagIds;
   const persistedCalls = [];
 
   const summary = await restoreCatalogBackup({
@@ -119,9 +150,8 @@ test("legacy backup without tag vocabularies reconstructs them from records and 
   });
 
   assert.deepEqual(summary.errors, []);
-  assert.equal(persistedCalls[0].tagVocabularies.paper.includes("Illustration"), true);
-  assert.equal(persistedCalls[0].tagVocabularies.paper.includes("Legacy Paper Assignment"), true);
-  assert.deepEqual(persistedCalls[0].tagVocabularies.card, ["Legacy Card Assignment"]);
+  assert.equal(persistedCalls[0].tagCatalog.tags.some((tag) => tag.name === "Legacy Paper Assignment"), true);
+  assert.equal(persistedCalls[0].tagCatalog.tags.some((tag) => tag.name === "Legacy Card Assignment"), true);
 });
 
 test("restore treats a missing saved Paper tag vocabulary as empty", async () => {

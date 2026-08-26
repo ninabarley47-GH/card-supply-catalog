@@ -131,9 +131,9 @@ Each color's JSON entry includes a color ID derived from the name, name, HEX val
 
 Backups are explicit, user-triggered JSON exports rather than automatic rolling snapshots.
 
-- Standard backup: includes paper packs, Cards, colors, embedded fallback images, and relative references to folder-backed Paper and Card images. The image folders must be backed up separately.
-- iPad backup: embeds compressed copies of accessible Paper and Card images so the catalog can be restored where folder access is unavailable.
-- Import: validates every color, paper pack, and Card before writing; prepares image references; then persists the complete selected import in one IndexedDB transaction. Any validation, preparation, or transaction failure leaves the catalog unchanged. Import warns before overwriting matching records and reports missing folder-image requirements.
+- Standard backup: includes paper packs, Cards, colors, the versioned global tag catalog, `tagIds` assignments, embedded fallback images, and relative references to folder-backed Paper and Card images. The image folders must be backed up separately.
+- iPad backup: includes the same global tag catalog and `tagIds` assignments while embedding compressed copies of accessible Paper and Card images so the catalog can be restored where folder access is unavailable.
+- Import: validates and reconciles the complete taxonomy and all catalog records in memory before writing; then persists the global catalog and selected Paper/Card records in one IndexedDB transaction. Any unresolved identity conflict, validation, preparation, or transaction failure leaves IndexedDB and in-memory catalog state unchanged. Legacy name-based backups remain importable through the approved conversion rules.
 - Destination: if the selected image-library folder is writable, export saves there; otherwise it uses a browser download.
 
 ## Schema Version Boundaries
@@ -145,7 +145,7 @@ Catalog-record schema and backup-envelope schema are versioned independently in 
 
 The Card Status change raised the catalog schema to version 3. Cards now persist `status` as either `available` or `sent`; legacy Cards without a status are normalized to `available` when loaded or imported. Exported records carry catalog schema version 3, and exported backup envelopes declare `catalogSchemaVersion: 3`.
 
-The backup envelope remains version 2 because Card Status changes the contents of a Card record, not the top-level backup format. A current export therefore has `schemaVersion: 2` for the envelope and `catalogSchemaVersion: 3` for its records. Older version-2 app backups that do not declare `catalogSchemaVersion` remain importable through the legacy compatibility path, with their Card records normalized to the current catalog schema.
+Phase B2 raises the backup envelope to version 3. Version-3 Standard and Compact iPad exports contain one `tagCatalog` object (`schemaVersion`, `tags`, and `categories`), and Paper/Card records contain only `tagIds`. Version-1/2 backups with optional `tagVocabularies` and legacy `keywords`/`tags` remain importable through in-memory conversion and reconciliation. The record catalog schema remains version 3.
 
 # Error Handling
 Never lose user data.

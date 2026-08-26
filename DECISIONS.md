@@ -359,7 +359,9 @@ These rules are documented for review and are not implemented by Phase A:
 # Decision 32
 ## Selected Image Folders Are Non-Destructive Shared Libraries
 
-CSC may create and read files in the user-selected Paper and Card image-library folders, but it must never delete files or folders from either library. Deleting a Paper Pack or Card removes only its catalog record and leaves every referenced image and thumbnail untouched because another user may share and still depend on those files.
+Deleting a Paper Pack from CSC must never delete, move, rename, overwrite, or otherwise modify image files or folders in the user-selected image library. It deletes only the Paper Pack's catalog record and related app-owned metadata.
+
+The same non-destructive rule applies to Cards and to both selected Paper and Card image libraries. CSC may create new image files and thumbnails when explicitly saving catalog content, and it may read existing files, but catalog deletion must leave the shared library and every existing file untouched. Another user may share and still depend on those files.
 
 # Permission Notes
 ## The File System Access API requires:
