@@ -1,6 +1,17 @@
 import { addCatalogSchemaVersion } from "./schema.js";
-import { uniqueTags } from "./tag-utils.js";
+import { PAPER_TAG_SEED, getTagKey, uniqueTags } from "./tag-utils.js";
 import { buildOwnerRegistry, isOwner, migratePaperPackOwners, serializePaperPackOwner } from "./owners.js";
+import { validateGlobalTagCatalog } from "./global-tag-catalog.js";
+import {
+  GLOBAL_TAG_CATALOG_SETTING_ID,
+  GLOBAL_TAG_MIGRATION_SETTING_ID,
+  dehydrateCardTagNames,
+  dehydratePaperTagNames,
+  hydrateCardTagNames,
+  hydratePaperTagNames,
+  mergeLegacyVocabularyIntoGlobalCatalog,
+  migrateGlobalTagPersistence
+} from "./global-tag-persistence.js";
 
 const DATABASE_NAME = "card-supply-catalog";
 const DATABASE_VERSION = 5;
@@ -26,13 +37,15 @@ const KEYWORD_REPLACEMENTS = new Map([
 
 let databasePromise;
 let legacyMigrationAttempted = false;
+let globalTagMigrationPromise;
 
 export async function loadSavedPaperPacks() {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
+  const catalog = await ensureGlobalTagPersistence(database);
   const paperPacks = await getAllFromStore(database, PAPER_PACKS_STORE);
 
-  return paperPacks.filter(isCompatiblePaperPack).map(normalizePaperPackForRuntime);
+  return paperPacks.filter(isCompatiblePaperPack).map((paperPack) => normalizePaperPackForRuntime(paperPack, catalog));
 }
 
 export async function loadOwners() {
@@ -48,6 +61,8 @@ export async function saveOwner(owner) {
 
 export async function migrateCatalogOwnership(basePaperPacks = [], savedPaperPacks = [], seedOwners = []) {
   const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
+  const catalog = await ensureGlobalTagPersistence(database);
   const existingOwners = (await getAllFromStore(database, OWNERS_STORE)).filter(isOwner);
   const owners = buildOwnerRegistry([...seedOwners, ...existingOwners], [...basePaperPacks, ...savedPaperPacks]);
   const migratedBasePacks = migratePaperPackOwners(basePaperPacks, owners);
@@ -57,7 +72,7 @@ export async function migrateCatalogOwnership(basePaperPacks = [], savedPaperPac
     const ownerStore = transaction.objectStore(OWNERS_STORE);
     const paperPackStore = transaction.objectStore(PAPER_PACKS_STORE);
     owners.forEach((owner) => ownerStore.put(owner));
-    migratedSavedPacks.forEach((paperPack) => paperPackStore.put(normalizePaperPackForStorage(paperPack)));
+    migratedSavedPacks.forEach((paperPack) => paperPackStore.put(normalizePaperPackForStorage(paperPack, catalog)));
   });
 
   return { owners, basePaperPacks: migratedBasePacks, savedPaperPacks: migratedSavedPacks };
@@ -66,31 +81,37 @@ export async function migrateCatalogOwnership(basePaperPacks = [], savedPaperPac
 export async function loadSavedPaperPack(paperPackId) {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
+  const catalog = await ensureGlobalTagPersistence(database);
   const paperPack = await getFromStore(database, PAPER_PACKS_STORE, paperPackId);
 
-  return isCompatiblePaperPack(paperPack) ? normalizePaperPackForRuntime(paperPack) : null;
+  return isCompatiblePaperPack(paperPack) ? normalizePaperPackForRuntime(paperPack, catalog) : null;
 }
 
 export async function savePaperPack(paperPack) {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
+  const catalog = await ensureGlobalTagPersistence(database);
+  const nextCatalog = ensureLegacyNamesInGlobalCatalog(catalog, paperPack.keywords, "paper");
 
-  await writeTransaction(database, [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE], (transaction) => {
-    transaction.objectStore(PAPER_PACKS_STORE).put(normalizePaperPackForStorage(paperPack));
+  await writeTransaction(database, [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE, SETTINGS_STORE], (transaction) => {
+    transaction.objectStore(PAPER_PACKS_STORE).put(normalizePaperPackForStorage(paperPack, nextCatalog));
     transaction.objectStore(DELETED_PAPER_PACK_IDS_STORE).delete(paperPack.id);
+    if (nextCatalog !== catalog) transaction.objectStore(SETTINGS_STORE).put({ id: GLOBAL_TAG_CATALOG_SETTING_ID, value: nextCatalog });
   });
+  if (nextCatalog !== catalog) globalTagMigrationPromise = Promise.resolve(nextCatalog);
 }
 
 export async function savePaperPacks(paperPacks) {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
+  const catalog = await ensureGlobalTagPersistence(database);
 
   await writeTransaction(database, [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE], (transaction) => {
     const paperPackStore = transaction.objectStore(PAPER_PACKS_STORE);
     const deletedPaperPackIdStore = transaction.objectStore(DELETED_PAPER_PACK_IDS_STORE);
 
     for (const paperPack of paperPacks) {
-      paperPackStore.put(normalizePaperPackForStorage(paperPack));
+      paperPackStore.put(normalizePaperPackForStorage(paperPack, catalog));
       deletedPaperPackIdStore.delete(paperPack.id);
     }
   });
@@ -116,23 +137,35 @@ export async function saveColor(color) {
 export async function loadSavedCards() {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
+  const catalog = await ensureGlobalTagPersistence(database);
   const cards = await getAllFromStore(database, CARDS_STORE);
 
-  return cards.filter(isCard).map(normalizeCardForRuntime);
+  return cards.filter(isCard).map((card) => normalizeCardForRuntime(card, catalog));
+}
+
+export async function loadGlobalTagCatalog() {
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
+  return ensureGlobalTagPersistence(database);
 }
 
 export async function saveCard(card) {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
+  const catalog = await ensureGlobalTagPersistence(database);
+  const nextCatalog = ensureLegacyNamesInGlobalCatalog(catalog, card.tags, "card");
 
-  await writeTransaction(database, [CARDS_STORE], (transaction) => {
-    transaction.objectStore(CARDS_STORE).put(addCatalogSchemaVersion(normalizeCardForRuntime(card)));
+  await writeTransaction(database, [CARDS_STORE, SETTINGS_STORE], (transaction) => {
+    transaction.objectStore(CARDS_STORE).put(normalizeCardForStorage(card, nextCatalog));
+    if (nextCatalog !== catalog) transaction.objectStore(SETTINGS_STORE).put({ id: GLOBAL_TAG_CATALOG_SETTING_ID, value: nextCatalog });
   });
+  if (nextCatalog !== catalog) globalTagMigrationPromise = Promise.resolve(nextCatalog);
 }
 
 export async function deleteTagEverywhere({ kind, records = [], vocabulary = [] }) {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
+  const catalog = await ensureGlobalTagPersistence(database);
 
   if (kind === "paper") {
     await writeTransaction(database, [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE, SETTINGS_STORE], (transaction) => {
@@ -140,7 +173,7 @@ export async function deleteTagEverywhere({ kind, records = [], vocabulary = [] 
       const deletedPaperPackIdStore = transaction.objectStore(DELETED_PAPER_PACK_IDS_STORE);
 
       for (const paperPack of records) {
-        paperPackStore.put(normalizePaperPackForStorage(paperPack));
+        paperPackStore.put(normalizePaperPackForStorage(paperPack, catalog));
         deletedPaperPackIdStore.delete(paperPack.id);
       }
 
@@ -157,7 +190,7 @@ export async function deleteTagEverywhere({ kind, records = [], vocabulary = [] 
       const cardStore = transaction.objectStore(CARDS_STORE);
 
       for (const card of records) {
-        cardStore.put(addCatalogSchemaVersion(normalizeCardForRuntime(card)));
+        cardStore.put(normalizeCardForStorage(card, catalog));
       }
 
       transaction.objectStore(SETTINGS_STORE).put({
@@ -356,6 +389,46 @@ async function migrateLegacyLocalStorage(database) {
   legacyMigrationAttempted = true;
 }
 
+async function ensureGlobalTagPersistence(database) {
+  if (globalTagMigrationPromise) return globalTagMigrationPromise;
+
+  globalTagMigrationPromise = migrateGlobalTagPersistence({
+    readState: async () => {
+      const [catalogSetting, migrationSetting, paperVocabularySetting, cardVocabularySetting, paperRecords, cardRecords] = await Promise.all([
+        getFromStore(database, SETTINGS_STORE, GLOBAL_TAG_CATALOG_SETTING_ID),
+        getFromStore(database, SETTINGS_STORE, GLOBAL_TAG_MIGRATION_SETTING_ID),
+        getFromStore(database, SETTINGS_STORE, PAPER_TAG_VOCABULARY_SETTING_ID),
+        getFromStore(database, SETTINGS_STORE, CARD_TAG_VOCABULARY_SETTING_ID),
+        getAllFromStore(database, PAPER_PACKS_STORE),
+        getAllFromStore(database, CARDS_STORE)
+      ]);
+      return {
+        globalTagCatalog: catalogSetting?.value ?? null,
+        migrationVersion: migrationSetting?.value ?? null,
+        paperVocabulary: paperVocabularySetting?.value ?? PAPER_TAG_SEED,
+        cardVocabulary: cardVocabularySetting?.value || [],
+        paperRecords,
+        cardRecords
+      };
+    },
+    commitMigration: ({ globalTagCatalog, migrationVersion, paperRecords, cardRecords }) =>
+      writeTransaction(database, [PAPER_PACKS_STORE, CARDS_STORE, SETTINGS_STORE], (transaction) => {
+        const paperStore = transaction.objectStore(PAPER_PACKS_STORE);
+        const cardStore = transaction.objectStore(CARDS_STORE);
+        const settingsStore = transaction.objectStore(SETTINGS_STORE);
+        paperRecords.forEach((record) => paperStore.put(record));
+        cardRecords.forEach((record) => cardStore.put(record));
+        settingsStore.put({ id: GLOBAL_TAG_CATALOG_SETTING_ID, value: globalTagCatalog });
+        settingsStore.put({ id: GLOBAL_TAG_MIGRATION_SETTING_ID, value: migrationVersion });
+      })
+  }).then(({ catalog }) => catalog).catch((error) => {
+    globalTagMigrationPromise = null;
+    throw error;
+  });
+
+  return globalTagMigrationPromise;
+}
+
 function isLegacyMigrationComplete() {
   try {
     return window.localStorage.getItem(LEGACY_MIGRATION_STORAGE_KEY) === "true";
@@ -388,17 +461,43 @@ function markLegacyMigrationComplete() {
   }
 }
 
-function normalizePaperPackForStorage(paperPack) {
-  return addCatalogSchemaVersion(serializePaperPackOwner(normalizePaperPackForRuntime(paperPack)));
+function normalizePaperPackForStorage(paperPack, catalog = null) {
+  const runtimeRecord = normalizePaperPackForRuntime(paperPack, catalog);
+  const shouldUseTagIds = Array.isArray(runtimeRecord.tagIds) || Boolean(catalog);
+  const persistentRecord = shouldUseTagIds
+    ? dehydratePaperTagNames(
+        Array.isArray(runtimeRecord.tagIds) ? runtimeRecord : { ...runtimeRecord, tagIds: [] },
+        requireValidGlobalTagCatalog(catalog)
+      )
+    : runtimeRecord;
+  return addCatalogSchemaVersion(serializePaperPackOwner(persistentRecord));
 }
 
-function normalizePaperPackForRuntime(paperPack) {
-  const normalizedPaperPack = normalizePaperPackKeywords(paperPack);
+function normalizeCardForStorage(card, catalog = null) {
+  const runtimeRecord = normalizeCardForRuntime(card, catalog);
+  const shouldUseTagIds = Array.isArray(runtimeRecord.tagIds) || Boolean(catalog);
+  const persistentRecord = shouldUseTagIds
+    ? dehydrateCardTagNames(
+        Array.isArray(runtimeRecord.tagIds) ? runtimeRecord : { ...runtimeRecord, tagIds: [] },
+        requireValidGlobalTagCatalog(catalog)
+      )
+    : runtimeRecord;
+  return addCatalogSchemaVersion(persistentRecord);
+}
 
-  return {
+export function normalizePaperPackForRuntime(paperPack, catalog = null) {
+  const compatiblePaperPack = Array.isArray(paperPack?.tagIds)
+    ? hydratePaperTagNames(paperPack, requireValidGlobalTagCatalog(catalog))
+    : paperPack;
+  const normalizedPaperPack = normalizePaperPackKeywords(compatiblePaperPack);
+
+  const runtimePaperPack = {
     ...normalizedPaperPack,
     patterns: (normalizedPaperPack.patterns || []).map(removeTransientPatternImageFields)
   };
+  return Array.isArray(paperPack?.tagIds)
+    ? hydratePaperTagNames({ ...runtimePaperPack, tagIds: paperPack.tagIds }, catalog)
+    : runtimePaperPack;
 }
 
 function removeTransientPatternImageFields(patternEntry) {
@@ -487,7 +586,7 @@ export function loadPaperTagVocabulary() {
 }
 
 export function savePaperTagVocabulary(tags) {
-  return saveCatalogSetting(PAPER_TAG_VOCABULARY_SETTING_ID, uniqueTags(tags));
+  return saveLegacyTagVocabulary(PAPER_TAG_VOCABULARY_SETTING_ID, uniqueTags(tags), "paper");
 }
 
 export function loadCardTagVocabulary() {
@@ -495,7 +594,33 @@ export function loadCardTagVocabulary() {
 }
 
 export function saveCardTagVocabulary(tags) {
-  return saveCatalogSetting(CARD_TAG_VOCABULARY_SETTING_ID, uniqueTags(tags));
+  return saveLegacyTagVocabulary(CARD_TAG_VOCABULARY_SETTING_ID, uniqueTags(tags), "card");
+}
+
+async function saveLegacyTagVocabulary(settingId, tags, productType) {
+  // Transitional only. Remove this legacy name bridge when the global tag-selection UI ships.
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
+  const catalog = await ensureGlobalTagPersistence(database);
+  const globalTagCatalog = mergeLegacyVocabularyIntoGlobalCatalog(catalog, {
+    ...(productType === "paper" ? { paperVocabulary: tags } : { cardVocabulary: tags })
+  });
+  await writeTransaction(database, [SETTINGS_STORE], (transaction) => {
+    const settingsStore = transaction.objectStore(SETTINGS_STORE);
+    settingsStore.put({ id: settingId, value: tags });
+    settingsStore.put({ id: GLOBAL_TAG_CATALOG_SETTING_ID, value: globalTagCatalog });
+  });
+  globalTagMigrationPromise = Promise.resolve(globalTagCatalog);
+}
+
+function ensureLegacyNamesInGlobalCatalog(catalog, names = [], productType) {
+  const applicableNames = new Set(catalog.tags
+    .filter((tag) => tag.appliesTo.includes(productType))
+    .map((tag) => getTagKey(tag.name)));
+  if ((names || []).every((name) => applicableNames.has(getTagKey(name)))) return catalog;
+  return mergeLegacyVocabularyIntoGlobalCatalog(catalog, {
+    ...(productType === "paper" ? { paperVocabulary: names } : { cardVocabulary: names })
+  });
 }
 
 export function isPaperPack(paperPack) {
@@ -507,7 +632,7 @@ export function isPaperPack(paperPack) {
     Number.isInteger(paperPack.releaseYear) &&
     Number.isInteger(paperPack.patternCount) &&
     Array.isArray(paperPack.colors) &&
-    Array.isArray(paperPack.keywords) &&
+    (Array.isArray(paperPack.keywords) || Array.isArray(paperPack.tagIds)) &&
     Array.isArray(paperPack.patterns)
   );
 }
@@ -533,19 +658,22 @@ export function isCompatiblePaperPack(paperPack) {
     paperPack && typeof paperPack.id === "string" && typeof paperPack.name === "string" &&
     typeof paperPack.owner === "string" && Number.isInteger(paperPack.releaseYear) &&
     Number.isInteger(paperPack.patternCount) && Array.isArray(paperPack.colors) &&
-    Array.isArray(paperPack.keywords) && Array.isArray(paperPack.patterns)
+    (Array.isArray(paperPack.keywords) || Array.isArray(paperPack.tagIds)) && Array.isArray(paperPack.patterns)
   );
 }
 
-export function normalizeCardForRuntime(card) {
+export function normalizeCardForRuntime(card, catalog = null) {
   const { selectedImage, imagePreviewSrc, imageThumbnailSrc, ...persistentCard } = card;
-  const { stampSet: legacyStampSet, ...cardWithoutLegacyStampSet } = persistentCard;
+  const compatibleCard = Array.isArray(persistentCard.tagIds)
+    ? hydrateCardTagNames(persistentCard, requireValidGlobalTagCatalog(catalog))
+    : persistentCard;
+  const { stampSet: legacyStampSet, ...cardWithoutLegacyStampSet } = compatibleCard;
   const tags = [];
   const seenTags = new Set();
   const stampSets = [];
   const seenStampSets = new Set();
 
-  for (const tag of persistentCard.tags || []) {
+  for (const tag of cardWithoutLegacyStampSet.tags || []) {
     const normalizedTag = String(tag || "").trim().replace(/\s+/g, " ");
     const tagKey = normalizedTag.toLocaleLowerCase();
 
@@ -570,12 +698,15 @@ export function normalizeCardForRuntime(card) {
     }
   }
 
-  return {
+  const runtimeCard = {
     ...cardWithoutLegacyStampSet,
     status: cardWithoutLegacyStampSet.status === "sent" ? "sent" : "available",
     tags,
     stampSets
   };
+  return Array.isArray(card?.tagIds)
+    ? hydrateCardTagNames({ ...runtimeCard, tagIds: card.tagIds }, catalog)
+    : runtimeCard;
 }
 
 export function isCard(card) {
@@ -588,9 +719,16 @@ export function isCard(card) {
     card.size &&
     Number.isFinite(card.size.width) &&
     Number.isFinite(card.size.height) &&
-    Array.isArray(card.tags) &&
+    (Array.isArray(card.tags) || Array.isArray(card.tagIds)) &&
     Array.isArray(card.paperPackIds) &&
     Array.isArray(card.colorIds) &&
     typeof card.favorite === "boolean"
   );
+}
+
+function requireValidGlobalTagCatalog(catalog) {
+  if (!validateGlobalTagCatalog(catalog).ok) {
+    throw new TypeError("A valid global tag catalog is required for tagIds records.");
+  }
+  return catalog;
 }

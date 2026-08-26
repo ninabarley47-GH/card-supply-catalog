@@ -343,6 +343,8 @@ Selected filters retain AND behavior. A selected category is one filter whose me
 
 Deleting a category removes only its relationships and never deletes member tags. A tag with item assignments cannot be converted into a category without explicit resolution of those assignments.
 
+During the persistence transition, inline legacy-name tag creation remains supported only as a compatibility bridge for the existing UI. This bridge must be removed when the global tag-selection UI replaces the legacy pickers; it is not a second permanent tag source of truth.
+
 ### Proposed Import Conflict Policy — Pending Separate Approval
 
 These rules are documented for review and are not implemented by Phase A:
