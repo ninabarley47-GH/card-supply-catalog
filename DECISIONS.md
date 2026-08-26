@@ -286,6 +286,74 @@ Provide a feature where you can load backup files incrementally. This allows a u
 cards and paper packs should eventually link in both directions
 card images should use the same folder-backed + thumbnail methodology you’ve now established for paper images
 
+# Decision 30
+## Global Tag Vocabulary with Categories
+
+CSC will use a single global tag vocabulary shared across Paper Packs, Cards, and Stamp Sets rather than maintaining separate tag vocabularies for each product type.
+
+Each tag will indicate which product types it applies to: Paper, Card, Stamp, or any combination of them.
+
+The tag system will also support **categories** for organizing related tags. Categories provide organization and broader filtering but are not themselves assigned to catalog items.
+
+A tag may:
+* Apply to one or more product types.
+* Belong to no category, one category, or multiple categories.
+
+For example, `Birthday` may belong to both `Messages` and `Celebrations` while remaining a single global tag.
+
+Category relationships will be limited to **one generation**. Categories cannot be nested within other categories, and a tag that belongs to a category cannot itself become a category for additional tags.
+
+Items will store only their assigned tag IDs. Category membership will be derived from the global tag vocabulary rather than stored on individual Paper Packs, Cards, or Stamp Sets.
+
+### Rationale
+
+Separate Paper and Card tag vocabularies create duplicate concepts and allow equivalent tags to develop different meanings across product types. Adding Stamp Sets would increase this problem.
+
+### A global vocabulary:
+
+* Provides consistent terminology across CSC.
+* Prevents unnecessary duplication such as separate Paper, Card, and Stamp versions of `Holiday`.
+* Allows the same tag to be reused wherever appropriate.
+* Makes a growing tag inventory easier to manage.
+* Supports broader concepts such as `Messages`, `Celebrations`, and `Animals` without requiring deeply nested tags.
+* Allows one tag to participate in multiple useful classifications.
+
+This architecture also supports the planned Stamp Library workflow, where a Stamp Set can be found through multiple descriptive tags without requiring individual records for every stamp in the set.
+
+### Migration Principle: Migration principle: preserve first, organize afterward
+
+Existing Paper and Card tag assignments must be preserved during migration.
+
+Existing vocabularies will first be consolidated into the global vocabulary without automatically imposing category relationships.
+
+Exact duplicates may be consolidated safely. Potential near-duplicates, such as singular/plural variants or possible misspellings, should be surfaced for user review rather than automatically merged.
+
+Category organization will occur after the existing vocabulary has been safely migrated.
+
+# Decision 31
+## Global Tag Catalog Model, Migration Identity, and Filtering Semantics
+
+This decision refines and supersedes the architectural details of the earlier Global Tag Vocabulary decision while retaining its purpose.
+
+CSC will use one versioned global catalog containing separate tag and category entities. Tags have stable immutable IDs, a display name, applicability to one or more of Paper, Card, and Stamp, and zero or more category IDs. Categories have stable IDs and display names. Categories are never assigned to catalog items, do not declare product applicability, cannot contain or belong to other categories, and derive their relevance from member tags. Catalog items store only tag IDs.
+
+Legacy name-based Paper and Card tags receive deterministic hash-derived IDs in the form `tag-<stable-hash-of-normalized-name>`. The composite hash is derived solely from the normalized name and contains no slug or processing-order component. Exact normalized names consolidate into one tag and union their product applicability. Different normalized names remain separate. A pre-existing computed-ID collision receives a deterministic name-derived fallback. Near-duplicates are reported for review but are not automatically merged. Renaming a migrated tag never changes its ID; tags created after migration may use generated opaque IDs. Migration preserves all assignments after applying previously approved legacy normalization and initially creates no category relationships. The retired Paper keyword `Background` continues to normalize to an empty value and is not recreated as a global tag or reassigned to `Scenery`.
+
+Selected filters retain AND behavior. A selected category is one filter whose members are evaluated with OR behavior. Narrowing that category to selected member tags refines the category filter rather than creating unrelated additional filters. For example, Animals plus Floral means `(Land Animals OR Water Animals OR Flying Animals) AND Floral`; narrowing Animals to Flying Animals means `Flying Animals AND Floral`.
+
+Deleting a category removes only its relationships and never deletes member tags. A tag with item assignments cannot be converted into a category without explicit resolution of those assignments.
+
+### Proposed Import Conflict Policy — Pending Separate Approval
+
+These rules are documented for review and are not implemented by Phase A:
+
+- For a new-format import with the same stable tag ID but different names, the ID establishes identity. Keep the local name by default, remap imported assignments to that ID, and union applicability and valid category relationships. An explicit conflict choice may instead adopt the imported name after normalized-name validation.
+- For different stable IDs with the same normalized name, keep the local ID and display name, remap imported references to the local ID, and union applicability and valid category relationships. An empty local catalog retains the imported ID.
+- For a legacy name-only backup imported into a migrated catalog, resolve an exact normalized current name first. If none exists, create a new uncategorized tag with applicability derived from the legacy Paper/Card context. Fuzzy matches require review and never merge automatically.
+- A deterministic legacy ID that happens to match a renamed local tag does not prove identity because the legacy backup contains no ID. If no current exact-name match exists, require explicit resolution between the renamed local tag and a separate newly created tag.
+- For a new-format backup containing a tag renamed on another installation, the shared stable ID establishes identity. Retain the local name by default and report the divergent imported name; backup time alone does not decide which rename wins.
+- All reconciliation and ID remapping must finish before validation and the atomic restore transaction. Unresolved conflicts result in no writes.
+
 # Permission Notes
 ## The File System Access API requires:
 secure context, generally HTTPS or localhost
