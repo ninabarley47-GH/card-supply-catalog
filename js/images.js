@@ -822,16 +822,6 @@ function rebuildPaperPackImageReferences(paperPack, images) {
   };
 }
 
-export async function deletePaperPackImages(paperPack) {
-  const directoryHandle = await getWritableImageLibraryDirectoryHandle();
-
-  if (!directoryHandle) {
-    return;
-  }
-
-  await deleteLocalPaperPackImageFolder(directoryHandle, paperPack);
-}
-
 function createMissingImageEntry(paperPack, patternObject, index) {
   return {
     packId: paperPack.id || paperPack.name || "untitled-pack",
@@ -1431,20 +1421,6 @@ async function getBlobFromImageSource(imageSrc) {
   }
 
   return await response.blob();
-}
-
-async function deleteLocalPaperPackImageFolder(directoryHandle, paperPack) {
-  const packFolderName = createId(paperPack.id || paperPack.name);
-
-  if (!packFolderName || !directoryHandle.removeEntry) {
-    return;
-  }
-
-  try {
-    await directoryHandle.removeEntry(packFolderName, { recursive: true });
-  } catch (error) {
-    // Deleting image files is best-effort; catalog deletion still proceeds.
-  }
 }
 
 function createStoredImageFileName(patternObject, index) {

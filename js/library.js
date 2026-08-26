@@ -3,7 +3,6 @@ import { initializeCatalogBackup } from "./backup.js";
 import { initializeAddColorWorkflow } from "./color-form.js";
 import { createCoverSheetForPack } from "./cover-sheet.js";
 import {
-  deletePaperPackImages,
   getUncatalogedPackDiscoveryAvailability,
   getPaperLibraryImageSource,
   getPatternImageSource,
@@ -2266,7 +2265,7 @@ function deleteSelectedPaperPack(selectedPack, paperPacks, renderCurrentLibrary,
     return;
   }
 
-  Promise.all([deletePaperPackImages(selectedPack), deletePaperPack(selectedPack.id)]).catch(() => {
+  deletePaperPack(selectedPack.id).catch(() => {
     window.alert("The paper pack was removed from this session, but the browser could not save the deletion permanently.");
   });
 

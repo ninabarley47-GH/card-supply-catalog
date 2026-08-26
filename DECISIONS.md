@@ -356,6 +356,11 @@ These rules are documented for review and are not implemented by Phase A:
 - For a new-format backup containing a tag renamed on another installation, the shared stable ID establishes identity. Retain the local name by default and report the divergent imported name; backup time alone does not decide which rename wins.
 - All reconciliation and ID remapping must finish before validation and the atomic restore transaction. Unresolved conflicts result in no writes.
 
+# Decision 32
+## Selected Image Folders Are Non-Destructive Shared Libraries
+
+CSC may create and read files in the user-selected Paper and Card image-library folders, but it must never delete files or folders from either library. Deleting a Paper Pack or Card removes only its catalog record and leaves every referenced image and thumbnail untouched because another user may share and still depend on those files.
+
 # Permission Notes
 ## The File System Access API requires:
 secure context, generally HTTPS or localhost
