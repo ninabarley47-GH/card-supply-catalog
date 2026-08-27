@@ -183,3 +183,15 @@ test("transitional vocabulary writes add exact tags without duplicating tags or 
   assert.deepEqual(merged.categories, catalog.categories);
   assert.deepEqual(merged.tags.find((tag) => tag.id === "tag-floral").categoryIds, ["category-style"]);
 });
+
+test("assigning an existing global tag through another product reuses its ID and expands applicability", () => {
+  const catalog = {
+    schemaVersion: 1,
+    tags: [{ id: "tag-hearts", name: "Hearts", appliesTo: ["card"], categoryIds: [] }],
+    categories: []
+  };
+  const merged = mergeLegacyVocabularyIntoGlobalCatalog(catalog, { paperVocabulary: ["Hearts"] });
+  assert.equal(merged.tags.length, 1);
+  assert.equal(merged.tags[0].id, "tag-hearts");
+  assert.deepEqual(merged.tags[0].appliesTo, ["paper", "card"]);
+});

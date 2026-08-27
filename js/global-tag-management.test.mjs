@@ -97,6 +97,13 @@ test("legacy runtime name arrays remain countable during transition", () => {
   assert.deepEqual(usage.get("shared"), { paper: 1, card: 1, stamp: 0 });
 });
 
+test("transitional Paper and Card pickers receive the complete global inventory", async () => {
+  const source = await readFile(new URL("./storage.js", import.meta.url), "utf8");
+  assert.match(source, /loadPaperTagVocabulary\(\)[\s\S]*?loadGlobalTagNamesForTransitionalPicker\(\)/);
+  assert.match(source, /loadCardTagVocabulary\(\)[\s\S]*?loadGlobalTagNamesForTransitionalPicker\(\)/);
+  assert.match(source, /return catalog\.tags\.map\(\(tag\) => tag\.name\)/);
+});
+
 test("persistent deletion is one transaction over taxonomy and assignment stores only", async () => {
   const source = await readFile(new URL("./storage.js", import.meta.url), "utf8");
   const start = source.indexOf("export async function deleteGlobalTagEverywhere");

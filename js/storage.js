@@ -669,7 +669,7 @@ function writeTransaction(database, storeNames, writeCallback) {
 }
 
 export function loadPaperTagVocabulary() {
-  return loadApplicableGlobalTagNames("paper");
+  return loadGlobalTagNamesForTransitionalPicker();
 }
 
 export function savePaperTagVocabulary(tags) {
@@ -677,12 +677,12 @@ export function savePaperTagVocabulary(tags) {
 }
 
 export function loadCardTagVocabulary() {
-  return loadApplicableGlobalTagNames("card");
+  return loadGlobalTagNamesForTransitionalPicker();
 }
 
-async function loadApplicableGlobalTagNames(productType) {
+async function loadGlobalTagNamesForTransitionalPicker() {
   const catalog = await loadGlobalTagCatalog();
-  return catalog.tags.filter((tag) => tag.appliesTo.includes(productType)).map((tag) => tag.name);
+  return catalog.tags.map((tag) => tag.name);
 }
 
 export function saveCardTagVocabulary(tags) {
