@@ -5,8 +5,8 @@ import {
   repairBrokenPaperPackImageLinks
 } from "./images.js";
 import { checkCardImageLibraryHealth, generateMissingCardImageThumbnails } from "./card-images.js";
-import { deleteTagEverywhere, loadCardTagVocabulary, loadCatalogSetting, loadPaperTagVocabulary, loadSavedCards, saveCard, saveCardTagVocabulary, saveCatalogSetting, saveOwner, savePaperPack, savePaperPacks, savePaperTagVocabulary } from "./storage.js";
-import { PAPER_TAG_SEED, addTag, buildEffectiveCardTagVocabulary, buildEffectivePaperTagVocabulary, countTagAssignments, getTagKey, normalizeTagName, removeTag, renameTag, replaceTagAssignments } from "./tag-utils.js";
+import { deleteGlobalTagEverywhere, loadCatalogSetting, loadGlobalTagCatalog, loadSavedCards, saveCatalogSetting, saveGlobalTagCatalog, saveOwner, savePaperPack, savePaperPacks } from "./storage.js";
+import { addGlobalTag, editGlobalTag, getGlobalTagUsage, sortGlobalTags } from "./global-tag-management.js";
 import { createLegacyOwnerId, getOwnerNameKey, isActiveOwner, normalizeOwnerName } from "./owners.js";
 import { supportsDirectoryPicker } from "./browser-capabilities.js";
 
@@ -130,79 +130,101 @@ function renderDefaultOwnerMessage(message, owners, ownerId) {
 }
 
 async function initializeTagSettings({ paperPacks = [] } = {}) {
-  const cards = await loadSavedCards().catch(() => []);
-  await Promise.all([
-    initializeTagManager({ kind: "paper", records: paperPacks, fieldName: "keywords", loadVocabulary: loadPaperTagVocabulary, saveVocabulary: savePaperTagVocabulary, saveRecord: savePaperPack, buildVocabulary: (persisted, records) => buildEffectivePaperTagVocabulary(persisted, records, persisted === null), protectedTags: PAPER_TAG_SEED }),
-    initializeTagManager({ kind: "card", records: cards, fieldName: "tags", loadVocabulary: loadCardTagVocabulary, saveVocabulary: saveCardTagVocabulary, saveRecord: saveCard, buildVocabulary: buildEffectiveCardTagVocabulary, protectedTags: [] })
-  ]);
-}
-
-async function initializeTagManager(config) {
-  const root = document.querySelector(`[data-tag-settings="${config.kind}"]`);
+  const root = document.querySelector("[data-global-tag-settings]");
   if (!root) return;
+  const cards = await loadSavedCards().catch(() => []);
   const form = root.querySelector("[data-tag-add-form]");
   const input = root.querySelector("[data-tag-add-input]");
   const list = root.querySelector("[data-tag-list]");
   const message = root.querySelector("[data-tag-message]");
   const total = root.querySelector("[data-tag-total]");
-  let vocabulary = sortTagsAlphabetically(config.buildVocabulary(await config.loadVocabulary(), config.records));
+  let catalog = await loadGlobalTagCatalog();
   const announce = (text, tone = "") => { message.textContent = text; message.dataset.tone = tone; };
-  const persist = async (tags) => {
-    vocabulary = sortTagsAlphabetically(tags);
-    await config.saveVocabulary(vocabulary);
-    document.dispatchEvent(new CustomEvent(`catalog:${config.kind}-tags-updated`));
-    render();
-  };
   const render = () => {
-    total.textContent = `${vocabulary.length} tag${vocabulary.length === 1 ? "" : "s"}`;
-    list.replaceChildren(...vocabulary.map((tag) => createTagSettingsRow(tag, config, async (nextName) => {
-    if (config.protectedTags.some((value) => getTagKey(value) === getTagKey(tag))) { announce(`“${tag}” is a built-in Paper tag and cannot be renamed.`, "error"); return; }
-    const result = renameTag(vocabulary, tag, nextName);
-    if (!result.ok) { announce(result.reason === "duplicate" ? "That tag already exists." : "Enter a valid tag name.", "error"); return; }
-    const assigned = countTagAssignments(config.records, config.fieldName, tag);
-    if (assigned > 0 && !window.confirm(`Rename “${tag}” to “${result.tag}” on ${assigned} assigned record${assigned === 1 ? "" : "s"}?`)) return;
-    if (assigned > 0) {
-      const updated = replaceTagAssignments(config.records, config.fieldName, tag, result.tag);
-      await Promise.all(updated.map(config.saveRecord));
-      config.records.splice(0, config.records.length, ...updated);
-    }
-    await persist(result.tags);
-    announce(`Renamed “${tag}” to “${result.tag}”.`, "success");
-  }, async () => {
-    const assigned = countTagAssignments(config.records, config.fieldName, tag);
-    const recordName = config.kind === "paper" ? "pack" : "card";
-    if (!await confirmTagDeletion(tag, assigned, recordName)) return;
-
-    const updatedRecords = replaceTagAssignments(config.records, config.fieldName, tag, "");
-    const affectedRecords = updatedRecords.filter((record, index) => record[config.fieldName].length !== config.records[index][config.fieldName].length);
-    const nextVocabulary = removeTag(vocabulary, tag);
-
-    try {
-      await deleteTagEverywhere({ kind: config.kind, records: affectedRecords, vocabulary: nextVocabulary });
-      config.records.splice(0, config.records.length, ...updatedRecords);
-      vocabulary = nextVocabulary;
-      document.dispatchEvent(new CustomEvent(`catalog:${config.kind}-tags-updated`));
-      render();
-      announce(`Deleted “${tag}” from ${assigned} ${recordName}${assigned === 1 ? "" : "s"} and removed it from the vocabulary.`, "success");
-    } catch (error) {
-      announce(`“${tag}” could not be deleted. No changes were saved.`, "error");
-    }
+    const usage = getGlobalTagUsage(catalog, { paperRecords: paperPacks, cardRecords: cards });
+    const tags = sortGlobalTags(catalog.tags);
+    total.textContent = `${tags.length} tag${tags.length === 1 ? "" : "s"}`;
+    list.replaceChildren(...tags.map((tag) => createGlobalTagSettingsRow({
+      tag, catalog, usage: usage.get(tag.id),
+      onSave: async (name, appliesTo) => {
+        const result = editGlobalTag(catalog, tag.id, { name, appliesTo }, usage);
+        if (!result.ok) {
+          if (result.reason === "assigned-applicability") announce(`Applicability cannot be removed: ${result.blocked.map((entry) => `${entry.count} ${entry.productType} item${entry.count === 1 ? "" : "s"}`).join(", ")} still use this tag.`, "error");
+          else announce(result.reason === "duplicate" ? `That name already belongs to “${result.existingTag.name}”.` : "Enter a unique name and select at least one product type.", "error");
+          return false;
+        }
+        try {
+          await saveGlobalTagCatalog(result.catalog);
+          renameRuntimeTagDisplay(paperPacks, tag, result.tag, "keywords");
+          renameRuntimeTagDisplay(cards, tag, result.tag, "tags");
+          catalog = result.catalog;
+          render();
+          dispatchGlobalTagUpdates();
+          announce(`Updated “${result.tag.name}”. Its stable ID was preserved.`, "success");
+          return true;
+        } catch (error) { announce(error.message || "The tag could not be updated.", "error"); return false; }
+      },
+      onDelete: async () => {
+        const counts = usage.get(tag.id) || { paper: 0, card: 0, stamp: 0 };
+        const assigned = counts.paper + counts.card + counts.stamp;
+        if (!await confirmTagDeletion(tag.name, assigned, "item")) return;
+        try {
+          const result = await deleteGlobalTagEverywhere(tag.id, { paperRecords: paperPacks });
+          catalog = result.catalog;
+          removeRuntimeTagAssignments(paperPacks, tag, "keywords");
+          removeRuntimeTagAssignments(cards, tag, "tags");
+          render();
+          dispatchGlobalTagUpdates();
+          announce(`Deleted “${tag.name}” and removed it from ${assigned} item${assigned === 1 ? "" : "s"}. Image files were unchanged.`, "success");
+        } catch (error) { announce(`“${tag.name}” could not be deleted. No changes were saved.`, "error"); }
+      }
     })));
   };
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const tag = normalizeTagName(input.value);
-    if (!tag) return;
-    if (vocabulary.some((value) => getTagKey(value) === getTagKey(tag))) { announce("That tag already exists.", "error"); return; }
-    await persist(addTag(vocabulary, tag));
-    input.value = "";
-    announce(`Added “${tag}”.`, "success");
+    const appliesTo = [...form.querySelectorAll("[data-tag-add-product]:checked")].map((control) => control.value);
+    let result = addGlobalTag(catalog, { name: input.value, appliesTo });
+    if (!result.ok && result.reason === "duplicate") { announce(`That tag already exists as “${result.existingTag.name}”.`, "error"); return; }
+    if (!result.ok && result.reason === "fuzzy") {
+      if (!window.confirm(`Possible duplicate${result.fuzzyCandidates.length === 1 ? "" : "s"}: ${result.fuzzyCandidates.join(", ")}. Create a distinct tag anyway?`)) { announce("The possible duplicate was not created.", ""); return; }
+      result = addGlobalTag(catalog, { name: input.value, appliesTo, allowFuzzy: true });
+    }
+    if (!result.ok) { announce("Enter a tag name and select at least one product type.", "error"); return; }
+    try {
+      await saveGlobalTagCatalog(result.catalog);
+      catalog = result.catalog;
+      input.value = "";
+      form.querySelectorAll("[data-tag-add-product]").forEach((control) => { control.checked = false; });
+      render();
+      dispatchGlobalTagUpdates();
+      announce(`Added “${result.tag.name}”.`, "success");
+    } catch (error) {
+      announce("The tag could not be added. No changes were saved.", "error");
+    }
   });
   render();
-  document.addEventListener(`catalog:${config.kind}-tags-updated`, async () => {
-    vocabulary = sortTagsAlphabetically(config.buildVocabulary(await config.loadVocabulary(), config.records));
-    render();
-  });
+}
+
+function removeRuntimeTagAssignments(records, tag, legacyField) {
+  for (const record of records) {
+    if (Array.isArray(record.tagIds)) record.tagIds = record.tagIds.filter((id) => id !== tag.id);
+    if (Array.isArray(record[legacyField])) record[legacyField] = record[legacyField].filter((name) => name.trim().toLocaleLowerCase() !== tag.name.trim().toLocaleLowerCase());
+  }
+}
+
+function renameRuntimeTagDisplay(records, previousTag, nextTag, legacyField) {
+  for (const record of records) {
+    if (!Array.isArray(record[legacyField])) continue;
+    record[legacyField] = record[legacyField].map((name) =>
+      name.trim().toLocaleLowerCase() === previousTag.name.trim().toLocaleLowerCase() ? nextTag.name : name
+    );
+  }
+}
+
+function dispatchGlobalTagUpdates() {
+  document.dispatchEvent(new CustomEvent("catalog:global-tags-updated"));
+  document.dispatchEvent(new CustomEvent("catalog:paper-tags-updated"));
+  document.dispatchEvent(new CustomEvent("catalog:card-tags-updated"));
 }
 
 function confirmTagDeletion(tag, assignmentCount, recordName) {
@@ -264,58 +286,77 @@ function confirmTagDeletion(tag, assignmentCount, recordName) {
   });
 }
 
-function createTagSettingsRow(tag, config, onRename, onDelete) {
+function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0, stamp: 0 }, onSave, onDelete }) {
   const row = document.createElement("div");
-  const label = document.createElement("button");
+  const display = document.createElement("div");
+  const label = document.createElement("strong");
+  const details = document.createElement("span");
   const input = document.createElement("input");
-  const count = document.createElement("span");
-  const rename = document.createElement("button");
+  const editor = document.createElement("div");
+  const applicability = document.createElement("fieldset");
+  const save = document.createElement("button");
+  const cancel = document.createElement("button");
+  const edit = document.createElement("button");
   const remove = document.createElement("button");
-  row.className = "tag-settings-row";
-  label.className = "tag-settings-name";
-  label.type = "button";
-  label.setAttribute("aria-label", `Rename ${tag}`);
-  label.textContent = tag;
-  input.value = tag;
-  input.setAttribute("aria-label", `Rename ${tag}`);
+  row.className = "tag-settings-row global-tag-settings-row";
+  display.className = "global-tag-display";
+  label.textContent = tag.name;
+  const categoryNames = tag.categoryIds.map((id) => catalog.categories.find((entry) => entry.id === id)?.name).filter(Boolean);
+  details.textContent = tag.appliesTo.map((type) => `${formatProductType(type)}: ${usage[type]} used`).join(" · ") + (categoryNames.length ? ` · Categories: ${categoryNames.join(", ")}` : "");
+  display.append(label, details);
+  input.value = tag.name;
+  input.setAttribute("aria-label", `Tag name for ${tag.name}`);
   input.className = "tag-settings-name-input";
-  input.hidden = true;
-  count.className = "tag-settings-count";
-  const assignmentCount = countTagAssignments(config.records, config.fieldName, tag);
-  const recordName = config.kind === "paper" ? "pack" : "card";
-  count.textContent = `${assignmentCount} ${recordName}${assignmentCount === 1 ? "" : "s"}`;
-  rename.className = remove.className = "tag-settings-action";
-  rename.type = remove.type = "button";
-  rename.setAttribute("aria-label", `Rename ${tag}`);
-  remove.setAttribute("aria-label", `Delete ${tag}`);
-  rename.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>';
+  applicability.className = "global-tag-applicability";
+  applicability.append(Object.assign(document.createElement("legend"), { textContent: "Applies to" }));
+  for (const productType of ["paper", "card", "stamp"]) {
+    const control = document.createElement("input");
+    const controlLabel = document.createElement("label");
+    control.type = "checkbox";
+    control.value = productType;
+    control.checked = tag.appliesTo.includes(productType);
+    controlLabel.append(control, ` ${formatProductType(productType)}`);
+    applicability.append(controlLabel);
+  }
+  editor.className = "global-tag-editor";
+  editor.hidden = true;
+  save.className = cancel.className = edit.className = "button button-compact";
+  save.type = cancel.type = edit.type = remove.type = "button";
+  save.textContent = "Save";
+  cancel.textContent = "Cancel";
+  edit.textContent = "Edit";
+  remove.className = "tag-settings-action";
+  edit.setAttribute("aria-label", `Edit ${tag.name}`);
+  remove.setAttribute("aria-label", `Delete ${tag.name}`);
   remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"/></svg>';
   const beginEditing = () => {
-    label.hidden = true;
-    input.hidden = false;
+    display.hidden = true;
+    edit.hidden = true;
+    editor.hidden = false;
     input.focus();
     input.select();
   };
   const cancelEditing = () => {
-    input.value = tag;
-    input.hidden = true;
-    label.hidden = false;
+    input.value = tag.name;
+    [...applicability.querySelectorAll("input")].forEach((control) => { control.checked = tag.appliesTo.includes(control.value); });
+    editor.hidden = true;
+    display.hidden = false;
+    edit.hidden = false;
   };
-  label.addEventListener("click", beginEditing);
-  rename.addEventListener("click", beginEditing);
-  input.addEventListener("blur", cancelEditing);
-  input.addEventListener("keydown", async (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      await onRename(input.value);
-    } else if (event.key === "Escape") {
-      cancelEditing();
-      rename.focus();
-    }
+  edit.addEventListener("click", beginEditing);
+  cancel.addEventListener("click", cancelEditing);
+  save.addEventListener("click", async () => {
+    const selected = [...applicability.querySelectorAll("input:checked")].map((control) => control.value);
+    if (await onSave(input.value, selected)) cancelEditing();
   });
   remove.addEventListener("click", onDelete);
-  row.append(label, input, count, rename, remove);
+  editor.append(input, applicability, save, cancel);
+  row.append(display, editor, edit, remove);
   return row;
+}
+
+function formatProductType(type) {
+  return type === "card" ? "Card" : type === "stamp" ? "Stamp" : "Paper";
 }
 
 async function initializeCardImageLibrarySettings({ paperPacks = [] } = {}) {

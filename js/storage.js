@@ -1,7 +1,7 @@
 import { addCatalogSchemaVersion } from "./schema.js";
 import { PAPER_TAG_SEED, getTagKey, uniqueTags } from "./tag-utils.js";
 import { buildOwnerRegistry, isOwner, migratePaperPackOwners, serializePaperPackOwner } from "./owners.js";
-import { validateGlobalTagCatalog } from "./global-tag-catalog.js";
+import { getGlobalTagNameKey, validateGlobalTagCatalog, validateItemTagAssignments } from "./global-tag-catalog.js";
 import {
   GLOBAL_TAG_CATALOG_SETTING_ID,
   GLOBAL_TAG_MIGRATION_SETTING_ID,
@@ -158,6 +158,77 @@ export async function loadGlobalTagCatalog() {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
   return ensureGlobalTagPersistence(database);
+}
+
+export async function saveGlobalTagCatalog(catalog) {
+  if (!validateGlobalTagCatalog(catalog).ok) throw new TypeError("Cannot save an invalid global tag catalog.");
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
+  await ensureGlobalTagPersistence(database);
+  const [paperRecords, cardRecords] = await Promise.all([
+    getAllFromStore(database, PAPER_PACKS_STORE), getAllFromStore(database, CARDS_STORE)
+  ]);
+  assertCatalogSupportsAssignments(catalog, paperRecords, cardRecords);
+  await writeTransaction(database, [SETTINGS_STORE], (transaction) => {
+    transaction.objectStore(SETTINGS_STORE).put({ id: GLOBAL_TAG_CATALOG_SETTING_ID, value: catalog });
+  });
+  globalTagMigrationPromise = Promise.resolve(catalog);
+  return catalog;
+}
+
+export async function deleteGlobalTagEverywhere(tagId, { paperRecords: runtimePaperRecords = [] } = {}) {
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
+  const catalog = await ensureGlobalTagPersistence(database);
+  if (!catalog.tags.some((tag) => tag.id === tagId)) throw new TypeError("The global tag does not exist.");
+  const [paperRecords, cardRecords] = await Promise.all([
+    getAllFromStore(database, PAPER_PACKS_STORE), getAllFromStore(database, CARDS_STORE)
+  ]);
+  const nextCatalog = {
+    ...catalog,
+    tags: catalog.tags.filter((tag) => tag.id !== tagId).map((tag) => ({ ...tag, appliesTo: [...tag.appliesTo], categoryIds: [...tag.categoryIds] })),
+    categories: catalog.categories.map((entry) => ({ ...entry }))
+  };
+  if (!validateGlobalTagCatalog(nextCatalog).ok) throw new TypeError("Deleting the tag produced an invalid catalog.");
+  const deletedTag = catalog.tags.find((tag) => tag.id === tagId);
+  const paperById = new Map(paperRecords.map((record) => [record.id, record]));
+  for (const record of runtimePaperRecords) paperById.set(record.id, record);
+  const affectedPaper = [...paperById.values()].filter((record) =>
+    record.tagIds?.includes(tagId) || record.keywords?.some((name) => getGlobalTagNameKey(name) === getGlobalTagNameKey(deletedTag.name))
+  );
+  const affectedCards = cardRecords.filter((record) => record.tagIds?.includes(tagId));
+  await writeTransaction(database, [PAPER_PACKS_STORE, CARDS_STORE, SETTINGS_STORE], (transaction) => {
+    const paperStore = transaction.objectStore(PAPER_PACKS_STORE);
+    const cardStore = transaction.objectStore(CARDS_STORE);
+    for (const record of affectedPaper) paperStore.put(normalizePaperPackForStorage(removePaperTagAssignment(record, tagId, catalog), nextCatalog));
+    for (const record of affectedCards) cardStore.put({ ...record, tagIds: record.tagIds.filter((id) => id !== tagId) });
+    transaction.objectStore(SETTINGS_STORE).put({ id: GLOBAL_TAG_CATALOG_SETTING_ID, value: nextCatalog });
+  });
+  globalTagMigrationPromise = Promise.resolve(nextCatalog);
+  return { catalog: nextCatalog, paperCount: affectedPaper.length, cardCount: affectedCards.length, stampCount: 0 };
+}
+
+function removePaperTagAssignment(record, tagId, catalog) {
+  const idsByName = new Map(catalog.tags.map((tag) => [getGlobalTagNameKey(tag.name), tag.id]));
+  const tagIds = Array.isArray(record.tagIds)
+    ? record.tagIds
+    : (record.keywords || []).map((name) => idsByName.get(getGlobalTagNameKey(name))).filter(Boolean);
+  const next = { ...record, tagIds: tagIds.filter((id) => id !== tagId) };
+  delete next.keywords;
+  return next;
+}
+
+function assertCatalogSupportsAssignments(catalog, paperRecords, cardRecords) {
+  for (const record of paperRecords) {
+    if (Array.isArray(record.tagIds) && !validateItemTagAssignments({ catalog, productType: "paper", tagIds: record.tagIds }).ok) {
+      throw new TypeError("Paper assignments prevent this tag applicability change.");
+    }
+  }
+  for (const record of cardRecords) {
+    if (Array.isArray(record.tagIds) && !validateItemTagAssignments({ catalog, productType: "card", tagIds: record.tagIds }).ok) {
+      throw new TypeError("Card assignments prevent this tag applicability change.");
+    }
+  }
 }
 
 export async function saveCard(card) {
@@ -598,7 +669,7 @@ function writeTransaction(database, storeNames, writeCallback) {
 }
 
 export function loadPaperTagVocabulary() {
-  return loadCatalogSetting(PAPER_TAG_VOCABULARY_SETTING_ID).then((value) => value === null ? null : uniqueTags(value));
+  return loadApplicableGlobalTagNames("paper");
 }
 
 export function savePaperTagVocabulary(tags) {
@@ -606,7 +677,12 @@ export function savePaperTagVocabulary(tags) {
 }
 
 export function loadCardTagVocabulary() {
-  return loadCatalogSetting(CARD_TAG_VOCABULARY_SETTING_ID).then((value) => uniqueTags(value));
+  return loadApplicableGlobalTagNames("card");
+}
+
+async function loadApplicableGlobalTagNames(productType) {
+  const catalog = await loadGlobalTagCatalog();
+  return catalog.tags.filter((tag) => tag.appliesTo.includes(productType)).map((tag) => tag.name);
 }
 
 export function saveCardTagVocabulary(tags) {

@@ -1,0 +1,95 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { addGlobalTag, editGlobalTag, getGlobalTagUsage, removeGlobalTag, sortGlobalTags } from "./global-tag-management.js";
+
+const tag = (id, name, appliesTo = ["paper"], categoryIds = []) => ({ id, name, appliesTo, categoryIds });
+const catalog = (tags = [], categories = []) => ({ schemaVersion: 1, tags, categories });
+
+test("Settings declares one flat global tag manager rather than product-specific managers", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  assert.equal((html.match(/data-global-tag-settings/g) || []).length, 1);
+  assert.equal(html.includes('data-tag-settings="paper"'), false);
+  assert.equal(html.includes('data-tag-settings="card"'), false);
+});
+
+test("one shared Paper and Card tag remains one rendered entity", () => {
+  const shared = tag("shared", "Holiday", ["paper", "card"]);
+  assert.deepEqual(sortGlobalTags(catalog([shared]).tags), [shared]);
+});
+
+test("usage reports Paper, Card, and Stamp applicability counts", () => {
+  const source = catalog([tag("all", "Holiday", ["paper", "card", "stamp"])]);
+  const usage = getGlobalTagUsage(source, {
+    paperRecords: [{ tagIds: ["all"] }], cardRecords: [{ tagIds: ["all"] }, { tagIds: ["all"] }], stampRecords: [{ tagIds: ["all"] }]
+  });
+  assert.deepEqual(usage.get("all"), { paper: 1, card: 2, stamp: 1 });
+});
+
+test("adds a global tag with selected applicability and no categories", () => {
+  const result = addGlobalTag(catalog(), { name: "  New   Tag ", appliesTo: ["card", "paper"], idFactory: () => "opaque" });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.tag, tag("opaque", "New Tag", ["paper", "card"]));
+});
+
+test("blocks exact normalized duplicates and points to the existing entity", () => {
+  const existing = tag("one", "Birthday");
+  const result = addGlobalTag(catalog([existing]), { name: " birthday ", appliesTo: ["card"] });
+  assert.equal(result.reason, "duplicate");
+  assert.equal(result.existingTag.id, "one");
+});
+
+test("fuzzy duplicates warn only and may be explicitly created", () => {
+  const source = catalog([tag("one", "Birthday")]);
+  const warning = addGlobalTag(source, { name: "Birthdays", appliesTo: ["card"], idFactory: () => "two" });
+  assert.equal(warning.reason, "fuzzy");
+  assert.equal(source.tags.length, 1);
+  const created = addGlobalTag(source, { name: "Birthdays", appliesTo: ["card"], allowFuzzy: true, idFactory: () => "two" });
+  assert.equal(created.ok, true);
+  assert.equal(created.catalog.tags.length, 2);
+});
+
+test("rename preserves stable ID and existing category relationships", () => {
+  const source = catalog([tag("stable", "Old", ["paper"], ["cat"] )], [{ id: "cat", name: "Messages" }]);
+  const result = editGlobalTag(source, "stable", { name: "New", appliesTo: ["paper"] });
+  assert.equal(result.tag.id, "stable");
+  assert.deepEqual(result.tag.categoryIds, ["cat"]);
+});
+
+test("applicability additions succeed", () => {
+  const result = editGlobalTag(catalog([tag("one", "Tag")]), "one", { name: "Tag", appliesTo: ["paper", "card", "stamp"] });
+  assert.deepEqual(result.tag.appliesTo, ["paper", "card", "stamp"]);
+});
+
+test("applicability removal is blocked while assignments exist", () => {
+  const usage = new Map([["one", { paper: 2, card: 0, stamp: 0 }]]);
+  const result = editGlobalTag(catalog([tag("one", "Tag", ["paper", "card"])]), "one", { name: "Tag", appliesTo: ["card"] }, usage);
+  assert.equal(result.reason, "assigned-applicability");
+  assert.deepEqual(result.blocked, [{ productType: "paper", count: 2 }]);
+});
+
+test("delete removes tag assignments and entity without touching images", () => {
+  const patterns = [{ imagePath: "shared/image.jpg", imageSrc: "data:image/jpeg;base64,AA" }];
+  const result = removeGlobalTag(catalog([tag("delete", "Delete"), tag("keep", "Keep")]), "delete", {
+    paperRecords: [{ id: "p", tagIds: ["delete", "keep"], patterns }], cardRecords: [{ id: "c", tagIds: ["delete"] }]
+  });
+  assert.deepEqual(result.catalog.tags.map((entry) => entry.id), ["keep"]);
+  assert.deepEqual(result.paperRecords[0].tagIds, ["keep"]);
+  assert.deepEqual(result.cardRecords[0].tagIds, []);
+  assert.strictEqual(result.paperRecords[0].patterns, patterns);
+});
+
+test("legacy runtime name arrays remain countable during transition", () => {
+  const source = catalog([tag("shared", "Holiday", ["paper", "card"])]);
+  const usage = getGlobalTagUsage(source, { paperRecords: [{ keywords: [" holiday "] }], cardRecords: [{ tags: ["HOLIDAY"] }] });
+  assert.deepEqual(usage.get("shared"), { paper: 1, card: 1, stamp: 0 });
+});
+
+test("persistent deletion is one transaction over taxonomy and assignment stores only", async () => {
+  const source = await readFile(new URL("./storage.js", import.meta.url), "utf8");
+  const start = source.indexOf("export async function deleteGlobalTagEverywhere");
+  const end = source.indexOf("function assertCatalogSupportsAssignments", start);
+  const body = source.slice(start, end);
+  assert.match(body, /writeTransaction\(database, \[PAPER_PACKS_STORE, CARDS_STORE, SETTINGS_STORE\]/);
+  assert.equal(/removeEntry|remove\(|imageLibrary|directoryHandle/.test(body), false);
+});

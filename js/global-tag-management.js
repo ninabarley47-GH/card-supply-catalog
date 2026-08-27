@@ -1,0 +1,107 @@
+import {
+  TAG_PRODUCT_TYPES,
+  findFuzzyDuplicateCandidates,
+  getGlobalTagNameKey,
+  normalizeGlobalTagName,
+  validateGlobalTagCatalog
+} from "./global-tag-catalog.js";
+
+export function getGlobalTagUsage(catalog, { paperRecords = [], cardRecords = [], stampRecords = [] } = {}) {
+  const usage = new Map(catalog.tags.map((tag) => [tag.id, { paper: 0, card: 0, stamp: 0 }]));
+  const idsByName = new Map(catalog.tags.map((tag) => [getGlobalTagNameKey(tag.name), tag.id]));
+  for (const [productType, records] of [["paper", paperRecords], ["card", cardRecords], ["stamp", stampRecords]]) {
+    for (const record of records) {
+      const legacyNames = productType === "paper" ? record.keywords : productType === "card" ? record.tags : [];
+      const recordTagIds = Array.isArray(record.tagIds)
+        ? record.tagIds
+        : (legacyNames || []).map((name) => idsByName.get(getGlobalTagNameKey(name))).filter(Boolean);
+      for (const tagId of new Set(recordTagIds)) {
+        if (usage.has(tagId)) usage.get(tagId)[productType] += 1;
+      }
+    }
+  }
+  return usage;
+}
+
+export function addGlobalTag(catalog, { name, appliesTo, allowFuzzy = false, idFactory = createOpaqueTagId }) {
+  assertCatalog(catalog);
+  const normalizedName = normalizeGlobalTagName(name);
+  const normalizedApplicability = normalizeApplicability(appliesTo);
+  if (!normalizedName) return { ok: false, reason: "invalid-name" };
+  if (!normalizedApplicability.length) return { ok: false, reason: "invalid-applicability" };
+  const exact = catalog.tags.find((tag) => getGlobalTagNameKey(tag.name) === getGlobalTagNameKey(normalizedName));
+  if (exact) return { ok: false, reason: "duplicate", existingTag: exact };
+  const fuzzyCandidates = findFuzzyDuplicateCandidates([normalizedName, ...catalog.tags.map((tag) => tag.name)])
+    .filter((candidate) => candidate.firstName === normalizedName || candidate.secondName === normalizedName)
+    .map((candidate) => candidate.firstName === normalizedName ? candidate.secondName : candidate.firstName);
+  if (fuzzyCandidates.length && !allowFuzzy) return { ok: false, reason: "fuzzy", fuzzyCandidates };
+  const tag = { id: idFactory(), name: normalizedName, appliesTo: normalizedApplicability, categoryIds: [] };
+  const nextCatalog = cloneCatalog(catalog);
+  nextCatalog.tags.push(tag);
+  assertCatalog(nextCatalog);
+  return { ok: true, catalog: nextCatalog, tag, fuzzyCandidates };
+}
+
+export function editGlobalTag(catalog, tagId, { name, appliesTo }, usage = new Map()) {
+  assertCatalog(catalog);
+  const current = catalog.tags.find((tag) => tag.id === tagId);
+  if (!current) return { ok: false, reason: "not-found" };
+  const normalizedName = normalizeGlobalTagName(name);
+  const normalizedApplicability = normalizeApplicability(appliesTo);
+  if (!normalizedName) return { ok: false, reason: "invalid-name" };
+  if (!normalizedApplicability.length) return { ok: false, reason: "invalid-applicability" };
+  const duplicate = catalog.tags.find((tag) => tag.id !== tagId && getGlobalTagNameKey(tag.name) === getGlobalTagNameKey(normalizedName));
+  if (duplicate) return { ok: false, reason: "duplicate", existingTag: duplicate };
+  const counts = usage.get(tagId) || { paper: 0, card: 0, stamp: 0 };
+  const blocked = current.appliesTo.filter((type) => !normalizedApplicability.includes(type) && counts[type] > 0)
+    .map((type) => ({ productType: type, count: counts[type] }));
+  if (blocked.length) return { ok: false, reason: "assigned-applicability", blocked };
+  const nextCatalog = cloneCatalog(catalog);
+  const edited = nextCatalog.tags.find((tag) => tag.id === tagId);
+  edited.name = normalizedName;
+  edited.appliesTo = normalizedApplicability;
+  assertCatalog(nextCatalog);
+  return { ok: true, catalog: nextCatalog, tag: edited };
+}
+
+export function removeGlobalTag(catalog, tagId, recordGroups = {}) {
+  assertCatalog(catalog);
+  if (!catalog.tags.some((tag) => tag.id === tagId)) return { ok: false, reason: "not-found" };
+  const nextCatalog = cloneCatalog(catalog);
+  nextCatalog.tags = nextCatalog.tags.filter((tag) => tag.id !== tagId);
+  const paperRecords = removeAssignment(recordGroups.paperRecords || [], tagId);
+  const cardRecords = removeAssignment(recordGroups.cardRecords || [], tagId);
+  const stampRecords = removeAssignment(recordGroups.stampRecords || [], tagId);
+  assertCatalog(nextCatalog);
+  return { ok: true, catalog: nextCatalog, paperRecords, cardRecords, stampRecords };
+}
+
+export function sortGlobalTags(tags) {
+  return [...tags].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+}
+
+function removeAssignment(records, tagId) {
+  return records.map((record) => ({ ...record, tagIds: (record.tagIds || []).filter((id) => id !== tagId) }));
+}
+
+function normalizeApplicability(values) {
+  const selected = new Set(Array.isArray(values) ? values : []);
+  return TAG_PRODUCT_TYPES.filter((type) => selected.has(type));
+}
+
+function createOpaqueTagId() {
+  if (globalThis.crypto?.randomUUID) return `tag-${globalThis.crypto.randomUUID()}`;
+  return `tag-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function assertCatalog(catalog) {
+  if (!validateGlobalTagCatalog(catalog).ok) throw new TypeError("The global tag catalog is invalid.");
+}
+
+function cloneCatalog(catalog) {
+  return {
+    schemaVersion: catalog.schemaVersion,
+    tags: catalog.tags.map((tag) => ({ ...tag, appliesTo: [...tag.appliesTo], categoryIds: [...tag.categoryIds] })),
+    categories: catalog.categories.map((category) => ({ ...category }))
+  };
+}
