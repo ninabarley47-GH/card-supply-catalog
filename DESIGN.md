@@ -7,7 +7,7 @@ This document defines the visual and interaction principles for Card Supply Cata
 **Version:** 1.1
 **Status:** Maintained
 
-**Last Updated:** 2026-08-02
+**Last Updated:** 2026-08-27
 
 # Design Priorities
 
@@ -125,6 +125,9 @@ Primary action always on the right.
 Cancel always on the left.
 Dialogs behave consistently.
 Similar actions use the same wording throughout the app.
+
+# Flat Tag and Category Management
+Tags appear once in the flat alphabetical Settings inventory. Categories are managed separately in a compact area, and category membership is displayed as removable metadata chips on each tag row. A tag may belong to multiple categories while retaining one stable identity. Settings does not present the taxonomy as a hierarchy or category tree.
 
 # Image Quality
 Images are the application's primary content.

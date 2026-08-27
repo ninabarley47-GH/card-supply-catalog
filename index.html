@@ -340,6 +340,15 @@
                 <span class="tag-settings-total" data-tag-total>0 tags</span>
               </summary>
               <div class="tag-settings-body" role="region" aria-labelledby="global-tags-settings-title">
+                <section class="category-settings" aria-labelledby="category-settings-title">
+                  <div class="category-settings-heading"><div><h5 id="category-settings-title">Categories</h5><p>Organize tags without changing their item assignments.</p></div><span data-category-total>0 categories</span></div>
+                  <form class="category-settings-add" data-category-add-form>
+                    <label class="visually-hidden" for="global-category-add">New category</label>
+                    <input id="global-category-add" type="text" autocomplete="off" placeholder="Add a category..." data-category-add-input required>
+                    <button class="button button-primary button-compact" type="submit">Add Category</button>
+                  </form>
+                  <div class="category-settings-list" data-category-list aria-live="polite"></div>
+                </section>
                 <form class="tag-settings-add global-tag-settings-add" data-tag-add-form>
                   <label class="visually-hidden" for="global-tag-add">New tag</label>
                   <input id="global-tag-add" type="text" autocomplete="off" placeholder="Add a new tag..." data-tag-add-input required>
@@ -347,7 +356,7 @@
                   <button class="button button-primary" type="submit">Add Tag</button>
                 </form>
                 <p class="settings-message tag-settings-message" data-tag-message aria-live="polite"></p>
-                <div class="tag-settings-columns global-tag-settings-columns" aria-hidden="true"><span>Tag</span><span>Applies to and usage</span></div>
+                <div class="tag-settings-columns global-tag-settings-columns" aria-hidden="true"><span>Tags</span><span>Actions</span></div>
                 <div class="tag-settings-list" data-tag-list aria-live="polite"></div>
               </div>
             </details>

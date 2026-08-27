@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { addGlobalTag, editGlobalTag, getGlobalTagUsage, removeGlobalTag, sortGlobalTags } from "./global-tag-management.js";
+import { validateGlobalTagCatalog } from "./global-tag-catalog.js";
+import {
+  addGlobalCategory, addGlobalTag, addTagToCategory, editGlobalCategory, editGlobalTag,
+  getGlobalTagUsage, removeGlobalCategory, removeGlobalTag, removeTagFromCategory, sortGlobalTags
+} from "./global-tag-management.js";
 
 const tag = (id, name, appliesTo = ["paper"], categoryIds = []) => ({ id, name, appliesTo, categoryIds });
 const catalog = (tags = [], categories = []) => ({ schemaVersion: 1, tags, categories });
@@ -59,6 +63,93 @@ test("fuzzy duplicates warn only and may be explicitly created", () => {
   const created = addGlobalTag(source, { name: "Birthdays", appliesTo: ["card"], allowFuzzy: true, idFactory: () => "two" });
   assert.equal(created.ok, true);
   assert.equal(created.catalog.tags.length, 2);
+});
+
+test("adds an empty category and blocks exact normalized duplicates", () => {
+  const added = addGlobalCategory(catalog(), { name: "  Messages ", idFactory: () => "category-messages" });
+  assert.deepEqual(added.category, { id: "category-messages", name: "Messages" });
+  assert.deepEqual(added.catalog.tags, []);
+  const duplicate = addGlobalCategory(added.catalog, { name: " messages " });
+  assert.equal(duplicate.reason, "duplicate");
+  assert.equal(duplicate.existingCategory.id, "category-messages");
+});
+
+test("fuzzy category match warns without merging and may be explicitly created", () => {
+  const source = catalog([], [{ id: "category-message", name: "Message" }]);
+  const warning = addGlobalCategory(source, { name: "Messages", idFactory: () => "category-messages" });
+  assert.equal(warning.reason, "fuzzy");
+  assert.equal(source.categories.length, 1);
+  const created = addGlobalCategory(source, { name: "Messages", allowFuzzy: true, idFactory: () => "category-messages" });
+  assert.equal(created.catalog.categories.length, 2);
+});
+
+test("renaming a category preserves its stable ID and every tag membership", () => {
+  const source = catalog([tag("one", "Birthday", ["card"], ["cat"]), tag("two", "Cake", ["paper"], ["cat"])], [{ id: "cat", name: "Old" }]);
+  const result = editGlobalCategory(source, "cat", { name: "Celebrations" });
+  assert.equal(result.category.id, "cat");
+  assert.deepEqual(result.catalog.tags.map((entry) => entry.categoryIds), [["cat"], ["cat"]]);
+});
+
+test("deleting a category removes relationships while preserving tags and item records", () => {
+  const source = catalog([tag("one", "Birthday", ["card"], ["cat", "keep"])], [{ id: "cat", name: "Delete" }, { id: "keep", name: "Keep" }]);
+  const paperRecords = [{ id: "paper", tagIds: ["one"], patterns: [{ imagePath: "shared.jpg" }] }];
+  const cardRecords = [{ id: "card", tagIds: ["one"] }];
+  const result = removeGlobalCategory(source, "cat");
+  assert.deepEqual(result.catalog.categories.map((entry) => entry.id), ["keep"]);
+  assert.deepEqual(result.catalog.tags, [tag("one", "Birthday", ["card"], ["keep"])]);
+  assert.deepEqual(paperRecords[0].tagIds, ["one"]);
+  assert.deepEqual(cardRecords[0].tagIds, ["one"]);
+});
+
+test("tag membership supports multiple categories and preserves ID and applicability", () => {
+  const source = catalog([tag("stable", "Birthday", ["card", "stamp"])], [{ id: "messages", name: "Messages" }, { id: "celebrations", name: "Celebrations" }]);
+  const first = addTagToCategory(source, "stable", "messages");
+  const second = addTagToCategory(first.catalog, "stable", "celebrations");
+  assert.deepEqual(second.tag.categoryIds, ["messages", "celebrations"]);
+  assert.equal(second.tag.id, "stable");
+  assert.deepEqual(second.tag.appliesTo, ["card", "stamp"]);
+  const removed = removeTagFromCategory(second.catalog, "stable", "messages");
+  assert.deepEqual(removed.tag.categoryIds, ["celebrations"]);
+  assert.deepEqual(removed.tag.appliesTo, ["card", "stamp"]);
+});
+
+test("duplicate category membership and missing references are rejected", () => {
+  const source = catalog([tag("one", "Birthday", ["card"], ["cat"])], [{ id: "cat", name: "Messages" }]);
+  assert.equal(addTagToCategory(source, "one", "cat").reason, "duplicate-membership");
+  assert.equal(addTagToCategory(source, "one", "missing").reason, "category-not-found");
+  assert.equal(addTagToCategory(source, "missing", "cat").reason, "tag-not-found");
+});
+
+test("every category and membership mutation produces a valid complete catalog", () => {
+  let current = catalog([tag("tag-one", "Birthday", ["card", "stamp"])], []);
+  const mutations = [
+    () => addGlobalCategory(current, { name: "Messages", idFactory: () => "category-one" }),
+    () => editGlobalCategory(current, "category-one", { name: "Celebrations" }),
+    () => addTagToCategory(current, "tag-one", "category-one"),
+    () => removeTagFromCategory(current, "tag-one", "category-one"),
+    () => removeGlobalCategory(current, "category-one")
+  ];
+  for (const mutate of mutations) {
+    const result = mutate();
+    assert.equal(result.ok, true);
+    assert.equal(validateGlobalTagCatalog(result.catalog).ok, true);
+    current = result.catalog;
+  }
+});
+
+test("C2 Settings stays flat, excludes assigned category choices, and does not use item or image deletion APIs", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const source = await readFile(new URL("./settings.js", import.meta.url), "utf8");
+  assert.equal((html.match(/data-tag-list/g) || []).length, 1);
+  assert.match(html, /data-category-add-form/);
+  assert.match(html, /data-category-list/);
+  assert.match(source, /filter\(\(category\) => !tag\.categoryIds\.includes\(category\.id\)\)/);
+  const deleteStart = source.indexOf("onDelete: async () =>", source.indexOf("createGlobalCategorySettingsRow"));
+  const deleteEnd = source.indexOf("}))", deleteStart);
+  const categoryDelete = source.slice(deleteStart, deleteEnd);
+  assert.match(categoryDelete, /removeGlobalCategory/);
+  assert.match(categoryDelete, /persistCatalogMutation/);
+  assert.equal(/savePaper|deleteGlobalTagEverywhere|image|directory|folder/i.test(categoryDelete), false);
 });
 
 test("rename preserves stable ID and existing category relationships", () => {

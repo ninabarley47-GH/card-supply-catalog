@@ -6,7 +6,10 @@ import {
 } from "./images.js";
 import { checkCardImageLibraryHealth, generateMissingCardImageThumbnails } from "./card-images.js";
 import { deleteGlobalTagEverywhere, loadCatalogSetting, loadGlobalTagCatalog, loadSavedCards, saveCatalogSetting, saveGlobalTagCatalog, saveOwner, savePaperPack, savePaperPacks } from "./storage.js";
-import { addGlobalTag, editGlobalTag, getGlobalTagUsage, sortGlobalTags } from "./global-tag-management.js";
+import {
+  addGlobalCategory, addGlobalTag, addTagToCategory, editGlobalCategory, editGlobalTag,
+  getGlobalTagUsage, removeGlobalCategory, removeTagFromCategory, sortGlobalCategories, sortGlobalTags
+} from "./global-tag-management.js";
 import { createLegacyOwnerId, getOwnerNameKey, isActiveOwner, normalizeOwnerName } from "./owners.js";
 import { supportsDirectoryPicker } from "./browser-capabilities.js";
 
@@ -138,14 +141,64 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
   const list = root.querySelector("[data-tag-list]");
   const message = root.querySelector("[data-tag-message]");
   const total = root.querySelector("[data-tag-total]");
+  const categoryForm = root.querySelector("[data-category-add-form]");
+  const categoryInput = root.querySelector("[data-category-add-input]");
+  const categoryList = root.querySelector("[data-category-list]");
+  const categoryTotal = root.querySelector("[data-category-total]");
   let catalog = await loadGlobalTagCatalog();
   const announce = (text, tone = "") => { message.textContent = text; message.dataset.tone = tone; };
+  const persistCatalogMutation = async (result, successMessage) => {
+    if (!result.ok) return false;
+    try {
+      await saveGlobalTagCatalog(result.catalog);
+      catalog = result.catalog;
+      render();
+      dispatchGlobalTagUpdates();
+      announce(successMessage, "success");
+      return true;
+    } catch (error) {
+      announce(error.message || "The category change could not be saved.", "error");
+      return false;
+    }
+  };
   const render = () => {
     const usage = getGlobalTagUsage(catalog, { paperRecords: paperPacks, cardRecords: cards });
     const tags = sortGlobalTags(catalog.tags);
     total.textContent = `${tags.length} tag${tags.length === 1 ? "" : "s"}`;
+    const categories = sortGlobalCategories(catalog.categories);
+    categoryTotal.textContent = `${categories.length} categor${categories.length === 1 ? "y" : "ies"}`;
+    categoryList.replaceChildren(...categories.map((category) => createGlobalCategorySettingsRow({
+      category,
+      memberCount: catalog.tags.filter((tag) => tag.categoryIds.includes(category.id)).length,
+      onRename: async (name) => {
+        const result = editGlobalCategory(catalog, category.id, { name });
+        if (!result.ok) {
+          announce(result.reason === "duplicate" ? `That category already exists as “${result.existingCategory.name}”.` : "Enter a unique category name.", "error");
+          return false;
+        }
+        return persistCatalogMutation(result, `Renamed category to “${result.category.name}”. Its relationships were preserved.`);
+      },
+      onDelete: async () => {
+        const memberCount = catalog.tags.filter((tag) => tag.categoryIds.includes(category.id)).length;
+        if (!window.confirm(`Delete “${category.name}”? Its relationship will be removed from ${memberCount} tag${memberCount === 1 ? "" : "s"}. The tags and all item assignments will remain unchanged.`)) return;
+        const result = removeGlobalCategory(catalog, category.id);
+        await persistCatalogMutation(result, `Deleted “${category.name}” and removed its tag relationships. Tags and item assignments were unchanged.`);
+      }
+    })));
     list.replaceChildren(...tags.map((tag) => createGlobalTagSettingsRow({
       tag, catalog, usage: usage.get(tag.id),
+      onAddCategory: async (categoryId) => {
+        const result = addTagToCategory(catalog, tag.id, categoryId);
+        if (!result.ok) { announce("That category relationship could not be added.", "error"); return false; }
+        const category = catalog.categories.find((entry) => entry.id === categoryId);
+        return persistCatalogMutation(result, `Added “${tag.name}” to “${category.name}”.`);
+      },
+      onRemoveCategory: async (categoryId) => {
+        const category = catalog.categories.find((entry) => entry.id === categoryId);
+        const result = removeTagFromCategory(catalog, tag.id, categoryId);
+        if (!result.ok) { announce("That category relationship could not be removed.", "error"); return false; }
+        return persistCatalogMutation(result, `Removed “${tag.name}” from “${category.name}”.`);
+      },
       onSave: async (name, appliesTo) => {
         const result = editGlobalTag(catalog, tag.id, { name, appliesTo }, usage);
         if (!result.ok) {
@@ -185,6 +238,17 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
       }
     })));
   };
+  categoryForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    let result = addGlobalCategory(catalog, { name: categoryInput.value });
+    if (!result.ok && result.reason === "duplicate") { announce(`That category already exists as “${result.existingCategory.name}”.`, "error"); return; }
+    if (!result.ok && result.reason === "fuzzy") {
+      if (!window.confirm(`Possible duplicate${result.fuzzyCandidates.length === 1 ? "" : "s"}: ${result.fuzzyCandidates.join(", ")}. Create a distinct category anyway?`)) { announce("The possible duplicate was not created.", ""); return; }
+      result = addGlobalCategory(catalog, { name: categoryInput.value, allowFuzzy: true });
+    }
+    if (!result.ok) { announce("Enter a unique category name.", "error"); return; }
+    if (await persistCatalogMutation(result, `Added category “${result.category.name}”.`)) categoryInput.value = "";
+  });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const appliesTo = [...form.querySelectorAll("[data-tag-add-product]:checked")].map((control) => control.value);
@@ -298,11 +362,32 @@ function confirmTagDeletion(tag, assignmentCount, recordName) {
   });
 }
 
-function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0, stamp: 0 }, onSave, onDelete }) {
+function createGlobalCategorySettingsRow({ category, memberCount, onRename, onDelete }) {
+  const row = document.createElement("div");
+  const input = document.createElement("input");
+  const count = document.createElement("span");
+  const rename = document.createElement("button");
+  const remove = document.createElement("button");
+  row.className = "category-settings-row";
+  input.value = category.name;
+  input.setAttribute("aria-label", `Category name for ${category.name}`);
+  count.textContent = `${memberCount} tag${memberCount === 1 ? "" : "s"}`;
+  rename.className = remove.className = "button button-compact";
+  rename.type = remove.type = "button";
+  rename.textContent = "Rename";
+  remove.textContent = "Delete";
+  rename.addEventListener("click", () => onRename(input.value));
+  remove.addEventListener("click", onDelete);
+  row.append(input, count, rename, remove);
+  return row;
+}
+
+function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0, stamp: 0 }, onSave, onDelete, onAddCategory, onRemoveCategory }) {
   const row = document.createElement("div");
   const display = document.createElement("div");
   const label = document.createElement("strong");
   const details = document.createElement("span");
+  const relationships = document.createElement("div");
   const input = document.createElement("input");
   const editor = document.createElement("div");
   const applicability = document.createElement("fieldset");
@@ -313,9 +398,40 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
   row.className = "tag-settings-row global-tag-settings-row";
   display.className = "global-tag-display";
   label.textContent = tag.name;
-  const categoryNames = tag.categoryIds.map((id) => catalog.categories.find((entry) => entry.id === id)?.name).filter(Boolean);
-  details.textContent = tag.appliesTo.map((type) => `${formatProductType(type)}: ${usage[type]} used`).join(" · ") + (categoryNames.length ? ` · Categories: ${categoryNames.join(", ")}` : "");
-  display.append(label, details);
+  details.textContent = tag.appliesTo.map((type) => `${formatProductType(type)}: ${usage[type]} used`).join(" · ");
+  relationships.className = "tag-category-relationships";
+  for (const category of sortGlobalCategories(catalog.categories.filter((entry) => tag.categoryIds.includes(entry.id)))) {
+    const chip = document.createElement("span");
+    const removeCategory = document.createElement("button");
+    chip.className = "tag-category-chip";
+    chip.append(document.createTextNode(category.name));
+    removeCategory.type = "button";
+    removeCategory.textContent = "×";
+    removeCategory.setAttribute("aria-label", `Remove ${tag.name} from ${category.name}`);
+    removeCategory.addEventListener("click", () => onRemoveCategory(category.id));
+    chip.append(removeCategory);
+    relationships.append(chip);
+  }
+  const availableCategories = sortGlobalCategories(catalog.categories.filter((category) => !tag.categoryIds.includes(category.id)));
+  if (availableCategories.length) {
+    const select = document.createElement("select");
+    const addCategory = document.createElement("button");
+    select.setAttribute("aria-label", `Category to add ${tag.name} to`);
+    select.append(new Option("Add to category…", ""), ...availableCategories.map((category) => new Option(category.name, category.id)));
+    addCategory.className = "button button-compact";
+    addCategory.type = "button";
+    addCategory.textContent = "Add";
+    addCategory.disabled = true;
+    select.addEventListener("change", () => { addCategory.disabled = !select.value; });
+    addCategory.addEventListener("click", () => onAddCategory(select.value));
+    relationships.append(select, addCategory);
+  } else if (!catalog.categories.length) {
+    const empty = document.createElement("span");
+    empty.className = "tag-category-empty";
+    empty.textContent = "Create a category above to organize this tag.";
+    relationships.append(empty);
+  }
+  display.append(label, details, relationships);
   input.value = tag.name;
   input.setAttribute("aria-label", `Tag name for ${tag.name}`);
   input.className = "tag-settings-name-input";
