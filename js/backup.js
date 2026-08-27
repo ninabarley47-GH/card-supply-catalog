@@ -2,6 +2,7 @@ import {
   loadCatalogSetting,
   loadGlobalTagCatalog,
   loadSavedCards,
+  loadSavedCardRecordsForRestore,
   loadSavedPaperPack,
   isCard,
   isColor,
@@ -1004,7 +1005,9 @@ export async function restoreCatalogBackup({
   );
   const importedPaperPacks = migratePaperPackOwners(rawImportedPaperPacks, importedOwners);
   const importedCards = reconciliation.cards;
-  const savedCards = await (services.loadSavedCards || loadSavedCards)();
+  const savedCards = await (
+    services.loadSavedCardRecordsForRestore || services.loadSavedCards || loadSavedCardRecordsForRestore
+  )();
   const colorPlan = createImportPlan(
     importedColorsById ? Object.values(importedColorsById) : [],
     Object.values(colorsById),

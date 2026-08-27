@@ -144,6 +144,16 @@ export async function loadSavedCards() {
   return cards.filter(isCard).map((card) => normalizeCardForRuntime(card, catalog));
 }
 
+// Restore planning needs only stable record IDs and canonical data. Hydrating
+// names here would validate against the pre-restore catalog before the
+// reconciled catalog can be committed atomically.
+export async function loadSavedCardRecordsForRestore() {
+  const database = await openCatalogDatabase();
+  await migrateLegacyLocalStorage(database);
+  await ensureGlobalTagPersistence(database);
+  return (await getAllFromStore(database, CARDS_STORE)).filter(isCard);
+}
+
 export async function loadGlobalTagCatalog() {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);

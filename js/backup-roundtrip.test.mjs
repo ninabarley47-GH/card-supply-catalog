@@ -122,6 +122,28 @@ test("compact iPad backup round-trip carries the global catalog and tagIds", asy
   assert.deepEqual(writes[0].tagCatalog, backup.tagCatalog);
 });
 
+test("restore planning does not hydrate existing Cards against the pre-reconciliation catalog", async () => {
+  const { color, paperPack, card } = createCatalogRecords();
+  const backup = createCatalogBackupSnapshot({
+    paperPacks: [paperPack], colorsById: { [color.id]: color }, cards: [card]
+  });
+  let transitionalLoaderCalls = 0;
+  const writes = [];
+  const summary = await restoreCatalogBackup({
+    backup, paperPacks: [], colorsById: {},
+    services: {
+      loadGlobalTagCatalog: async () => ({ schemaVersion: 1, tags: [], categories: [] }),
+      loadSavedCards: async () => { transitionalLoaderCalls += 1; throw new Error("old catalog cannot hydrate imported IDs"); },
+      loadSavedCardRecordsForRestore: async () => [],
+      preparePaperPack: async (record) => ({ paperPack: record }),
+      restoreCatalogRecords: async (records) => writes.push(records), dispatchCardsRestored: () => {}
+    }
+  });
+  assert.deepEqual(summary.errors, []);
+  assert.equal(transitionalLoaderCalls, 0);
+  assert.equal(writes.length, 1);
+});
+
 test("legacy backup without tag vocabularies reconstructs them from records and the Paper seed", async () => {
   const { color, paperPack, card } = createCatalogRecords();
   paperPack.keywords = ["Legacy Paper Assignment"];
