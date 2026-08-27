@@ -2297,8 +2297,12 @@ button.pattern {
 .category-settings-add { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
 .category-settings-add input { min-width: 12rem; max-width: 24rem; }
 .category-settings-list { display: grid; margin-top: var(--space-2); }
-.category-settings-row { display: grid; grid-template-columns: minmax(10rem, 1fr) auto auto auto; align-items: center; gap: var(--space-2); border-top: 1px solid var(--color-border); padding: var(--space-2) 0; }
-.category-settings-row span { color: var(--color-muted); font-size: 0.82rem; white-space: nowrap; }
+.category-settings-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-2); border-top: 1px solid var(--color-border); padding: var(--space-2) 0; }
+.category-settings-display { display: grid; gap: 0.2rem; min-width: 0; }
+.category-settings-display span { color: var(--color-muted); font-size: 0.82rem; }
+.category-settings-editor { display: grid; grid-template-columns: minmax(10rem, 1fr) auto auto; align-items: center; gap: var(--space-2); }
+.category-settings-editor[hidden], .category-settings-row > .button[hidden] { display: none; }
+.category-settings-row > .tag-settings-action { grid-column: 3; grid-row: 1; align-self: center; }
 .tag-settings-add { display: flex; align-items: center; gap: var(--space-2); }
 .tag-settings-add input { width: min(24rem, 70%); }
 .global-tag-settings-add { align-items: end; flex-wrap: wrap; }
@@ -2337,8 +2341,9 @@ button.pattern {
 .global-tag-settings-row > .tag-settings-action { grid-column: 3; grid-row: 1; align-self: center; }
 
 @media (max-width: 720px) {
-  .category-settings-row { grid-template-columns: minmax(0, 1fr) auto auto; }
-  .category-settings-row span { grid-column: 1 / -1; grid-row: 2; }
+  .category-settings-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .category-settings-row > .tag-settings-action { grid-column: 2; }
+  .category-settings-editor { grid-template-columns: minmax(0, 1fr) auto auto; }
   .global-tag-settings-row { grid-template-columns: minmax(0, 1fr) auto; }
   .global-tag-settings-row > .tag-settings-action { grid-column: 2; }
   .global-tag-editor { grid-template-columns: 1fr auto auto; }

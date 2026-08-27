@@ -364,21 +364,53 @@ function confirmTagDeletion(tag, assignmentCount, recordName) {
 
 function createGlobalCategorySettingsRow({ category, memberCount, onRename, onDelete }) {
   const row = document.createElement("div");
-  const input = document.createElement("input");
+  const display = document.createElement("div");
+  const label = document.createElement("strong");
   const count = document.createElement("span");
-  const rename = document.createElement("button");
+  const editor = document.createElement("div");
+  const input = document.createElement("input");
+  const save = document.createElement("button");
+  const cancel = document.createElement("button");
+  const edit = document.createElement("button");
   const remove = document.createElement("button");
   row.className = "category-settings-row";
+  display.className = "category-settings-display";
+  label.textContent = category.name;
+  count.textContent = `${memberCount} tag${memberCount === 1 ? "" : "s"}`;
+  display.append(label, count);
+  editor.className = "category-settings-editor";
+  editor.hidden = true;
   input.value = category.name;
   input.setAttribute("aria-label", `Category name for ${category.name}`);
-  count.textContent = `${memberCount} tag${memberCount === 1 ? "" : "s"}`;
-  rename.className = remove.className = "button button-compact";
-  rename.type = remove.type = "button";
-  rename.textContent = "Rename";
-  remove.textContent = "Delete";
-  rename.addEventListener("click", () => onRename(input.value));
+  save.className = cancel.className = edit.className = "button button-compact";
+  save.type = cancel.type = edit.type = remove.type = "button";
+  save.textContent = "Save";
+  cancel.textContent = "Cancel";
+  edit.textContent = "Edit";
+  edit.setAttribute("aria-label", `Edit ${category.name}`);
+  remove.className = "tag-settings-action";
+  remove.setAttribute("aria-label", `Delete ${category.name}`);
+  remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"/></svg>';
+  const closeEditor = () => {
+    input.value = category.name;
+    editor.hidden = true;
+    display.hidden = false;
+    edit.hidden = false;
+  };
+  edit.addEventListener("click", () => {
+    display.hidden = true;
+    edit.hidden = true;
+    editor.hidden = false;
+    input.focus();
+    input.select();
+  });
+  cancel.addEventListener("click", closeEditor);
+  save.addEventListener("click", async () => {
+    if (await onRename(input.value)) closeEditor();
+  });
   remove.addEventListener("click", onDelete);
-  row.append(input, count, rename, remove);
+  editor.append(input, save, cancel);
+  row.append(display, editor, edit, remove);
   return row;
 }
 

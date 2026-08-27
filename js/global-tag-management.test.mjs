@@ -152,6 +152,18 @@ test("C2 Settings stays flat, excludes assigned category choices, and does not u
   assert.equal(/savePaper|deleteGlobalTagEverywhere|image|directory|folder/i.test(categoryDelete), false);
 });
 
+test("category rows match tag rows with read-only display, Edit, Save/Cancel, and trash action", async () => {
+  const source = await readFile(new URL("./settings.js", import.meta.url), "utf8");
+  const row = source.slice(source.indexOf("function createGlobalCategorySettingsRow"), source.indexOf("function createGlobalTagSettingsRow"));
+  assert.match(row, /category-settings-display/);
+  assert.match(row, /edit\.textContent = "Edit"/);
+  assert.match(row, /save\.textContent = "Save"/);
+  assert.match(row, /cancel\.textContent = "Cancel"/);
+  assert.match(row, /remove\.className = "tag-settings-action"/);
+  assert.match(row, /<svg/);
+  assert.match(row, /editor\.hidden = true/);
+});
+
 test("rename preserves stable ID and existing category relationships", () => {
   const source = catalog([tag("stable", "Old", ["paper"], ["cat"] )], [{ id: "cat", name: "Messages" }]);
   const result = editGlobalTag(source, "stable", { name: "New", appliesTo: ["paper"] });
