@@ -104,6 +104,24 @@ test("transitional Paper and Card pickers receive the complete global inventory"
   assert.match(source, /return catalog\.tags\.map\(\(tag\) => tag\.name\)/);
 });
 
+test("Settings refreshes applicability and usage after Paper or Card saves", async () => {
+  const settings = await readFile(new URL("./settings.js", import.meta.url), "utf8");
+  const library = await readFile(new URL("./library.js", import.meta.url), "utf8");
+  const cards = await readFile(new URL("./cards.js", import.meta.url), "utf8");
+  assert.match(settings, /catalog:paper-pack-saved/);
+  assert.match(settings, /catalog:card-saved/);
+  assert.match(library, /new CustomEvent\("catalog:paper-pack-saved"\)/);
+  assert.match(cards, /new CustomEvent\('catalog:card-saved'\)/);
+});
+
+test("Delete refreshes assignment counts immediately before confirmation", async () => {
+  const settings = await readFile(new URL("./settings.js", import.meta.url), "utf8");
+  const deleteHandler = settings.slice(settings.indexOf("onDelete: async"), settings.indexOf("if (!await confirmTagDeletion", settings.indexOf("onDelete: async")));
+  assert.match(deleteHandler, /await loadGlobalTagCatalog\(\)/);
+  assert.match(deleteHandler, /await loadSavedCards\(\)/);
+  assert.match(deleteHandler, /getGlobalTagUsage/);
+});
+
 test("persistent deletion is one transaction over taxonomy and assignment stores only", async () => {
   const source = await readFile(new URL("./storage.js", import.meta.url), "utf8");
   const start = source.indexOf("export async function deleteGlobalTagEverywhere");

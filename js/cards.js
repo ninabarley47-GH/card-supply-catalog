@@ -363,6 +363,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
       }
       sortCards(cards);
       renderCurrent();
+      document.dispatchEvent(new CustomEvent('catalog:card-saved'));
       if (isNewCard && card.ownerId) {
         saveCatalogSetting(ADD_CARD_LAST_OWNER_SETTING_ID, card.ownerId).catch(() => {});
       }

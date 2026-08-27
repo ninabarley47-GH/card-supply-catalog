@@ -132,7 +132,7 @@ function renderDefaultOwnerMessage(message, owners, ownerId) {
 async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = {}) {
   const root = document.querySelector("[data-global-tag-settings]");
   if (!root) return;
-  const cards = await loadSavedCards().catch(() => []);
+  let cards = await loadSavedCards().catch(() => []);
   const form = root.querySelector("[data-tag-add-form]");
   const input = root.querySelector("[data-tag-add-input]");
   const list = root.querySelector("[data-tag-list]");
@@ -166,7 +166,10 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
         } catch (error) { announce(error.message || "The tag could not be updated.", "error"); return false; }
       },
       onDelete: async () => {
-        const counts = usage.get(tag.id) || { paper: 0, card: 0, stamp: 0 };
+        catalog = await loadGlobalTagCatalog();
+        cards = await loadSavedCards().catch(() => cards);
+        const currentUsage = getGlobalTagUsage(catalog, { paperRecords: paperPacks, cardRecords: cards });
+        const counts = currentUsage.get(tag.id) || { paper: 0, card: 0, stamp: 0 };
         const assigned = counts.paper + counts.card + counts.stamp;
         if (!await confirmTagDeletion(tag.name, assigned, "item")) return;
         try {
@@ -204,6 +207,13 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
       announce("The tag could not be added. No changes were saved.", "error");
     }
   });
+  const refreshAfterItemSave = async (event) => {
+    catalog = await loadGlobalTagCatalog();
+    if (event.type === "catalog:card-saved") cards = await loadSavedCards().catch(() => cards);
+    render();
+  };
+  document.addEventListener("catalog:paper-pack-saved", refreshAfterItemSave);
+  document.addEventListener("catalog:card-saved", refreshAfterItemSave);
   render();
 }
 

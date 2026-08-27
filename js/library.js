@@ -1339,6 +1339,7 @@ function initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById, rend
         await hydratePaperPackImageSources([preparedPack]);
         replacePaperPack(paperPacks, preparedPack);
         renderCurrentLibrary();
+        document.dispatchEvent(new CustomEvent("catalog:paper-pack-saved"));
 
         return {
           warning: saveResult.warning
