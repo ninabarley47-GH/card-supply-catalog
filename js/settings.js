@@ -129,7 +129,7 @@ function renderDefaultOwnerMessage(message, owners, ownerId) {
   message.textContent = owner ? `Default owner for this device: ${owner.name}.` : "No default owner selected for this device.";
 }
 
-async function initializeTagSettings({ paperPacks = [] } = {}) {
+async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = {}) {
   const root = document.querySelector("[data-global-tag-settings]");
   if (!root) return;
   const cards = await loadSavedCards().catch(() => []);
@@ -160,6 +160,7 @@ async function initializeTagSettings({ paperPacks = [] } = {}) {
           catalog = result.catalog;
           render();
           dispatchGlobalTagUpdates();
+          onPaperPacksUpdated?.();
           announce(`Updated “${result.tag.name}”. Its stable ID was preserved.`, "success");
           return true;
         } catch (error) { announce(error.message || "The tag could not be updated.", "error"); return false; }
@@ -175,6 +176,7 @@ async function initializeTagSettings({ paperPacks = [] } = {}) {
           removeRuntimeTagAssignments(cards, tag, "tags");
           render();
           dispatchGlobalTagUpdates();
+          onPaperPacksUpdated?.();
           announce(`Deleted “${tag.name}” and removed it from ${assigned} item${assigned === 1 ? "" : "s"}. Image files were unchanged.`, "success");
         } catch (error) { announce(`“${tag.name}” could not be deleted. No changes were saved.`, "error"); }
       }

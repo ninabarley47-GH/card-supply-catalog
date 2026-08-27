@@ -13,6 +13,18 @@ test("Settings declares one flat global tag manager rather than product-specific
   assert.equal(html.includes('data-tag-settings="card"'), false);
 });
 
+test("successful global tag changes request an immediate Paper Library refresh", async () => {
+  const source = await readFile(new URL("./settings.js", import.meta.url), "utf8");
+  const manager = source.slice(source.indexOf("async function initializeTagSettings"), source.indexOf("function confirmTagDeletion"));
+  assert.match(manager, /onPaperPacksUpdated\?\.\(\)/);
+  assert.match(manager, /dispatchGlobalTagUpdates\(\)/);
+});
+
+test("the row Edit button is hidden while the global tag editor is open", async () => {
+  const styles = await readFile(new URL("../css/styles.css", import.meta.url), "utf8");
+  assert.match(styles, /\.global-tag-settings-row > \.button\[hidden\]\s*\{\s*display:\s*none;/);
+});
+
 test("one shared Paper and Card tag remains one rendered entity", () => {
   const shared = tag("shared", "Holiday", ["paper", "card"]);
   assert.deepEqual(sortGlobalTags(catalog([shared]).tags), [shared]);
