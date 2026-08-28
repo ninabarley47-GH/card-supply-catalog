@@ -145,19 +145,21 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
   const categoryInput = root.querySelector("[data-category-add-input]");
   const categoryList = root.querySelector("[data-category-list]");
   const categoryTotal = root.querySelector("[data-category-total]");
+  const categoryMessage = root.querySelector("[data-category-message]");
   let catalog = await loadGlobalTagCatalog();
   const announce = (text, tone = "") => { message.textContent = text; message.dataset.tone = tone; };
-  const persistCatalogMutation = async (result, successMessage) => {
+  const announceCategory = (text, tone = "") => { categoryMessage.textContent = text; categoryMessage.dataset.tone = tone; };
+  const persistCatalogMutation = async (result, successMessage, notify = announce) => {
     if (!result.ok) return false;
     try {
       await saveGlobalTagCatalog(result.catalog);
       catalog = result.catalog;
       render();
       dispatchGlobalTagUpdates();
-      announce(successMessage, "success");
+      notify(successMessage, "success");
       return true;
     } catch (error) {
-      announce(error.message || "The category change could not be saved.", "error");
+      notify(error.message || "The category change could not be saved.", "error");
       return false;
     }
   };
@@ -171,18 +173,25 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
       category,
       memberCount: catalog.tags.filter((tag) => tag.categoryIds.includes(category.id)).length,
       onRename: async (name) => {
-        const result = editGlobalCategory(catalog, category.id, { name });
+        let result = editGlobalCategory(catalog, category.id, { name });
+        if (!result.ok && result.reason === "fuzzy") {
+          if (!window.confirm(`Possible duplicate${result.fuzzyCandidates.length === 1 ? "" : "s"}: ${result.fuzzyCandidates.join(", ")}. Rename this category anyway?`)) {
+            announceCategory("The possible duplicate rename was cancelled.", "");
+            return false;
+          }
+          result = editGlobalCategory(catalog, category.id, { name, allowFuzzy: true });
+        }
         if (!result.ok) {
-          announce(result.reason === "duplicate" ? `That category already exists as “${result.existingCategory.name}”.` : "Enter a unique category name.", "error");
+          announceCategory(result.reason === "duplicate" ? `That category already exists as “${result.existingCategory.name}”.` : "Enter a unique category name.", "error");
           return false;
         }
-        return persistCatalogMutation(result, `Renamed category to “${result.category.name}”. Its relationships were preserved.`);
+        return persistCatalogMutation(result, `Renamed category to “${result.category.name}”. Its relationships were preserved.`, announceCategory);
       },
       onDelete: async () => {
         const memberCount = catalog.tags.filter((tag) => tag.categoryIds.includes(category.id)).length;
         if (!window.confirm(`Delete “${category.name}”? Its relationship will be removed from ${memberCount} tag${memberCount === 1 ? "" : "s"}. The tags and all item assignments will remain unchanged.`)) return;
         const result = removeGlobalCategory(catalog, category.id);
-        await persistCatalogMutation(result, `Deleted “${category.name}” and removed its tag relationships. Tags and item assignments were unchanged.`);
+        await persistCatalogMutation(result, `Deleted “${category.name}” and removed its tag relationships. Tags and item assignments were unchanged.`, announceCategory);
       }
     })));
     list.replaceChildren(...tags.map((tag) => createGlobalTagSettingsRow({
@@ -241,13 +250,13 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
   categoryForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     let result = addGlobalCategory(catalog, { name: categoryInput.value });
-    if (!result.ok && result.reason === "duplicate") { announce(`That category already exists as “${result.existingCategory.name}”.`, "error"); return; }
+    if (!result.ok && result.reason === "duplicate") { announceCategory(`That category already exists as “${result.existingCategory.name}”.`, "error"); return; }
     if (!result.ok && result.reason === "fuzzy") {
-      if (!window.confirm(`Possible duplicate${result.fuzzyCandidates.length === 1 ? "" : "s"}: ${result.fuzzyCandidates.join(", ")}. Create a distinct category anyway?`)) { announce("The possible duplicate was not created.", ""); return; }
+      if (!window.confirm(`Possible duplicate${result.fuzzyCandidates.length === 1 ? "" : "s"}: ${result.fuzzyCandidates.join(", ")}. Create a distinct category anyway?`)) { announceCategory("The possible duplicate was not created.", ""); return; }
       result = addGlobalCategory(catalog, { name: categoryInput.value, allowFuzzy: true });
     }
-    if (!result.ok) { announce("Enter a unique category name.", "error"); return; }
-    if (await persistCatalogMutation(result, `Added category “${result.category.name}”.`)) categoryInput.value = "";
+    if (!result.ok) { announceCategory("Enter a unique category name.", "error"); return; }
+    if (await persistCatalogMutation(result, `Added category “${result.category.name}”.`, announceCategory)) categoryInput.value = "";
   });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();

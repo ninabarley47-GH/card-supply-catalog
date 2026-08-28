@@ -59,7 +59,7 @@ export function addGlobalCategory(catalog, { name, allowFuzzy = false, idFactory
   return { ok: true, catalog: nextCatalog, category, fuzzyCandidates };
 }
 
-export function editGlobalCategory(catalog, categoryId, { name }) {
+export function editGlobalCategory(catalog, categoryId, { name, allowFuzzy = false }) {
   assertCatalog(catalog);
   const current = catalog.categories.find((category) => category.id === categoryId);
   if (!current) return { ok: false, reason: "not-found" };
@@ -67,11 +67,18 @@ export function editGlobalCategory(catalog, categoryId, { name }) {
   if (!normalizedName) return { ok: false, reason: "invalid-name" };
   const duplicate = catalog.categories.find((category) => category.id !== categoryId && getGlobalTagNameKey(category.name) === getGlobalTagNameKey(normalizedName));
   if (duplicate) return { ok: false, reason: "duplicate", existingCategory: duplicate };
+  const fuzzyCandidates = findFuzzyDuplicateCandidates([
+    normalizedName,
+    ...catalog.categories.filter((category) => category.id !== categoryId).map((category) => category.name)
+  ])
+    .filter((candidate) => candidate.firstName === normalizedName || candidate.secondName === normalizedName)
+    .map((candidate) => candidate.firstName === normalizedName ? candidate.secondName : candidate.firstName);
+  if (fuzzyCandidates.length && !allowFuzzy) return { ok: false, reason: "fuzzy", fuzzyCandidates };
   const nextCatalog = cloneCatalog(catalog);
   const category = nextCatalog.categories.find((entry) => entry.id === categoryId);
   category.name = normalizedName;
   assertCatalog(nextCatalog);
-  return { ok: true, catalog: nextCatalog, category };
+  return { ok: true, catalog: nextCatalog, category, fuzzyCandidates };
 }
 
 export function removeGlobalCategory(catalog, categoryId) {

@@ -2296,9 +2296,11 @@ button.pattern {
 .category-settings-heading p, .category-settings-heading > span { color: var(--color-muted); font-size: 0.82rem; }
 .category-settings-add { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
 .category-settings-add input { min-width: 12rem; max-width: 24rem; }
+.category-settings-message { margin: var(--space-2) 0 0; }
 .category-settings-list { display: grid; margin-top: var(--space-2); }
 .category-settings-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-2); border-top: 1px solid var(--color-border); padding: var(--space-2) 0; }
-.category-settings-display { display: grid; gap: 0.2rem; min-width: 0; }
+.category-settings-display { display: grid; justify-self: stretch; gap: 0.2rem; min-width: 0; text-align: left; }
+.category-settings-display strong, .category-settings-display span { justify-self: start; }
 .category-settings-display span { color: var(--color-muted); font-size: 0.82rem; }
 .category-settings-editor { display: grid; grid-template-columns: minmax(10rem, 1fr) auto auto; align-items: center; gap: var(--space-2); }
 .category-settings-editor[hidden], .category-settings-row > .button[hidden] { display: none; }

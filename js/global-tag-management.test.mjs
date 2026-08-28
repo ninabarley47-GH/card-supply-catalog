@@ -90,6 +90,18 @@ test("renaming a category preserves its stable ID and every tag membership", () 
   assert.deepEqual(result.catalog.tags.map((entry) => entry.categoryIds), [["cat"], ["cat"]]);
 });
 
+test("fuzzy category rename warns without changing the catalog and requires explicit confirmation", () => {
+  const source = catalog([], [{ id: "animals", name: "Animals" }, { id: "seasons", name: "Seasons" }]);
+  const warning = editGlobalCategory(source, "animals", { name: "Season" });
+  assert.equal(warning.reason, "fuzzy");
+  assert.deepEqual(warning.fuzzyCandidates, ["Seasons"]);
+  assert.equal(source.categories.find((entry) => entry.id === "animals").name, "Animals");
+  const renamed = editGlobalCategory(source, "animals", { name: "Season", allowFuzzy: true });
+  assert.equal(renamed.ok, true);
+  assert.equal(renamed.category.id, "animals");
+  assert.equal(renamed.category.name, "Season");
+});
+
 test("deleting a category removes relationships while preserving tags and item records", () => {
   const source = catalog([tag("one", "Birthday", ["card"], ["cat", "keep"])], [{ id: "cat", name: "Delete" }, { id: "keep", name: "Keep" }]);
   const paperRecords = [{ id: "paper", tagIds: ["one"], patterns: [{ imagePath: "shared.jpg" }] }];
@@ -154,6 +166,7 @@ test("C2 Settings stays flat, excludes assigned category choices, and does not u
 
 test("category rows match tag rows with read-only display, Edit, Save/Cancel, and trash action", async () => {
   const source = await readFile(new URL("./settings.js", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../css/styles.css", import.meta.url), "utf8");
   const row = source.slice(source.indexOf("function createGlobalCategorySettingsRow"), source.indexOf("function createGlobalTagSettingsRow"));
   assert.match(row, /category-settings-display/);
   assert.match(row, /edit\.textContent = "Edit"/);
@@ -162,6 +175,18 @@ test("category rows match tag rows with read-only display, Edit, Save/Cancel, an
   assert.match(row, /remove\.className = "tag-settings-action"/);
   assert.match(row, /<svg/);
   assert.match(row, /editor\.hidden = true/);
+  assert.match(styles, /\.category-settings-display\s*\{[^}]*justify-self:\s*stretch;[^}]*text-align:\s*left;/);
+  assert.match(styles, /\.category-settings-display strong, \.category-settings-display span\s*\{\s*justify-self:\s*start;/);
+});
+
+test("category validation feedback is rendered beside category controls", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const source = await readFile(new URL("./settings.js", import.meta.url), "utf8");
+  const categorySection = html.slice(html.indexOf('<section class="category-settings"'), html.indexOf("</section>", html.indexOf('<section class="category-settings"')));
+  assert.match(categorySection, /data-category-message/);
+  assert.ok(categorySection.indexOf("data-category-message") < categorySection.indexOf("data-category-list"));
+  assert.match(source, /announceCategory\(result\.reason === "duplicate"/);
+  assert.match(source, /persistCatalogMutation\(result, `Renamed category[^;]+announceCategory\)/);
 });
 
 test("rename preserves stable ID and existing category relationships", () => {
