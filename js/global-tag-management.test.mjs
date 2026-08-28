@@ -175,7 +175,9 @@ test("category rows match tag rows with read-only display, Edit, Save/Cancel, an
   assert.match(row, /remove\.className = "tag-settings-action"/);
   assert.match(row, /<svg/);
   assert.match(row, /editor\.hidden = true/);
-  assert.match(styles, /\.category-settings-display\s*\{[^}]*justify-self:\s*stretch;[^}]*text-align:\s*left;/);
+  assert.match(styles, /\.category-settings-list\s*\{[^}]*justify-items:\s*start;/);
+  assert.match(styles, /\.category-settings-row\s*\{[^}]*justify-content:\s*start;[^}]*width:\s*min\(100%, 36rem\);/);
+  assert.match(styles, /\.category-settings-display\s*\{[^}]*justify-self:\s*start;[^}]*text-align:\s*left;/);
   assert.match(styles, /\.category-settings-display strong, \.category-settings-display span\s*\{\s*justify-self:\s*start;/);
 });
 
@@ -187,6 +189,30 @@ test("category validation feedback is rendered beside category controls", async 
   assert.ok(categorySection.indexOf("data-category-message") < categorySection.indexOf("data-category-list"));
   assert.match(source, /announceCategory\(result\.reason === "duplicate"/);
   assert.match(source, /persistCatalogMutation\(result, `Renamed category[^;]+announceCategory\)/);
+});
+
+test("C2 cleanup collapses creation forms and category choices in the resting state", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const source = await readFile(new URL("./settings.js", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../css/styles.css", import.meta.url), "utf8");
+  assert.match(html, /data-category-add-open[^>]*>\+ Add Category</);
+  assert.match(html, /data-category-add-form hidden/);
+  assert.match(html, /data-category-add-cancel/);
+  assert.match(html, /data-tag-add-open[^>]*>\+ Add Tag</);
+  assert.match(html, /data-tag-add-form hidden/);
+  assert.match(html, /data-tag-add-cancel/);
+  assert.match(source, /reveal\.textContent = "\+ Add to category"/);
+  assert.match(source, /select\.addEventListener\("change", async \(\) =>/);
+  assert.doesNotMatch(source.slice(source.indexOf("const availableCategories"), source.indexOf("} else if (!catalog.categories.length)")), /textContent = "Add"/);
+  assert.match(styles, /\.category-settings-message:empty, \.tag-settings-message:empty\s*\{\s*display:\s*none;/);
+});
+
+test("successful Settings messages clear without hiding errors automatically", async () => {
+  const source = await readFile(new URL("./settings.js", import.meta.url), "utf8");
+  const announcer = source.slice(source.indexOf("function createSettingsAnnouncer"), source.indexOf("function removeRuntimeTagAssignments"));
+  assert.match(announcer, /tone === "success"/);
+  assert.match(announcer, /window\.setTimeout/);
+  assert.doesNotMatch(announcer, /tone === "error"[^}]*setTimeout/);
 });
 
 test("rename preserves stable ID and existing category relationships", () => {

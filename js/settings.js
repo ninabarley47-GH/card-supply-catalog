@@ -146,9 +146,18 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
   const categoryList = root.querySelector("[data-category-list]");
   const categoryTotal = root.querySelector("[data-category-total]");
   const categoryMessage = root.querySelector("[data-category-message]");
+  const categoryAddOpen = root.querySelector("[data-category-add-open]");
+  const categoryAddCancel = root.querySelector("[data-category-add-cancel]");
+  const tagAddOpen = root.querySelector("[data-tag-add-open]");
+  const tagAddCancel = root.querySelector("[data-tag-add-cancel]");
   let catalog = await loadGlobalTagCatalog();
-  const announce = (text, tone = "") => { message.textContent = text; message.dataset.tone = tone; };
-  const announceCategory = (text, tone = "") => { categoryMessage.textContent = text; categoryMessage.dataset.tone = tone; };
+  const announce = createSettingsAnnouncer(message);
+  const announceCategory = createSettingsAnnouncer(categoryMessage);
+  const toggleAddForm = (addForm, trigger, expanded) => {
+    addForm.hidden = !expanded;
+    trigger.hidden = expanded;
+    trigger.setAttribute("aria-expanded", String(expanded));
+  };
   const persistCatalogMutation = async (result, successMessage, notify = announce) => {
     if (!result.ok) return false;
     try {
@@ -247,6 +256,27 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
       }
     })));
   };
+  categoryAddOpen.addEventListener("click", () => {
+    announceCategory("");
+    toggleAddForm(categoryForm, categoryAddOpen, true);
+    categoryInput.focus();
+  });
+  categoryAddCancel.addEventListener("click", () => {
+    categoryInput.value = "";
+    announceCategory("");
+    toggleAddForm(categoryForm, categoryAddOpen, false);
+  });
+  tagAddOpen.addEventListener("click", () => {
+    announce("");
+    toggleAddForm(form, tagAddOpen, true);
+    input.focus();
+  });
+  tagAddCancel.addEventListener("click", () => {
+    input.value = "";
+    form.querySelectorAll("[data-tag-add-product]").forEach((control) => { control.checked = false; });
+    announce("");
+    toggleAddForm(form, tagAddOpen, false);
+  });
   categoryForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     let result = addGlobalCategory(catalog, { name: categoryInput.value });
@@ -256,7 +286,10 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
       result = addGlobalCategory(catalog, { name: categoryInput.value, allowFuzzy: true });
     }
     if (!result.ok) { announceCategory("Enter a unique category name.", "error"); return; }
-    if (await persistCatalogMutation(result, `Added category “${result.category.name}”.`, announceCategory)) categoryInput.value = "";
+    if (await persistCatalogMutation(result, `Added category “${result.category.name}”.`, announceCategory)) {
+      categoryInput.value = "";
+      toggleAddForm(categoryForm, categoryAddOpen, false);
+    }
   });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -273,6 +306,7 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
       catalog = result.catalog;
       input.value = "";
       form.querySelectorAll("[data-tag-add-product]").forEach((control) => { control.checked = false; });
+      toggleAddForm(form, tagAddOpen, false);
       render();
       dispatchGlobalTagUpdates();
       announce(`Added “${result.tag.name}”.`, "success");
@@ -288,6 +322,23 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
   document.addEventListener("catalog:paper-pack-saved", refreshAfterItemSave);
   document.addEventListener("catalog:card-saved", refreshAfterItemSave);
   render();
+}
+
+function createSettingsAnnouncer(element) {
+  let successTimer = null;
+  return (text, tone = "") => {
+    if (successTimer !== null) window.clearTimeout(successTimer);
+    successTimer = null;
+    element.textContent = text;
+    element.dataset.tone = tone;
+    if (text && tone === "success") {
+      successTimer = window.setTimeout(() => {
+        element.textContent = "";
+        element.dataset.tone = "";
+        successTimer = null;
+      }, 4000);
+    }
+  };
 }
 
 function removeRuntimeTagAssignments(records, tag, legacyField) {
@@ -397,6 +448,8 @@ function createGlobalCategorySettingsRow({ category, memberCount, onRename, onDe
   cancel.textContent = "Cancel";
   edit.textContent = "Edit";
   edit.setAttribute("aria-label", `Edit ${category.name}`);
+  edit.className = "tag-settings-action category-edit-action";
+  edit.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.25-1 10.5-10.5-3.25-3.25L5 15.75 4 20Zm9.75-13 3.25 3.25M14.5 6.25l1.25-1.25a1.75 1.75 0 0 1 2.5 0l.75.75a1.75 1.75 0 0 1 0 2.5L17.75 9.5"/></svg>';
   remove.className = "tag-settings-action";
   remove.setAttribute("aria-label", `Delete ${category.name}`);
   remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"/></svg>';
@@ -456,16 +509,37 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
   const availableCategories = sortGlobalCategories(catalog.categories.filter((category) => !tag.categoryIds.includes(category.id)));
   if (availableCategories.length) {
     const select = document.createElement("select");
-    const addCategory = document.createElement("button");
+    const reveal = document.createElement("button");
+    const chooser = document.createElement("span");
+    const cancelCategory = document.createElement("button");
     select.setAttribute("aria-label", `Category to add ${tag.name} to`);
     select.append(new Option("Add to category…", ""), ...availableCategories.map((category) => new Option(category.name, category.id)));
-    addCategory.className = "button button-compact";
-    addCategory.type = "button";
-    addCategory.textContent = "Add";
-    addCategory.disabled = true;
-    select.addEventListener("change", () => { addCategory.disabled = !select.value; });
-    addCategory.addEventListener("click", () => onAddCategory(select.value));
-    relationships.append(select, addCategory);
+    reveal.className = "text-action tag-category-reveal";
+    reveal.type = "button";
+    reveal.textContent = "+ Add to category";
+    reveal.setAttribute("aria-expanded", "false");
+    chooser.className = "tag-category-chooser";
+    chooser.hidden = true;
+    cancelCategory.className = "text-action";
+    cancelCategory.type = "button";
+    cancelCategory.textContent = "Cancel";
+    reveal.addEventListener("click", () => {
+      reveal.hidden = true;
+      chooser.hidden = false;
+      reveal.setAttribute("aria-expanded", "true");
+      select.focus();
+    });
+    cancelCategory.addEventListener("click", () => {
+      select.value = "";
+      chooser.hidden = true;
+      reveal.hidden = false;
+      reveal.setAttribute("aria-expanded", "false");
+    });
+    select.addEventListener("change", async () => {
+      if (select.value) await onAddCategory(select.value);
+    });
+    chooser.append(select, cancelCategory);
+    relationships.append(reveal, chooser);
   } else if (!catalog.categories.length) {
     const empty = document.createElement("span");
     empty.className = "tag-category-empty";
