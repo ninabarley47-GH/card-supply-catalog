@@ -207,6 +207,20 @@ test("C2 cleanup collapses creation forms and category choices in the resting st
   assert.match(styles, /\.category-settings-message:empty, \.tag-settings-message:empty\s*\{\s*display:\s*none;/);
 });
 
+test("final C2 labels and tag actions match the category treatment", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const source = await readFile(new URL("./settings.js", import.meta.url), "utf8");
+  const tagRow = source.slice(source.indexOf("function createGlobalTagSettingsRow"), source.indexOf("function formatProductType"));
+  assert.match(html, /Tags &amp; Categories/);
+  assert.match(html, /Manage the shared tag system for Paper, Cards, and Stamp Sets\./);
+  assert.match(html, /<h5>All Tags<\/h5>/);
+  assert.doesNotMatch(html, /Tags inventory/);
+  assert.match(tagRow, /edit\.className = "tag-settings-action tag-edit-action"/);
+  assert.match(tagRow, /edit\.innerHTML = '<svg/);
+  assert.match(tagRow, /remove\.className = "tag-settings-action"/);
+  assert.match(tagRow, /reveal\.textContent = "\+ Add to category"/);
+});
+
 test("successful Settings messages clear without hiding errors automatically", async () => {
   const source = await readFile(new URL("./settings.js", import.meta.url), "utf8");
   const announcer = source.slice(source.indexOf("function createSettingsAnnouncer"), source.indexOf("function removeRuntimeTagAssignments"));

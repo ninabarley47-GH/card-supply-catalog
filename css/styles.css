@@ -2351,15 +2351,17 @@ button.pattern {
 .global-tag-editor[hidden] { display: none; }
 .global-tag-settings-row > .button { align-self: center; }
 .global-tag-settings-row > .button[hidden] { display: none; }
-.global-tag-settings-row > .tag-settings-action { grid-column: 3; grid-row: 1; align-self: center; }
+.global-tag-settings-row > .tag-settings-action.tag-edit-action { grid-column: 2; grid-row: 1; align-self: center; margin: 0; }
+.global-tag-settings-row > .tag-settings-action:last-child { grid-column: 3; grid-row: 1; align-self: center; margin: 0; }
 
 @media (max-width: 720px) {
   .category-settings-row { grid-template-columns: minmax(0, auto) 2rem 2rem; }
   .category-settings-row > .category-edit-action { grid-column: 2; }
   .category-settings-row > .tag-settings-action:last-child { grid-column: 3; }
   .category-settings-editor { grid-template-columns: minmax(0, 1fr) auto auto; }
-  .global-tag-settings-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .global-tag-settings-row > .tag-settings-action { grid-column: 2; }
+  .global-tag-settings-row { grid-template-columns: minmax(0, 1fr) 2rem 2rem; }
+  .global-tag-settings-row > .tag-settings-action.tag-edit-action { grid-column: 2; }
+  .global-tag-settings-row > .tag-settings-action:last-child { grid-column: 3; }
   .global-tag-editor { grid-template-columns: 1fr auto auto; }
   .global-tag-editor .global-tag-applicability { grid-column: 1 / -1; }
 }

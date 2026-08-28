@@ -568,6 +568,8 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
   save.textContent = "Save";
   cancel.textContent = "Cancel";
   edit.textContent = "Edit";
+  edit.className = "tag-settings-action tag-edit-action";
+  edit.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.25-1 10.5-10.5-3.25-3.25L5 15.75 4 20Zm9.75-13 3.25 3.25M14.5 6.25l1.25-1.25a1.75 1.75 0 0 1 2.5 0l.75.75a1.75 1.75 0 0 1 0 2.5L17.75 9.5"/></svg>';
   remove.className = "tag-settings-action";
   edit.setAttribute("aria-label", `Edit ${tag.name}`);
   remove.setAttribute("aria-label", `Delete ${tag.name}`);
