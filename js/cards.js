@@ -1,4 +1,4 @@
-import { deleteCard, loadCatalogSetting, loadSavedCards, saveCard, saveCatalogSetting, saveOwner } from './storage.js';
+import { deleteCard, loadCatalogSetting, loadGlobalTagCatalog, loadSavedCards, saveCard, saveCatalogSetting, saveOwner } from './storage.js';
 import { loadDefaultOwnerId } from './settings.js';
 import { initializeOwnerPicker, notifyOwnerRegistryUpdated, refreshOwnerOptions, resolveOwnerPicker, setOwnerPickerValue } from './owner-picker.js';
 import { isActiveOwner } from './owners.js';
@@ -13,7 +13,7 @@ import {
   prepareCardImageForSave
 } from './card-images.js';
 import { createCardTagVocabularyStore } from './card-tags.js';
-import { createTagPicker } from './tag-picker.js';
+import { createTagPicker, resolveItemTagIds } from './tag-picker.js';
 
 const CARD_SIZE_PRESETS = {
   'a2-portrait': { label: 'A2 Portrait — 4.25 × 5.5 inches', width: 4.25, height: 5.5 },
@@ -37,7 +37,8 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
 
   const detailView = createCardDetailView();
   const cardTagVocabulary = createCardTagVocabularyStore();
-  const addCardView = createAddCardView({ owners, onCreateTag: (tag) => cardTagVocabulary.create(tag) });
+  let tagCatalog = await loadGlobalTagCatalog();
+  const addCardView = createAddCardView({ owners, tagCatalog });
   const cards = [];
   const filterForm = document.querySelector('[data-card-library-filter-form]');
   const searchInput = document.querySelector('[data-card-library-search]');
@@ -100,7 +101,6 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     sortCards(savedCards);
     cards.splice(0, cards.length, ...savedCards);
     const tagVocabulary = await cardTagVocabulary.load(cards);
-    addCardView.tagPicker.setVocabulary(tagVocabulary);
     refreshCardTagFilters(tagFilter, tagVocabulary);
     renderCurrent();
   };
@@ -125,6 +125,9 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   });
 
   document.addEventListener('catalog:card-tags-updated', async () => {
+    tagCatalog = await loadGlobalTagCatalog();
+    addCardView.tagCatalog = tagCatalog;
+    addCardView.tagPicker.setCatalog(tagCatalog);
     await reloadCards();
   });
 
@@ -396,7 +399,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   return cards;
 }
 
-function createAddCardView({ owners = [], onCreateTag } = {}) {
+function createAddCardView({ owners = [], tagCatalog } = {}) {
   const overlay = document.createElement('div');
   overlay.className = 'card-add-overlay';
   overlay.hidden = true;
@@ -479,9 +482,8 @@ function createAddCardView({ owners = [], onCreateTag } = {}) {
   controls.append(stampSetPicker.section);
   const tagPicker = createTagPicker({
     label: 'Tags',
-    inputLabel: 'Search or create Card tags',
-    placeholder: 'Search Card tags',
-    onCreateTag
+    productType: 'card',
+    catalog: tagCatalog
   });
   controls.append(tagPicker.element);
   const paperPackPicker = createPaperPackPicker();
@@ -524,6 +526,7 @@ function createAddCardView({ owners = [], onCreateTag } = {}) {
     stampSetInput: stampSetPicker.input,
     stampSetList: stampSetPicker.selected,
     stampSets: [],
+    tagCatalog,
     tagPicker,
     imageChooseButton: imagePicker.choose,
     imagePreview: imagePicker.preview,
@@ -626,7 +629,7 @@ function openEditCardView(addCardView, card) {
   addCardView.height.value = card.size.height;
   addCardView.favorite.checked = card.favorite;
   addCardView.stampSets = [...(card.stampSets || [])];
-  addCardView.tagPicker.setSelected(card.tags || []);
+  addCardView.tagPicker.setSelectedTagIds(resolveItemTagIds(card, addCardView.tagCatalog, 'card', 'tags'));
   addCardView.paperPackIds = [...(card.paperPackIds || [])];
   addCardView.existingImageSource = getCardDetailImageSource(card);
   addCardView.imageMessage.textContent = card.imageName || '';
@@ -937,6 +940,7 @@ function getLocalDateValue() {
 function createCardRecord(addCardView) {
   const timestamp = new Date().toISOString();
   const existingCard = addCardView.existingCard;
+  const selectedTags = addCardView.tagPicker.getSelectedTags();
 
   return {
     ...(existingCard || {}),
@@ -948,7 +952,8 @@ function createCardRecord(addCardView) {
       width: Number(addCardView.width.value),
       height: Number(addCardView.height.value)
     },
-    tags: addCardView.tagPicker.getSelected(),
+    tagIds: selectedTags.map((tag) => tag.id),
+    tags: selectedTags.map((tag) => tag.name),
     stampSets: [...addCardView.stampSets],
     paperPackIds: [...addCardView.paperPackIds],
     colorIds: [...(existingCard?.colorIds || [])],

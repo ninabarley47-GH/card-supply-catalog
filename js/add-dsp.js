@@ -6,14 +6,12 @@ import {
   loadPatternImagesForPaperPackName
 } from "./images.js";
 import { addCatalogSchemaVersion } from "./schema.js";
-import { loadCatalogSetting, loadPaperTagVocabulary, saveCatalogSetting, saveOwner, savePaperTagVocabulary } from "./storage.js";
+import { loadCatalogSetting, loadGlobalTagCatalog, saveCatalogSetting, saveOwner } from "./storage.js";
 import { createLegacyOwnerId, getOwnerNameKey, isActiveOwner } from "./owners.js";
 import { loadDefaultOwnerId } from "./settings.js";
 import { initializeOwnerPicker, notifyOwnerRegistryUpdated, refreshOwnerOptions, setOwnerPickerValue } from "./owner-picker.js";
-import { buildEffectivePaperTagVocabulary } from "./tag-utils.js";
 import { supportsDirectoryPicker, supportsOpenFilePicker } from "./browser-capabilities.js";
-import { createTagPicker } from "./tag-picker.js";
-import { createTagVocabularyStore } from "./card-tags.js";
+import { createTagPicker, projectTagNames, resolveItemTagIds } from "./tag-picker.js";
 
 const ADD_DSP_DEFAULTS_SETTING_ID = "addDspDefaults";
 
@@ -55,19 +53,18 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = [], owners = [
 
   initializeOwnerPicker(form.elements.ownerId, form.elements.owner, owners);
 
-  const paperTagVocabulary = createTagVocabularyStore({
-    loadVocabulary: loadPaperTagVocabulary,
-    saveVocabulary: savePaperTagVocabulary,
-    buildVocabulary: (persisted, records) => buildEffectivePaperTagVocabulary(persisted, records, persisted === null),
-    onVocabularyChanged: () => document.dispatchEvent(new CustomEvent("catalog:paper-tags-updated"))
-  });
-  const loadPaperTags = async () => tagPicker.setVocabulary(await paperTagVocabulary.load(paperPacks));
-  let paperTagsReady;
-  const tagPicker = createTagPicker({ label: "Paper Tags", inputLabel: "Search or create Paper tags", placeholder: "Search Paper tags", onCreateTag: async (tag) => { await paperTagsReady; return paperTagVocabulary.create(tag); } });
+  const emptyTagCatalog = { schemaVersion: 1, tags: [], categories: [] };
+  const tagPicker = createTagPicker({ label: "Paper Tags", productType: "paper", catalog: emptyTagCatalog });
   formState.tagPicker = tagPicker;
+  formState.tagCatalog = emptyTagCatalog;
   tagPickerMount?.replaceChildren(tagPicker.element);
-  paperTagsReady = loadPaperTags();
-  document.addEventListener("catalog:paper-tags-updated", () => void loadPaperTags());
+  const loadPaperTags = async () => {
+    const catalog = await loadGlobalTagCatalog();
+    formState.tagCatalog = catalog;
+    tagPicker.setCatalog(catalog);
+  };
+  let paperTagsReady = loadPaperTags();
+  document.addEventListener("catalog:global-tags-updated", () => { paperTagsReady = loadPaperTags(); });
 
   const defaultsReady = loadCatalogSetting(ADD_DSP_DEFAULTS_SETTING_ID)
     .then((defaults) => {
@@ -192,19 +189,21 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = [], owners = [
     });
   }
 
-  document.addEventListener("paper-pack:edit-request", (event) => {
+  document.addEventListener("paper-pack:edit-request", async (event) => {
     const paperPack = event.detail?.paperPack;
 
     if (!paperPack) {
       return;
     }
 
-    openEditDspPanel(panel, form, paperPack, colorsById, selectedImages, imagePreviewList, imagePreviewCount, {
-      title,
-      summary,
-      submitButton,
-      formState
-    });
+    try {
+      await paperTagsReady;
+      openEditDspPanel(panel, form, paperPack, colorsById, selectedImages, imagePreviewList, imagePreviewCount, {
+        title, summary, submitButton, formState
+      });
+    } catch (error) {
+      renderFormMessage(message, error.message || "The Paper tags could not be loaded.", "error");
+    }
   });
 
   document.addEventListener("paper-pack:add-from-library", async (event) => {
@@ -240,14 +239,16 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = [], owners = [
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    await paperTagsReady;
 
     const result = buildPaperPackFromForm(
       new FormData(form),
       colorsById,
       selectedImages,
       formState.editingPaperPack,
-      tagPicker.getSelected(),
-      owners
+      tagPicker.getSelectedTagIds(),
+      owners,
+      formState.tagCatalog
     );
 
     if (!result.ok) {
@@ -437,7 +438,7 @@ function openEditDspPanel(panel, form, paperPack, colorsById, selectedImages, im
   controls.submitButton.textContent = "Save Changes";
 
   fillPaperPackForm(form, paperPack, colorsById, controls.owners);
-  controls.formState.tagPicker?.setSelected(paperPack.keywords || []);
+  controls.formState.tagPicker?.setSelectedTagIds(resolveItemTagIds(paperPack, controls.formState.tagCatalog, "paper", "keywords"));
   selectedImages.push(...getImageEntriesFromPatterns(paperPack.patterns));
   renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount);
 
@@ -464,7 +465,7 @@ function resetAddDspForm(form, selectedImages, imagePreviewList, imagePreviewCou
   controls.submitButton.textContent = "Save Paper Pack";
 }
 
-export function buildPaperPackFromForm(formData, colorsById, selectedImages = [], editingPaperPack = null, selectedKeywords = [], owners = []) {
+export function buildPaperPackFromForm(formData, colorsById, selectedImages = [], editingPaperPack = null, selectedTagIds = [], owners = [], tagCatalog = null) {
   const name = cleanText(formData.get("name"));
   const selectedOwnerId = cleanText(formData.get("ownerId"));
   const selectedOwner = owners.find((candidate) => isActiveOwner(candidate) && candidate.id === selectedOwnerId);
@@ -475,7 +476,8 @@ export function buildPaperPackFromForm(formData, colorsById, selectedImages = []
   const releaseYear = Number.parseInt(formData.get("releaseYear"), 10);
   const patternCount = Number.parseInt(formData.get("patternCount"), 10);
   const colorResult = resolveColorIds(parseList(formData.get("colors")), colorsById);
-  const keywords = selectedKeywords.map(cleanText).filter(Boolean);
+  const tagIds = [...new Set(selectedTagIds)];
+  const keywords = tagCatalog ? projectTagNames(tagCatalog, tagIds, "paper") : [];
 
   if (!name || !owner || Number.isNaN(releaseYear) || !Number.isInteger(patternCount) || patternCount < 1) {
     return {
@@ -522,6 +524,7 @@ export function buildPaperPackFromForm(formData, colorsById, selectedImages = []
       refillAvailable: parseOptionalBoolean(formData.get("refillAvailable")),
       recentlyAdded: editingPaperPack?.recentlyAdded === true,
       favorite: editingPaperPack?.favorite === true,
+      tagIds,
       keywords,
       colors: colorResult.colorIds,
       patterns

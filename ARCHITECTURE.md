@@ -5,7 +5,7 @@ Version: 1.1
 
 Status: Maintained
 
-Last Updated: 2026-08-24
+Last Updated: 2026-08-27
 
 1. Architectural Goals
 
@@ -77,6 +77,7 @@ Every module should have one clear job. The current modules are:
 | `pwa.js` | Service worker registration |
 | `ui.js` | Shared UI helpers |
 | `search.js` | Reserved boundary for future extraction of search/filter logic; current filtering remains in `library.js` |
+| `tag-picker.js` | Reusable ID-based global tag selection for product Add/Edit forms, including applicability, categories, selected-tag summaries, and picker-local search |
 
 # Data Storage
 The application has three storage layers:
@@ -146,6 +147,8 @@ Catalog-record schema and backup-envelope schema are versioned independently in 
 The Card Status change raised the catalog schema to version 3. Cards now persist `status` as either `available` or `sent`; legacy Cards without a status are normalized to `available` when loaded or imported. Exported records carry catalog schema version 3, and exported backup envelopes declare `catalogSchemaVersion: 3`.
 
 Phase B2 raises the backup envelope to version 3. Version-3 Standard and Compact iPad exports contain one `tagCatalog` object (`schemaVersion`, `tags`, and `categories`), and Paper/Card records contain only `tagIds`. Version-1/2 backups with optional `tagVocabularies` and legacy `keywords`/`tags` remain importable through in-memory conversion and reconciliation. The record catalog schema remains version 3.
+
+Paper and Card Add/Edit forms select global tags by stable ID through the shared category-aware picker and persist canonical `tagIds`. Temporary runtime `keywords` and `tags` name projections remain available for Library detail and filtering compatibility until those consumers migrate; they are not authoritative picker state or persisted fields.
 
 # Error Handling
 Never lose user data.

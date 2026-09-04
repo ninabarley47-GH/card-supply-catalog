@@ -19,6 +19,14 @@ function createValidPaperPackForm() {
 }
 
 const colorsById = { red: { id: "red", name: "Red" } };
+const tagCatalog = {
+  schemaVersion: 1,
+  categories: [],
+  tags: [
+    { id: "tag-floral", name: "Floral", appliesTo: ["paper"], categoryIds: [] },
+    { id: "tag-fun-fold", name: "Fun Fold", appliesTo: ["paper"], categoryIds: [] }
+  ]
+};
 const owners = [
   { id: "owner-nina", name: "Nina" },
   { id: "owner-amanda", name: "Amanda" }
@@ -53,17 +61,19 @@ test("Add DSP saves a user-changed owner using that owner's stable ID", () => {
   assert.equal(result.paperPack.ownerId, "owner-amanda");
 });
 
-test("Add DSP stores shared-picker selections in keywords", () => {
-  const result = buildPaperPackFromForm(createValidPaperPackForm(), colorsById, [], null, ["Floral", "Fun Fold"]);
+test("Add DSP stores canonical picker IDs with a temporary keyword projection", () => {
+  const result = buildPaperPackFromForm(createValidPaperPackForm(), colorsById, [], null, ["tag-floral", "tag-fun-fold"], [], tagCatalog);
   assert.equal(result.ok, true);
+  assert.deepEqual(result.paperPack.tagIds, ["tag-floral", "tag-fun-fold"]);
   assert.deepEqual(result.paperPack.keywords, ["Floral", "Fun Fold"]);
 });
 
-test("Edit DSP round-trips the existing id, favorite, and selected keywords", () => {
-  const existing = { id: "original-id", recentlyAdded: true, favorite: true, patterns: [], keywords: ["Floral"] };
-  const result = buildPaperPackFromForm(createValidPaperPackForm(), colorsById, [], existing, existing.keywords);
+test("Edit DSP round-trips the existing id, favorite, and canonical tag IDs", () => {
+  const existing = { id: "original-id", recentlyAdded: true, favorite: true, patterns: [], tagIds: ["tag-floral"], keywords: ["Floral"] };
+  const result = buildPaperPackFromForm(createValidPaperPackForm(), colorsById, [], existing, existing.tagIds, [], tagCatalog);
   assert.equal(result.paperPack.id, "original-id");
   assert.equal(result.paperPack.favorite, true);
+  assert.deepEqual(result.paperPack.tagIds, ["tag-floral"]);
   assert.deepEqual(result.paperPack.keywords, ["Floral"]);
 });
 
