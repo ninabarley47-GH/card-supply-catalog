@@ -186,7 +186,11 @@ export async function deleteGlobalTagEverywhere(tagId, { paperRecords: runtimePa
   ]);
   const nextCatalog = {
     ...catalog,
-    tags: catalog.tags.filter((tag) => tag.id !== tagId).map((tag) => ({ ...tag, appliesTo: [...tag.appliesTo], categoryIds: [...tag.categoryIds] })),
+    tags: catalog.tags.filter((tag) => tag.id !== tagId).map((tag) => ({
+      ...tag,
+      ...(Array.isArray(tag.appliesTo) ? { appliesTo: [...tag.appliesTo] } : {}),
+      categoryIds: [...tag.categoryIds]
+    })),
     categories: catalog.categories.map((entry) => ({ ...entry }))
   };
   if (!validateGlobalTagCatalog(nextCatalog).ok) throw new TypeError("Deleting the tag produced an invalid catalog.");
@@ -221,12 +225,12 @@ function removePaperTagAssignment(record, tagId, catalog) {
 function assertCatalogSupportsAssignments(catalog, paperRecords, cardRecords) {
   for (const record of paperRecords) {
     if (Array.isArray(record.tagIds) && !validateItemTagAssignments({ catalog, productType: "paper", tagIds: record.tagIds }).ok) {
-      throw new TypeError("Paper assignments prevent this tag applicability change.");
+      throw new TypeError("The catalog does not support the existing Paper tag assignments.");
     }
   }
   for (const record of cardRecords) {
     if (Array.isArray(record.tagIds) && !validateItemTagAssignments({ catalog, productType: "card", tagIds: record.tagIds }).ok) {
-      throw new TypeError("Card assignments prevent this tag applicability change.");
+      throw new TypeError("The catalog does not support the existing Card tag assignments.");
     }
   }
 }
@@ -706,9 +710,7 @@ async function saveLegacyTagVocabulary(settingId, tags, productType) {
 }
 
 function ensureLegacyNamesInGlobalCatalog(catalog, names = [], productType) {
-  const applicableNames = new Set(catalog.tags
-    .filter((tag) => tag.appliesTo.includes(productType))
-    .map((tag) => getTagKey(tag.name)));
+  const applicableNames = new Set(catalog.tags.map((tag) => getTagKey(tag.name)));
   if ((names || []).every((name) => applicableNames.has(getTagKey(name)))) return catalog;
   return mergeLegacyVocabularyIntoGlobalCatalog(catalog, {
     ...(productType === "paper" ? { paperVocabulary: names } : { cardVocabulary: names })

@@ -12,9 +12,12 @@ const catalog = (tags = [], categories = []) => ({ schemaVersion: 1, tags, categ
 
 test("Settings declares one flat global tag manager rather than product-specific managers", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const source = await readFile(new URL("./settings.js", import.meta.url), "utf8");
   assert.equal((html.match(/data-global-tag-settings/g) || []).length, 1);
   assert.equal(html.includes('data-tag-settings="paper"'), false);
   assert.equal(html.includes('data-tag-settings="card"'), false);
+  assert.equal(html.includes("data-tag-add-product"), false);
+  assert.equal(source.includes("global-tag-applicability"), false);
 });
 
 test("successful global tag changes request an immediate Paper Library refresh", async () => {
@@ -34,7 +37,7 @@ test("one shared Paper and Card tag remains one rendered entity", () => {
   assert.deepEqual(sortGlobalTags(catalog([shared]).tags), [shared]);
 });
 
-test("usage reports Paper, Card, and Stamp applicability counts", () => {
+test("usage reports Paper, Card, and Stamp assignment counts", () => {
   const source = catalog([tag("all", "Holiday", ["paper", "card", "stamp"])]);
   const usage = getGlobalTagUsage(source, {
     paperRecords: [{ tagIds: ["all"] }], cardRecords: [{ tagIds: ["all"] }, { tagIds: ["all"] }], stampRecords: [{ tagIds: ["all"] }]
@@ -42,10 +45,10 @@ test("usage reports Paper, Card, and Stamp applicability counts", () => {
   assert.deepEqual(usage.get("all"), { paper: 1, card: 2, stamp: 1 });
 });
 
-test("adds a global tag with selected applicability and no categories", () => {
-  const result = addGlobalTag(catalog(), { name: "  New   Tag ", appliesTo: ["card", "paper"], idFactory: () => "opaque" });
+test("adds a universal global tag without writing deprecated applicability", () => {
+  const result = addGlobalTag(catalog(), { name: "  New   Tag ", idFactory: () => "opaque" });
   assert.equal(result.ok, true);
-  assert.deepEqual(result.tag, tag("opaque", "New Tag", ["paper", "card"]));
+  assert.deepEqual(result.tag, { id: "opaque", name: "New Tag", categoryIds: [] });
 });
 
 test("blocks exact normalized duplicates and points to the existing entity", () => {
@@ -231,21 +234,14 @@ test("successful Settings messages clear without hiding errors automatically", a
 
 test("rename preserves stable ID and existing category relationships", () => {
   const source = catalog([tag("stable", "Old", ["paper"], ["cat"] )], [{ id: "cat", name: "Messages" }]);
-  const result = editGlobalTag(source, "stable", { name: "New", appliesTo: ["paper"] });
+  const result = editGlobalTag(source, "stable", { name: "New" });
   assert.equal(result.tag.id, "stable");
   assert.deepEqual(result.tag.categoryIds, ["cat"]);
 });
 
-test("applicability additions succeed", () => {
-  const result = editGlobalTag(catalog([tag("one", "Tag")]), "one", { name: "Tag", appliesTo: ["paper", "card", "stamp"] });
-  assert.deepEqual(result.tag.appliesTo, ["paper", "card", "stamp"]);
-});
-
-test("applicability removal is blocked while assignments exist", () => {
-  const usage = new Map([["one", { paper: 2, card: 0, stamp: 0 }]]);
-  const result = editGlobalTag(catalog([tag("one", "Tag", ["paper", "card"])]), "one", { name: "Tag", appliesTo: ["card"] }, usage);
-  assert.equal(result.reason, "assigned-applicability");
-  assert.deepEqual(result.blocked, [{ productType: "paper", count: 2 }]);
+test("rename preserves deprecated applicability metadata without depending on it", () => {
+  const result = editGlobalTag(catalog([tag("one", "Tag", ["card"])]), "one", { name: "Renamed" });
+  assert.deepEqual(result.tag.appliesTo, ["card"]);
 });
 
 test("delete removes tag assignments and entity without touching images", () => {
@@ -272,7 +268,7 @@ test("transitional Paper and Card pickers receive the complete global inventory"
   assert.match(source, /return catalog\.tags\.map\(\(tag\) => tag\.name\)/);
 });
 
-test("Settings refreshes applicability and usage after Paper or Card saves", async () => {
+test("Settings refreshes usage after Paper or Card saves", async () => {
   const settings = await readFile(new URL("./settings.js", import.meta.url), "utf8");
   const library = await readFile(new URL("./library.js", import.meta.url), "utf8");
   const cards = await readFile(new URL("./cards.js", import.meta.url), "utf8");

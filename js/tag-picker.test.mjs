@@ -15,11 +15,11 @@ const catalog = {
   ]
 };
 
-test('Paper and Card models include only applicable tags and hide empty categories', () => {
+test('Paper and Card models include every global tag and hide only empty categories', () => {
   const paper = getApplicableTagPickerModel(catalog, 'paper');
   const card = getApplicableTagPickerModel(catalog, 'card');
-  assert.deepEqual(paper.applicableTags.map((entry) => entry.id), ['paper-only', 'paper-animal', 'shared']);
-  assert.deepEqual(card.applicableTags.map((entry) => entry.id), ['shared', 'card-only']);
+  assert.deepEqual(paper.applicableTags.map((entry) => entry.id), ['paper-only', 'paper-animal', 'shared', 'card-only']);
+  assert.deepEqual(card.applicableTags.map((entry) => entry.id), ['paper-only', 'paper-animal', 'shared', 'card-only']);
   assert.deepEqual(paper.categories.map((entry) => entry.id), ['animals', 'messages']);
   assert.equal(paper.categories.some((entry) => entry.id === 'empty'), false);
   assert.deepEqual(paper.uncategorizedTags.map((entry) => entry.id), ['paper-only']);
@@ -32,8 +32,9 @@ test('one ID-authoritative state selects, deduplicates, toggles, and rejects cat
   assert.deepEqual(state.getSelectedTagIds(), ['shared', 'paper-only']);
   state.toggle('shared', false);
   assert.deepEqual(state.getSelectedTagIds(), ['paper-only']);
-  assert.throws(() => state.select('animals'), /applicable tags/);
-  assert.throws(() => state.select('card-only'), /applicable tags/);
+  assert.throws(() => state.select('animals'), /global tags/);
+  state.select('card-only');
+  assert.deepEqual(state.getSelectedTagIds(), ['paper-only', 'card-only']);
 });
 
 test('pending picker changes do not mutate the persisted item used to open Edit', () => {
@@ -51,21 +52,24 @@ test('multi-category tag appears in each category but search returns it once wit
   assert.deepEqual(searchApplicableTags(catalog, 'paper', 'birth'), [{ id: 'shared', name: 'Birthday', categoryNames: ['Animals', 'Messages'] }]);
 });
 
-test('search finds applicable categorized and uncategorized tags only', () => {
+test('search finds every global tag for both product types', () => {
   assert.equal(searchApplicableTags(catalog, 'paper', 'back')[0].id, 'paper-only');
   assert.equal(searchApplicableTags(catalog, 'card', 'thank')[0].id, 'card-only');
-  assert.deepEqual(searchApplicableTags(catalog, 'paper', 'thank'), []);
+  assert.equal(searchApplicableTags(catalog, 'paper', 'thank')[0].id, 'card-only');
+  assert.equal(searchApplicableTags(catalog, 'card', 'back')[0].id, 'paper-only');
 });
 
 test('Edit resolution prefers canonical IDs and uses names only as fallback', () => {
   assert.deepEqual(resolveItemTagIds({ tagIds: ['shared'], keywords: ['Background'] }, catalog, 'paper', 'keywords'), ['shared']);
   assert.deepEqual(resolveItemTagIds({ keywords: ['Background'] }, catalog, 'paper', 'keywords'), ['paper-only']);
   assert.deepEqual(resolveItemTagIds({ tags: ['Thanks'] }, catalog, 'card', 'tags'), ['card-only']);
+  assert.deepEqual(resolveItemTagIds({ keywords: ['Thanks'] }, catalog, 'paper', 'keywords'), ['card-only']);
   assert.throws(() => resolveItemTagIds({ keywords: ['Missing'] }, catalog, 'paper', 'keywords'), /cannot be resolved/);
 });
 
 test('canonical IDs project temporary runtime names without becoming name-authoritative', () => {
   assert.deepEqual(projectTagNames(catalog, ['shared', 'paper-only'], 'paper'), ['Birthday', 'Background']);
+  assert.deepEqual(projectTagNames(catalog, ['card-only'], 'paper'), ['Thanks']);
   assert.throws(() => projectTagNames(catalog, ['animals'], 'paper'), /invalid/);
 });
 

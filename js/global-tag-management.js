@@ -1,5 +1,4 @@
 import {
-  TAG_PRODUCT_TYPES,
   findFuzzyDuplicateCandidates,
   getGlobalTagNameKey,
   normalizeGlobalTagName,
@@ -23,19 +22,17 @@ export function getGlobalTagUsage(catalog, { paperRecords = [], cardRecords = []
   return usage;
 }
 
-export function addGlobalTag(catalog, { name, appliesTo, allowFuzzy = false, idFactory = createOpaqueTagId }) {
+export function addGlobalTag(catalog, { name, allowFuzzy = false, idFactory = createOpaqueTagId }) {
   assertCatalog(catalog);
   const normalizedName = normalizeGlobalTagName(name);
-  const normalizedApplicability = normalizeApplicability(appliesTo);
   if (!normalizedName) return { ok: false, reason: "invalid-name" };
-  if (!normalizedApplicability.length) return { ok: false, reason: "invalid-applicability" };
   const exact = catalog.tags.find((tag) => getGlobalTagNameKey(tag.name) === getGlobalTagNameKey(normalizedName));
   if (exact) return { ok: false, reason: "duplicate", existingTag: exact };
   const fuzzyCandidates = findFuzzyDuplicateCandidates([normalizedName, ...catalog.tags.map((tag) => tag.name)])
     .filter((candidate) => candidate.firstName === normalizedName || candidate.secondName === normalizedName)
     .map((candidate) => candidate.firstName === normalizedName ? candidate.secondName : candidate.firstName);
   if (fuzzyCandidates.length && !allowFuzzy) return { ok: false, reason: "fuzzy", fuzzyCandidates };
-  const tag = { id: idFactory(), name: normalizedName, appliesTo: normalizedApplicability, categoryIds: [] };
+  const tag = { id: idFactory(), name: normalizedName, categoryIds: [] };
   const nextCatalog = cloneCatalog(catalog);
   nextCatalog.tags.push(tag);
   assertCatalog(nextCatalog);
@@ -117,24 +114,17 @@ export function removeTagFromCategory(catalog, tagId, categoryId) {
   return { ok: true, catalog: nextCatalog, tag };
 }
 
-export function editGlobalTag(catalog, tagId, { name, appliesTo }, usage = new Map()) {
+export function editGlobalTag(catalog, tagId, { name }) {
   assertCatalog(catalog);
   const current = catalog.tags.find((tag) => tag.id === tagId);
   if (!current) return { ok: false, reason: "not-found" };
   const normalizedName = normalizeGlobalTagName(name);
-  const normalizedApplicability = normalizeApplicability(appliesTo);
   if (!normalizedName) return { ok: false, reason: "invalid-name" };
-  if (!normalizedApplicability.length) return { ok: false, reason: "invalid-applicability" };
   const duplicate = catalog.tags.find((tag) => tag.id !== tagId && getGlobalTagNameKey(tag.name) === getGlobalTagNameKey(normalizedName));
   if (duplicate) return { ok: false, reason: "duplicate", existingTag: duplicate };
-  const counts = usage.get(tagId) || { paper: 0, card: 0, stamp: 0 };
-  const blocked = current.appliesTo.filter((type) => !normalizedApplicability.includes(type) && counts[type] > 0)
-    .map((type) => ({ productType: type, count: counts[type] }));
-  if (blocked.length) return { ok: false, reason: "assigned-applicability", blocked };
   const nextCatalog = cloneCatalog(catalog);
   const edited = nextCatalog.tags.find((tag) => tag.id === tagId);
   edited.name = normalizedName;
-  edited.appliesTo = normalizedApplicability;
   assertCatalog(nextCatalog);
   return { ok: true, catalog: nextCatalog, tag: edited };
 }
@@ -163,11 +153,6 @@ function removeAssignment(records, tagId) {
   return records.map((record) => ({ ...record, tagIds: (record.tagIds || []).filter((id) => id !== tagId) }));
 }
 
-function normalizeApplicability(values) {
-  const selected = new Set(Array.isArray(values) ? values : []);
-  return TAG_PRODUCT_TYPES.filter((type) => selected.has(type));
-}
-
 function createOpaqueTagId() {
   if (globalThis.crypto?.randomUUID) return `tag-${globalThis.crypto.randomUUID()}`;
   return `tag-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
@@ -185,7 +170,11 @@ function assertCatalog(catalog) {
 function cloneCatalog(catalog) {
   return {
     schemaVersion: catalog.schemaVersion,
-    tags: catalog.tags.map((tag) => ({ ...tag, appliesTo: [...tag.appliesTo], categoryIds: [...tag.categoryIds] })),
+    tags: catalog.tags.map((tag) => ({
+      ...tag,
+      ...(Array.isArray(tag.appliesTo) ? { appliesTo: [...tag.appliesTo] } : {}),
+      categoryIds: [...tag.categoryIds]
+    })),
     categories: catalog.categories.map((category) => ({ ...category }))
   };
 }

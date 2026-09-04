@@ -97,8 +97,11 @@ test("rejects duplicate IDs and duplicate normalized names", () => {
   assert.equal(result.errors.some(({ message }) => message.includes("normalized category name")), true);
 });
 
-test("rejects invalid, empty, and duplicate applicability", () => {
-  for (const appliesTo of [[], ["ink"], ["paper", "paper"]]) {
+test("accepts omitted deprecated applicability and validates it when retained", () => {
+  const { appliesTo, ...universalTag } = tag();
+  assert.equal(validateGlobalTagCatalog(catalogWith({ tags: [universalTag] })).ok, true);
+  assert.equal(validateGlobalTagCatalog(catalogWith({ tags: [tag({ appliesTo: [] })] })).ok, true);
+  for (const appliesTo of [["ink"], ["paper", "paper"]]) {
     assert.equal(validateGlobalTagCatalog(catalogWith({ tags: [tag({ appliesTo })] })).ok, false);
   }
 });
@@ -167,8 +170,9 @@ test("preserves every distinct Paper and Card assignment after approved legacy n
   assert.equal(result.catalog.tags.some(({ name }) => name === "Background"), false);
 });
 
-test("validates item applicability and valid tag assignments", () => {
-  const catalog = catalogWith({ tags: [tag({ appliesTo: ["paper", "card"] })] });
-  assert.equal(validateItemTagAssignments({ catalog, productType: "card", tagIds: ["tag-one"] }).ok, true);
-  assert.equal(validateItemTagAssignments({ catalog, productType: "stamp", tagIds: ["tag-one"] }).ok, false);
+test("every global tag is valid for Paper, Card, and Stamp assignments", () => {
+  const catalog = catalogWith({ tags: [tag({ appliesTo: ["card"] })] });
+  for (const productType of ["paper", "card", "stamp"]) {
+    assert.equal(validateItemTagAssignments({ catalog, productType, tagIds: ["tag-one"] }).ok, true);
+  }
 });

@@ -104,11 +104,13 @@ test("unknown category and item tag references are rejected before reconciliatio
   }), /unknown tag/);
 });
 
-test("wrong-product assignments and mixed records are rejected", () => {
-  assert.throws(() => reconcileBackupTagData({
+test("cross-product assignments are accepted while mixed records are rejected", () => {
+  const result = reconcileBackupTagData({
     localCatalog: createEmptyGlobalTagCatalog(),
     backup: modern(catalog([tag("t", "Paper only")]), [], [card("c", ["t"])])
-  }), /invalid tag assignments/);
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.cards[0].tagIds, ["t"]);
   assert.throws(() => reconcileBackupTagData({
     localCatalog: createEmptyGlobalTagCatalog(),
     backup: modern(catalog(), [{ id: "p", tagIds: [], keywords: [] }])

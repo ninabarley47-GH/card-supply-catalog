@@ -56,10 +56,17 @@ function reconcileModern(localCatalog, backup) {
         report.localNamesRetained.push({ id: byId.id, localName: byId.name, importedName: imported.name });
       }
       if (!byId) { report.tagIdsRemapped += 1; report.exactNamesConsolidated += 1; }
-      report.applicabilityAdded += unionInto(target.appliesTo, imported.appliesTo);
+      if (Array.isArray(imported.appliesTo)) {
+        if (!Array.isArray(target.appliesTo)) target.appliesTo = [];
+        report.applicabilityAdded += unionInto(target.appliesTo, imported.appliesTo);
+      }
       report.categoryRelationshipsAdded += unionInto(target.categoryIds, remappedCategories);
     } else {
-      const added = { ...imported, appliesTo: [...imported.appliesTo], categoryIds: remappedCategories };
+      const added = {
+        ...imported,
+        ...(Array.isArray(imported.appliesTo) ? { appliesTo: [...imported.appliesTo] } : {}),
+        categoryIds: remappedCategories
+      };
       catalog.tags.push(added);
       localTagsById.set(added.id, added);
       localTagsByName.set(getGlobalTagNameKey(added.name), added);
@@ -167,7 +174,15 @@ function unionInto(target, values) {
 }
 
 function cloneCatalog(catalog) {
-  return { schemaVersion: catalog.schemaVersion, tags: catalog.tags.map((tag) => ({ ...tag, appliesTo: [...tag.appliesTo], categoryIds: [...tag.categoryIds] })), categories: catalog.categories.map((category) => ({ ...category })) };
+  return {
+    schemaVersion: catalog.schemaVersion,
+    tags: catalog.tags.map((tag) => ({
+      ...tag,
+      ...(Array.isArray(tag.appliesTo) ? { appliesTo: [...tag.appliesTo] } : {}),
+      categoryIds: [...tag.categoryIds]
+    })),
+    categories: catalog.categories.map((category) => ({ ...category }))
+  };
 }
 
 function createReport() {

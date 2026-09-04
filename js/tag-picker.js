@@ -2,7 +2,8 @@ import { getGlobalTagNameKey, validateGlobalTagCatalog, validateItemTagAssignmen
 
 export function getApplicableTagPickerModel(catalog, productType) {
   assertCatalog(catalog);
-  const applicableTags = sortByName(catalog.tags.filter((tag) => tag.appliesTo.includes(productType)));
+  assertProductType(productType);
+  const applicableTags = sortByName(catalog.tags);
   const applicableIds = new Set(applicableTags.map((tag) => tag.id));
   const categories = sortByName(catalog.categories)
     .map((category) => ({ ...category, tags: applicableTags.filter((tag) => tag.categoryIds.includes(category.id)) }))
@@ -31,9 +32,7 @@ export function resolveItemTagIds(record, catalog, productType, legacyField) {
     if (!validation.ok) throw new TypeError('The item contains tag assignments that cannot be resolved.');
     return [...record.tagIds];
   }
-  const applicableByName = new Map(
-    catalog.tags.filter((tag) => tag.appliesTo.includes(productType)).map((tag) => [getGlobalTagNameKey(tag.name), tag.id])
-  );
+  const applicableByName = new Map(catalog.tags.map((tag) => [getGlobalTagNameKey(tag.name), tag.id]));
   const names = Array.isArray(record?.[legacyField]) ? record[legacyField] : [];
   const tagIds = names.map((name) => applicableByName.get(getGlobalTagNameKey(name)));
   if (tagIds.some((id) => !id)) throw new TypeError('The item contains tag assignments that cannot be resolved.');
@@ -64,7 +63,7 @@ export function createTagPickerState({ catalog, productType, selectedTagIds = []
     },
     setSelectedTagIds(tagIds) { selectedIds = validateSelected(tagIds, currentCatalog, productType); },
     select(tagId) {
-      assertApplicableTag(model, tagId);
+      assertGlobalTag(model, tagId);
       if (!selectedIds.includes(tagId)) selectedIds.push(tagId);
     },
     deselect(tagId) { selectedIds = selectedIds.filter((id) => id !== tagId); },
@@ -223,12 +222,16 @@ function validateSelected(tagIds, catalog, productType) {
   return uniqueIds;
 }
 
-function assertApplicableTag(model, tagId) {
-  if (!model.applicableIds.has(tagId)) throw new TypeError('Only applicable tags can be selected.');
+function assertGlobalTag(model, tagId) {
+  if (!model.applicableIds.has(tagId)) throw new TypeError('Only global tags can be selected.');
 }
 
 function assertCatalog(catalog) {
   if (!validateGlobalTagCatalog(catalog).ok) throw new TypeError('The global tag catalog is invalid.');
+}
+
+function assertProductType(productType) {
+  if (!['paper', 'card', 'stamp'].includes(productType)) throw new TypeError('The product type is invalid.');
 }
 
 function sortByName(entries) {

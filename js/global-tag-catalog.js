@@ -91,10 +91,12 @@ export function validateGlobalTagCatalog(catalog) {
     }
     addUnique(tagIds, tag.id, `${path}.id`, "tag ID", errors);
     addUnique(tagNames, getGlobalTagNameKey(tag.name), `${path}.name`, "normalized tag name", errors);
-    if (!Array.isArray(tag.appliesTo) || tag.appliesTo.length === 0 ||
+    // appliesTo is deprecated compatibility metadata. Existing catalogs and
+    // backups may retain it, but new tags do not need to write it.
+    if ("appliesTo" in tag && (!Array.isArray(tag.appliesTo) ||
         new Set(tag.appliesTo).size !== tag.appliesTo.length ||
-        tag.appliesTo.some((type) => !TAG_PRODUCT_TYPES.includes(type))) {
-      errors.push(error(`${path}.appliesTo`, "Applicability must contain unique supported product types."));
+        tag.appliesTo.some((type) => !TAG_PRODUCT_TYPES.includes(type)))) {
+      errors.push(error(`${path}.appliesTo`, "Deprecated applicability metadata must contain unique supported product types."));
     }
     if (!Array.isArray(tag.categoryIds) || new Set(tag.categoryIds).size !== tag.categoryIds.length) {
       errors.push(error(`${path}.categoryIds`, "Category relationships must be a unique ID array."));
@@ -133,11 +135,7 @@ export function validateItemTagAssignments({ catalog, productType, tagIds }) {
       errors.push(error(`tagIds[${index}]`, "Categories cannot be assigned to catalog items."));
       return;
     }
-    const tag = tagsById.get(tagId);
-    if (!tag) errors.push(error(`tagIds[${index}]`, `Unknown tag ID "${tagId}".`));
-    else if (!tag.appliesTo.includes(productType)) {
-      errors.push(error(`tagIds[${index}]`, `Tag "${tag.name}" does not apply to ${productType}.`));
-    }
+    if (!tagsById.has(tagId)) errors.push(error(`tagIds[${index}]`, `Unknown tag ID "${tagId}".`));
   });
   return errors.length ? { ok: false, errors } : { ok: true, errors: [] };
 }
@@ -184,8 +182,10 @@ export function migrateLegacyTagData({
       tagsByKey.set(key, tag);
       occupiedIds.set(tag.id, key);
     }
-    if (!tag.appliesTo.includes(productType)) tag.appliesTo.push(productType);
-    tag.appliesTo.sort(compareProductTypes);
+    if (Array.isArray(tag.appliesTo)) {
+      if (!tag.appliesTo.includes(productType)) tag.appliesTo.push(productType);
+      tag.appliesTo.sort(compareProductTypes);
+    }
     return tag;
   };
 
@@ -254,7 +254,11 @@ function addUnique(set, value, path, label, errors) {
 }
 
 function cloneTag(tag) {
-  return { ...tag, appliesTo: [...tag.appliesTo], categoryIds: [...tag.categoryIds] };
+  return {
+    ...tag,
+    ...(Array.isArray(tag.appliesTo) ? { appliesTo: [...tag.appliesTo] } : {}),
+    categoryIds: [...tag.categoryIds]
+  };
 }
 
 function uniqueIds(values) {

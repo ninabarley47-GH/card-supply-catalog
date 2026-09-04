@@ -103,7 +103,6 @@ function dehydrateTagNames(record, catalog, productType, legacyField) {
     ? record[legacyField]
     : resolveTagNames(record.tagIds, catalog, productType);
   const tagsByName = new Map(catalog.tags
-    .filter((tag) => tag.appliesTo.includes(productType))
     .map((tag) => [tag.name.trim().replace(/\s+/g, " ").toLocaleLowerCase(), tag.id]));
   const tagIds = suppliedNames.map((name) => tagsByName.get(String(name).trim().replace(/\s+/g, " ").toLocaleLowerCase()));
   if (tagIds.some((tagId) => !tagId)) {
@@ -117,7 +116,11 @@ function dehydrateTagNames(record, catalog, productType, legacyField) {
 function cloneCatalog(catalog) {
   return {
     schemaVersion: catalog.schemaVersion,
-    tags: catalog.tags.map((tag) => ({ ...tag, appliesTo: [...tag.appliesTo], categoryIds: [...tag.categoryIds] })),
+    tags: catalog.tags.map((tag) => ({
+      ...tag,
+      ...(Array.isArray(tag.appliesTo) ? { appliesTo: [...tag.appliesTo] } : {}),
+      categoryIds: [...tag.categoryIds]
+    })),
     categories: catalog.categories.map((category) => ({ ...category }))
   };
 }

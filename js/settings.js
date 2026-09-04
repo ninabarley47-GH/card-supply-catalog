@@ -217,11 +217,10 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
         if (!result.ok) { announce("That category relationship could not be removed.", "error"); return false; }
         return persistCatalogMutation(result, `Removed “${tag.name}” from “${category.name}”.`);
       },
-      onSave: async (name, appliesTo) => {
-        const result = editGlobalTag(catalog, tag.id, { name, appliesTo }, usage);
+      onSave: async (name) => {
+        const result = editGlobalTag(catalog, tag.id, { name });
         if (!result.ok) {
-          if (result.reason === "assigned-applicability") announce(`Applicability cannot be removed: ${result.blocked.map((entry) => `${entry.count} ${entry.productType} item${entry.count === 1 ? "" : "s"}`).join(", ")} still use this tag.`, "error");
-          else announce(result.reason === "duplicate" ? `That name already belongs to “${result.existingTag.name}”.` : "Enter a unique name and select at least one product type.", "error");
+          announce(result.reason === "duplicate" ? `That name already belongs to “${result.existingTag.name}”.` : "Enter a unique tag name.", "error");
           return false;
         }
         try {
@@ -273,7 +272,6 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
   });
   tagAddCancel.addEventListener("click", () => {
     input.value = "";
-    form.querySelectorAll("[data-tag-add-product]").forEach((control) => { control.checked = false; });
     announce("");
     toggleAddForm(form, tagAddOpen, false);
   });
@@ -293,19 +291,17 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
   });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const appliesTo = [...form.querySelectorAll("[data-tag-add-product]:checked")].map((control) => control.value);
-    let result = addGlobalTag(catalog, { name: input.value, appliesTo });
+    let result = addGlobalTag(catalog, { name: input.value });
     if (!result.ok && result.reason === "duplicate") { announce(`That tag already exists as “${result.existingTag.name}”.`, "error"); return; }
     if (!result.ok && result.reason === "fuzzy") {
       if (!window.confirm(`Possible duplicate${result.fuzzyCandidates.length === 1 ? "" : "s"}: ${result.fuzzyCandidates.join(", ")}. Create a distinct tag anyway?`)) { announce("The possible duplicate was not created.", ""); return; }
-      result = addGlobalTag(catalog, { name: input.value, appliesTo, allowFuzzy: true });
+      result = addGlobalTag(catalog, { name: input.value, allowFuzzy: true });
     }
-    if (!result.ok) { announce("Enter a tag name and select at least one product type.", "error"); return; }
+    if (!result.ok) { announce("Enter a unique tag name.", "error"); return; }
     try {
       await saveGlobalTagCatalog(result.catalog);
       catalog = result.catalog;
       input.value = "";
-      form.querySelectorAll("[data-tag-add-product]").forEach((control) => { control.checked = false; });
       toggleAddForm(form, tagAddOpen, false);
       render();
       dispatchGlobalTagUpdates();
@@ -484,7 +480,6 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
   const relationships = document.createElement("div");
   const input = document.createElement("input");
   const editor = document.createElement("div");
-  const applicability = document.createElement("fieldset");
   const save = document.createElement("button");
   const cancel = document.createElement("button");
   const edit = document.createElement("button");
@@ -492,7 +487,7 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
   row.className = "tag-settings-row global-tag-settings-row";
   display.className = "global-tag-display";
   label.textContent = tag.name;
-  details.textContent = tag.appliesTo.map((type) => `${formatProductType(type)}: ${usage[type]} used`).join(" · ");
+  details.textContent = `Paper: ${usage.paper} used · Card: ${usage.card} used · Stamp: ${usage.stamp} used`;
   relationships.className = "tag-category-relationships";
   for (const category of sortGlobalCategories(catalog.categories.filter((entry) => tag.categoryIds.includes(entry.id)))) {
     const chip = document.createElement("span");
@@ -550,17 +545,6 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
   input.value = tag.name;
   input.setAttribute("aria-label", `Tag name for ${tag.name}`);
   input.className = "tag-settings-name-input";
-  applicability.className = "global-tag-applicability";
-  applicability.append(Object.assign(document.createElement("legend"), { textContent: "Applies to" }));
-  for (const productType of ["paper", "card", "stamp"]) {
-    const control = document.createElement("input");
-    const controlLabel = document.createElement("label");
-    control.type = "checkbox";
-    control.value = productType;
-    control.checked = tag.appliesTo.includes(productType);
-    controlLabel.append(control, ` ${formatProductType(productType)}`);
-    applicability.append(controlLabel);
-  }
   editor.className = "global-tag-editor";
   editor.hidden = true;
   save.className = cancel.className = edit.className = "button button-compact";
@@ -583,7 +567,6 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
   };
   const cancelEditing = () => {
     input.value = tag.name;
-    [...applicability.querySelectorAll("input")].forEach((control) => { control.checked = tag.appliesTo.includes(control.value); });
     editor.hidden = true;
     display.hidden = false;
     edit.hidden = false;
@@ -591,17 +574,12 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
   edit.addEventListener("click", beginEditing);
   cancel.addEventListener("click", cancelEditing);
   save.addEventListener("click", async () => {
-    const selected = [...applicability.querySelectorAll("input:checked")].map((control) => control.value);
-    if (await onSave(input.value, selected)) cancelEditing();
+    if (await onSave(input.value)) cancelEditing();
   });
   remove.addEventListener("click", onDelete);
-  editor.append(input, applicability, save, cancel);
+  editor.append(input, save, cancel);
   row.append(display, editor, edit, remove);
   return row;
-}
-
-function formatProductType(type) {
-  return type === "card" ? "Card" : type === "stamp" ? "Stamp" : "Paper";
 }
 
 async function initializeCardImageLibrarySettings({ paperPacks = [] } = {}) {

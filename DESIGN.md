@@ -130,7 +130,7 @@ Similar actions use the same wording throughout the app.
 Tags appear once in the flat alphabetical Settings inventory. Categories are managed separately in a compact area, and category membership is displayed as removable metadata chips on each tag row. A tag may belong to multiple categories while retaining one stable identity. Settings does not present the taxonomy as a hierarchy or category tree.
 
 # Category-Aware Tag Selection
-Paper and Card Add/Edit forms use one shared global tag picker. Selected Tags are always summarized as removable chips. Only tags applicable to the current product appear: uncategorized tags are listed directly, while categorized tags appear inside collapsed category groups. Categories organize the picker but are never selectable assignments. A tag in multiple categories remains one stable tag, and every occurrence synchronizes through its ID. Search spans all applicable tags and returns one result per tag with category context. New tags are created only in Settings under Tags & Categories.
+Paper and Card Add/Edit forms use one shared global tag picker, with the same behavior intended for Stamp Sets. Every global tag is available to every product type. Selected tags are summarized as removable chips. Uncategorized tags are listed directly, while categorized tags appear inside collapsed category groups. Categories organize the picker but are never selectable assignments. A tag in multiple categories remains one stable tag, and every occurrence synchronizes through its ID. Search spans all global tags and returns one result per tag with category context. New tags are created only in Settings under Tags & Categories.
 
 # Image Quality
 Images are the application's primary content.

@@ -77,7 +77,7 @@ Every module should have one clear job. The current modules are:
 | `pwa.js` | Service worker registration |
 | `ui.js` | Shared UI helpers |
 | `search.js` | Reserved boundary for future extraction of search/filter logic; current filtering remains in `library.js` |
-| `tag-picker.js` | Reusable ID-based global tag selection for product Add/Edit forms, including applicability, categories, selected-tag summaries, and picker-local search |
+| `tag-picker.js` | Reusable ID-based global tag selection for product Add/Edit forms, including categories, selected-tag summaries, and picker-local search |
 
 # Data Storage
 The application has three storage layers:
@@ -149,6 +149,8 @@ The Card Status change raised the catalog schema to version 3. Cards now persist
 Phase B2 raises the backup envelope to version 3. Version-3 Standard and Compact iPad exports contain one `tagCatalog` object (`schemaVersion`, `tags`, and `categories`), and Paper/Card records contain only `tagIds`. Version-1/2 backups with optional `tagVocabularies` and legacy `keywords`/`tags` remain importable through in-memory conversion and reconciliation. The record catalog schema remains version 3.
 
 Paper and Card Add/Edit forms select global tags by stable ID through the shared category-aware picker and persist canonical `tagIds`. Temporary runtime `keywords` and `tags` name projections remain available for Library detail and filtering compatibility until those consumers migrate; they are not authoritative picker state or persisted fields.
+
+Every global tag is assignable to Paper Packs, Cards, and Stamp Sets. Assignment validation checks that each `tagId` identifies a real tag and never a category; it does not filter by product type. The legacy `appliesTo` field is optional, deprecated compatibility metadata. Existing catalogs and backups may retain and round-trip it, but current selection, search, validation, legacy fallback resolution, and runtime projections ignore it. Newly created tags omit it without changing the catalog or backup schema version.
 
 # Error Handling
 Never lose user data.
