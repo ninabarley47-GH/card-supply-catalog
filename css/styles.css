@@ -2377,10 +2377,10 @@ button.pattern {
 .tag-picker-search { width: 100%; }
 .tag-picker-selected { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; margin: 0 0 var(--space-1); padding: 0; list-style: none; }
 .tag-picker-selected[hidden] { display: none; }
-.tag-picker-selected li { display: inline-flex; flex: 0 0 auto; max-width: 100%; }
-.tag-picker-selected button { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 0.35rem; width: max-content; min-height: 1.85rem; max-width: 100%; border: 0; border-radius: 999px; padding: 0.2rem 0.4rem 0.2rem 0.6rem; background: rgba(82, 120, 109, 0.12); color: var(--color-text); cursor: pointer; font: inherit; font-size: 0.8rem; font-weight: 800; line-height: 1.15; text-align: left; white-space: nowrap; }
-.tag-picker-selected button > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.tag-picker-selected-remove { flex: 0 0 auto; font-size: 1rem; font-weight: 700; line-height: 1; }
+.tag-picker-selected-chip { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 0.25rem; width: max-content; max-width: 100%; border-radius: 999px; padding: 0.2rem 0.3rem 0.2rem 0.6rem; background: #f2f0eb; color: var(--color-text); font-size: 0.82rem; font-weight: 700; line-height: 1.2; white-space: nowrap; }
+.tag-picker-selected-chip > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tag-picker-selected-remove { display: inline-grid; flex: 0 0 auto; width: 1.35rem; height: 1.35rem; place-items: center; border: 0; border-radius: 50%; padding: 0; background: transparent; color: var(--color-muted); cursor: pointer; font: inherit; font-size: 1rem; font-weight: 700; line-height: 1; }
+.tag-picker-selected-remove:hover, .tag-picker-selected-remove:focus-visible { background: rgba(82, 120, 109, 0.12); color: var(--color-accent-dark); }
 .global-tag-picker-search-results { display: grid; border: 1px solid var(--color-border); border-radius: var(--radius-small); background: var(--color-surface); }
 .global-tag-picker-search-results[hidden] { display: none; }
 .global-tag-picker-search-results > p { margin: 0; padding: var(--space-3); color: var(--color-muted); font-size: 0.85rem; }
@@ -2399,7 +2399,7 @@ button.pattern {
 .global-tag-picker-option small { color: var(--color-muted); font-size: 0.76rem; }
 
 @media (pointer: coarse) {
-  .tag-picker-selected button { min-height: 2.25rem; }
+  .tag-picker-selected-remove { width: 1.75rem; height: 1.75rem; }
   .global-tag-picker-uncategorized, .global-tag-picker-category > div { grid-auto-rows: 2.5rem; }
   .global-tag-picker-category summary, .global-tag-picker-option { height: 2.5rem; min-height: 2.5rem; }
 }

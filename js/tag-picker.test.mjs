@@ -103,5 +103,6 @@ test('Paper and Card forms use the shared ID picker without inline creation or i
   assert.match(styles, /\.global-tag-picker-option\s*\{[^}]*height:\s*1\.8rem;[^}]*min-height:\s*0;/);
   assert.match(styles, /\.global-tag-picker-uncategorized\s*\{[^}]*repeat\(auto-fit, minmax\(9rem, 1fr\)\)/);
   assert.match(styles, /\.tag-picker-selected\[hidden\]\s*\{\s*display:\s*none;/);
-  assert.match(styles, /\.tag-picker-selected button\s*\{[^}]*display:\s*inline-flex;[^}]*width:\s*max-content;[^}]*white-space:\s*nowrap;/);
+  assert.match(styles, /\.tag-picker-selected-chip\s*\{[^}]*display:\s*inline-flex;[^}]*width:\s*max-content;[^}]*white-space:\s*nowrap;/);
+  assert.match(styles, /\.tag-picker-selected-remove\s*\{[^}]*width:\s*1\.35rem;[^}]*height:\s*1\.35rem;/);
 });
