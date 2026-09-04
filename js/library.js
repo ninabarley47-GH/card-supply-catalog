@@ -735,9 +735,10 @@ function initializeLibraryColorTypeahead(container, renderCurrent) {
     }
   });
   container.addEventListener("focusout", (event) => {
-    if (!container.contains(event.relatedTarget)) {
-      results.hidden = true;
-    }
+    if (container.contains(event.relatedTarget)) return;
+    window.setTimeout(() => {
+      if (!container.contains(document.activeElement)) results.hidden = true;
+    }, 0);
   });
   container.addEventListener("click", (event) => {
     const removeButton = event.target.closest("[data-remove-library-color]");

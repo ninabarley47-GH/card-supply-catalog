@@ -45,3 +45,10 @@ test('color suggestions use direct click buttons instead of hidden checkbox chan
   assert.match(createMatch, /button\.type = "button"/);
   assert.doesNotMatch(createMatch, /checkbox|change/);
 });
+
+test('color results are not hidden synchronously before an iPad tap can click its option', async () => {
+  const source = await readFile(new URL('./library.js', import.meta.url), 'utf8');
+  const typeahead = source.slice(source.indexOf('function initializeLibraryColorTypeahead'), source.indexOf('function renderLibraryColorMatches'));
+  assert.match(typeahead, /focusout[\s\S]*window\.setTimeout/);
+  assert.doesNotMatch(typeahead, /focusout[\s\S]*if \(!container\.contains\(event\.relatedTarget\)\) \{\s*results\.hidden = true;/);
+});
