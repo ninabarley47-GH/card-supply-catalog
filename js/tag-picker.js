@@ -119,10 +119,16 @@ export function createTagPicker({ label = 'Tags', productType, catalog, selected
     selectedList.replaceChildren(...state.getSelectedTags().map((tag) => {
       const item = document.createElement('li');
       const remove = document.createElement('button');
+      const name = document.createElement('span');
+      const icon = document.createElement('span');
       remove.type = 'button';
       remove.dataset.removeTagId = tag.id;
       remove.setAttribute('aria-label', `Remove ${tag.name}`);
-      remove.textContent = `${tag.name} ×`;
+      name.textContent = tag.name;
+      icon.className = 'tag-picker-selected-remove';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = '×';
+      remove.append(name, icon);
       item.append(remove);
       return item;
     }));

@@ -100,7 +100,8 @@ test('Paper and Card forms use the shared ID picker without inline creation or i
   assert.doesNotMatch(paper, /onCreateTag|paperTagVocabulary\.create/);
   assert.doesNotMatch(card.slice(card.indexOf('function createAddCardView'), card.indexOf('function openAddCardView')), /onCreateTag/);
   assert.doesNotMatch(await readFile(new URL('./tag-picker.js', import.meta.url), 'utf8'), /images|imagePath|directoryHandle/);
-  assert.match(styles, /\.global-tag-picker-option\s*\{[^}]*min-height:\s*2\.75rem;/);
-  assert.match(styles, /\.global-tag-picker-uncategorized\s*\{[^}]*repeat\(auto-fit, minmax\(10rem, 1fr\)\)/);
+  assert.match(styles, /\.global-tag-picker-option\s*\{[^}]*height:\s*1\.8rem;[^}]*min-height:\s*0;/);
+  assert.match(styles, /\.global-tag-picker-uncategorized\s*\{[^}]*repeat\(auto-fit, minmax\(9rem, 1fr\)\)/);
   assert.match(styles, /\.tag-picker-selected\[hidden\]\s*\{\s*display:\s*none;/);
+  assert.match(styles, /\.tag-picker-selected button\s*\{[^}]*display:\s*inline-flex;[^}]*width:\s*max-content;[^}]*white-space:\s*nowrap;/);
 });
