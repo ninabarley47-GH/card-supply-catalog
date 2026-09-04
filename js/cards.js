@@ -3,6 +3,16 @@ import { loadDefaultOwnerId } from './settings.js';
 import { initializeOwnerPicker, notifyOwnerRegistryUpdated, refreshOwnerOptions, resolveOwnerPicker, setOwnerPickerValue } from './owner-picker.js';
 import { isActiveOwner } from './owners.js';
 import {
+  clearGlobalTagFilter,
+  getGlobalTagSearchNames,
+  matchesGlobalTagFilters,
+  matchesHolidayFilter,
+  readGlobalTagFilter,
+  renderGlobalTagFilter,
+  resolveHolidayFilterIdentity,
+  synchronizeGlobalTagFilterChange
+} from './global-tag-filter.js';
+import {
   clearSelectedCardImage,
   chooseCardImageFromLibrary,
   createCardImageFromFile,
@@ -12,7 +22,6 @@ import {
   hydrateCardImageSources,
   prepareCardImageForSave
 } from './card-images.js';
-import { createCardTagVocabularyStore } from './card-tags.js';
 import { createTagPicker, resolveItemTagIds } from './tag-picker.js';
 
 const CARD_SIZE_PRESETS = {
@@ -36,7 +45,6 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   }
 
   const detailView = createCardDetailView();
-  const cardTagVocabulary = createCardTagVocabularyStore();
   let tagCatalog = await loadGlobalTagCatalog();
   const addCardView = createAddCardView({ owners, tagCatalog });
   const cards = [];
@@ -61,11 +69,11 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   }
 
   const renderCurrent = () => {
-    const selectedTags = getSelectedCardTags(tagFilter);
+    const selectedTags = readGlobalTagFilter(tagFilter);
     const favoritesOnly = favoritesButton?.getAttribute('aria-pressed') === 'true';
     const hasActiveFilters = Boolean(
       searchInput?.value.trim() || favoritesOnly || ownerFilter?.value || holidayFilter?.value ||
-      statusFilter?.value || selectedTags.length > 0
+      statusFilter?.value || hasGlobalTagFilterSelection(selectedTags)
     );
     const visibleCards = filterAndSortCards(cards, {
       query: searchInput?.value,
@@ -75,7 +83,8 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
       status: statusFilter?.value,
       selectedTags,
       sortOrder: sortControl?.value,
-      paperPackNamesById
+      paperPackNamesById,
+      tagCatalog
     });
 
     renderCardLibrary(gallery, visibleCards, cards.length, paperPackNamesById);
@@ -87,7 +96,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     }
 
     if (clearTagsButton) {
-      clearTagsButton.hidden = selectedTags.length === 0;
+      clearTagsButton.hidden = !hasGlobalTagFilterSelection(selectedTags);
     }
   };
 
@@ -100,8 +109,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     await hydrateCardImageSources(savedCards);
     sortCards(savedCards);
     cards.splice(0, cards.length, ...savedCards);
-    const tagVocabulary = await cardTagVocabulary.load(cards);
-    refreshCardTagFilters(tagFilter, tagVocabulary);
+    renderGlobalTagFilter(tagFilter, tagCatalog, { inputPrefix: 'card-library', optionsDataAttribute: 'cardTagFilterOptions' });
     renderCurrent();
   };
 
@@ -150,7 +158,10 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   ownerFilter?.addEventListener('change', renderCurrent);
   holidayFilter?.addEventListener('change', renderCurrent);
   statusFilter?.addEventListener('change', renderCurrent);
-  tagFilter?.addEventListener('change', renderCurrent);
+  tagFilter?.addEventListener('change', (event) => {
+    synchronizeGlobalTagFilterChange(event.target, tagFilter);
+    renderCurrent();
+  });
   sortControl?.addEventListener('change', renderCurrent);
   filterForm?.addEventListener('submit', (event) => event.preventDefault());
   clearFiltersButton?.addEventListener('click', () => {
@@ -159,7 +170,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     if (ownerFilter) ownerFilter.value = '';
     if (holidayFilter) holidayFilter.value = '';
     if (statusFilter) statusFilter.value = '';
-    clearSelectedCardTags(tagFilter);
+    clearGlobalTagFilter(tagFilter);
     renderCurrent();
     searchInput.focus();
   });
@@ -168,7 +179,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     renderCurrent();
   });
   clearTagsButton?.addEventListener('click', () => {
-    clearSelectedCardTags(tagFilter);
+    clearGlobalTagFilter(tagFilter);
     renderCurrent();
   });
   toggleTagsButton?.addEventListener('click', () => {
@@ -990,7 +1001,6 @@ function createCardId(createdAt) {
 
 export function filterAndSortCards(cards, options = {}) {
   const query = String(options.query || '').trim().toLocaleLowerCase();
-  const selectedTags = (options.selectedTags || []).map((tag) => tag.toLocaleLowerCase());
   const filteredCards = cards.filter((card) => {
     if (options.favoritesOnly && !card.favorite) {
       return false;
@@ -1004,17 +1014,16 @@ export function filterAndSortCards(cards, options = {}) {
       return false;
     }
 
-    const cardTags = (card.tags || []).map((tag) => tag.toLocaleLowerCase());
-
-    if (options.holiday === 'only' && !cardTags.includes('holiday')) {
+    if (!matchesHolidayFilter(
+      card.tagIds || [],
+      options.holiday,
+      resolveHolidayFilterIdentity(options.tagCatalog),
+      options.tagCatalog
+    )) {
       return false;
     }
 
-    if (options.holiday === 'exclude' && cardTags.includes('holiday')) {
-      return false;
-    }
-
-    if (!selectedTags.every((tag) => cardTags.includes(tag))) {
+    if (!matchesGlobalTagFilters(card.tagIds || [], options.selectedTags, options.tagCatalog)) {
       return false;
     }
 
@@ -1023,7 +1032,7 @@ export function filterAndSortCards(cards, options = {}) {
     }
 
     const searchableValues = [
-      ...(card.tags || []),
+      ...getGlobalTagSearchNames(card.tagIds || [], options.tagCatalog),
       ...(card.stampSets || []),
       ...(card.paperPackIds || []).map((paperPackId) => options.paperPackNamesById?.get(paperPackId)),
       card.dateCreated
@@ -1061,53 +1070,8 @@ function updateCardQuickFilterStates({ favoritesButton, ownerFilter, holidayFilt
   }
 }
 
-function getSelectedCardTags(container) {
-  if (!container) {
-    return [];
-  }
-
-  return [...container.querySelectorAll('input[name="card-library-tags"]:checked')].map(
-    (input) => input.value
-  );
-}
-
-function clearSelectedCardTags(container) {
-  for (const input of container?.querySelectorAll('input[name="card-library-tags"]:checked') || []) {
-    input.checked = false;
-  }
-}
-
-function refreshCardTagFilters(container, tags = []) {
-  if (!container) {
-    return;
-  }
-
-  const selectedTags = new Set(getSelectedCardTags(container));
-  const existingOptions = container.querySelector('[data-card-tag-filter-options]');
-  const optionsWereHidden = existingOptions?.hidden || false;
-  const options = document.createElement('div');
-
-  options.className = 'keyword-picker-options library-tag-filter-options';
-  options.dataset.cardTagFilterOptions = '';
-  options.hidden = optionsWereHidden;
-
-  options.append(...tags.map((tag) => {
-    const label = document.createElement('label');
-    const input = document.createElement('input');
-    const text = document.createElement('span');
-
-    label.className = 'keyword-option library-tag-option';
-    input.type = 'checkbox';
-    input.name = 'card-library-tags';
-    input.value = tag;
-    input.checked = selectedTags.has(tag);
-    text.textContent = tag;
-    label.append(input, text);
-    return label;
-  }));
-
-  existingOptions?.remove();
-  container.append(options);
+function hasGlobalTagFilterSelection(selection = {}) {
+  return (selection.individualTagIds || []).length > 0 || (selection.categories || []).length > 0;
 }
 
 function sortCards(cards, sortOrder = 'date-desc') {

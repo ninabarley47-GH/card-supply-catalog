@@ -132,6 +132,10 @@ Tags appear once in the flat alphabetical Settings inventory. Categories are man
 # Category-Aware Tag Selection
 Paper and Card Add/Edit forms use one shared global tag picker, with the same behavior intended for Stamp Sets. Every global tag is available to every product type. Selected tags are summarized as removable chips. Uncategorized tags are listed directly, while categorized tags appear inside collapsed category groups. Categories organize the picker but are never selectable assignments. A tag in multiple categories remains one stable tag, and every occurrence synchronizes through its ID. Search spans all global tags and returns one result per tag with category context. New tags are created only in Settings under Tags & Categories.
 
+# Category-Aware Tag Filtering
+
+Paper and Card Libraries share the same global-tag filter semantics. All Tags provides individual tag choices; multiple individual tags use AND behavior. Categories are compact, expandable filter groups. Selecting a category matches any of its member tags, while selecting members within that category narrows it using OR behavior. Separate categories and individual tags combine with AND behavior. Categories remain organizational and are never assigned to items. Library search matches tag display names by resolving each item's stable `tagIds` through the current global catalog; category names are not part of general search.
+
 # Image Quality
 Images are the application's primary content.
 

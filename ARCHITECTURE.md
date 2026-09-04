@@ -78,6 +78,7 @@ Every module should have one clear job. The current modules are:
 | `ui.js` | Shared UI helpers |
 | `search.js` | Reserved boundary for future extraction of search/filter logic; current filtering remains in `library.js` |
 | `tag-picker.js` | Reusable ID-based global tag selection for product Add/Edit forms, including categories, selected-tag summaries, and picker-local search |
+| `global-tag-filter.js` | Shared stable-ID tag/category filter semantics, filter UI rendering, tag-name search projection, and Holiday identity resolution for Paper and Card Libraries |
 
 # Data Storage
 The application has three storage layers:
@@ -148,9 +149,11 @@ The Card Status change raised the catalog schema to version 3. Cards now persist
 
 Phase B2 raises the backup envelope to version 3. Version-3 Standard and Compact iPad exports contain one `tagCatalog` object (`schemaVersion`, `tags`, and `categories`), and Paper/Card records contain only `tagIds`. Version-1/2 backups with optional `tagVocabularies` and legacy `keywords`/`tags` remain importable through in-memory conversion and reconciliation. The record catalog schema remains version 3.
 
-Paper and Card Add/Edit forms select global tags by stable ID through the shared category-aware picker and persist canonical `tagIds`. Temporary runtime `keywords` and `tags` name projections remain available for Library detail and filtering compatibility until those consumers migrate; they are not authoritative picker state or persisted fields.
+Paper and Card Add/Edit forms select global tags by stable ID through the shared category-aware picker and persist canonical `tagIds`. Temporary runtime `keywords` and `tags` name projections remain available for current card/detail display compatibility; they are not authoritative picker, filter, search, or persisted state.
 
 Every global tag is assignable to Paper Packs, Cards, and Stamp Sets. Assignment validation checks that each `tagId` identifies a real tag and never a category; it does not filter by product type. The legacy `appliesTo` field is optional, deprecated compatibility metadata. Existing catalogs and backups may retain and round-trip it, but current selection, search, validation, legacy fallback resolution, and runtime projections ignore it. Newly created tags omit it without changing the catalog or backup schema version.
+
+Paper and Card Library tag filters consume canonical item `tagIds`. Individual tag constraints use AND semantics. Each category constraint resolves its current member IDs from the global catalog and uses OR semantics; selected category members replace the full membership set as a refinement. Independent tag and category constraints combine with AND semantics. General Library search resolves assigned tag IDs to current display names, so renaming a tag changes searchable text without changing persisted assignments. Category names are not general-search terms. The retained Holiday quick filter resolves the current Holiday tag (or a Holiday/Holidays category fallback) to stable identity before evaluating item IDs.
 
 # Error Handling
 Never lose user data.
