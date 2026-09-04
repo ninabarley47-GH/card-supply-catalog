@@ -78,6 +78,9 @@ test('picker UI uses collapsed native categories, synchronized ID occurrences, a
   assert.doesNotMatch(source, /onCreateTag|Create "/);
   assert.match(source, /event\.key === 'Escape'/);
   assert.match(source, /checkbox\.type = 'checkbox'/);
+  assert.doesNotMatch(source, /Selected Tags|Find a tag/);
+  assert.match(source, /textContent: 'Other Tags'/);
+  assert.match(source, /categoriesHeading\.textContent = 'Categories'/);
 });
 
 test('Paper and Card forms use the shared ID picker without inline creation or image coupling', async () => {
@@ -94,4 +97,6 @@ test('Paper and Card forms use the shared ID picker without inline creation or i
   assert.doesNotMatch(card.slice(card.indexOf('function createAddCardView'), card.indexOf('function openAddCardView')), /onCreateTag/);
   assert.doesNotMatch(await readFile(new URL('./tag-picker.js', import.meta.url), 'utf8'), /images|imagePath|directoryHandle/);
   assert.match(styles, /\.global-tag-picker-option\s*\{[^}]*min-height:\s*2\.75rem;/);
+  assert.match(styles, /\.global-tag-picker-uncategorized\s*\{[^}]*repeat\(auto-fit, minmax\(10rem, 1fr\)\)/);
+  assert.match(styles, /\.tag-picker-selected\[hidden\]\s*\{\s*display:\s*none;/);
 });

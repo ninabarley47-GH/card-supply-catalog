@@ -83,26 +83,22 @@ export function createTagPicker({ label = 'Tags', productType, catalog, selected
   section.className = 'tag-picker global-tag-picker';
   const heading = document.createElement('h4');
   heading.textContent = label;
-  const selectedHeading = document.createElement('h5');
-  selectedHeading.textContent = 'Selected Tags';
   const selectedList = document.createElement('ul');
   selectedList.className = 'tag-picker-selected';
   selectedList.setAttribute('aria-label', `Selected ${label}`);
-  const searchLabel = document.createElement('label');
-  searchLabel.className = 'tag-picker-search-label';
-  searchLabel.textContent = 'Find a tag';
   const input = document.createElement('input');
   input.type = 'search';
-  input.placeholder = 'Search tags';
+  input.className = 'tag-picker-search';
+  input.placeholder = 'Search tags…';
+  input.setAttribute('aria-label', `Search ${label}`);
   input.setAttribute('aria-controls', `${id}-search-results`);
-  searchLabel.append(input);
   const searchResults = document.createElement('div');
   searchResults.id = `${id}-search-results`;
   searchResults.className = 'global-tag-picker-search-results';
   searchResults.setAttribute('aria-live', 'polite');
   const taxonomy = document.createElement('div');
   taxonomy.className = 'global-tag-picker-taxonomy';
-  section.append(heading, selectedHeading, selectedList, searchLabel, searchResults, taxonomy);
+  section.append(heading, selectedList, input, searchResults, taxonomy);
 
   function notify() { onSelectionChange(state.getSelectedTagIds()); }
 
@@ -131,7 +127,6 @@ export function createTagPicker({ label = 'Tags', productType, catalog, selected
       item.append(remove);
       return item;
     }));
-    selectedHeading.hidden = selectedList.childElementCount === 0;
     selectedList.hidden = selectedList.childElementCount === 0;
   }
 
@@ -141,9 +136,15 @@ export function createTagPicker({ label = 'Tags', productType, catalog, selected
     if (model.uncategorizedTags.length) {
       const group = document.createElement('fieldset');
       group.className = 'global-tag-picker-uncategorized';
-      group.append(Object.assign(document.createElement('legend'), { textContent: 'Uncategorized' }));
+      group.append(Object.assign(document.createElement('legend'), { textContent: 'Other Tags' }));
       group.append(...model.uncategorizedTags.map((tag) => createTagOption(tag)));
       children.push(group);
+    }
+    if (model.categories.length) {
+      const categoriesHeading = document.createElement('h5');
+      categoriesHeading.className = 'global-tag-picker-categories-heading';
+      categoriesHeading.textContent = 'Categories';
+      children.push(categoriesHeading);
     }
     for (const category of model.categories) {
       const details = document.createElement('details');
@@ -169,7 +170,7 @@ export function createTagPicker({ label = 'Tags', productType, catalog, selected
     } else {
       searchResults.replaceChildren(...matches.map((match) => createTagOption(
         match,
-        match.categoryNames.length ? match.categoryNames.join(' · ') : 'Uncategorized'
+        match.categoryNames.length ? match.categoryNames.join(' · ') : 'Other Tags'
       )));
     }
     searchResults.hidden = false;
