@@ -836,17 +836,14 @@ h6 {
 .library-color-option {
   position: relative;
   display: flex;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
   cursor: pointer;
-}
-
-.library-color-option input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  clip-path: inset(50%);
+  font: inherit;
+  text-align: left;
 }
 
 .library-color-option > span {
@@ -867,7 +864,7 @@ h6 {
 }
 
 .library-color-option:hover > span,
-.library-color-option input:focus-visible + span {
+.library-color-option:focus-visible > span {
   border-color: rgba(82, 120, 109, 0.7);
   background: #eef5f2;
 }

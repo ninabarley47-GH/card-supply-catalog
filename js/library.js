@@ -741,24 +741,21 @@ function initializeLibraryColorTypeahead(container, renderCurrent) {
   });
   container.addEventListener("click", (event) => {
     const removeButton = event.target.closest("[data-remove-library-color]");
+    const optionButton = event.target.closest("[data-library-color-option]");
 
     if (removeButton) {
       removeSelectedLibraryColor(container, removeButton.dataset.removeLibraryColor);
       renderCurrent();
       searchInput.focus();
-    }
-  });
-  container.addEventListener("change", (event) => {
-    const option = event.target.closest("[data-library-color-option]");
-
-    if (!option || !event.target.checked) {
       return;
     }
 
-    addSelectedLibraryColor(container, option.dataset.libraryColorOption);
-    searchInput.value = "";
-    renderCurrent();
-    searchInput.focus();
+    if (optionButton) {
+      addSelectedLibraryColor(container, optionButton.dataset.libraryColorOption);
+      searchInput.value = "";
+      renderCurrent();
+      searchInput.focus();
+    }
   });
 }
 
@@ -792,22 +789,19 @@ export function filterLibraryColorOptions(colors, query = "", selectedColors = [
 }
 
 function createLibraryColorMatch(color) {
-  const label = document.createElement("label");
-  label.className = "library-color-option";
-  label.dataset.libraryColorOption = color.id;
-
-  const input = document.createElement("input");
-  input.type = "checkbox";
-  input.name = "library-color-suggestions";
-  input.value = color.id;
+  const button = document.createElement("button");
+  button.className = "library-color-option";
+  button.type = "button";
+  button.dataset.libraryColorOption = color.id;
+  button.setAttribute("aria-label", `Filter by ${color.name}`);
 
   const marker = document.createElement("span");
   const name = document.createElement("span");
   name.textContent = color.name;
 
   marker.append(createLibraryColorSwatch(color), name);
-  label.append(input, marker);
-  return label;
+  button.append(marker);
+  return button;
 }
 
 function renderSelectedLibraryColors(container) {

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 
 import { filterLibraryColorOptions, updateLibraryColorSelection } from './library.js';
 
@@ -35,4 +36,12 @@ test('selected color IDs persist independently of the rebuilt chip and suggestio
   assert.deepEqual(selected, ['balmy-blue', 'night-of-navy']);
   selected = updateLibraryColorSelection(selected, 'balmy-blue', false);
   assert.deepEqual(selected, ['night-of-navy']);
+});
+
+test('color suggestions use direct click buttons instead of hidden checkbox change events', async () => {
+  const source = await readFile(new URL('./library.js', import.meta.url), 'utf8');
+  const createMatch = source.slice(source.indexOf('function createLibraryColorMatch'), source.indexOf('function renderSelectedLibraryColors'));
+  assert.match(createMatch, /document\.createElement\("button"\)/);
+  assert.match(createMatch, /button\.type = "button"/);
+  assert.doesNotMatch(createMatch, /checkbox|change/);
 });
