@@ -859,15 +859,18 @@ function createLibraryColorSwatch(color) {
 function addSelectedLibraryColor(container, colorId) {
   const selectedContainer = container?.querySelector("[data-library-color-selected]");
   const color = (container?.libraryColorOptions || []).find((option) => option.id === colorId);
+  const selectedColorIds = getSelectedLibraryColors(container);
 
-  if (!selectedContainer || !color || getSelectedLibraryColors(container).includes(colorId)) {
+  if (!selectedContainer || !color || selectedColorIds.includes(colorId)) {
     return;
   }
 
+  container.librarySelectedColorIds = updateLibraryColorSelection(selectedColorIds, colorId, true);
   selectedContainer.append(createSelectedLibraryColor(color));
 }
 
 function removeSelectedLibraryColor(container, colorId) {
+  container.librarySelectedColorIds = updateLibraryColorSelection(getSelectedLibraryColors(container), colorId, false);
   const input = [...(container?.querySelectorAll('input[name="library-colors"]') || [])]
     .find((candidate) => candidate.value === colorId);
   input?.closest(".library-color-chip")?.remove();
@@ -938,9 +941,14 @@ function getSelectedLibraryColors(container) {
     return [];
   }
 
-  return [...container.querySelectorAll('input[name="library-colors"]:checked')].map(
+  if (Array.isArray(container.librarySelectedColorIds)) {
+    return [...container.librarySelectedColorIds];
+  }
+
+  container.librarySelectedColorIds = [...container.querySelectorAll('input[name="library-colors"]:checked')].map(
     (input) => input.value
   );
+  return [...container.librarySelectedColorIds];
 }
 
 function clearSelectedLibraryColors(container) {
@@ -948,9 +956,18 @@ function clearSelectedLibraryColors(container) {
     return;
   }
 
+  container.librarySelectedColorIds = [];
+
   for (const input of container.querySelectorAll('input[name="library-colors"]:checked')) {
     input.checked = false;
   }
+}
+
+export function updateLibraryColorSelection(selectedColorIds = [], colorId, selected) {
+  const ids = new Set(selectedColorIds);
+  if (selected) ids.add(colorId);
+  else ids.delete(colorId);
+  return [...ids];
 }
 
 export function matchesPaperPackFilters(paperPack, filterState, colorsById, tagCatalog) {

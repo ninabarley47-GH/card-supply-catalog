@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { filterLibraryColorOptions } from './library.js';
+import { filterLibraryColorOptions, updateLibraryColorSelection } from './library.js';
 
 const colors = [
   { id: 'mossy-meadow', name: 'Mossy Meadow' },
@@ -26,4 +26,13 @@ test('Paper color type-ahead keeps selected colors out of the suggestion list', 
     filterLibraryColorOptions(colors, '', ['lost-lagoon']).map((color) => color.name),
     ['Mossy Meadow', 'Pretty Peacock']
   );
+});
+
+test('selected color IDs persist independently of the rebuilt chip and suggestion views', () => {
+  let selected = updateLibraryColorSelection([], 'balmy-blue', true);
+  assert.deepEqual(selected, ['balmy-blue']);
+  selected = updateLibraryColorSelection(selected, 'night-of-navy', true);
+  assert.deepEqual(selected, ['balmy-blue', 'night-of-navy']);
+  selected = updateLibraryColorSelection(selected, 'balmy-blue', false);
+  assert.deepEqual(selected, ['night-of-navy']);
 });
