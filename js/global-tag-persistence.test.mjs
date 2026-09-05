@@ -7,6 +7,7 @@ import {
   dehydratePaperTagNames,
   hydrateCardTagNames,
   hydratePaperTagNames,
+  mergeLegacyVocabularyIntoGlobalCatalog,
   migrateGlobalTagPersistence
 } from "./global-tag-persistence.js";
 
@@ -166,4 +167,11 @@ test("near-duplicates remain separate and are only reported", async () => {
   const result = await migrateGlobalTagPersistence(harness);
   assert.equal(result.catalog.tags.length, 2);
   assert.equal(result.fuzzyDuplicateCandidates.length, 1);
+});
+
+test("cached storage modules retain the side-effect-free legacy merge export during upgrades", () => {
+  const catalog = { schemaVersion: 1, tags: [], categories: [] };
+  const merged = mergeLegacyVocabularyIntoGlobalCatalog(catalog, { paperVocabulary: ["Floral"] });
+  assert.equal(merged.tags[0].name, "Floral");
+  assert.deepEqual(catalog, { schemaVersion: 1, tags: [], categories: [] });
 });

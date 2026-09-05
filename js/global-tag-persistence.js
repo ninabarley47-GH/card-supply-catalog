@@ -74,6 +74,14 @@ export function isCurrentGlobalTagCatalog(catalog) {
   return catalog?.schemaVersion === GLOBAL_TAG_CATALOG_SCHEMA_VERSION && validateGlobalTagCatalog(catalog).ok;
 }
 
+// Upgrade compatibility: a previously cached storage.js may import this while
+// the service worker is replacing the application module graph. Current
+// runtime code does not use it; legacy data migration still uses the same
+// catalog migration implementation directly.
+export function mergeLegacyVocabularyIntoGlobalCatalog(catalog, { paperVocabulary = [], cardVocabulary = [] } = {}) {
+  return migrateLegacyTagData({ catalog, paperVocabulary, cardVocabulary }).catalog;
+}
+
 function toTagIdRecord(record, tagIds = [], legacyField = "keywords") {
   const migrated = { ...record, tagIds: [...tagIds] };
   delete migrated[legacyField];
