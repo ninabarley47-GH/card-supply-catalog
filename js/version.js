@@ -41,16 +41,18 @@ export async function initializeVersionDisplay() {
 
     try {
       const registration = await navigator.serviceWorker?.getRegistration();
+      if (!registration) throw new Error("No service worker registration is available.");
       await registration?.update();
+      const waitingWorker = await waitForWaitingWorker(registration);
       const latestVersion = await loadVersionInfo({ bypassCache: true });
-      const displayedBuild = buildValue.textContent;
+      const cacheVersion = await getServiceWorkerVersion();
 
-      if (latestVersion.build !== displayedBuild || registration?.waiting) {
+      if (isAppUpdateAvailable(latestVersion.build, cacheVersion, Boolean(waitingWorker))) {
         updateMessage.textContent = "Update available. Loading it now...";
         container.dataset.updateAvailable = "true";
-        if (registration?.waiting) {
+        if (waitingWorker) {
           navigator.serviceWorker.addEventListener("controllerchange", () => window.location.reload(), { once: true });
-          registration.waiting.postMessage({ type: "catalog:activate-update" });
+          waitingWorker.postMessage({ type: "catalog:activate-update" });
         } else {
           window.location.reload();
         }
@@ -64,6 +66,39 @@ export async function initializeVersionDisplay() {
       updateButton.disabled = false;
     }
   });
+}
+
+export function isAppUpdateAvailable(latestBuild, cacheVersion, hasWaitingWorker = false) {
+  if (hasWaitingWorker) return true;
+  if (!latestBuild || cacheVersion === "unavailable") return false;
+  return cacheVersion !== `card-supply-catalog-${latestBuild}`;
+}
+
+async function waitForWaitingWorker(registration, timeoutMs = 10000) {
+  if (registration.waiting) return registration.waiting;
+  let worker = registration.installing;
+  if (!worker) {
+    worker = await new Promise((resolve) => {
+      const timeout = window.setTimeout(() => resolve(null), 250);
+      registration.addEventListener("updatefound", () => {
+        window.clearTimeout(timeout);
+        resolve(registration.installing || null);
+      }, { once: true });
+    });
+  }
+  if (!worker || worker.state === "redundant") return registration.waiting || null;
+  if (worker.state === "installed") return registration.waiting || worker;
+
+  await new Promise((resolve) => {
+    const timeout = window.setTimeout(resolve, timeoutMs);
+    worker.addEventListener("statechange", () => {
+      if (worker.state === "installed" || worker.state === "redundant") {
+        window.clearTimeout(timeout);
+        resolve();
+      }
+    });
+  });
+  return registration.waiting || (worker.state === "installed" ? worker : null);
 }
 
 async function loadVersionInfo(options = {}) {
