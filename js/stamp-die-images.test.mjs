@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   chooseStampImages, selectStampImageFiles, prepareStampImagesForSave,
   removeDraftStampImage, clearDraftStampImages, hydrateStampImages,
-  STAMP_IMAGE_LIBRARY_MARKER
+  getStampDetailImageSource, STAMP_IMAGE_LIBRARY_MARKER
 } from './stamp-die-images.js';
 import {
   prepareFolderBackedImage, prepareEmbeddedImage, writeFile,
@@ -294,4 +294,18 @@ test('existing Edit references bypass all image writes; removing a reference lea
   assert.deepEqual(library.writes, []);
   assert.equal(await library.files.get('Die.jpg').text(), 'original');
   assert.equal(await library.files.get('Die.thumb.jpg').text(), 'thumbnail');
+});
+
+test('Detail reuses full-image resolution after folder hydration and falls back to embedded/thumbnail sources', async () => {
+  const h = directoryHarness({ 'Stamp.jpg': 'original', 'Stamp.thumb.jpg': 'thumbnail' });
+  const ref = { imagePath: 'Stamp.jpg', thumbnailImagePath: 'Stamp.thumb.jpg', imageLibrary: 'stamp-die-images' };
+  await hydrateStampImages([{ imageRefs: [ref] }], { loadDirectory: async () => h.directory });
+  try {
+    assert.equal(getStampDetailImageSource(ref), ref.imagePreviewSrc);
+    assert.match(getStampDetailImageSource(ref), /^blob:/);
+    assert.deepEqual(h.writes, []);
+    assert.equal(getStampDetailImageSource({ imageSrc: 'full', thumbnailImageSrc: 'thumb' }), 'full');
+    assert.equal(getStampDetailImageSource({ thumbnailImageSrc: 'thumb' }), 'thumb');
+    assert.equal(getStampDetailImageSource({ imagePath: 'unresolved.jpg' }), '');
+  } finally { clearImageReferenceObjectUrls(ref); }
 });

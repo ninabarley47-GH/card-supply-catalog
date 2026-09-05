@@ -1,6 +1,6 @@
 import { loadCatalogSetting, saveCatalogSetting } from './storage.js';
 import { supportsOpenFilePicker, supportsDirectoryPicker } from './browser-capabilities.js';
-import { createCardImageFromFile, clearSelectedCardImage, getCardLibraryImageSource } from './card-images.js';
+import { createCardImageFromFile, clearSelectedCardImage, getCardLibraryImageSource, getCardDetailImageSource } from './card-images.js';
 import {
   prepareFolderBackedImage, prepareEmbeddedImage, hasDirectoryPermission,
   hydrateImageReference, clearImageReferenceObjectUrls
@@ -143,3 +143,5 @@ async function sameDirectory(first, second) {
   if (!first || !second || !first.isSameEntry) return false;
   try { return await first.isSameEntry(second); } catch { return false; }
 }
+
+export const getStampDetailImageSource = getCardDetailImageSource;

@@ -2,8 +2,8 @@
 
 ## Status
 
-Phases 1, 2A, 2B1, and 2B2 are implemented: a Library, shared Add/Edit Set workflow,
-and ordered multiple-image selection/persistence. Detail, filtering, search,
+Phases 1, 2A, 2B1, 2B2, and 2C are implemented: Library and Detail views, a shared
+Add/Edit Set workflow, and ordered multiple-image selection/persistence. Filtering, search,
 Card relationships, and backup/restore remain out of scope.
 
 A Stamp & Die Set is one catalog record for stamps only, dies only, or coordinating
@@ -151,7 +151,7 @@ Release Year, Favorite, and current global tag names. All images render in stabl
 Stamp -> Die -> Mask order: one uses the available width, two appear side-by-side, and additional images
 wrap into a two-column grid. Thumbnails are preferred; a failed thumbnail falls back
 to the full image. Missing files show Image unavailable. Empty Sets show No image.
-Each tile has an Edit action; there is no Detail view.
+Each tile opens Detail and also retains its Edit action.
 
 Folder-backed references are hydrated at runtime, with object URLs released on
 refresh. New Set references use the explicit stamp-die-images marker. Existing
@@ -165,7 +165,7 @@ existing shared-library images. Only new image/thumbnail files may be created du
 Save. No Set path calls image deletion, folder scanning, or thumbnail repair.
 
 Standard/iPad backups still exclude Stamp & Die Set records and images. No backup,
-import/export, automatic folder discovery/Set creation, Detail, Library search
+import/export, automatic folder discovery/Set creation, Library search
 or filtering, Card relationships, or image-deletion workflow was added.
 
 ## Edit Set (Phase 2B2)
@@ -202,7 +202,40 @@ also applies to newly selected Edit images; no deletion/rollback was added.
 
 No database, schema, backup, Settings, or Paper/Card image behavior changed.
 
+## Detail view (Phase 2C)
+
+Click a Library tile, or focus it and press Enter/Space, to open its modal Detail.
+This follows the Paper/Card modal-panel interaction and Card header styling, using
+Set's existing native dialog mechanics for focus containment and Escape. Back to
+Stamps & Dies, Escape, or clicking the backdrop closes Detail and returns focus to
+the Library tile. The application hash and shell are unchanged; no history stack
+was added.
+
+Detail displays Set Name, Release Year (or unknown), read-only Favorite state,
+ordinary global tag names resolved from canonical tagIds, and every image. Tags
+are not editable in Detail; categories remain organizational metadata.
+
+Images use stable Stamp -> Die -> Mask ordering without changing stored data.
+A responsive grid gives one image the available width, fits two or three alongside
+one another when space permits, and wraps on narrower screens. Images retain useful
+size rather than shrinking every image into a single row of thumbnails.
+
+Detail reuses Card's full-image source selector through the Set image module and
+the existing folder hydration path. Full folder-backed or embedded images are
+preferred, with the existing thumbnail source as fallback. Unavailable sources show
+Image unavailable; Sets with no images show No image. Viewing or failing to load an
+image never writes a record, runs inference, prepares a thumbnail, or modifies files.
+
+Edit opens the existing form for the selected stable ID above Detail. Save refreshes
+the Library and that same open Detail, including changed images and tag names.
+Cancel returns to the unchanged Detail. No alternate Edit implementation, Favorite
+toggle, schema change, or storage change was introduced.
+
 ## Verification
+
+Detail tests cover tile/keyboard navigation, metadata, global-tag renames, full and
+thumbnail image sources, missing images, stable ordering, read-only safety, and
+Edit returning to and refreshing the selected record.
 
 Automated tests cover multiple selection and order, safe folder copies/references,
 collision handling, embedded and thumbnail-unavailable fallback, thumbnail metadata,

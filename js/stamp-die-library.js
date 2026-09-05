@@ -1,7 +1,7 @@
 import {
   chooseStampImages, selectStampImageFiles, chooseStampImageDirectory, loadStampImageDirectory,
   prepareStampImagesForSave, hydrateStampImages, clearStampImageSources,
-  clearDraftStampImages, removeDraftStampImage, getStampLibraryImageSource
+  clearDraftStampImages, removeDraftStampImage, getStampLibraryImageSource, getStampDetailImageSource
 } from './stamp-die-images.js';
 import { inferStampDieImageTags, reconcileStampDieImageTags, orderStampDieImages } from './stamp-die-image-tags.js';
 import { supportsOpenFilePicker, supportsDirectoryPicker } from './browser-capabilities.js';
@@ -41,7 +41,47 @@ export async function initializeStampDieLibrary(services = {}) {
   const status = screen.querySelector('[data-set-library-status]');
   status.className += ' form-message';
   const view = createSetFormView();
-  document.body.append(view.dialog);
+  const detail = createSetDetailView();
+  document.body.append(view.dialog, detail.dialog);
+  let selectedSetId = null;
+  let detailSource = null;
+  function renderDetail(records, tagCatalog) {
+    const record = records.find((entry) => entry.id === selectedSetId);
+    if (!record) { if (detail.dialog.open) detail.dialog.close(); return; }
+    detail.title.textContent = record.name;
+    const metadata = document.createElement('div');
+    metadata.className = 'stamp-set-tile-content';
+    const year = document.createElement('p');
+    year.textContent = record.releaseYear === undefined ? 'Release year not recorded' : `Release year: ${record.releaseYear}`;
+    const favorite = document.createElement('p');
+    favorite.textContent = record.favorite ? '\u2665 Favorite' : 'Not a favorite';
+    const tags = document.createElement('ul');
+    tags.className = 'card-library-tags';
+    tags.setAttribute('aria-label', 'Tags');
+    for (const name of projectTagNames(tagCatalog, record.tagIds, 'stamp')) {
+      const tag = document.createElement('li');
+      tag.textContent = name;
+      tags.append(tag);
+    }
+    metadata.append(year, favorite, tags);
+    detail.body.replaceChildren(createSetImageGrid(record.imageRefs, true), metadata);
+  }
+  function openDetail(id, source) {
+    selectedSetId = id;
+    detailSource = source;
+    renderDetail(displayedRecords, catalog);
+    detail.dialog.showModal();
+    detail.close.focus();
+  }
+  detail.close.addEventListener('click', () => detail.dialog.close());
+  detail.dialog.addEventListener('click', (event) => { if (event.target === detail.dialog) detail.dialog.close(); });
+  detail.dialog.addEventListener('close', () => {
+    selectedSetId = null;
+    detail.body.replaceChildren();
+    const currentTile = [...gallery.querySelectorAll('[data-set-id]')].find((tile) => tile.dataset.setId === detailSource?.dataset.setId);
+    (currentTile || add).focus();
+  });
+  detail.edit.addEventListener('click', () => openForm(selectedSetId));
   let catalog;
   let picker;
   let draftId;
@@ -84,7 +124,8 @@ export async function initializeStampDieLibrary(services = {}) {
       clearStampImageSources(displayedRecords);
       displayedRecords = records;
       if (!view.dialog.open) catalog = nextCatalog;
-      renderStampDieLibrary(gallery, records, nextCatalog, (id) => openForm(id));
+      renderStampDieLibrary(gallery, records, nextCatalog, (id) => openForm(id), openDetail);
+      if (selectedSetId) renderDetail(records, nextCatalog);
       status.dataset.tone = '';
       status.textContent = `${records.length} set${records.length === 1 ? '' : 's'}`;
     } catch {
@@ -226,7 +267,7 @@ export async function initializeStampDieLibrary(services = {}) {
 
   view.cancel.addEventListener('click', () => { if (!saving) view.dialog.close(); });
   view.dialog.addEventListener('cancel', (event) => { if (saving) event.preventDefault(); });
-  view.dialog.addEventListener('close', () => { reset(); add.focus(); });
+  view.dialog.addEventListener('close', () => { reset(); (detail.dialog.open ? detail.edit : add).focus(); });
   view.name.addEventListener('input', () => view.name.setCustomValidity(''));
   view.form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -374,10 +415,25 @@ function createField(text, input) {
   return label;
 }
 
-export function renderStampDieLibrary(gallery, records, catalog, onEdit) {
+export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetail) {
   const tiles = records.map((record) => {
     const tile = document.createElement('article');
     tile.className = 'stamp-set-tile';
+    tile.dataset.setId = record.id;
+    if (onDetail) {
+      tile.tabIndex = 0;
+      tile.setAttribute('role', 'group');
+      tile.setAttribute('aria-label', `Open details for ${record.name}`);
+      tile.addEventListener('click', (event) => {
+        if (!event.target.closest('button')) onDetail(record.id, tile);
+      });
+      tile.addEventListener('keydown', (event) => {
+        if (event.target === tile && ['Enter', ' '].includes(event.key)) {
+          event.preventDefault();
+          onDetail(record.id, tile);
+        }
+      });
+    }
     const placeholder = createSetImageGrid(record.imageRefs);
     const content = document.createElement('div');
     content.className = 'stamp-set-tile-content';
@@ -426,9 +482,9 @@ export function renderStampDieLibrary(gallery, records, catalog, onEdit) {
   gallery.replaceChildren(...tiles);
 }
 
-function createSetImageGrid(references = []) {
+function createSetImageGrid(references = [], fullQuality = false) {
   const grid = document.createElement('div');
-  grid.className = 'stamp-set-images';
+  grid.className = fullQuality ? 'stamp-set-images stamp-set-detail-images' : 'stamp-set-images';
   if (!references.length) {
     const empty = document.createElement('div');
     empty.className = 'stamp-set-placeholder';
@@ -440,7 +496,7 @@ function createSetImageGrid(references = []) {
     const missing = document.createElement('div');
     missing.className = 'stamp-set-placeholder';
     missing.textContent = 'Image unavailable';
-    const source = getStampLibraryImageSource(reference);
+    const source = fullQuality ? getStampDetailImageSource(reference) : getStampLibraryImageSource(reference);
     if (source) {
       const image = document.createElement('img');
       image.src = source;
@@ -449,7 +505,7 @@ function createSetImageGrid(references = []) {
       missing.hidden = true;
       let triedFull = false;
       image.addEventListener('error', () => {
-        const full = reference.imagePreviewSrc || reference.imageSrc;
+        const full = fullQuality ? getStampLibraryImageSource(reference) : reference.imagePreviewSrc || reference.imageSrc;
         if (!triedFull && full && full !== source) { triedFull = true; image.src = full; }
         else { image.hidden = true; missing.hidden = false; }
       });
@@ -459,4 +515,27 @@ function createSetImageGrid(references = []) {
     grid.append(frame);
   }
   return grid;
+}
+
+function createSetDetailView() {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'stamp-set-dialog stamp-set-detail';
+  dialog.setAttribute('aria-labelledby', 'stamp-set-detail-title');
+  const header = document.createElement('header');
+  header.className = 'card-detail-header';
+  const title = document.createElement('h3');
+  title.id = 'stamp-set-detail-title';
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'button';
+  close.textContent = 'Back to Stamps & Dies';
+  const edit = document.createElement('button');
+  edit.type = 'button';
+  edit.className = 'button button-primary';
+  edit.textContent = 'Edit';
+  const body = document.createElement('div');
+  body.className = 'stamp-set-detail-body';
+  header.append(close, title, edit);
+  dialog.append(header, body);
+  return { dialog, title, close, edit, body };
 }

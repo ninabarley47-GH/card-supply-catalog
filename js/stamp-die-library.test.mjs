@@ -552,3 +552,125 @@ test('unchanged legacy Edit leaves an unknown Release Year absent instead of inv
   assert.equal(h.dialog.open, false);
   assert.deepEqual(h.records, before);
 });
+
+function setDetail(h) { return h.document.querySelector('.stamp-set-detail'); }
+
+test('Library click and keyboard open correct Detail metadata and canonical tags; Back and Escape return focus', async (t) => {
+  const h = await harness(t);
+  await seedEdit(h);
+  await h.cancel.emit('click');
+  const tile = h.gallery.querySelector('article');
+  await tile.emit('click');
+  const detail = setDetail(h);
+  assert.equal(detail.open, true);
+  assert.match(detail.textContent, /Original.*No image.*2022.*Favorite.*Floral/);
+  assert.equal(h.calls(), 0);
+  await detail.querySelector('button').emit('click');
+  assert.equal(detail.open, false);
+  assert.equal(h.document.activeElement, tile);
+  await tile.emit('keydown', { key: 'Enter' });
+  assert.equal(detail.open, true);
+  const event = await detail.emit('cancel');
+  if (!event.defaultPrevented) await detail.close();
+  assert.equal(detail.open, false);
+  assert.equal(h.document.activeElement, tile);
+  h.records.push(createStampDieSetRecord({ id: 'second', name: 'Second Set', dateCreated: '2020-01-01', favorite: false, tagIds: ['stable-card'], imageRefs: [] }, initialCatalog()));
+  await h.document.emit('catalog:global-tags-updated');
+  await h.gallery.querySelectorAll('article')[1].emit('click');
+  assert.match(detail.textContent, /Second Set.*Release year not recorded.*Not a favorite.*Birthday/);
+  assert.doesNotMatch(detail.textContent, /Original|Floral/);
+});
+
+test('Detail shows all ordered images at full quality with read-only thumbnail/missing fallbacks', async (t) => {
+  const full = 'data:image/jpeg;base64,YQ==';
+  const thumb = 'data:image/jpeg;base64,Yg==';
+  const h = await harness(t, {
+    hydrateStampImages: async (records) => {
+      for (const record of records) for (const ref of record.imageRefs) {
+        if (ref.imagePath === 'Dies.jpg') { ref.imagePreviewSrc = full; ref.imageThumbnailSrc = thumb; }
+      }
+    }
+  });
+  const names = ['Mask 1.jpg', 'Dies.jpg', 'Stamp 1.jpg', 'Mask 2.jpg', 'Die 2.jpg', 'Stamp 2.jpg'];
+  await seedEdit(h, { imageRefs: names.map((imageName) => imageName === 'Dies.jpg'
+    ? { imageName, imagePath: 'Dies.jpg', imageLibrary: 'stamp-die-images', thumbnailImagePath: 'Dies.thumb.jpg' }
+    : { imageName, imageSrc: full, thumbnailImageSrc: thumb }) });
+  await h.cancel.emit('click');
+  const before = structuredClone(h.records);
+  await h.gallery.querySelector('article').emit('click');
+  const detail = setDetail(h);
+  const images = detail.querySelectorAll('img');
+  assert.deepEqual(images.map((image) => image.alt), ['Stamp 1.jpg', 'Stamp 2.jpg', 'Dies.jpg', 'Die 2.jpg', 'Mask 1.jpg', 'Mask 2.jpg']);
+  assert.ok(images.every((image) => image.src === full));
+  await images[0].emit('error');
+  assert.equal(images[0].src, thumb);
+  await images[0].emit('error');
+  assert.equal(images[0].hidden, true);
+  assert.match(detail.textContent, /Image unavailable/);
+  assert.deepEqual(h.records, before);
+  assert.equal(h.calls(), 0);
+});
+
+test('unresolved folder image remains in persisted data when Detail opens and closes', async (t) => {
+  const h = await harness(t, { hydrateStampImages: async () => {} });
+  await seedEdit(h, { imageRefs: [{ imagePath: 'Missing.jpg', imageLibrary: 'stamp-die-images' }] });
+  await h.cancel.emit('click');
+  const before = structuredClone(h.records);
+  await h.gallery.querySelector('article').emit('click');
+  assert.match(setDetail(h).textContent, /Image unavailable/);
+  await setDetail(h).close();
+  assert.deepEqual(h.records, before);
+  assert.equal(h.calls(), 0);
+});
+
+test('Edit from Detail reuses form, preserves ID, refreshes selected Set and returns to Detail after cancel', async (t) => {
+  const imageCatalog = initialCatalog();
+  imageCatalog.tags.push({ id: 'stamp', name: 'Stamp', categoryIds: [] });
+  const h = await harness(t, {
+    loadGlobalTagCatalog: async () => structuredClone(imageCatalog),
+    selectStampImageFiles: async (files) => files.map((file) => ({ name: file.name, file, previewSrc: 'data:image/jpeg;base64,YQ==' })),
+    prepareStampImagesForSave: async (images) => ({ usedFallback: true, imageRefs: images.map((image) => image.existingReference || { imageName: image.name, imageSrc: 'data:image/jpeg;base64,YQ==' }) })
+  });
+  await seedEdit(h);
+  await h.cancel.emit('click');
+  await h.gallery.querySelector('article').emit('click');
+  const detail = setDetail(h);
+  const edit = detail.querySelectorAll('button').find((button) => button.textContent === 'Edit');
+  await edit.emit('click');
+  assert.equal(h.dialog.open, true);
+  assert.equal(h.name.value, 'Original');
+  const input = h.form.querySelector('input[type="file"]');
+  input.files = [{ name: 'New stamp.jpg' }];
+  await input.emit('change');
+  h.name.value = 'Edited in Detail';
+  h.year.value = '2024';
+  h.favorite.checked = false;
+  await h.select('stable-card');
+  await h.form.emit('submit');
+  assert.equal(h.dialog.open, false);
+  assert.equal(detail.open, true);
+  assert.match(detail.textContent, /Edited in Detail.*2024.*Not a favorite.*Birthday/);
+  assert.equal(h.records.length, 1);
+  assert.equal(h.records[0].id, 'set-existing');
+  assert.equal(detail.querySelector('img').alt, 'New stamp.jpg');
+  assert.equal(h.document.activeElement, edit);
+  await edit.emit('click');
+  h.name.value = 'Discard this';
+  await h.cancel.emit('click');
+  assert.equal(detail.open, true);
+  assert.match(detail.textContent, /Edited in Detail/);
+  assert.doesNotMatch(detail.textContent, /Discard this/);
+  await detail.querySelector('button').emit('click');
+  assert.equal(h.document.activeElement, h.gallery.querySelector('article'));
+});
+
+test('Detail resolves renamed global tags without changing assignments', async (t) => {
+  const h = await harness(t);
+  await seedEdit(h);
+  await h.cancel.emit('click');
+  await h.gallery.querySelector('article').emit('click');
+  h.renameTag();
+  await h.document.emit('catalog:global-tags-updated');
+  assert.match(setDetail(h).textContent, /Botanical/);
+  assert.deepEqual(h.records[0].tagIds, ['stable-paper']);
+});
