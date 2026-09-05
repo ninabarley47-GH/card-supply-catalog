@@ -107,7 +107,8 @@ original image and thumbnail are embedded in IndexedDB. A browser without workin
 thumbnail generation can retain the embedded original without a thumbnail. Save
 reports when images were kept in browser storage. A Set without images remains valid.
 
-Failed record saves retain the draft for retry. Prepared image references are reused
+Known minor storage debt (accepted for now): failed record saves may leave newly
+created image files behind. Failed saves retain the draft for retry. Prepared image references are reused
 for that draft/folder to avoid recopying successful preparations. Filesystem creation
 and IndexedDB cannot form one transaction: new files can remain if a subsequent
 thumbnail/record write fails. They are never deleted as rollback. This limitation
