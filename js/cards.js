@@ -1,3 +1,4 @@
+import { getLocalDateValue } from './ui.js';
 import { deleteCard, loadCatalogSetting, loadGlobalTagCatalog, loadSavedCards, saveCard, saveCatalogSetting, saveOwner } from './storage.js';
 import { loadDefaultOwnerId } from './settings.js';
 import { initializeOwnerPicker, notifyOwnerRegistryUpdated, refreshOwnerOptions, resolveOwnerPicker, setOwnerPickerValue } from './owner-picker.js';
@@ -940,13 +941,6 @@ function applyCardSizePreset(addCardView) {
   addCardView.height.value = preset.height;
 }
 
-function getLocalDateValue() {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 function createCardRecord(addCardView) {
   const timestamp = new Date().toISOString();

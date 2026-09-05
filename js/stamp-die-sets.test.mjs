@@ -146,3 +146,21 @@ test('database upgrade preserves all existing stores and set saves round-trip ca
     assert.deepEqual((await storage.loadSavedStampDieSets())[0].imageRefs, setRecord().imageRefs);
   } finally { globalThis.window = oldWindow; }
 });
+
+test('Phase 2A canonical creation survives storage reload with empty imageRefs', async () => {
+  const harness = databaseHarness();
+  const previousWindow = globalThis.window;
+  globalThis.window = { indexedDB: harness.indexedDB, localStorage: { getItem: () => 'true' } };
+  try {
+    const { createStampDieSetRecord } = await import('./stamp-die-library.js');
+    const firstSession = await import('./storage.js?phase2a-save');
+    const record = createStampDieSetRecord({ name: 'Garden', dateCreated: '2026-09-05', favorite: true, tagIds: ['stable-one'] }, catalog);
+    await firstSession.saveStampDieSet(record);
+    // A fresh module instance has no cached database or global tag state.
+    const nextSession = await import('./storage.js?phase2a-reload');
+    assert.deepEqual(await nextSession.loadSavedStampDieSets(), [record]);
+    assert.deepEqual(record.imageRefs, []);
+    assert.deepEqual(record.tagIds, ['stable-one']);
+    assert.equal(record.favorite, true);
+  } finally { globalThis.window = previousWindow; }
+});

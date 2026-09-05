@@ -1,3 +1,4 @@
+import { initializeStampDieLibrary } from './stamp-die-library.js';
 import { initializeCardLibrary } from './cards.js';
 import { initializeLibraryShell, setCardsForPaperPackDetails } from './library.js';
 import { initializePwaInstall } from './pwa.js';
@@ -9,3 +10,5 @@ initializeVersionDisplay();
 const { paperPacks, owners } = await initializeLibraryShell();
 const cards = await initializeCardLibrary({ paperPacks, owners });
 setCardsForPaperPackDetails(cards);
+
+await initializeStampDieLibrary();

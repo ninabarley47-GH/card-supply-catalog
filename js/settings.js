@@ -316,10 +316,12 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
   const refreshAfterItemSave = async (event) => {
     catalog = await loadGlobalTagCatalog();
     if (event.type === "catalog:card-saved") cards = await loadSavedCards().catch(() => cards);
+    if (event.type === "catalog:stamp-die-set-saved") stampSets = await loadSavedStampDieSets();
     render();
   };
   document.addEventListener("catalog:paper-pack-saved", refreshAfterItemSave);
   document.addEventListener("catalog:card-saved", refreshAfterItemSave);
+  document.addEventListener("catalog:stamp-die-set-saved", refreshAfterItemSave);
   render();
 }
 

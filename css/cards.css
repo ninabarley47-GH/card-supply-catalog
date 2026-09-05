@@ -801,3 +801,48 @@
     animation: none;
   }
 }
+
+/* Stamp & Die Phase 2A: metadata form and non-interactive Library tiles. */
+.stamp-set-dialog {
+  width: min(36rem, calc(100% - 2rem));
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.stamp-set-dialog[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.stamp-set-dialog::backdrop { background: rgba(47, 44, 40, 0.48); }
+.stamp-set-fields { min-width: 0; margin: 0; border: 0; }
+.stamp-set-fields > p:empty { display: none; }
+
+.stamp-set-tile {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background: var(--color-surface);
+  overflow-wrap: anywhere;
+}
+
+.stamp-set-placeholder {
+  display: grid;
+  place-items: center;
+  min-height: 8rem;
+  padding: var(--space-5);
+  background: var(--color-page);
+  color: var(--color-muted);
+}
+
+.stamp-set-tile-content {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+.stamp-set-tile-content .card-library-tags { padding: 0; }

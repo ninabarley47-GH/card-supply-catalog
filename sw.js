@@ -30,6 +30,8 @@ const APP_SHELL = [
   "./js/settings.js",
   "./js/storage.js",
   "./js/stamp-die-sets.js",
+  "./js/stamp-die-library.js",
+  "./js/ui.js",
   "./js/tag-picker.js",
   "./js/tag-utils.js",
   "./js/thumbnails.js",
