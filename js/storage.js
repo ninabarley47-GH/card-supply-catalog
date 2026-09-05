@@ -331,8 +331,9 @@ export async function deletePaperPack(paperPackId) {
 export async function mergePaperPacks(basePaperPacks, savedPaperPacks) {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
-  const normalizedSavedPaperPacks = savedPaperPacks.map(normalizePaperPackForRuntime);
-  const normalizedBasePaperPacks = basePaperPacks.map(normalizePaperPackForRuntime);
+  const catalog = await ensureGlobalTagPersistence(database);
+  const normalizedSavedPaperPacks = savedPaperPacks.map((paperPack) => normalizePaperPackForRuntime(paperPack, catalog));
+  const normalizedBasePaperPacks = basePaperPacks.map((paperPack) => normalizePaperPackForRuntime(paperPack, catalog));
   const savedPaperPackIds = new Set(normalizedSavedPaperPacks.map((paperPack) => paperPack.id));
   const deletedPaperPackIds = new Set(
     (await getAllFromStore(database, DELETED_PAPER_PACK_IDS_STORE)).map((entry) => entry.id)

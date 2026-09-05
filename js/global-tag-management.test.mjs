@@ -268,6 +268,12 @@ test("obsolete product vocabulary runtime bridges are removed", async () => {
   assert.match(source, /migrateGlobalTagPersistence/);
 });
 
+test("Paper merge normalization supplies the global catalog for canonical tagIds", async () => {
+  const source = await readFile(new URL("./storage.js", import.meta.url), "utf8");
+  assert.match(source, /mergePaperPacks[\s\S]*?ensureGlobalTagPersistence\(database\)[\s\S]*?normalizePaperPackForRuntime\(paperPack, catalog\)/);
+  assert.doesNotMatch(source, /savedPaperPacks\.map\(normalizePaperPackForRuntime\)/);
+});
+
 test("Settings refreshes usage after Paper or Card saves", async () => {
   const settings = await readFile(new URL("./settings.js", import.meta.url), "utf8");
   const library = await readFile(new URL("./library.js", import.meta.url), "utf8");
