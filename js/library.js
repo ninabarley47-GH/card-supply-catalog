@@ -189,12 +189,21 @@ export async function initializeLibraryShell() {
 
     return { paperPacks, colorsById, owners };
   } catch (error) {
+    console.error("Paper Library initialization failed.", error);
     if (paperPackLibrary) {
-      renderError(paperPackLibrary, "Paper packs could not be loaded.");
+      renderError(paperPackLibrary, `Paper packs could not be loaded. ${error?.message || "Unknown error."}`);
     }
 
     if (colorLibrary) {
-      renderError(colorLibrary, "Colors could not be loaded.");
+      try {
+        const colorsById = await loadColors();
+        initializeAddColorWorkflow(colorsById);
+        initializeColorReferenceControls(colorLibrary, Object.values(colorsById));
+        return { paperPacks: [], colorsById, owners: [] };
+      } catch (colorError) {
+        console.error("Color Library initialization failed.", colorError);
+        renderError(colorLibrary, `Colors could not be loaded. ${colorError?.message || "Unknown error."}`);
+      }
     }
 
     return { paperPacks: [], colorsById: {}, owners: [] };
@@ -527,7 +536,12 @@ async function loadPaperPacks() {
   const ownership = await migrateCatalogOwnership(basePaperPacks, savedPaperPacks, seedOwners);
   const paperPacks = await mergePaperPacks(ownership.basePaperPacks, ownership.savedPaperPacks);
 
-  return { paperPacks: await hydratePaperPackImageSources(paperPacks), owners: ownership.owners };
+  try {
+    await hydratePaperPackImageSources(paperPacks);
+  } catch (error) {
+    console.warn("Paper metadata loaded, but Paper images could not be hydrated.", error);
+  }
+  return { paperPacks, owners: ownership.owners };
 }
 
 function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById, owners = [], initialTagCatalog) {
