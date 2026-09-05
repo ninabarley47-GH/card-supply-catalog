@@ -12,23 +12,27 @@ separate stampIds/dieIds, or required per-image Stamp/Die classifications.
 
 ```js
 {
-  schemaVersion: 3,
+  schemaVersion: 4,
   id: 'stable-set-id',
   name: 'Set name',
   imageRefs: [],
   tagIds: [],
   favorite: false,
-  dateCreated: '2026-09-05'
+  dateCreated: '2026-09-05',
+  releaseYear: 2024
 }
 ```
 
 The name is required and trimmed. Identity is a stable, nonempty string and is
 not regenerated from the name. `dateCreated` follows Cards' existing naming and
 YYYY-MM-DD convention. `favorite` follows the existing Paper/Card boolean field.
-Add Set defaults Date Created to local today, Favorite to false, and tags to empty.
+Add Set defaults Release Year to the current year, Favorite to false, and tags to empty.
+Creation date remains automatic local-today metadata; it is not a release date.
 The form and storage path validate supplied values before persistence.
-`schemaVersion` uses the existing catalog-record version helper. No existing record
-format changes, catalog-version increment, or record migrations are introduced.
+`schemaVersion` uses the existing shared catalog-record version helper. The Release
+Year follow-up raises that version to 4. Earlier records remain readable without
+a release year; their original creation dates are preserved and never inferred as
+release years. No database upgrade or bulk record rewrite is required.
 
 `imageRefs` is an ordered array, empty or containing multiple reference objects.
 Each reference has a relative `imagePath` and optional `imageName` and
@@ -62,7 +66,7 @@ validation, and atomic tag deletion include saved sets so tag references stay va
 
 The Stamps & Dies navigation link opens `#stamps-dies` through the existing shared
 hash-navigation handler. The Library reuses existing structure and CSS and hides other libraries' sidebar
-controls. It loads saved records on startup and renders each name, date, Favorite
+controls. It loads saved records on startup and renders each name, release year, Favorite
 state, current tag display names, and a simple No image placeholder. Tiles have
 no Detail or Edit actions, and no sample records are created.
 
@@ -88,7 +92,7 @@ harness; no real user database or image files are changed by the tests.
 
 ## Phase 2A Add Set workflow
 
-The Library's Add Set action opens a native modal dialog with Set Name, Date Created,
+The Library's Add Set action opens a native modal dialog with Set Name, Release Year,
 Favorite, and the existing D1 global tag picker. Field, checkbox, and action styling
 reuse Cards' existing CSS; the dialog uses native focus containment and Escape
 handling. Cancel is on the left and Save Set on the right. No image input is present.
@@ -107,11 +111,18 @@ records. Sets still use a `set-` UUID with the same timestamp/random fallback
 approach as Cards. Generated IDs remain the true record identity. No existing
 records, IDs, schema versions, storage structure, or tag behavior are changed.
 
-Date Created uses the same local-calendar helper as Cards, now shared through
-`ui.js`. Saved records pass through `normalizeStampDieSet`, the shared
+Release Year matches DSP's year-only field: a required whole number from 1990 to
+2100, defaulting to the current year. It persists as numeric `releaseYear` and
+appears on Library tiles instead of creation date. Existing Sets without this field
+show "Release year not recorded". Their creation dates are not repurposed.
+`dateCreated` remains automatic creation metadata using the same local-calendar
+helper as Cards in `ui.js`.
+
+Saved records pass through `normalizeStampDieSet`, the shared
 `addCatalogSchemaVersion` helper, and `saveStampDieSet`. Every new record has
-`imageRefs: []`. The shared catalog schema stays at 3 and IndexedDB stays at 6.
-No Stamp-specific version, new store, or image-reference extension is introduced.
+`imageRefs: []`. The Release Year follow-up raises the shared catalog schema to 4;
+IndexedDB stays at 6 and the backup envelope stays at 3. No Stamp-specific version,
+new store, or image-reference extension is introduced.
 
 The shared tag picker uses product type `stamp` and stable `tagIds`. All tags remain
 available, including tags with legacy Paper/Card applicability metadata. Category
@@ -123,7 +134,7 @@ Successful saves close the dialog, refresh the Library, announce success, and em
 changes refresh Library display names and assignments. Failed saves retain the
 draft for retry. While saving, the form prevents duplicate submits and dismissal.
 Cancel or Escape discards the draft without writing; reopening resets the name,
-date, Favorite, selected tags, and picker search. No confirmation is required for
+release year, Favorite, selected tags, and picker search. No confirmation is required for
 cancellation. Focus returns to Add Set after dismissal.
 
 Phase 2A tests cover opening/defaults, whitespace-only names, canonical record
@@ -134,3 +145,6 @@ save/retry, repeated-submit protection, and a fresh storage-module reload. DOM a
 IndexedDB API harnesses run without altering real user records. Visual layout,
 native focus containment, and browser-native validation still require a browser
 check; the in-app browser was unavailable during this phase's verification.
+
+Release Year tests cover the DSP year range, persistence, Library display, and
+compatibility with older Sets whose creation dates remain unchanged.

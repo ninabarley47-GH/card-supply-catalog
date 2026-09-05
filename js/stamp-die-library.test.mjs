@@ -1,3 +1,4 @@
+import { CATALOG_SCHEMA_VERSION } from './schema.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -104,7 +105,7 @@ async function harness(t, otherCatalogServices = {}) {
   const dialog = document.querySelector('dialog');
   const form = dialog.querySelector('form');
   const name = form.querySelector('input[name="name"]');
-  const date = form.querySelector('input[name="dateCreated"]');
+  const year = form.querySelector('input[name="releaseYear"]');
   const favorite = form.querySelector('input[name="favorite"]');
   const cancel = form.querySelectorAll('button').find((button) => button.textContent === 'Cancel');
   async function select(id) {
@@ -112,18 +113,18 @@ async function harness(t, otherCatalogServices = {}) {
     input.checked = true;
     await form.querySelector('.global-tag-picker').emit('change', { target: input });
   }
-  return { document, add, gallery, status, dialog, form, name, date, favorite, cancel, records, select,
+  return { document, add, gallery, status, dialog, form, name, year, favorite, cancel, records, select,
     calls: () => calls, setFailure: (value) => { failure = value; }, setGate: (value) => { commitGate = value; },
     renameTag: () => { catalog.tags[0].name = 'Botanical'; } };
 }
 
-test('Add Set opens with local today, empty name/tags and Favorite off; blank names cannot save', async (t) => {
+test('Add Set opens with current release year, empty name/tags and Favorite off; blank names cannot save', async (t) => {
   const h = await harness(t);
   await h.add.emit('click');
   assert.equal(h.dialog.open, true);
   assert.equal(h.document.activeElement, h.name);
   assert.equal(h.name.value, '');
-  assert.equal(h.date.value, getLocalDateValue());
+  assert.equal(h.year.value, String(new Date().getFullYear()));
   assert.equal(h.favorite.checked, false);
   h.name.value = '   ';
   await h.form.emit('submit');
@@ -144,7 +145,7 @@ test('save persists Favorite and universal stable tag IDs, then renders a no-ima
   assert.equal(h.form.querySelector('[data-tag-id="nature"]'), null);
   assert.ok(h.form.querySelector('[data-category-id="nature"]'));
   h.name.value = '  Garden  ';
-  h.date.value = '2026-09-01';
+  h.year.value = '2024';
   h.favorite.checked = true;
   await h.select('stable-paper');
   await h.select('stable-card');
@@ -153,10 +154,10 @@ test('save persists Favorite and universal stable tag IDs, then renders a no-ima
   await h.form.emit('submit');
   const record = h.records[0];
   assert.match(record.id, /^set-/);
-  assert.deepEqual(record, { schemaVersion: 3, id: record.id, name: 'Garden', dateCreated: '2026-09-01', favorite: true, tagIds: ['stable-paper', 'stable-card'], imageRefs: [] });
+  assert.deepEqual(record, { schemaVersion: CATALOG_SCHEMA_VERSION, id: record.id, name: 'Garden', dateCreated: getLocalDateValue(), releaseYear: 2024, favorite: true, tagIds: ['stable-paper', 'stable-card'], imageRefs: [] });
   assert.equal(h.dialog.open, false);
   assert.equal(saves, 1);
-  assert.match(h.gallery.textContent, /No image.*Garden.*2026-09-01.*Favorite.*Floral.*Birthday/);
+  assert.match(h.gallery.textContent, /No image.*Garden.*2024.*Favorite.*Floral.*Birthday/);
   assert.equal(h.gallery.querySelector('img'), null);
   h.renameTag();
   await h.document.emit('catalog:global-tags-updated');
@@ -169,7 +170,7 @@ test('Cancel and Escape discard all fields and picker search; reopening starts c
   for (const action of ['cancel', 'escape']) {
     await h.add.emit('click');
     h.name.value = 'Unsaved';
-    h.date.value = '2000-01-01';
+    h.year.value = '2000';
     h.favorite.checked = true;
     await h.select('stable-paper');
     h.form.querySelector('input[type="search"]').value = 'floral';
@@ -183,7 +184,7 @@ test('Cancel and Escape discard all fields and picker search; reopening starts c
     assert.equal(h.document.activeElement, h.add);
     await h.add.emit('click');
     assert.equal(h.name.value, '');
-    assert.equal(h.date.value, getLocalDateValue());
+    assert.equal(h.year.value, String(new Date().getFullYear()));
     assert.equal(h.favorite.checked, false);
     assert.ok(h.form.querySelectorAll('[data-tag-id]').every((input) => !input.checked));
     assert.equal(h.form.querySelector('input[type="search"]').value, '');
@@ -216,7 +217,7 @@ for (const [variation, duplicateName] of [
     const original = structuredClone(h.records[0]);
     await h.add.emit('click');
     h.name.value = duplicateName;
-    h.date.value = '2026-08-01';
+    h.year.value = '2023';
     h.favorite.checked = true;
     await h.select('stable-paper');
     await h.form.emit('submit');
@@ -225,7 +226,7 @@ for (const [variation, duplicateName] of [
     assert.equal(h.dialog.open, true);
     assert.match(h.form.textContent, /A Stamp & Die Set with this name already exists/);
     assert.equal(h.name.value, duplicateName);
-    assert.equal(h.date.value, '2026-08-01');
+    assert.equal(h.year.value, '2023');
     assert.equal(h.favorite.checked, true);
     assert.equal(h.form.querySelector('[data-tag-id="stable-paper"]').checked, true);
     assert.equal(h.form.querySelector('fieldset').disabled, false);
@@ -236,7 +237,8 @@ for (const [variation, duplicateName] of [
     assert.equal(h.records.length, 2);
     assert.deepEqual(h.records[1].tagIds, ['stable-paper']);
     assert.equal(h.records[1].favorite, true);
-    assert.equal(h.records[1].dateCreated, '2026-08-01');
+    assert.equal(h.records[1].releaseYear, 2023);
+    assert.equal(h.records[1].dateCreated, getLocalDateValue());
     assert.notEqual(h.records[1].id, original.id);
   });
 }
@@ -311,4 +313,13 @@ test('Add Set is wired into the application and offline shell without any image 
   assert.match(html, /data-add-set>Add Set/);
   assert.match(settings, /catalog:stamp-die-set-saved/);
   assert.doesNotMatch(source, /showOpenFilePicker|showDirectoryPicker|FileReader|createObjectURL|type = 'file'|card-images|\.\/images/);
+});
+
+
+test('Library does not present an older creation date as a release year', async (t) => {
+  const h = await harness(t);
+  h.records.push(createStampDieSetRecord({ name: 'Older Set', dateCreated: '2020-05-01', favorite: false, tagIds: [] }, initialCatalog()));
+  await h.document.emit('catalog:global-tags-updated');
+  assert.match(h.gallery.textContent, /Release year not recorded/);
+  assert.doesNotMatch(h.gallery.textContent, /2020/);
 });

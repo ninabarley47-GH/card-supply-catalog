@@ -9,6 +9,10 @@ export function normalizeStampDieSet(record, catalog) {
       !isCalendarDate(record.dateCreated) || !Array.isArray(record.imageRefs)) {
     throw new TypeError('Invalid Stamp & Die Set record.');
   }
+  if (record.releaseYear !== undefined &&
+      (!Number.isInteger(record.releaseYear) || record.releaseYear < 1990 || record.releaseYear > 2100)) {
+    throw new TypeError('Release Year must be a whole year between 1990 and 2100.');
+  }
   if (!validateItemTagAssignments({ catalog, productType: 'stamp', tagIds: record.tagIds }).ok) {
     throw new TypeError('Invalid Stamp & Die Set tagIds.');
   }
@@ -18,7 +22,8 @@ export function normalizeStampDieSet(record, catalog) {
     imageRefs: record.imageRefs.map(normalizeImageReference),
     tagIds: [...record.tagIds],
     favorite: record.favorite,
-    dateCreated: record.dateCreated
+    dateCreated: record.dateCreated,
+    ...(record.releaseYear === undefined ? {} : { releaseYear: record.releaseYear })
   });
 }
 

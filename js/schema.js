@@ -1,4 +1,4 @@
-export const CATALOG_SCHEMA_VERSION = 3;
+export const CATALOG_SCHEMA_VERSION = 4;
 export const BACKUP_SCHEMA_VERSION = 3;
 
 export function addCatalogSchemaVersion(record) {

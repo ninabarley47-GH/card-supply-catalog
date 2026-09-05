@@ -9,6 +9,7 @@ export function createStampDieSetRecord(values, catalog) {
     id: values.id || createSetId(),
     name: values.name,
     dateCreated: values.dateCreated,
+    releaseYear: values.releaseYear,
     favorite: values.favorite,
     tagIds: values.tagIds,
     imageRefs: []
@@ -29,6 +30,7 @@ export async function initializeStampDieLibrary(services = {}) {
   const add = screen.querySelector('[data-add-set]');
   const gallery = screen.querySelector('[data-set-library]');
   const status = screen.querySelector('[data-set-library-status]');
+  status.className += ' form-message';
   const view = createAddSetView();
   document.body.append(view.dialog);
   let catalog;
@@ -39,9 +41,10 @@ export async function initializeStampDieLibrary(services = {}) {
   function reset() {
     view.form.reset();
     view.name.setCustomValidity('');
-    view.dateCreated.value = getLocalDateValue();
+    view.releaseYear.value = String(new Date().getFullYear());
     picker?.reset();
     view.message.textContent = '';
+    view.message.dataset.tone = '';
     draftId = null;
   }
 
@@ -52,8 +55,10 @@ export async function initializeStampDieLibrary(services = {}) {
       ]);
       catalog = nextCatalog;
       renderStampDieLibrary(gallery, records, catalog);
+      status.dataset.tone = '';
       status.textContent = `${records.length} set${records.length === 1 ? '' : 's'}`;
     } catch {
+      status.dataset.tone = 'error';
       status.textContent = 'Sets could not be loaded. Reload to try again.';
     }
   }
@@ -71,6 +76,7 @@ export async function initializeStampDieLibrary(services = {}) {
       view.dialog.showModal();
       view.name.focus();
     } catch {
+      status.dataset.tone = 'error';
       status.textContent = 'Add Set could not be opened. Please try again.';
     } finally { add.disabled = false; }
   });
@@ -89,12 +95,14 @@ export async function initializeStampDieLibrary(services = {}) {
     view.save.disabled = true;
     view.cancel.disabled = true;
     view.message.textContent = 'Saving set…';
+    view.message.dataset.tone = '';
     let saved = false;
     try {
       // This is a Set-only data-quality check; generated IDs remain identity.
       const existingSets = await storage.loadSavedStampDieSets();
       const nameKey = getTagKey(view.name.value);
       if (existingSets.some((record) => getTagKey(record.name) === nameKey)) {
+        view.message.dataset.tone = 'error';
         view.message.textContent = 'A Stamp & Die Set with this name already exists. Enter a different Set Name.';
         return;
       }
@@ -102,14 +110,16 @@ export async function initializeStampDieLibrary(services = {}) {
       const record = createStampDieSetRecord({
         id: draftId,
         name: view.name.value,
-        dateCreated: view.dateCreated.value,
+        dateCreated: getLocalDateValue(),
+        releaseYear: Number(view.releaseYear.value),
         favorite: view.favorite.checked,
         tagIds: picker.getSelectedTagIds()
       }, catalog);
       await storage.saveStampDieSet(record);
       saved = true;
     } catch {
-      view.message.textContent = 'The set could not be saved. Check the date and selected tags, then try again.';
+      view.message.dataset.tone = 'error';
+      view.message.textContent = 'The set could not be saved. Check the release year and selected tags, then try again.';
     } finally {
       saving = false;
       view.fields.disabled = false;
@@ -148,10 +158,13 @@ function createAddSetView() {
   name.name = 'name';
   name.type = 'text';
   name.required = true;
-  const dateCreated = document.createElement('input');
-  dateCreated.name = 'dateCreated';
-  dateCreated.type = 'date';
-  dateCreated.required = true;
+  const releaseYear = document.createElement('input');
+  releaseYear.name = 'releaseYear';
+  releaseYear.type = 'number';
+  releaseYear.min = '1990';
+  releaseYear.max = '2100';
+  releaseYear.step = '1';
+  releaseYear.required = true;
   const favorite = document.createElement('input');
   favorite.name = 'favorite';
   favorite.type = 'checkbox';
@@ -160,8 +173,9 @@ function createAddSetView() {
   favoriteLabel.append(favorite, document.createTextNode('Favorite'));
   const tags = document.createElement('div');
   const message = document.createElement('p');
+  message.className = 'form-message';
   message.setAttribute('role', 'status');
-  fields.append(createField('Set Name', name), createField('Date Created', dateCreated), favoriteLabel, tags, message);
+  fields.append(createField('Set Name', name), createField('Release Year', releaseYear), favoriteLabel, tags, message);
   const actions = document.createElement('div');
   actions.className = 'card-add-actions';
   const cancel = document.createElement('button');
@@ -175,7 +189,7 @@ function createAddSetView() {
   actions.append(cancel, save);
   form.append(fields, actions);
   dialog.append(header, form);
-  return { dialog, form, fields, name, dateCreated, favorite, tags, message, cancel, save };
+  return { dialog, form, fields, name, releaseYear, favorite, tags, message, cancel, save };
 }
 
 function createField(text, input) {
@@ -196,12 +210,11 @@ export function renderStampDieLibrary(gallery, records, catalog) {
     content.className = 'stamp-set-tile-content';
     const name = document.createElement('h3');
     name.textContent = record.name;
-    const date = document.createElement('p');
-    const time = document.createElement('time');
-    time.dateTime = record.dateCreated;
-    time.textContent = record.dateCreated;
-    date.append(document.createTextNode('Created '), time);
-    content.append(name, date);
+    const release = document.createElement('p');
+    release.textContent = record.releaseYear === undefined
+      ? 'Release year not recorded'
+      : `Release year: ${record.releaseYear}`;
+    content.append(name, release);
     if (record.favorite) {
       const favorite = document.createElement('p');
       favorite.textContent = '♥ Favorite';

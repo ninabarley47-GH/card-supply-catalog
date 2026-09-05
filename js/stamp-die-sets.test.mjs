@@ -1,4 +1,5 @@
-﻿import test from 'node:test';
+import { CATALOG_SCHEMA_VERSION } from './schema.js';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { normalizeStampDieSet } from './stamp-die-sets.js';
@@ -20,7 +21,7 @@ test('set metadata supports multiple images without persisting runtime image sou
   const record = normalizeStampDieSet(input, catalog);
   assert.deepEqual(record.imageRefs, setRecord().imageRefs);
   assert.notEqual(record.imageRefs[0], input.imageRefs[0]);
-  assert.equal(record.schemaVersion, 3);
+  assert.equal(record.schemaVersion, CATALOG_SCHEMA_VERSION);
   assert.equal(normalizeStampDieSet({ ...input, imageRefs: [] }, catalog).imageRefs.length, 0);
   assert.throws(() => normalizeStampDieSet({ ...input, name: ' ' }, catalog));
   assert.throws(() => normalizeStampDieSet({ ...input, dateCreated: '2026-02-30' }, catalog));
@@ -154,7 +155,7 @@ test('Phase 2A canonical creation survives storage reload with empty imageRefs',
   try {
     const { createStampDieSetRecord } = await import('./stamp-die-library.js');
     const firstSession = await import('./storage.js?phase2a-save');
-    const record = createStampDieSetRecord({ name: 'Garden', dateCreated: '2026-09-05', favorite: true, tagIds: ['stable-one'] }, catalog);
+    const record = createStampDieSetRecord({ name: 'Garden', dateCreated: '2026-09-05', releaseYear: 2024, favorite: true, tagIds: ['stable-one'] }, catalog);
     await firstSession.saveStampDieSet(record);
     // A fresh module instance has no cached database or global tag state.
     const nextSession = await import('./storage.js?phase2a-reload');
@@ -163,4 +164,20 @@ test('Phase 2A canonical creation survives storage reload with empty imageRefs',
     assert.deepEqual(record.tagIds, ['stable-one']);
     assert.equal(record.favorite, true);
   } finally { globalThis.window = previousWindow; }
+});
+
+
+test('Release Year validates the DSP year range while legacy creation dates remain metadata', () => {
+  for (const releaseYear of [1990, 2024, 2100]) {
+    assert.equal(normalizeStampDieSet({ ...setRecord(), releaseYear }, catalog).releaseYear, releaseYear);
+  }
+  for (const releaseYear of [1989, 2101, 2024.5, '2024', null]) {
+    assert.throws(() => normalizeStampDieSet({ ...setRecord(), releaseYear }, catalog));
+  }
+  const legacy = { ...setRecord(), schemaVersion: 3 };
+  const normalized = normalizeStampDieSet(legacy, catalog);
+  assert.equal('releaseYear' in normalized, false);
+  assert.equal(normalized.dateCreated, legacy.dateCreated);
+  assert.equal(normalized.id, legacy.id);
+  assert.deepEqual(normalized.tagIds, legacy.tagIds);
 });

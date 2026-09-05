@@ -145,9 +145,9 @@ Catalog-record schema and backup-envelope schema are versioned independently in 
 - `CATALOG_SCHEMA_VERSION` describes the structure and interpretation of catalog records such as Paper Packs, Cards, and colors. Increment it when persisted record fields, allowed values, validation, or record migration behavior changes.
 - `BACKUP_SCHEMA_VERSION` describes the top-level backup envelope: its identifying fields, collection layout, image-storage metadata, and import contract. Increment it only when that envelope structure or its interpretation changes incompatibly.
 
-The Card Status change raised the catalog schema to version 3. Cards now persist `status` as either `available` or `sent`; legacy Cards without a status are normalized to `available` when loaded or imported. Exported records carry catalog schema version 3, and exported backup envelopes declare `catalogSchemaVersion: 3`.
+The Card Status change raised the catalog schema to version 3. Cards now persist `status` as either `available` or `sent`; legacy Cards without a status are normalized to `available` when loaded or imported. The later Stamp & Die Release Year addition raises the shared catalog schema to version 4; current exports declare `catalogSchemaVersion: 4`.
 
-Phase B2 raises the backup envelope to version 3. Version-3 Standard and Compact iPad exports contain one `tagCatalog` object (`schemaVersion`, `tags`, and `categories`), and Paper/Card records contain only `tagIds`. Version-1/2 backups with optional `tagVocabularies` and legacy `keywords`/`tags` remain importable through in-memory conversion and reconciliation. The record catalog schema remains version 3.
+Phase B2 raises the backup envelope to version 3. Version-3 Standard and Compact iPad exports contain one `tagCatalog` object (`schemaVersion`, `tags`, and `categories`), and Paper/Card records contain only `tagIds`. Version-1/2 backups with optional `tagVocabularies` and legacy `keywords`/`tags` remain importable through in-memory conversion and reconciliation. At Phase B2 the record catalog schema remained version 3; the later Release Year change uses version 4.
 
 Paper and Card Add/Edit forms select global tags by stable ID through the shared category-aware picker and persist canonical `tagIds`. Runtime `keywords` and `tags` arrays are derived display projections used only by existing Paper/Card tile and detail renderers. They remain enumerable so ordinary runtime record copies retain canonical `tagIds`; persistence validates and writes `tagIds` directly and never rebuilds identity from those display names.
 
@@ -244,3 +244,12 @@ serializes metadata using the existing catalog schema helper. Global tag usage a
 delete operations include sets. Image workflows, record forms, relationships, and
 backup/restore support are deferred. See [feature_stamp_die_catalog.md](feature_stamp_die_catalog.md)
 for the agreed record shape and Phase 1 boundaries.
+
+### Stamp & Die Release Year
+
+Sets now persist an optional numeric `releaseYear`, using DSP's 1990?2100 range.
+Add Set requires this field; older records may omit it. Their original `dateCreated`
+is preserved as creation metadata and is never converted into a release year.
+This persisted-field change raises shared `CATALOG_SCHEMA_VERSION` to 4 under the
+existing record-version boundary. IndexedDB stays at 6 and the backup envelope
+stays at 3. No bulk migration or image-storage change is needed.
