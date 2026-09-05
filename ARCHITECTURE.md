@@ -233,3 +233,14 @@ Never sacrifice readability for brevity.
 Do not create competing writable sources of truth. IndexedDB is authoritative for writable catalog records; the selected Paper and Card image-library folders are authoritative for their respective folder-backed image files; exported JSON is a portable backup.
 Never duplicate business logic across modules.
 Prefer extending existing modules over creating unnecessary new ones.
+
+## Stamp & Die Catalog ? Phase 1
+
+The Stamps & Dies shell reuses shared hash navigation and Library styles. A set is
+one named record with multiple image references and canonical global `tagIds`.
+IndexedDB version 6 adds the `stampDieSets` store without changing existing records.
+`storage.js` supplies minimal load/save support; `stamp-die-sets.js` validates and
+serializes metadata using the existing catalog schema helper. Global tag usage and
+delete operations include sets. Image workflows, record forms, relationships, and
+backup/restore support are deferred. See [feature_stamp_die_catalog.md](feature_stamp_die_catalog.md)
+for the agreed record shape and Phase 1 boundaries.

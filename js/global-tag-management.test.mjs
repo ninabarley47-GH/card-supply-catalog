@@ -297,6 +297,6 @@ test("persistent deletion is one transaction over taxonomy and assignment stores
   const start = source.indexOf("export async function deleteGlobalTagEverywhere");
   const end = source.indexOf("function assertCatalogSupportsAssignments", start);
   const body = source.slice(start, end);
-  assert.match(body, /writeTransaction\(database, \[PAPER_PACKS_STORE, CARDS_STORE, SETTINGS_STORE\]/);
+  assert.match(body, /writeTransaction\(database, \[PAPER_PACKS_STORE, CARDS_STORE, STAMP_DIE_SETS_STORE, SETTINGS_STORE\]/);
   assert.equal(/removeEntry|remove\(|imageLibrary|directoryHandle/.test(body), false);
 });

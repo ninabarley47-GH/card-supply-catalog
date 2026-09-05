@@ -5,7 +5,7 @@ import {
   repairBrokenPaperPackImageLinks
 } from "./images.js";
 import { checkCardImageLibraryHealth, generateMissingCardImageThumbnails } from "./card-images.js";
-import { deleteGlobalTagEverywhere, loadCatalogSetting, loadGlobalTagCatalog, loadSavedCards, saveCatalogSetting, saveGlobalTagCatalog, saveOwner, savePaperPack, savePaperPacks } from "./storage.js";
+import { deleteGlobalTagEverywhere, loadCatalogSetting, loadGlobalTagCatalog, loadSavedCards, loadSavedStampDieSets, saveCatalogSetting, saveGlobalTagCatalog, saveOwner, savePaperPack, savePaperPacks } from "./storage.js";
 import {
   addGlobalCategory, addGlobalTag, addTagToCategory, editGlobalCategory, editGlobalTag,
   getGlobalTagUsage, removeGlobalCategory, removeTagFromCategory, sortGlobalCategories, sortGlobalTags
@@ -136,6 +136,7 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
   const root = document.querySelector("[data-global-tag-settings]");
   if (!root) return;
   let cards = await loadSavedCards().catch(() => []);
+  let stampSets = await loadSavedStampDieSets();
   const form = root.querySelector("[data-tag-add-form]");
   const input = root.querySelector("[data-tag-add-input]");
   const list = root.querySelector("[data-tag-list]");
@@ -173,7 +174,7 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
     }
   };
   const render = () => {
-    const usage = getGlobalTagUsage(catalog, { paperRecords: paperPacks, cardRecords: cards });
+    const usage = getGlobalTagUsage(catalog, { paperRecords: paperPacks, cardRecords: cards, stampRecords: stampSets });
     const tags = sortGlobalTags(catalog.tags);
     total.textContent = `${tags.length} tag${tags.length === 1 ? "" : "s"}`;
     const categories = sortGlobalCategories(catalog.categories);
@@ -238,7 +239,8 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
       onDelete: async () => {
         catalog = await loadGlobalTagCatalog();
         cards = await loadSavedCards().catch(() => cards);
-        const currentUsage = getGlobalTagUsage(catalog, { paperRecords: paperPacks, cardRecords: cards });
+        stampSets = await loadSavedStampDieSets();
+        const currentUsage = getGlobalTagUsage(catalog, { paperRecords: paperPacks, cardRecords: cards, stampRecords: stampSets });
         const counts = currentUsage.get(tag.id) || { paper: 0, card: 0, stamp: 0 };
         const assigned = counts.paper + counts.card + counts.stamp;
         if (!await confirmTagDeletion(tag.name, assigned, "item")) return;
@@ -247,6 +249,7 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
           catalog = result.catalog;
           removeRuntimeTagAssignments(paperPacks, tag.id, "keywords");
           removeRuntimeTagAssignments(cards, tag.id, "tags");
+          stampSets = await loadSavedStampDieSets();
           render();
           dispatchGlobalTagUpdates();
           onPaperPacksUpdated?.();

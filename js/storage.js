@@ -1,4 +1,5 @@
 import { addCatalogSchemaVersion } from "./schema.js";
+import { normalizeStampDieSet } from "./stamp-die-sets.js";
 import { PAPER_TAG_SEED } from "./tag-utils.js";
 import { buildOwnerRegistry, isOwner, migratePaperPackOwners, serializePaperPackOwner } from "./owners.js";
 import { getGlobalTagNameKey, validateGlobalTagCatalog, validateItemTagAssignments } from "./global-tag-catalog.js";
@@ -14,12 +15,13 @@ import {
 } from "./global-tag-persistence.js";
 
 const DATABASE_NAME = "card-supply-catalog";
-const DATABASE_VERSION = 5;
+const DATABASE_VERSION = 6;
 const PAPER_PACKS_STORE = "paperPacks";
 const DELETED_PAPER_PACK_IDS_STORE = "deletedPaperPackIds";
 const COLORS_STORE = "colors";
 const SETTINGS_STORE = "settings";
 const CARDS_STORE = "cards";
+const STAMP_DIE_SETS_STORE = "stampDieSets";
 const OWNERS_STORE = "owners";
 export const PAPER_TAG_VOCABULARY_SETTING_ID = "paperTagVocabulary";
 export const CARD_TAG_VOCABULARY_SETTING_ID = "cardTagVocabulary";
@@ -130,6 +132,22 @@ export async function saveColor(color) {
   });
 }
 
+export async function loadSavedStampDieSets() {
+  const database = await openCatalogDatabase();
+  const catalog = await ensureGlobalTagPersistence(database);
+  const records = await getAllFromStore(database, STAMP_DIE_SETS_STORE);
+  return records.map((record) => normalizeStampDieSet(record, catalog));
+}
+
+export async function saveStampDieSet(record) {
+  const database = await openCatalogDatabase();
+  const catalog = await ensureGlobalTagPersistence(database);
+  const normalized = normalizeStampDieSet(record, catalog);
+  await writeTransaction(database, [STAMP_DIE_SETS_STORE], (transaction) => {
+    transaction.objectStore(STAMP_DIE_SETS_STORE).put(normalized);
+  });
+}
+
 export async function loadSavedCards() {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
@@ -160,10 +178,11 @@ export async function saveGlobalTagCatalog(catalog) {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
   await ensureGlobalTagPersistence(database);
-  const [paperRecords, cardRecords] = await Promise.all([
-    getAllFromStore(database, PAPER_PACKS_STORE), getAllFromStore(database, CARDS_STORE)
+  const [paperRecords, cardRecords, stampRecords] = await Promise.all([
+    getAllFromStore(database, PAPER_PACKS_STORE), getAllFromStore(database, CARDS_STORE),
+    getAllFromStore(database, STAMP_DIE_SETS_STORE)
   ]);
-  assertCatalogSupportsAssignments(catalog, paperRecords, cardRecords);
+  assertCatalogSupportsAssignments(catalog, paperRecords, cardRecords, stampRecords);
   await writeTransaction(database, [SETTINGS_STORE], (transaction) => {
     transaction.objectStore(SETTINGS_STORE).put({ id: GLOBAL_TAG_CATALOG_SETTING_ID, value: catalog });
   });
@@ -176,8 +195,9 @@ export async function deleteGlobalTagEverywhere(tagId, { paperRecords: runtimePa
   await migrateLegacyLocalStorage(database);
   const catalog = await ensureGlobalTagPersistence(database);
   if (!catalog.tags.some((tag) => tag.id === tagId)) throw new TypeError("The global tag does not exist.");
-  const [paperRecords, cardRecords] = await Promise.all([
-    getAllFromStore(database, PAPER_PACKS_STORE), getAllFromStore(database, CARDS_STORE)
+  const [paperRecords, cardRecords, stampRecords] = await Promise.all([
+    getAllFromStore(database, PAPER_PACKS_STORE), getAllFromStore(database, CARDS_STORE),
+    getAllFromStore(database, STAMP_DIE_SETS_STORE)
   ]);
   const nextCatalog = {
     ...catalog,
@@ -196,15 +216,17 @@ export async function deleteGlobalTagEverywhere(tagId, { paperRecords: runtimePa
     record.tagIds?.includes(tagId) || record.keywords?.some((name) => getGlobalTagNameKey(name) === getGlobalTagNameKey(deletedTag.name))
   );
   const affectedCards = cardRecords.filter((record) => record.tagIds?.includes(tagId));
-  await writeTransaction(database, [PAPER_PACKS_STORE, CARDS_STORE, SETTINGS_STORE], (transaction) => {
+  const affectedStamps = stampRecords.filter((record) => record.tagIds?.includes(tagId));
+  await writeTransaction(database, [PAPER_PACKS_STORE, CARDS_STORE, STAMP_DIE_SETS_STORE, SETTINGS_STORE], (transaction) => {
     const paperStore = transaction.objectStore(PAPER_PACKS_STORE);
     const cardStore = transaction.objectStore(CARDS_STORE);
     for (const record of affectedPaper) paperStore.put(normalizePaperPackForStorage(removePaperTagAssignment(record, tagId, catalog), nextCatalog));
     for (const record of affectedCards) cardStore.put({ ...record, tagIds: record.tagIds.filter((id) => id !== tagId) });
+    for (const record of affectedStamps) transaction.objectStore(STAMP_DIE_SETS_STORE).put({ ...record, tagIds: record.tagIds.filter((id) => id !== tagId) });
     transaction.objectStore(SETTINGS_STORE).put({ id: GLOBAL_TAG_CATALOG_SETTING_ID, value: nextCatalog });
   });
   globalTagMigrationPromise = Promise.resolve(nextCatalog);
-  return { catalog: nextCatalog, paperCount: affectedPaper.length, cardCount: affectedCards.length, stampCount: 0 };
+  return { catalog: nextCatalog, paperCount: affectedPaper.length, cardCount: affectedCards.length, stampCount: affectedStamps.length };
 }
 
 function removePaperTagAssignment(record, tagId, catalog) {
@@ -217,7 +239,8 @@ function removePaperTagAssignment(record, tagId, catalog) {
   return next;
 }
 
-function assertCatalogSupportsAssignments(catalog, paperRecords, cardRecords) {
+function assertCatalogSupportsAssignments(catalog, paperRecords, cardRecords, stampRecords) {
+  for (const record of stampRecords) normalizeStampDieSet(record, catalog);
   for (const record of paperRecords) {
     if (Array.isArray(record.tagIds) && !validateItemTagAssignments({ catalog, productType: "paper", tagIds: record.tagIds }).ok) {
       throw new TypeError("The catalog does not support the existing Paper tag assignments.");
@@ -380,6 +403,10 @@ function openCatalogDatabase() {
 
       if (!database.objectStoreNames.contains(OWNERS_STORE)) {
         database.createObjectStore(OWNERS_STORE, { keyPath: "id" });
+      }
+
+      if (!database.objectStoreNames.contains(STAMP_DIE_SETS_STORE)) {
+        database.createObjectStore(STAMP_DIE_SETS_STORE, { keyPath: "id" });
       }
     });
 

@@ -465,7 +465,7 @@ function getUncatalogedPackScanMessage(folderCount, ignoredCount = 0, showingIgn
   return `${availableMessage} ${ignoredCount} ignored folder${ignoredCount === 1 ? "" : "s"}.`;
 }
 
-function initializeScreenNavigation() {
+export function initializeScreenNavigation() {
   const screens = [...document.querySelectorAll("[data-screen]")];
   const navLinks = [...document.querySelectorAll("[data-nav-link]")];
   const sidebarControlGroups = [...document.querySelectorAll("[data-sidebar-controls]")];
