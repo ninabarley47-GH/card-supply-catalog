@@ -136,6 +136,10 @@ Paper and Card Add/Edit forms use one shared global tag picker, with the same be
 
 Paper and Card Libraries share the same global-tag filter semantics. All Tags provides individual tag choices; multiple individual tags use AND behavior. Categories are compact, expandable filter groups. Selecting a category matches any of its member tags, while selecting members within that category narrows it using OR behavior. Separate categories and individual tags combine with AND behavior. Categories remain organizational and are never assigned to items. Library search matches tag display names by resolving each item's stable `tagIds` through the current global catalog; category names are not part of general search.
 
+# Global Tag Data Rules
+
+Paper Packs, Cards, and future Stamp Sets share one global inventory. Items assign tags only through stable `tagIds`; display-name changes do not change assignments. Categories are one-level organizational metadata, may contain the same tag in more than one category, and are never item assignments. Every tag is universally available to every product type. Legacy `appliesTo` values may round-trip in old data but have no user-visible or behavioral effect.
+
 # Image Quality
 Images are the application's primary content.
 

@@ -261,11 +261,11 @@ test("legacy runtime name arrays remain countable during transition", () => {
   assert.deepEqual(usage.get("shared"), { paper: 1, card: 1, stamp: 0 });
 });
 
-test("transitional Paper and Card pickers receive the complete global inventory", async () => {
+test("obsolete product vocabulary runtime bridges are removed", async () => {
   const source = await readFile(new URL("./storage.js", import.meta.url), "utf8");
-  assert.match(source, /loadPaperTagVocabulary\(\)[\s\S]*?loadGlobalTagNamesForTransitionalPicker\(\)/);
-  assert.match(source, /loadCardTagVocabulary\(\)[\s\S]*?loadGlobalTagNamesForTransitionalPicker\(\)/);
-  assert.match(source, /return catalog\.tags\.map\(\(tag\) => tag\.name\)/);
+  assert.doesNotMatch(source, /loadPaperTagVocabulary|loadCardTagVocabulary|saveLegacyTagVocabulary|ensureLegacyNamesInGlobalCatalog/);
+  assert.match(source, /paperVocabularySetting[\s\S]*?cardVocabularySetting/);
+  assert.match(source, /migrateGlobalTagPersistence/);
 });
 
 test("Settings refreshes usage after Paper or Card saves", async () => {

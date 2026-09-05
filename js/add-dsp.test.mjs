@@ -2,9 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { applyDefaultOwner, buildPaperPackFromForm, getPatternImageHelpText, shouldShowPatternLibraryPicker, waitForPaperPackPersistence } from "./add-dsp.js";
-import { createTagVocabularyStore } from "./card-tags.js";
 import { normalizePaperPackKeywords } from "./storage.js";
-import { buildEffectiveCardTagVocabulary, buildEffectivePaperTagVocabulary } from "./tag-utils.js";
 
 function createValidPaperPackForm() {
   const form = new FormData();
@@ -87,26 +85,6 @@ test("Add DSP stores the Not Bought paper-pack status", () => {
 
 test("legacy Paper keyword replacements remain active", () => {
   assert.deepEqual(normalizePaperPackKeywords({ keywords: ["cartoon", "ocean animals", "background"] }).keywords, ["Illustration", "Water Animals"]);
-});
-
-test("Paper tag creation prevents case-insensitive duplicates", async () => {
-  const writes = [];
-  const updates = [];
-  const store = createTagVocabularyStore({ loadVocabulary: async () => ["Floral"], saveVocabulary: async (tags) => writes.push(tags), buildVocabulary: buildEffectivePaperTagVocabulary, onVocabularyChanged: (tags) => updates.push(tags) });
-  await store.load([]);
-  assert.equal(await store.create(" floral "), "Floral");
-  assert.equal(writes.length, 0);
-  await store.create("New Paper Tag");
-  assert.deepEqual(updates, [["Floral", "New Paper Tag"]]);
-});
-
-test("Paper and Card vocabulary stores remain isolated", async () => {
-  const paperStore = createTagVocabularyStore({ loadVocabulary: async () => ["Paper Only"], saveVocabulary: async () => {}, buildVocabulary: buildEffectivePaperTagVocabulary });
-  const cardStore = createTagVocabularyStore({ loadVocabulary: async () => ["Card Only"], saveVocabulary: async () => {}, buildVocabulary: buildEffectiveCardTagVocabulary });
-  const paper = await paperStore.load([]);
-  const card = await cardStore.load([]);
-  assert.equal(paper.includes("Card Only"), false);
-  assert.equal(card.includes("Paper Only"), false);
 });
 
 test("Add DSP remains pending until persistence completes", async () => {

@@ -132,7 +132,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     }
   });
 
-  document.addEventListener('catalog:card-tags-updated', async () => {
+  document.addEventListener('catalog:global-tags-updated', async () => {
     tagCatalog = await loadGlobalTagCatalog();
     addCardView.tagCatalog = tagCatalog;
     addCardView.tagPicker.setCatalog(tagCatalog);

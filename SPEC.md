@@ -23,7 +23,7 @@ Goals
 Version 1.0 is designed to allow users to:
 
 Browse their DSP collection visually.
-Find papers using partial names, keywords, owners, or release years.
+Find papers using partial names, global tags, owners, or release years.
 Quickly determine whether a paper is still available.
 Add new DSP packs in under one minute (excluding image collection).
 View every pattern within a DSP pack on a single screen.
@@ -31,6 +31,8 @@ Gradually improve their catalog by adding or replacing images over time.
 Share a single catalog among multiple family members while identifying ownership of each paper pack.
 
 The application prioritizes ease of use over exhaustive data collection.
+
+Global tags are shared by Paper Packs, Cards, and future Stamp Sets. Catalog items persist stable `tagIds`, while tag display names and category membership live in one global catalog. Categories are one-level organizational metadata, may share member tags, and are never assigned directly to items. Every global tag is available to every product type. Legacy name-based records and backups remain importable, and deprecated `appliesTo` metadata is ignored.
 
 Non-Goals
 

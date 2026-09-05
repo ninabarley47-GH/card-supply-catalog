@@ -1,5 +1,5 @@
 import { addCatalogSchemaVersion } from "./schema.js";
-import { PAPER_TAG_SEED, getTagKey, uniqueTags } from "./tag-utils.js";
+import { PAPER_TAG_SEED } from "./tag-utils.js";
 import { buildOwnerRegistry, isOwner, migratePaperPackOwners, serializePaperPackOwner } from "./owners.js";
 import { getGlobalTagNameKey, validateGlobalTagCatalog, validateItemTagAssignments } from "./global-tag-catalog.js";
 import {
@@ -10,7 +10,6 @@ import {
   dehydratePaperTagNames,
   hydrateCardTagNames,
   hydratePaperTagNames,
-  mergeLegacyVocabularyIntoGlobalCatalog,
   migrateGlobalTagPersistence
 } from "./global-tag-persistence.js";
 
@@ -92,14 +91,10 @@ export async function savePaperPack(paperPack) {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
   const catalog = await ensureGlobalTagPersistence(database);
-  const nextCatalog = ensureLegacyNamesInGlobalCatalog(catalog, paperPack.keywords, "paper");
-
-  await writeTransaction(database, [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE, SETTINGS_STORE], (transaction) => {
-    transaction.objectStore(PAPER_PACKS_STORE).put(normalizePaperPackForStorage(paperPack, nextCatalog));
+  await writeTransaction(database, [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE], (transaction) => {
+    transaction.objectStore(PAPER_PACKS_STORE).put(normalizePaperPackForStorage(paperPack, catalog));
     transaction.objectStore(DELETED_PAPER_PACK_IDS_STORE).delete(paperPack.id);
-    if (nextCatalog !== catalog) transaction.objectStore(SETTINGS_STORE).put({ id: GLOBAL_TAG_CATALOG_SETTING_ID, value: nextCatalog });
   });
-  if (nextCatalog !== catalog) globalTagMigrationPromise = Promise.resolve(nextCatalog);
 }
 
 export async function savePaperPacks(paperPacks) {
@@ -239,55 +234,9 @@ export async function saveCard(card) {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
   const catalog = await ensureGlobalTagPersistence(database);
-  const nextCatalog = ensureLegacyNamesInGlobalCatalog(catalog, card.tags, "card");
-
-  await writeTransaction(database, [CARDS_STORE, SETTINGS_STORE], (transaction) => {
-    transaction.objectStore(CARDS_STORE).put(normalizeCardForStorage(card, nextCatalog));
-    if (nextCatalog !== catalog) transaction.objectStore(SETTINGS_STORE).put({ id: GLOBAL_TAG_CATALOG_SETTING_ID, value: nextCatalog });
+  await writeTransaction(database, [CARDS_STORE], (transaction) => {
+    transaction.objectStore(CARDS_STORE).put(normalizeCardForStorage(card, catalog));
   });
-  if (nextCatalog !== catalog) globalTagMigrationPromise = Promise.resolve(nextCatalog);
-}
-
-export async function deleteTagEverywhere({ kind, records = [], vocabulary = [] }) {
-  const database = await openCatalogDatabase();
-  await migrateLegacyLocalStorage(database);
-  const catalog = await ensureGlobalTagPersistence(database);
-
-  if (kind === "paper") {
-    await writeTransaction(database, [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE, SETTINGS_STORE], (transaction) => {
-      const paperPackStore = transaction.objectStore(PAPER_PACKS_STORE);
-      const deletedPaperPackIdStore = transaction.objectStore(DELETED_PAPER_PACK_IDS_STORE);
-
-      for (const paperPack of records) {
-        paperPackStore.put(normalizePaperPackForStorage(paperPack, catalog));
-        deletedPaperPackIdStore.delete(paperPack.id);
-      }
-
-      transaction.objectStore(SETTINGS_STORE).put({
-        id: PAPER_TAG_VOCABULARY_SETTING_ID,
-        value: uniqueTags(vocabulary)
-      });
-    });
-    return;
-  }
-
-  if (kind === "card") {
-    await writeTransaction(database, [CARDS_STORE, SETTINGS_STORE], (transaction) => {
-      const cardStore = transaction.objectStore(CARDS_STORE);
-
-      for (const card of records) {
-        cardStore.put(normalizeCardForStorage(card, catalog));
-      }
-
-      transaction.objectStore(SETTINGS_STORE).put({
-        id: CARD_TAG_VOCABULARY_SETTING_ID,
-        value: uniqueTags(vocabulary)
-      });
-    });
-    return;
-  }
-
-  throw new Error(`Unsupported tag vocabulary kind: ${kind}`);
 }
 
 export async function restoreCatalogRecords({ paperPacks = [], colors = [], cards = [], owners = [], tagCatalog = null, tagVocabularies = null }) {
@@ -669,51 +618,6 @@ function writeTransaction(database, storeNames, writeCallback) {
       transaction.abort();
       reject(error);
     }
-  });
-}
-
-export function loadPaperTagVocabulary() {
-  return loadGlobalTagNamesForTransitionalPicker();
-}
-
-export function savePaperTagVocabulary(tags) {
-  return saveLegacyTagVocabulary(PAPER_TAG_VOCABULARY_SETTING_ID, uniqueTags(tags), "paper");
-}
-
-export function loadCardTagVocabulary() {
-  return loadGlobalTagNamesForTransitionalPicker();
-}
-
-async function loadGlobalTagNamesForTransitionalPicker() {
-  const catalog = await loadGlobalTagCatalog();
-  return catalog.tags.map((tag) => tag.name);
-}
-
-export function saveCardTagVocabulary(tags) {
-  return saveLegacyTagVocabulary(CARD_TAG_VOCABULARY_SETTING_ID, uniqueTags(tags), "card");
-}
-
-async function saveLegacyTagVocabulary(settingId, tags, productType) {
-  // Transitional only. Remove this legacy name bridge when the global tag-selection UI ships.
-  const database = await openCatalogDatabase();
-  await migrateLegacyLocalStorage(database);
-  const catalog = await ensureGlobalTagPersistence(database);
-  const globalTagCatalog = mergeLegacyVocabularyIntoGlobalCatalog(catalog, {
-    ...(productType === "paper" ? { paperVocabulary: tags } : { cardVocabulary: tags })
-  });
-  await writeTransaction(database, [SETTINGS_STORE], (transaction) => {
-    const settingsStore = transaction.objectStore(SETTINGS_STORE);
-    settingsStore.put({ id: settingId, value: tags });
-    settingsStore.put({ id: GLOBAL_TAG_CATALOG_SETTING_ID, value: globalTagCatalog });
-  });
-  globalTagMigrationPromise = Promise.resolve(globalTagCatalog);
-}
-
-function ensureLegacyNamesInGlobalCatalog(catalog, names = [], productType) {
-  const applicableNames = new Set(catalog.tags.map((tag) => getTagKey(tag.name)));
-  if ((names || []).every((name) => applicableNames.has(getTagKey(name)))) return catalog;
-  return mergeLegacyVocabularyIntoGlobalCatalog(catalog, {
-    ...(productType === "paper" ? { paperVocabulary: names } : { cardVocabulary: names })
   });
 }
 

@@ -225,8 +225,8 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
         }
         try {
           await saveGlobalTagCatalog(result.catalog);
-          renameRuntimeTagDisplay(paperPacks, tag, result.tag, "keywords");
-          renameRuntimeTagDisplay(cards, tag, result.tag, "tags");
+          renameRuntimeTagDisplay(paperPacks, tag.id, result.tag.name, "keywords");
+          renameRuntimeTagDisplay(cards, tag.id, result.tag.name, "tags");
           catalog = result.catalog;
           render();
           dispatchGlobalTagUpdates();
@@ -245,8 +245,8 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
         try {
           const result = await deleteGlobalTagEverywhere(tag.id, { paperRecords: paperPacks });
           catalog = result.catalog;
-          removeRuntimeTagAssignments(paperPacks, tag, "keywords");
-          removeRuntimeTagAssignments(cards, tag, "tags");
+          removeRuntimeTagAssignments(paperPacks, tag.id, "keywords");
+          removeRuntimeTagAssignments(cards, tag.id, "tags");
           render();
           dispatchGlobalTagUpdates();
           onPaperPacksUpdated?.();
@@ -337,26 +337,24 @@ function createSettingsAnnouncer(element) {
   };
 }
 
-function removeRuntimeTagAssignments(records, tag, legacyField) {
+function removeRuntimeTagAssignments(records, tagId, legacyField) {
   for (const record of records) {
-    if (Array.isArray(record.tagIds)) record.tagIds = record.tagIds.filter((id) => id !== tag.id);
-    if (Array.isArray(record[legacyField])) record[legacyField] = record[legacyField].filter((name) => name.trim().toLocaleLowerCase() !== tag.name.trim().toLocaleLowerCase());
+    const removedIndex = record.tagIds?.indexOf(tagId) ?? -1;
+    if (removedIndex < 0) continue;
+    record.tagIds = record.tagIds.filter((id) => id !== tagId);
+    if (Array.isArray(record[legacyField])) record[legacyField].splice(removedIndex, 1);
   }
 }
 
-function renameRuntimeTagDisplay(records, previousTag, nextTag, legacyField) {
+function renameRuntimeTagDisplay(records, tagId, nextName, legacyField) {
   for (const record of records) {
-    if (!Array.isArray(record[legacyField])) continue;
-    record[legacyField] = record[legacyField].map((name) =>
-      name.trim().toLocaleLowerCase() === previousTag.name.trim().toLocaleLowerCase() ? nextTag.name : name
-    );
+    const tagIndex = record.tagIds?.indexOf(tagId) ?? -1;
+    if (tagIndex >= 0 && Array.isArray(record[legacyField])) record[legacyField][tagIndex] = nextName;
   }
 }
 
 function dispatchGlobalTagUpdates() {
   document.dispatchEvent(new CustomEvent("catalog:global-tags-updated"));
-  document.dispatchEvent(new CustomEvent("catalog:paper-tags-updated"));
-  document.dispatchEvent(new CustomEvent("catalog:card-tags-updated"));
 }
 
 function confirmTagDeletion(tag, assignmentCount, recordName) {

@@ -101,7 +101,7 @@ release year
 pattern count
 availability
 refill available
-keywords
+tagIds
 patterns
 recently added status
 
@@ -149,11 +149,13 @@ The Card Status change raised the catalog schema to version 3. Cards now persist
 
 Phase B2 raises the backup envelope to version 3. Version-3 Standard and Compact iPad exports contain one `tagCatalog` object (`schemaVersion`, `tags`, and `categories`), and Paper/Card records contain only `tagIds`. Version-1/2 backups with optional `tagVocabularies` and legacy `keywords`/`tags` remain importable through in-memory conversion and reconciliation. The record catalog schema remains version 3.
 
-Paper and Card Add/Edit forms select global tags by stable ID through the shared category-aware picker and persist canonical `tagIds`. Temporary runtime `keywords` and `tags` name projections remain available for current card/detail display compatibility; they are not authoritative picker, filter, search, or persisted state.
+Paper and Card Add/Edit forms select global tags by stable ID through the shared category-aware picker and persist canonical `tagIds`. Runtime `keywords` and `tags` arrays are derived display projections used only by existing Paper/Card tile and detail renderers. They remain enumerable so ordinary runtime record copies retain canonical `tagIds`; persistence validates and writes `tagIds` directly and never rebuilds identity from those display names.
 
 Every global tag is assignable to Paper Packs, Cards, and Stamp Sets. Assignment validation checks that each `tagId` identifies a real tag and never a category; it does not filter by product type. The legacy `appliesTo` field is optional, deprecated compatibility metadata. Existing catalogs and backups may retain and round-trip it, but current selection, search, validation, legacy fallback resolution, and runtime projections ignore it. Newly created tags omit it without changing the catalog or backup schema version.
 
 Paper and Card Library tag filters consume canonical item `tagIds`. Individual tag constraints use AND semantics. Each category constraint resolves its current member IDs from the global catalog and uses OR semantics; selected category members replace the full membership set as a refinement. Independent tag and category constraints combine with AND semantics. General Library search resolves assigned tag IDs to current display names, so renaming a tag changes searchable text without changing persisted assignments. Category names are not general-search terms. The retained Holiday quick filter resolves the current Holiday tag (or a Holiday/Holidays category fallback) to stable identity before evaluating item IDs.
+
+The old product-specific vocabulary stores, vocabulary loaders/writers, inline name-to-tag creation bridge, and Paper/Card-specific tag update events have been removed. The legacy `paperTagVocabulary` and `cardTagVocabulary` setting IDs are still read during the idempotent one-time migration and may be written only while restoring an older backup; they are not current taxonomy stores. Legacy Paper `keywords` and Card `tags` are likewise accepted only by migration/import compatibility paths.
 
 # Error Handling
 Never lose user data.

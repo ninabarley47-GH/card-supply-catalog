@@ -75,8 +75,6 @@ test("backup and restore round-trip includes Cards and their persistent image re
     colorsById,
     services: {
       loadSavedCards: async () => [],
-      loadPaperTagVocabulary: async () => [],
-      loadCardTagVocabulary: async () => [],
       preparePaperPack: async (record) => ({ paperPack: record }),
       restoreCatalogRecords: async (records) => persistedCalls.push(records),
       dispatchCardsRestored: () => { cardsRestoredEvents += 1; }
@@ -163,8 +161,6 @@ test("legacy backup without tag vocabularies reconstructs them from records and 
     colorsById: {},
     services: {
       loadSavedCards: async () => [],
-      loadPaperTagVocabulary: async () => [],
-      loadCardTagVocabulary: async () => [],
       preparePaperPack: async (record) => ({ paperPack: record }),
       restoreCatalogRecords: async (records) => persistedCalls.push(records),
       dispatchCardsRestored: () => {}
@@ -191,8 +187,6 @@ test("restore treats a missing saved Paper tag vocabulary as empty", async () =>
     colorsById: {},
     services: {
       loadSavedCards: async () => [],
-      loadPaperTagVocabulary: async () => null,
-      loadCardTagVocabulary: async () => [],
       preparePaperPack: async (record) => ({ paperPack: record }),
       restoreCatalogRecords: async (records) => persistedCalls.push(records),
       dispatchCardsRestored: () => {}
@@ -218,8 +212,6 @@ test("malformed import is rejected before reading or writing catalog storage", a
     colorsById: {},
     services: {
       loadSavedCards: async () => { storageCalls += 1; return []; },
-      loadPaperTagVocabulary: async () => { storageCalls += 1; return []; },
-      loadCardTagVocabulary: async () => { storageCalls += 1; return []; },
       restoreCatalogRecords: async () => { storageCalls += 1; }
     }
   });
@@ -245,8 +237,6 @@ test("failed atomic restore leaves all in-memory catalog collections unchanged",
     colorsById,
     services: {
       loadSavedCards: async () => [],
-      loadPaperTagVocabulary: async () => [],
-      loadCardTagVocabulary: async () => [],
       preparePaperPack: async (record) => ({ paperPack: record }),
       restoreCatalogRecords: async () => {
         atomicWrites += 1;

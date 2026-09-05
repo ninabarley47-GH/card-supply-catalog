@@ -291,13 +291,11 @@ card images should use the same folder-backed + thumbnail methodology you’ve n
 
 CSC will use a single global tag vocabulary shared across Paper Packs, Cards, and Stamp Sets rather than maintaining separate tag vocabularies for each product type.
 
-Each tag will indicate which product types it applies to: Paper, Card, Stamp, or any combination of them.
+Decision 31 supersedes the original product-applicability proposal below: every global tag is now available to Paper, Card, and Stamp.
 
 The tag system will also support **categories** for organizing related tags. Categories provide organization and broader filtering but are not themselves assigned to catalog items.
 
-A tag may:
-* Apply to one or more product types.
-* Belong to no category, one category, or multiple categories.
+A tag may belong to no category, one category, or multiple categories.
 
 For example, `Birthday` may belong to both `Messages` and `Celebrations` while remaining a single global tag.
 
@@ -345,7 +343,7 @@ Selected filters retain AND behavior. A selected category is one filter whose me
 
 Deleting a category removes only its relationships and never deletes member tags. A tag with item assignments cannot be converted into a category without explicit resolution of those assignments.
 
-During the persistence transition, inline legacy-name tag creation remains supported only as a compatibility bridge for the existing UI. This bridge must be removed when the global tag-selection UI replaces the legacy pickers; it is not a second permanent tag source of truth.
+The former inline legacy-name creation bridge was removed after the global Add/Edit picker shipped. Modern create/edit, filtering, search, and persistence are ID-authoritative. Legacy names remain accepted only at explicit migration and older-backup import boundaries.
 
 ### Proposed Import Conflict Policy — Pending Separate Approval
 

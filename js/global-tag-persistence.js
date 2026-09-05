@@ -54,12 +54,12 @@ export async function migrateGlobalTagPersistence({ readState, commitMigration }
 
 export function hydratePaperTagNames(record, catalog) {
   if (!Array.isArray(record?.tagIds)) return record;
-  return attachTransitionalTagIds({ ...withoutTagIds(record), keywords: resolveTagNames(record.tagIds, catalog, "paper") }, record.tagIds);
+  return { ...record, tagIds: [...record.tagIds], keywords: resolveTagNames(record.tagIds, catalog, "paper") };
 }
 
 export function hydrateCardTagNames(record, catalog) {
   if (!Array.isArray(record?.tagIds)) return record;
-  return attachTransitionalTagIds({ ...withoutTagIds(record), tags: resolveTagNames(record.tagIds, catalog, "card") }, record.tagIds);
+  return { ...record, tagIds: [...record.tagIds], tags: resolveTagNames(record.tagIds, catalog, "card") };
 }
 
 export function dehydratePaperTagNames(record, catalog) {
@@ -72,11 +72,6 @@ export function dehydrateCardTagNames(record, catalog) {
 
 export function isCurrentGlobalTagCatalog(catalog) {
   return catalog?.schemaVersion === GLOBAL_TAG_CATALOG_SCHEMA_VERSION && validateGlobalTagCatalog(catalog).ok;
-}
-
-export function mergeLegacyVocabularyIntoGlobalCatalog(catalog, { paperVocabulary = [], cardVocabulary = [] } = {}) {
-  const result = migrateLegacyTagData({ catalog, paperVocabulary, cardVocabulary });
-  return result.catalog;
 }
 
 function toTagIdRecord(record, tagIds = [], legacyField = "keywords") {
@@ -99,16 +94,10 @@ function resolveTagNames(tagIds, catalog, productType) {
 
 function dehydrateTagNames(record, catalog, productType, legacyField) {
   if (!Array.isArray(record?.tagIds)) return record;
-  const suppliedNames = Array.isArray(record[legacyField])
-    ? record[legacyField]
-    : resolveTagNames(record.tagIds, catalog, productType);
-  const tagsByName = new Map(catalog.tags
-    .map((tag) => [tag.name.trim().replace(/\s+/g, " ").toLocaleLowerCase(), tag.id]));
-  const tagIds = suppliedNames.map((name) => tagsByName.get(String(name).trim().replace(/\s+/g, " ").toLocaleLowerCase()));
-  if (tagIds.some((tagId) => !tagId)) {
-    throw new TypeError(`Cannot persist an unknown ${productType} tag before it exists in the global catalog.`);
-  }
-  const persistentRecord = { ...record, tagIds: [...new Set(tagIds)] };
+  const tagIds = [...new Set(record.tagIds)];
+  const validation = validateItemTagAssignments({ catalog, productType, tagIds });
+  if (!validation.ok) throw new TypeError(`Cannot persist invalid ${productType} tag assignments.`);
+  const persistentRecord = { ...record, tagIds };
   delete persistentRecord[legacyField];
   return persistentRecord;
 }
@@ -123,19 +112,4 @@ function cloneCatalog(catalog) {
     })),
     categories: catalog.categories.map((category) => ({ ...category }))
   };
-}
-
-function withoutTagIds(record) {
-  const { tagIds, ...recordWithoutTagIds } = record;
-  return recordWithoutTagIds;
-}
-
-function attachTransitionalTagIds(record, tagIds) {
-  Object.defineProperty(record, "tagIds", {
-    configurable: true,
-    enumerable: false,
-    value: [...tagIds],
-    writable: true
-  });
-  return record;
 }

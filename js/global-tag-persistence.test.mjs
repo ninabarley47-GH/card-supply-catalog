@@ -7,7 +7,6 @@ import {
   dehydratePaperTagNames,
   hydrateCardTagNames,
   hydratePaperTagNames,
-  mergeLegacyVocabularyIntoGlobalCatalog,
   migrateGlobalTagPersistence
 } from "./global-tag-persistence.js";
 
@@ -133,7 +132,7 @@ test("transition loaders accept legacy and tagIds Card records", () => {
   assert.deepEqual(hydrateCardTagNames({ id: "new", tagIds: ["tag-b"] }, catalog).tags, ["Birthday"]);
 });
 
-test("transition adapter is lossless across display-name changes and unchanged saves", () => {
+test("runtime display projections remain ID-authoritative across renames and saves", () => {
   const originalCatalog = {
     schemaVersion: 1,
     tags: [{ id: "tag-stable", name: "Birds", appliesTo: ["paper", "card"], categoryIds: [] }],
@@ -152,13 +151,13 @@ test("transition adapter is lossless across display-name changes and unchanged s
   assert.deepEqual(renamedCard.tags, ["Winged Creatures"]);
   assert.deepEqual(dehydratePaperTagNames(renamedPaper, renamedCatalog), storedPaper);
   assert.deepEqual(dehydrateCardTagNames(renamedCard, renamedCatalog), storedCard);
-  assert.equal(Object.keys(renamedPaper).includes("tagIds"), false);
-  assert.equal(JSON.stringify(renamedCard).includes("tagIds"), false);
+  assert.equal(Object.keys(renamedPaper).includes("tagIds"), true);
+  assert.equal(JSON.stringify(renamedCard).includes("tagIds"), true);
   assert.equal(renamedCatalog.tags.length, 1);
   assert.equal(renamedCatalog.tags[0].id, "tag-stable");
   assert.deepEqual(
     dehydratePaperTagNames({ id: "new-paper", keywords: ["Winged Creatures"], tagIds: [] }, renamedCatalog),
-    { id: "new-paper", tagIds: ["tag-stable"] }
+    { id: "new-paper", tagIds: [] }
   );
 });
 
@@ -167,31 +166,4 @@ test("near-duplicates remain separate and are only reported", async () => {
   const result = await migrateGlobalTagPersistence(harness);
   assert.equal(result.catalog.tags.length, 2);
   assert.equal(result.fuzzyDuplicateCandidates.length, 1);
-});
-
-test("transitional vocabulary writes add exact tags without duplicating tags or changing categories", () => {
-  const catalog = {
-    schemaVersion: 1,
-    tags: [{ id: "tag-floral", name: "Floral", appliesTo: ["paper"], categoryIds: ["category-style"] }],
-    categories: [{ id: "category-style", name: "Style" }]
-  };
-  const merged = mergeLegacyVocabularyIntoGlobalCatalog(catalog, {
-    paperVocabulary: [" floral ", "Geometric"]
-  });
-  assert.equal(merged.tags.filter((tag) => tag.name === "Floral").length, 1);
-  assert.equal(merged.tags.some((tag) => tag.name === "Geometric"), true);
-  assert.deepEqual(merged.categories, catalog.categories);
-  assert.deepEqual(merged.tags.find((tag) => tag.id === "tag-floral").categoryIds, ["category-style"]);
-});
-
-test("assigning an existing global tag through another product reuses its ID and expands applicability", () => {
-  const catalog = {
-    schemaVersion: 1,
-    tags: [{ id: "tag-hearts", name: "Hearts", appliesTo: ["card"], categoryIds: [] }],
-    categories: []
-  };
-  const merged = mergeLegacyVocabularyIntoGlobalCatalog(catalog, { paperVocabulary: ["Hearts"] });
-  assert.equal(merged.tags.length, 1);
-  assert.equal(merged.tags[0].id, "tag-hearts");
-  assert.deepEqual(merged.tags[0].appliesTo, ["paper", "card"]);
 });
