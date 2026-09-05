@@ -1,3 +1,8 @@
+import {
+  prepareFolderBackedImage, prepareEmbeddedImage as prepareEmbeddedCardImage,
+  hydrateImageReference as hydrateCardImageSource, hasDirectoryPermission,
+  getFileFromRelativePath, getDirectoryFromRelativePath, createThumbnailImageFileName
+} from './image-references.js';
 import { loadCatalogSetting } from './storage.js';
 import { generateImageThumbnail } from './thumbnails.js';
 import { isUsableThumbnailFile, runTasksWithConcurrency } from './images.js';
@@ -6,8 +11,6 @@ import { supportsOpenFilePicker, supportsOrdinaryImageFileFallback } from './bro
 const IMAGE_LIBRARY_SETTING_ID = 'imageLibrary';
 const CARD_IMAGE_LIBRARY_SETTING_ID = 'cardImageLibrary';
 const CARD_IMAGE_LIBRARY_MARKER = 'card-images';
-const LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY = 'local-folder';
-const EMBEDDED_IMAGE_STORAGE_STRATEGY = 'embedded-indexed-db';
 const THUMBNAIL_GENERATION_CONCURRENCY = 4;
 const SUPPORTED_CARD_IMAGE_FILE_PATTERN = /\.(?:jpe?g|png|webp|gif)$/i;
 const SUPPORTED_CARD_IMAGE_MIME_TYPES = new Set([
@@ -91,7 +94,7 @@ export async function generateMissingCardImageThumbnails(cards = []) {
         }
 
         const sourceImage = await (await directory.getFileHandle(imageName)).getFile();
-        await writeFile(directory, thumbnailName, await generateImageThumbnail(sourceImage));
+        await repairCardThumbnail(directory, thumbnailName, await generateImageThumbnail(sourceImage));
 
         if (existingThumbnailHandle) {
           summary.thumbnailsRepaired += 1;
@@ -287,94 +290,6 @@ export function getCardDetailImageSource(card) {
   return card.imagePreviewSrc || card.imageSrc || getCardLibraryImageSource(card);
 }
 
-async function prepareFolderBackedCardImage(card, selectedImage, rootDirectory) {
-  const cardWithoutImage = removeStoredCardImageFields(card);
-  const imageName = selectedImage.imagePath
-    ? selectedImage.file.name
-    : await createAvailableImageFileName(rootDirectory, selectedImage.file.name);
-  const thumbnailName = createThumbnailImageFileName(imageName);
-  const { directory, directoryPath } = selectedImage.imagePath
-    ? await getDirectoryFromRelativePath(rootDirectory, selectedImage.imagePath)
-    : { directory: rootDirectory, directoryPath: '' };
-  const imagePath = selectedImage.imagePath || imageName;
-  const thumbnailPath = directoryPath ? `${directoryPath}/${thumbnailName}` : thumbnailName;
-
-  if (!selectedImage.imagePath) {
-    await writeFile(directory, imageName, selectedImage.file);
-  }
-
-  if (!(await fileExists(directory, thumbnailName))) {
-    await writeFile(directory, thumbnailName, await generateImageThumbnail(selectedImage.file));
-  }
-
-  return {
-    ...cardWithoutImage,
-    imageName,
-    imagePath,
-    thumbnailImagePath: thumbnailPath,
-    imageLibrary: CARD_IMAGE_LIBRARY_MARKER,
-    imageStorageStrategy: LOCAL_FOLDER_IMAGE_STORAGE_STRATEGY
-  };
-}
-
-async function prepareEmbeddedCardImage(card, imageFile) {
-  const cardWithoutImage = removeStoredCardImageFields(card);
-  const thumbnail = await generateImageThumbnail(imageFile);
-
-  return {
-    ...cardWithoutImage,
-    imageName: imageFile.name,
-    imageSrc: await blobToDataUrl(imageFile),
-    thumbnailImageSrc: await blobToDataUrl(thumbnail),
-    imageStorageStrategy: EMBEDDED_IMAGE_STORAGE_STRATEGY
-  };
-}
-
-function removeStoredCardImageFields(card) {
-  const {
-    imageName,
-    imagePath,
-    thumbnailImagePath,
-    imageLibrary,
-    imageStorageStrategy,
-    imageSrc,
-    thumbnailImageSrc,
-    imagePreviewSrc,
-    imageThumbnailSrc,
-    ...cardWithoutImage
-  } = card;
-
-  return cardWithoutImage;
-}
-
-async function hydrateCardImageSource(card, rootDirectory) {
-  clearCardImageObjectUrls(card);
-
-  try {
-    const imageFile = await getFileFromRelativePath(rootDirectory, card.imagePath);
-    card.imagePreviewSrc = URL.createObjectURL(imageFile);
-  } catch (error) {
-    // The no-image placeholder remains visible when the original cannot be read.
-  }
-
-  try {
-    const thumbnailFile = await getFileFromRelativePath(rootDirectory, card.thumbnailImagePath);
-    card.imageThumbnailSrc = URL.createObjectURL(thumbnailFile);
-  } catch (error) {
-    // The full-resolution image remains the display fallback.
-  }
-}
-
-function clearCardImageObjectUrls(card) {
-  for (const property of ['imagePreviewSrc', 'imageThumbnailSrc']) {
-    if (card[property]?.startsWith('blob:')) {
-      URL.revokeObjectURL(card[property]);
-    }
-
-    delete card[property];
-  }
-}
-
 async function getDirectoryHandle(settingId, mode) {
   const imageLibrary = await loadCatalogSetting(settingId);
   const directoryHandle = imageLibrary?.directoryHandle;
@@ -384,49 +299,6 @@ async function getDirectoryHandle(settingId, mode) {
   }
 
   return directoryHandle;
-}
-
-async function hasDirectoryPermission(directoryHandle, mode) {
-  if (!directoryHandle?.queryPermission) {
-    return false;
-  }
-
-  try {
-    const permission = { mode };
-
-    if ((await directoryHandle.queryPermission(permission)) === 'granted') {
-      return true;
-    }
-
-    return directoryHandle.requestPermission &&
-      (await directoryHandle.requestPermission(permission)) === 'granted';
-  } catch (error) {
-    return false;
-  }
-}
-
-async function getFileFromRelativePath(rootDirectory, imagePath) {
-  const pathParts = String(imagePath || '').split('/').filter(Boolean);
-  const fileName = pathParts.pop();
-  let directory = rootDirectory;
-
-  for (const directoryName of pathParts) {
-    directory = await directory.getDirectoryHandle(directoryName);
-  }
-
-  return await (await directory.getFileHandle(fileName)).getFile();
-}
-
-async function getDirectoryFromRelativePath(rootDirectory, imagePath) {
-  const pathParts = String(imagePath || '').split('/').filter(Boolean);
-  pathParts.pop();
-  let directory = rootDirectory;
-
-  for (const directoryName of pathParts) {
-    directory = await directory.getDirectoryHandle(directoryName);
-  }
-
-  return { directory, directoryPath: pathParts.join('/') };
 }
 
 async function findRelativePathForFileHandle(directoryHandle, targetFileHandle, pathPrefix = '') {
@@ -453,55 +325,14 @@ async function findRelativePathForFileHandle(directoryHandle, targetFileHandle, 
   return '';
 }
 
-async function writeFile(directory, fileName, contents) {
-  const fileHandle = await directory.getFileHandle(fileName, { create: true });
-  const writable = await fileHandle.createWritable();
 
+async function prepareFolderBackedCardImage(card, selectedImage, directory) {
+  return prepareFolderBackedImage(card, selectedImage, directory, { imageLibrary: CARD_IMAGE_LIBRARY_MARKER });
+}
+
+async function repairCardThumbnail(directory, name, contents) {
+  const handle = await directory.getFileHandle(name, { create: true });
+  const writable = await handle.createWritable();
   await writable.write(contents);
   await writable.close();
-}
-
-async function fileExists(directory, fileName) {
-  try {
-    await directory.getFileHandle(fileName);
-    return true;
-  } catch (error) {
-    return false;
-  }
-}
-
-async function createAvailableImageFileName(directory, requestedName) {
-  const normalizedName = String(requestedName || 'card-image.jpg');
-
-  if (!(await fileExists(directory, normalizedName)) &&
-      !(await fileExists(directory, createThumbnailImageFileName(normalizedName)))) {
-    return normalizedName;
-  }
-
-  const extensionMatch = normalizedName.match(/(\.[^.]+)$/);
-  const extension = extensionMatch?.[1] || '';
-  const baseName = extension ? normalizedName.slice(0, -extension.length) : normalizedName;
-  let suffix = 2;
-  let candidateName = `${baseName}-${suffix}${extension}`;
-
-  while (await fileExists(directory, candidateName) ||
-         await fileExists(directory, createThumbnailImageFileName(candidateName))) {
-    suffix += 1;
-    candidateName = `${baseName}-${suffix}${extension}`;
-  }
-
-  return candidateName;
-}
-
-function createThumbnailImageFileName(imageName) {
-  return `${imageName.replace(/\.[^.]+$/, '')}.thumb.jpg`;
-}
-
-function blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener('load', () => resolve(reader.result));
-    reader.addEventListener('error', () => reject(reader.error));
-    reader.readAsDataURL(blob);
-  });
 }

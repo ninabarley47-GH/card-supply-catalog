@@ -78,6 +78,7 @@ function databaseHarness() {
   stores.get('settings').set('globalTagCatalog', { id: 'globalTagCatalog', value: structuredClone(catalog) });
   stores.get('settings').set('globalTagMigrationVersion', { id: 'globalTagMigrationVersion', value: 1 });
   const added = [];
+  let failCommit = false;
   const request = (result) => {
     const target = new EventTarget();
     target.result = structuredClone(result);
@@ -108,11 +109,14 @@ function databaseHarness() {
         for (const [key, value] of snapshot) stores.set(key, value);
         target.dispatchEvent(new Event('abort'));
       };
-      if (mode === 'readwrite') queueMicrotask(() => { if (!aborted) target.dispatchEvent(new Event('complete')); });
+      if (mode === 'readwrite') queueMicrotask(() => {
+        if (failCommit) { failCommit = false; target.error = new Error('Simulated failed commit'); target.abort(); }
+        else if (!aborted) target.dispatchEvent(new Event('complete'));
+      });
       return target;
     }
   };
-  return { stores, added, indexedDB: { open(name, version) {
+  return { stores, added, failNextCommit: () => { failCommit = true; }, indexedDB: { open(name, version) {
     assert.equal(name, 'card-supply-catalog');
     assert.equal(version, 6);
     const target = new EventTarget();
@@ -180,4 +184,48 @@ test('Release Year validates the DSP year range while legacy creation dates rema
   assert.equal(normalized.dateCreated, legacy.dateCreated);
   assert.equal(normalized.id, legacy.id);
   assert.deepEqual(normalized.tagIds, legacy.tagIds);
+});
+
+
+test('image references and inferred ordinary tags commit together and survive reload', async () => {
+  const harness = databaseHarness();
+  const previousWindow = globalThis.window;
+  globalThis.window = { indexedDB: harness.indexedDB, localStorage: { getItem: () => 'true' } };
+  try {
+    const { inferStampDieImageTags } = await import('./stamp-die-image-tags.js');
+    const storage = await import('./storage.js?image-set-save');
+    const inferred = inferStampDieImageTags(catalog, ['stable-one'], ['stamp.jpg', 'die.jpg', 'mask.jpg']);
+    const refs = [
+      { imageName: 'stamp.jpg', imagePath: 'stamp.jpg', imageLibrary: 'stamp-die-images', thumbnailImagePath: 'stamp.thumb.jpg', imageStorageStrategy: 'local-folder' },
+      { imageName: 'die.jpg', imageSrc: 'data:image/jpeg;base64,ZnVsbA==', thumbnailImageSrc: 'data:image/jpeg;base64,dGh1bWI=', imageStorageStrategy: 'embedded-indexed-db' }
+    ];
+    const record = { ...setRecord(), imageRefs: refs, tagIds: inferred.tagIds };
+    await storage.saveStampDieSet(record, { inferredTags: inferred.inferredTags });
+    const nextSession = await import('./storage.js?image-set-reload');
+    const [reloaded] = await nextSession.loadSavedStampDieSets();
+    assert.deepEqual(reloaded.imageRefs, refs);
+    assert.deepEqual(reloaded.tagIds, inferred.tagIds);
+    const savedCatalog = await nextSession.loadGlobalTagCatalog();
+    assert.equal(savedCatalog.tags.length, 4);
+    assert.ok(savedCatalog.tags.some((tag) => tag.name === 'Stamp'));
+    assert.ok(savedCatalog.tags.some((tag) => tag.name === 'Die'));
+    assert.ok(savedCatalog.tags.some((tag) => tag.name === 'Mask'));
+  } finally { globalThis.window = previousWindow; }
+});
+
+test('failed Set transaction leaves both image references and inferred global tags unpersisted', async () => {
+  const harness = databaseHarness();
+  const previousWindow = globalThis.window;
+  globalThis.window = { indexedDB: harness.indexedDB, localStorage: { getItem: () => 'true' } };
+  try {
+    const { inferStampDieImageTags } = await import('./stamp-die-image-tags.js');
+    const storage = await import('./storage.js?image-set-abort');
+    await storage.loadSavedStampDieSets();
+    const before = structuredClone(harness.stores);
+    const inferred = inferStampDieImageTags(catalog, [], ['stamp.jpg']);
+    harness.failNextCommit();
+    await assert.rejects(storage.saveStampDieSet({ ...setRecord(), tagIds: inferred.tagIds, imageRefs: [{ imageSrc: 'data:image/jpeg;base64,ZnVsbA==' }] }, { inferredTags: inferred.inferredTags }));
+    assert.deepEqual(harness.stores, before);
+    assert.deepEqual(await storage.loadGlobalTagCatalog(), catalog);
+  } finally { globalThis.window = previousWindow; }
 });

@@ -1,18 +1,20 @@
 # Stamp & Die Catalog
 
-## Phases 1 and 2A: Library, data model, and Add Set
+## Status
 
-Status: Phase 1 and Phase 2A implemented. Add Set creates metadata-only records.
+Phases 1, 2A, and 2B1 are implemented: a Library, Add Set metadata workflow,
+and ordered multiple-image selection/persistence. Edit, Detail, filtering, search,
+Card relationships, and backup/restore remain out of scope.
 
-A Stamp & Die Set is one catalog record containing stamps only, dies only, or
-coordinating stamps and dies. There are no individual stamp or die records,
-separate stampIds/dieIds, or required per-image Stamp/Die classifications.
+A Stamp & Die Set is one catalog record for stamps only, dies only, or coordinating
+stamps and dies. There are no individual stamp/die records, separate stampIds or
+dieIds, or required per-image classifications. Every image belongs to the same Set.
 
-## Record
+## Canonical record
 
 ```js
 {
-  schemaVersion: 4,
+  schemaVersion: 5,
   id: 'stable-set-id',
   name: 'Set name',
   imageRefs: [],
@@ -23,128 +25,152 @@ separate stampIds/dieIds, or required per-image Stamp/Die classifications.
 }
 ```
 
-The name is required and trimmed. Identity is a stable, nonempty string and is
-not regenerated from the name. `dateCreated` follows Cards' existing naming and
-YYYY-MM-DD convention. `favorite` follows the existing Paper/Card boolean field.
-Add Set defaults Release Year to the current year, Favorite to false, and tags to empty.
-Creation date remains automatic local-today metadata; it is not a release date.
-The form and storage path validate supplied values before persistence.
-`schemaVersion` uses the existing shared catalog-record version helper. The Release
-Year follow-up raises that version to 4. Earlier records remain readable without
-a release year; their original creation dates are preserved and never inferred as
-release years. No database upgrade or bulk record rewrite is required.
+Identity is a generated `set-` UUID, with the same timestamp/random fallback as
+Cards. Names do not determine identity. Set Name is required and trimmed.
+Normalized duplicates within the Stamp & Die Catalog are rejected: case,
+surrounding whitespace, and repeated internal whitespace do not distinguish names.
+The existing `getTagKey()` helper supplies the comparison key. Add Set reads saved
+Sets at submit time and never checks other catalog types. A duplicate error keeps
+the entire draft intact. Future ownership data will describe who owns one Set
+rather than requiring duplicate records for different owners.
 
-`imageRefs` is an ordered array, empty or containing multiple reference objects.
-Each reference has a relative `imagePath` and optional `imageName` and
-`imageLibrary`, using existing Paper/Card reference field names. All references
-belong to the same set. Only reference metadata is serialized; temporary blob URLs,
-file handles, and image contents are not stored. No Stamp & Die folder marker or
-folder selection is implemented. Future image storage can extend each reference
-with the established thumbnail/fallback fields when that behavior is implemented.
-Future Library and Detail views should show all images, side-by-side when practical.
+Release Year matches DSP: a required whole year from 1990 to 2100, defaulting to
+the current year. Older Sets may omit it and show "Release year not recorded".
+`dateCreated` remains automatic creation metadata in local YYYY-MM-DD format,
+using Cards' shared date helper. Existing creation dates are never converted into
+release years. Favorite defaults to false; manually selected tags start empty.
 
-## Global tags
+The shared `addCatalogSchemaVersion()` boundary is authoritative. Release Year
+raised the catalog schema from 3 to 4; Phase 2B1 raises it to 5 because persisted
+image references now accept embedded image data and thumbnail fields that the old
+normalizer rejected or discarded. These are shared catalog versions, not Set-specific
+versions. Older path-only/no-image records remain readable. IndexedDB stays at
+version 6; the backup envelope stays at 3. No bulk record rewrite is needed.
 
-Sets assign canonical stable `tagIds` from the existing global catalog, never names
-or category IDs. All global tags are available; deprecated `appliesTo` metadata
-cannot restrict assignments. Categories organize tags and are not record fields.
-Stamp and Die are ordinary global tags, not separate entity types or special flags.
-Neither phase automatically creates either tag.
+## Image references and shared utilities
 
-Future filename inference may add Die when a filename contains `die`, ignoring case,
-or add Stamp for a stamp image whose filename does not contain `die`. Inference
-is additive only and never automatically removes either tag. Users may manually
-add or remove either tag. No inference is implemented in Phase 2A.
+`imageRefs` is an ordered array. It wraps existing CSC image field meanings rather
+than establishing another image storage format. Each reference may contain:
 
-## Storage and shell
+```js
+{
+  imageName: 'set-stamps.jpg',
+  imagePath: 'set-stamps.jpg',             // relative folder path, when folder-backed
+  imageLibrary: 'stamp-die-images',        // folder identity
+  thumbnailImagePath: 'set-stamps.thumb.jpg',
+  imageStorageStrategy: 'local-folder'
+}
+// Embedded fallback:
+{
+  imageName: 'set-dies.jpg',
+  imageSrc: 'data:image/jpeg;base64,...',
+  thumbnailImageSrc: 'data:image/jpeg;base64,...',
+  imageStorageStrategy: 'embedded-indexed-db'
+}
+```
 
-IndexedDB remains authoritative. Database version 6 adds only the `stampDieSets`
-object store with keyPath `id`, preserving existing stores and records. The existing
-storage module exposes `loadSavedStampDieSets` and `saveStampDieSet`; normalization
-lives in `js/stamp-die-sets.js`. Existing global-tag usage counts, assignment
-validation, and atomic tag deletion include saved sets so tag references stay valid.
+A valid reference requires an imagePath or embedded imageSrc. Thumbnail fields are
+optional. Supported embedded image types are JPEG, PNG, WebP, and GIF. Persistence
+whitelists the canonical fields and rejects invalid paths/data; temporary blob URLs,
+imagePreviewSrc, imageThumbnailSrc, File objects, and handles are never record data.
 
-The Stamps & Dies navigation link opens `#stamps-dies` through the existing shared
-hash-navigation handler. The Library reuses existing structure and CSS and hides other libraries' sidebar
-controls. It loads saved records on startup and renders each name, release year, Favorite
-state, current tag display names, and a simple No image placeholder. Tiles have
-no Detail or Edit actions, and no sample records are created.
+`image-references.js` extracts Card image preparation, relative-path loading,
+thumbnail naming, embedded encoding, and runtime URL cleanup for reuse. Cards
+continue using those implementations with their existing library marker. Sets reuse
+Card file validation/preview and thumbnail-first source selection, the existing
+browser-capability helpers, and `thumbnails.js` (400px JPEG thumbnails).
+`stamp-die-images.js` coordinates arrays and the Set folder; it does not duplicate
+image encoders or the folder-reference format.
 
-Decision 32 applies to future Stamp & Die images: editing or deleting a catalog
-record must never delete, move, rename, overwrite, or otherwise modify existing
-files in the user-selected shared library. Phases 1 and 2A have no image filesystem access.
+## Add Set image workflow
 
-## Boundaries
+Choose Images accepts multiple images in one operation. Native open-file selection
+is used where available; other browsers, including iPad, use a multiple file input.
+The order returned by selection is retained, and later selections append to it.
+Compact previews have Remove buttons. No image classification input is present.
 
-No Edit, image import or persistence, folder selection/scanning, thumbnails,
-filename inference, Library search/filtering, category management, detail panel, Card relationships,
-or backup/restore support is included. Standard and iPad backups do not include
-Stamp & Die Set records in this phase. Cards' existing free-text `stampSets` values
-remain unchanged; they are not stable references to these records.
+Choose Image Folder is available on browsers supporting directory selection. It
+stores a separate directory handle under `stampDieImageLibrary` in existing Settings
+storage, without a Settings redesign. Users can choose the same folder again to
+reconnect it. Selecting a folder does not import/scan it or write image files.
+
+On Save, a selected file already within that folder is referenced at its relative
+path using the directory handle's resolve method. Files selected elsewhere are
+copied into the folder root using an available filename. Originals and existing
+sibling thumbnails are retained; only missing thumbnails are created. The copy-name
+check accounts for both original and thumbnail collisions, and the shared save
+writer refuses to overwrite an existing file. Permission/read errors are not treated
+as proof that a file is absent.
+
+When no writable folder is available, or preparation in the folder fails, the
+original image and thumbnail are embedded in IndexedDB. A browser without working
+thumbnail generation can retain the embedded original without a thumbnail. Save
+reports when images were kept in browser storage. A Set without images remains valid.
+
+Failed record saves retain the draft for retry. Prepared image references are reused
+for that draft/folder to avoid recopying successful preparations. Filesystem creation
+and IndexedDB cannot form one transaction: new files can remain if a subsequent
+thumbnail/record write fails. They are never deleted as rollback. This limitation
+preserves the shared-library invariant.
+
+Cancel/Escape discards draft fields, previews, and selection without saving a Set or
+inference tags. Removing a draft image affects only the in-memory selection and
+preview URL, never user files. Late file-read results after cancellation are ignored.
+An explicitly chosen image-folder setting remains remembered. During Save the form
+blocks repeated submits and dismissal; while images load, Save is disabled.
+
+## Global tags and filename inference
+
+All tags remain universally available through the existing D1 category-aware picker.
+Only stable tag IDs are assignments; categories organize the picker and are never
+assigned. Deprecated appliesTo metadata does not restrict Set assignments. Ordinary
+tag creation remains in Settings; there is no inline tag-creation form.
+
+For each newly selected image, filename inference uses this case-insensitive order:
+contains `mask` adds ordinary global Mask; else contains `die` adds ordinary global
+Die; otherwise adds ordinary global Stamp. Mask takes precedence when both words
+occur. A mixed selection may add all three. Inference only adds assignments, preserving manual tags. Removing an
+image does not remove a tag. Users may remove either inferred tag before saving;
+Save and reload never recalculate it. Selecting another image can add its inferred
+tag again.
+
+If an exact Stamp/Die/Mask tag is missing, the existing global-tag creation helper adds
+it to the draft catalog only. On successful Save, any still-selected new inference
+tags and the Set commit in one IndexedDB transaction. An exact-name tag created
+meanwhile is reused by stable ID; failed commits leave both catalog and Set unchanged.
+No second taxonomy is created. No image-level classification is persisted; filename
+classification is evaluated only when selection occurs.
+
+## Library and safety
+
+The existing hash navigation opens Stamps & Dies. Library tiles retain Set name,
+Release Year, Favorite, and current global tag names. All images render in stored
+order: one uses the available width, two appear side-by-side, and additional images
+wrap into a two-column grid. Thumbnails are preferred; a failed thumbnail falls back
+to the full image. Missing files show Image unavailable. Empty Sets show No image.
+There is no Detail or Edit action.
+
+Folder-backed references are hydrated at runtime, with object URLs released on
+refresh. New Set references use the explicit stamp-die-images marker. Existing
+explicit Card/Paper references resolve through their corresponding libraries;
+unmarked legacy paths retain CSC's Paper-folder convention. Unknown markers never
+silently route into a different library. Reading does not request folder permissions.
+
+Decision 32 applies permanently: canceling, removing draft images, or changing a
+catalog record must never delete, rename, move, overwrite, or otherwise modify
+existing shared-library images. Only new image/thumbnail files may be created during
+Save. No Set path calls image deletion, folder scanning, or thumbnail repair.
+
+Standard/iPad backups still exclude Stamp & Die Set records and images. No backup,
+import/export, automatic folder discovery/Set creation, Edit, Detail, Library search
+or filtering, Card relationships, or image-deletion workflow was added.
 
 ## Verification
 
-Focused tests exercise shared navigation to and from the new screen, multi-image
-reference metadata, required fields, stable tag identities across renames, an additive
-database upgrade preserving existing stores, save/load round trips, and global-tag
-assignment/deletion integrity. Storage upgrade tests use an in-memory IndexedDB API
-harness; no real user database or image files are changed by the tests.
-
-## Phase 2A Add Set workflow
-
-The Library's Add Set action opens a native modal dialog with Set Name, Release Year,
-Favorite, and the existing D1 global tag picker. Field, checkbox, and action styling
-reuse Cards' existing CSS; the dialog uses native focus containment and Escape
-handling. Cancel is on the left and Save Set on the right. No image input is present.
-
-Set Name is required and trimmed. Within the Stamp & Die Catalog, Add Set rejects
-normalized duplicate names: surrounding whitespace, repeated internal whitespace,
-and case differences do not distinguish names. The existing `getTagKey()` helper
-provides comparison normalization without changing the stored display name. The
-check reads saved Sets at submit time and never consults Paper, Cards, or other
-catalog types, where the same name is allowed. A clear validation message leaves
-all draft fields and selected tags intact so the user can correct the name.
-
-This is a Set-only data-quality rule: CSC should keep one record for a given set;
-future ownership data will indicate who owns it rather than creating duplicate
-records. Sets still use a `set-` UUID with the same timestamp/random fallback
-approach as Cards. Generated IDs remain the true record identity. No existing
-records, IDs, schema versions, storage structure, or tag behavior are changed.
-
-Release Year matches DSP's year-only field: a required whole number from 1990 to
-2100, defaulting to the current year. It persists as numeric `releaseYear` and
-appears on Library tiles instead of creation date. Existing Sets without this field
-show "Release year not recorded". Their creation dates are not repurposed.
-`dateCreated` remains automatic creation metadata using the same local-calendar
-helper as Cards in `ui.js`.
-
-Saved records pass through `normalizeStampDieSet`, the shared
-`addCatalogSchemaVersion` helper, and `saveStampDieSet`. Every new record has
-`imageRefs: []`. The Release Year follow-up raises the shared catalog schema to 4;
-IndexedDB stays at 6 and the backup envelope stays at 3. No Stamp-specific version,
-new store, or image-reference extension is introduced.
-
-The shared tag picker uses product type `stamp` and stable `tagIds`. All tags remain
-available, including tags with legacy Paper/Card applicability metadata. Category
-groups are organizational; only tags can be selected. Picker-local tag search is
-part of the shared picker, not Library search. New tags are created in Settings.
-
-Successful saves close the dialog, refresh the Library, announce success, and emit
-`catalog:stamp-die-set-saved` so existing Settings usage counts refresh. Global tag
-changes refresh Library display names and assignments. Failed saves retain the
-draft for retry. While saving, the form prevents duplicate submits and dismissal.
-Cancel or Escape discards the draft without writing; reopening resets the name,
-release year, Favorite, selected tags, and picker search. No confirmation is required for
-cancellation. Focus returns to Add Set after dismissal.
-
-Phase 2A tests cover opening/defaults, whitespace-only names, canonical record
-creation, universal tag selection, category rejection, Favorite persistence,
-placeholder rendering, tag renames, cancel/Escape/reset, normalized duplicate-name
-rejection and correction, distinct names, cross-catalog name independence, failed
-save/retry, repeated-submit protection, and a fresh storage-module reload. DOM and
-IndexedDB API harnesses run without altering real user records. Visual layout,
-native focus containment, and browser-native validation still require a browser
-check; the in-app browser was unavailable during this phase's verification.
-
-Release Year tests cover the DSP year range, persistence, Library display, and
-compatibility with older Sets whose creation dates remain unchanged.
+Automated tests cover multiple selection and order, safe folder copies/references,
+collision handling, embedded and thumbnail-unavailable fallback, thumbnail metadata,
+Mask-first filename inference (including mixed selections and case variants), manual overrides, categories, cancel/removal/late reads,
+Library image rendering, atomic inferred-tag/Set writes, and reload. Existing
+Paper/Card and global-tag tests remain in the full suite. DOM, directory, and
+IndexedDB API harnesses do not modify real user files. Real picker permissions,
+iPad selection, and visual layout still require browser verification.

@@ -145,7 +145,7 @@ Catalog-record schema and backup-envelope schema are versioned independently in 
 - `CATALOG_SCHEMA_VERSION` describes the structure and interpretation of catalog records such as Paper Packs, Cards, and colors. Increment it when persisted record fields, allowed values, validation, or record migration behavior changes.
 - `BACKUP_SCHEMA_VERSION` describes the top-level backup envelope: its identifying fields, collection layout, image-storage metadata, and import contract. Increment it only when that envelope structure or its interpretation changes incompatibly.
 
-The Card Status change raised the catalog schema to version 3. Cards now persist `status` as either `available` or `sent`; legacy Cards without a status are normalized to `available` when loaded or imported. The later Stamp & Die Release Year addition raises the shared catalog schema to version 4; current exports declare `catalogSchemaVersion: 4`.
+The Card Status change raised the catalog schema to version 3. Cards now persist `status` as either `available` or `sent`; legacy Cards without a status are normalized to `available` when loaded or imported. The later Stamp & Die Release Year addition raises the shared catalog schema to version 4; current exports declare `catalogSchemaVersion: 5` after the Set image-reference extension.
 
 Phase B2 raises the backup envelope to version 3. Version-3 Standard and Compact iPad exports contain one `tagCatalog` object (`schemaVersion`, `tags`, and `categories`), and Paper/Card records contain only `tagIds`. Version-1/2 backups with optional `tagVocabularies` and legacy `keywords`/`tags` remain importable through in-memory conversion and reconciliation. At Phase B2 the record catalog schema remained version 3; the later Release Year change uses version 4.
 
@@ -241,8 +241,8 @@ one named record with multiple image references and canonical global `tagIds`.
 IndexedDB version 6 adds the `stampDieSets` store without changing existing records.
 `storage.js` supplies minimal load/save support; `stamp-die-sets.js` validates and
 serializes metadata using the existing catalog schema helper. Global tag usage and
-delete operations include sets. Image workflows, record forms, relationships, and
-backup/restore support are deferred. See [feature_stamp_die_catalog.md](feature_stamp_die_catalog.md)
+delete operations include sets. Add Set and multiple-image persistence are now
+implemented; relationships and backup/restore support remain deferred. See [feature_stamp_die_catalog.md](feature_stamp_die_catalog.md)
 for the agreed record shape and Phase 1 boundaries.
 
 ### Stamp & Die Release Year
@@ -253,3 +253,27 @@ is preserved as creation metadata and is never converted into a release year.
 This persisted-field change raises shared `CATALOG_SCHEMA_VERSION` to 4 under the
 existing record-version boundary. IndexedDB stays at 6 and the backup envelope
 stays at 3. No bulk migration or image-storage change is needed.
+
+### Shared image references and Stamp & Die Phase 2B1
+
+`image-references.js` contains reusable Card/Set image preparation, embedded encoding,
+relative-path hydration, and thumbnail-first support. It uses `thumbnails.js` rather
+than a separate encoder. Stamp & Die `imageRefs[]` is an ordered wrapper around
+existing `imagePath`, `imageLibrary`, `imageSrc`, `thumbnailImagePath`,
+`thumbnailImageSrc`, and `imageStorageStrategy` fields. Runtime object URLs are not
+persisted. The Set folder handle uses the existing Settings store under
+`stampDieImageLibrary`; references identify it with `stamp-die-images`.
+
+Supporting embedded images and thumbnail fields changes persisted reference
+validation/serialization, so the shared catalog schema advances from 4 to 5.
+Legacy path-only and empty references remain readable; no database/store upgrade
+or bulk migration is needed. Backup-envelope version 3 is unchanged, and Set
+backup support is still deferred.
+
+Filename inference uses case-insensitive Mask, then Die, then Stamp precedence.
+It creates missing ordinary Stamp/Die/Mask tags only in draft memory.
+Still-selected new tags and their Set commit together through the existing storage
+transaction helper. Inference never runs at reload or re-adds manually removed tags
+on Save. Folder files created before a failed record commit may remain; rollback
+never deletes shared-library files. Existing originals and thumbnails are never
+overwritten by the shared save path.

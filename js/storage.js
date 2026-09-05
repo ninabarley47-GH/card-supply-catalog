@@ -1,3 +1,4 @@
+import { reconcileStampDieImageTags } from './stamp-die-image-tags.js';
 import { addCatalogSchemaVersion } from "./schema.js";
 import { normalizeStampDieSet } from "./stamp-die-sets.js";
 import { PAPER_TAG_SEED } from "./tag-utils.js";
@@ -139,13 +140,19 @@ export async function loadSavedStampDieSets() {
   return records.map((record) => normalizeStampDieSet(record, catalog));
 }
 
-export async function saveStampDieSet(record) {
+export async function saveStampDieSet(record, { inferredTags = [] } = {}) {
   const database = await openCatalogDatabase();
   const catalog = await ensureGlobalTagPersistence(database);
-  const normalized = normalizeStampDieSet(record, catalog);
-  await writeTransaction(database, [STAMP_DIE_SETS_STORE], (transaction) => {
+  const reconciled = reconcileStampDieImageTags(record, catalog, inferredTags);
+  const normalized = normalizeStampDieSet(reconciled.record, reconciled.catalog);
+  const stores = reconciled.catalog === catalog ? [STAMP_DIE_SETS_STORE] : [STAMP_DIE_SETS_STORE, SETTINGS_STORE];
+  await writeTransaction(database, stores, (transaction) => {
     transaction.objectStore(STAMP_DIE_SETS_STORE).put(normalized);
+    if (reconciled.catalog !== catalog) {
+      transaction.objectStore(SETTINGS_STORE).put({ id: GLOBAL_TAG_CATALOG_SETTING_ID, value: reconciled.catalog });
+    }
   });
+  globalTagMigrationPromise = Promise.resolve(reconciled.catalog);
 }
 
 export async function loadSavedCards() {

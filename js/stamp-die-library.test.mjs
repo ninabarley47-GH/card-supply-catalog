@@ -41,7 +41,7 @@ class Element {
     for (const listener of this.listeners[type] || []) await listener(event);
     return event;
   }
-  dispatchEvent(event) { return this.emit(event.type, { target: event.target || this }); }
+  dispatchEvent(event) { return this.emit(event.type, { target: event.target || this, detail: event.detail }); }
   matches(selector) {
     const tag = selector.match(/^[a-z]+/);
     if (tag && this.tagName !== tag[0]) return false;
@@ -92,7 +92,6 @@ async function harness(t, otherCatalogServices = {}) {
   let commitGate;
   let calls = 0;
   await initializeStampDieLibrary({
-    ...otherCatalogServices,
     loadGlobalTagCatalog: async () => structuredClone(catalog),
     loadSavedStampDieSets: async () => structuredClone(records),
     saveStampDieSet: async (record) => {
@@ -100,7 +99,8 @@ async function harness(t, otherCatalogServices = {}) {
       if (commitGate) await commitGate;
       if (failure) throw new Error('Storage unavailable');
       records.push(structuredClone(record));
-    }
+    },
+    ...otherCatalogServices
   });
   const dialog = document.querySelector('dialog');
   const form = dialog.querySelector('form');
@@ -298,21 +298,24 @@ test('failed save preserves the draft and retry succeeds; pending save blocks du
   assert.equal(h.records.length, 1);
 });
 
-test('record creation rejects malformed dates/category assignments and always starts without images', () => {
+test('record creation rejects malformed dates/category assignments and supports optional images', () => {
   const input = { name: 'Garden', dateCreated: '2026-09-01', favorite: false, tagIds: [] };
   assert.throws(() => createStampDieSetRecord({ ...input, dateCreated: '2026-02-30' }, initialCatalog()));
   assert.throws(() => createStampDieSetRecord({ ...input, tagIds: ['nature'] }, initialCatalog()));
-  assert.deepEqual(createStampDieSetRecord({ ...input, imageRefs: [{ imagePath: 'ignored.jpg' }] }, initialCatalog()).imageRefs, []);
+  assert.deepEqual(createStampDieSetRecord(input, initialCatalog()).imageRefs, []);
+  assert.deepEqual(createStampDieSetRecord({ ...input, imageRefs: [{ imagePath: 'selected.jpg' }] }, initialCatalog()).imageRefs, [{ imagePath: 'selected.jpg' }]);
 });
 
-test('Add Set is wired into the application and offline shell without any image API', async () => {
+test('Add Set is wired into the application and offline shell with isolated image handling', async () => {
   const [app, shell, html, source, settings] = await Promise.all(['app.js', '../sw.js', '../index.html', 'stamp-die-library.js', 'settings.js'].map((file) => readFile(new URL(file, import.meta.url), 'utf8')));
   assert.match(app, /await initializeStampDieLibrary\(\)/);
   assert.match(shell, /\.\/js\/stamp-die-library\.js/);
   assert.match(shell, /\.\/js\/ui\.js/);
   assert.match(html, /data-add-set>Add Set/);
   assert.match(settings, /catalog:stamp-die-set-saved/);
-  assert.doesNotMatch(source, /showOpenFilePicker|showDirectoryPicker|FileReader|createObjectURL|type = 'file'|card-images|\.\/images/);
+  assert.doesNotMatch(source, /showOpenFilePicker|showDirectoryPicker|FileReader|createObjectURL|createWritable/);
+  assert.match(shell, /\.\/js\/image-references\.js/);
+  assert.match(shell, /\.\/js\/stamp-die-images\.js/);
 });
 
 
@@ -322,4 +325,82 @@ test('Library does not present an older creation date as a release year', async 
   await h.document.emit('catalog:global-tags-updated');
   assert.match(h.gallery.textContent, /Release year not recorded/);
   assert.doesNotMatch(h.gallery.textContent, /2020/);
+});
+
+test('Add Set previews selected images in order, preserves manual tag removal on save, and renders all images', async (t) => {
+  const imageCatalog = initialCatalog();
+  imageCatalog.tags.push({ id: 'stamp', name: 'Stamp', categoryIds: [] }, { id: 'die', name: 'Die', categoryIds: [] });
+  let preparedNames;
+  const h = await harness(t, {
+    loadGlobalTagCatalog: async () => structuredClone(imageCatalog),
+    selectStampImageFiles: async (files) => files.map((file) => ({ file, name: file.name, previewSrc: 'data:image/jpeg;base64,cHJldmlldw==' })),
+    prepareStampImagesForSave: async (images) => {
+      preparedNames = images.map((image) => image.name);
+      return { usedFallback: true, imageRefs: images.map((image) => ({ imageName: image.name, imageSrc: 'data:image/jpeg;base64,ZnVsbA==', thumbnailImageSrc: 'data:image/jpeg;base64,dGh1bWI=', imageStorageStrategy: 'embedded-indexed-db' })) };
+    }
+  });
+  await h.add.emit('click');
+  h.name.value = 'Both images';
+  await h.select('stable-paper');
+  const input = h.form.querySelector('input[type="file"]');
+  assert.equal(input.multiple, true);
+  input.files = [{ name: 'stamp.jpg' }, { name: 'DIES.jpg' }];
+  await input.emit('change');
+  assert.deepEqual(h.form.querySelector('.stamp-set-draft-images').querySelectorAll('img').map((image) => image.alt), ['stamp.jpg', 'DIES.jpg']);
+  const stamp = h.form.querySelector('[data-tag-id="stamp"]');
+  const die = h.form.querySelector('[data-tag-id="die"]');
+  assert.equal(stamp.checked, true);
+  assert.equal(die.checked, true);
+  die.checked = false;
+  await h.form.querySelector('.global-tag-picker').emit('change', { target: die });
+  await h.form.emit('submit');
+  assert.deepEqual(preparedNames, ['stamp.jpg', 'DIES.jpg']);
+  assert.deepEqual(h.records[0].tagIds, ['stable-paper', 'stamp']);
+  assert.deepEqual(h.gallery.querySelectorAll('img').map((image) => image.alt), ['stamp.jpg', 'DIES.jpg']);
+  assert.ok(h.gallery.querySelectorAll('img').every((image) => image.src === 'data:image/jpeg;base64,dGh1bWI='));
+  const displayed = h.gallery.querySelector('img');
+  await displayed.emit('error');
+  assert.equal(displayed.src, 'data:image/jpeg;base64,ZnVsbA==');
+  await displayed.emit('error');
+  assert.equal(displayed.hidden, true);
+});
+
+test('draft image removal never removes inferred tags; Cancel discards images without preparation or persistence', async (t) => {
+  let preparationCalls = 0;
+  const h = await harness(t, {
+    selectStampImageFiles: async (files) => files.map((file) => ({ file, name: file.name, previewSrc: 'data:image/jpeg;base64,cHJldmlldw==' })),
+    prepareStampImagesForSave: async () => { preparationCalls++; throw new Error('Must not save'); }
+  });
+  await h.add.emit('click');
+  const input = h.form.querySelector('input[type="file"]');
+  input.files = [{ name: 'stamp.jpg' }, { name: 'die.jpg' }];
+  await input.emit('change');
+  const previews = h.form.querySelector('.stamp-set-draft-images');
+  await previews.querySelector('button').emit('click');
+  assert.deepEqual(previews.querySelectorAll('img').map((image) => image.alt), ['die.jpg']);
+  assert.equal(h.form.querySelectorAll('[data-tag-id]').filter((checkbox) => checkbox.checked).length, 2);
+  await h.cancel.emit('click');
+  assert.equal(preparationCalls, 0);
+  assert.equal(h.records.length, 0);
+  await h.add.emit('click');
+  assert.equal(previews.children.length, 0);
+  assert.equal(h.form.querySelectorAll('[data-tag-id]').filter((checkbox) => checkbox.checked).length, 0);
+  assert.equal(h.form.querySelectorAll('[data-tag-id]').length, 2); // Only the original global tags remain.
+});
+
+test('cancel during image loading discards late results without restoring draft state', async (t) => {
+  let release;
+  const h = await harness(t, {
+    selectStampImageFiles: () => new Promise((resolve) => { release = resolve; })
+  });
+  await h.add.emit('click');
+  const input = h.form.querySelector('input[type="file"]');
+  input.files = [{ name: 'stamp.jpg' }];
+  const selection = input.emit('change');
+  await h.cancel.emit('click');
+  release([{ name: 'stamp.jpg', previewSrc: 'data:image/jpeg;base64,cHJldmlldw==' }]);
+  await selection;
+  await h.add.emit('click');
+  assert.equal(h.form.querySelector('.stamp-set-draft-images').children.length, 0);
+  assert.equal(h.records.length, 0);
 });
