@@ -9,6 +9,7 @@ test("Paper, Card, and Stamp image-library code never calls the destructive dire
     readFile(new URL("./library.js", import.meta.url), "utf8"),
     readFile(new URL("./cards.js", import.meta.url), "utf8"),
     readFile(new URL("./image-references.js", import.meta.url), "utf8"),
+    readFile(new URL("./stamp-die-library.js", import.meta.url), "utf8"),
     readFile(new URL("./stamp-die-images.js", import.meta.url), "utf8")
   ]);
 

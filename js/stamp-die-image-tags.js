@@ -2,13 +2,24 @@ import { validateItemTagAssignments } from './global-tag-catalog.js';
 import { addGlobalTag } from './global-tag-management.js';
 import { getTagKey } from './tag-utils.js';
 
+export function getStampDieImageType(filename) {
+  return /die/i.test(filename) ? 'Die' : /mask/i.test(filename) ? 'Mask' : 'Stamp';
+}
+
+// Stable presentation ordering; classification is derived, never persisted.
+export function orderStampDieImages(images) {
+  const rank = { Stamp: 0, Die: 1, Mask: 2 };
+  return [...images].sort((a, b) => rank[getStampDieImageType(a.name || a.imageName || a.imagePath?.split('/').pop() || '')]
+    - rank[getStampDieImageType(b.name || b.imageName || b.imagePath?.split('/').pop() || '')]);
+}
+
 // Runs only for newly selected filenames, never for save, removal, or reload.
 export function inferStampDieImageTags(catalog, tagIds, filenames) {
   if (!validateItemTagAssignments({ catalog, productType: 'stamp', tagIds }).ok) throw new TypeError('Invalid image inference assignments.');
   let nextCatalog = catalog;
   const selected = new Set(tagIds);
   const inferredTags = [];
-  for (const name of new Set(filenames.map((filename) => /die/i.test(filename) ? 'Die' : /mask/i.test(filename) ? 'Mask' : 'Stamp'))) {
+  for (const name of new Set(filenames.map(getStampDieImageType))) {
     let tag = nextCatalog.tags.find((entry) => getTagKey(entry.name) === getTagKey(name));
     if (!tag) {
       const added = addGlobalTag(nextCatalog, { name, allowFuzzy: true });

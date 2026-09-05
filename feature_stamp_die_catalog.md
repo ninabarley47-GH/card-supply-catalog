@@ -2,8 +2,8 @@
 
 ## Status
 
-Phases 1, 2A, and 2B1 are implemented: a Library, Add Set metadata workflow,
-and ordered multiple-image selection/persistence. Edit, Detail, filtering, search,
+Phases 1, 2A, 2B1, and 2B2 are implemented: a Library, shared Add/Edit Set workflow,
+and ordered multiple-image selection/persistence. Detail, filtering, search,
 Card relationships, and backup/restore remain out of scope.
 
 A Stamp & Die Set is one catalog record for stamps only, dies only, or coordinating
@@ -29,8 +29,8 @@ Identity is a generated `set-` UUID, with the same timestamp/random fallback as
 Cards. Names do not determine identity. Set Name is required and trimmed.
 Normalized duplicates within the Stamp & Die Catalog are rejected: case,
 surrounding whitespace, and repeated internal whitespace do not distinguish names.
-The existing `getTagKey()` helper supplies the comparison key. Add Set reads saved
-Sets at submit time and never checks other catalog types. A duplicate error keeps
+The existing `getTagKey()` helper supplies the comparison key. Add/Edit reads saved
+Sets at submit time, excluding the current stable ID during Edit, and never checks other catalog types. A duplicate error keeps
 the entire draft intact. Future ownership data will describe who owns one Set
 rather than requiring duplicate records for different owners.
 
@@ -86,7 +86,8 @@ image encoders or the folder-reference format.
 
 Choose Images accepts multiple images in one operation. Native open-file selection
 is used where available; other browsers, including iPad, use a multiple file input.
-The order returned by selection is retained, and later selections append to it.
+Images are grouped Stamp first, Die second, Mask last. Selection order is retained
+within each type, and later selections append within their type.
 Compact previews have Remove buttons. No image classification input is present.
 
 Choose Image Folder is available on browsers supporting directory selection. It
@@ -140,16 +141,17 @@ it to the draft catalog only. On successful Save, any still-selected new inferen
 tags and the Set commit in one IndexedDB transaction. An exact-name tag created
 meanwhile is reused by stable ID; failed commits leave both catalog and Set unchanged.
 No second taxonomy is created. No image-level classification is persisted; filename
-classification is evaluated only when selection occurs.
+classification is derived from filenames for presentation ordering; tag assignment
+inference runs only when new images are selected.
 
 ## Library and safety
 
 The existing hash navigation opens Stamps & Dies. Library tiles retain Set name,
-Release Year, Favorite, and current global tag names. All images render in stored
-order: one uses the available width, two appear side-by-side, and additional images
+Release Year, Favorite, and current global tag names. All images render in stable
+Stamp -> Die -> Mask order: one uses the available width, two appear side-by-side, and additional images
 wrap into a two-column grid. Thumbnails are preferred; a failed thumbnail falls back
 to the full image. Missing files show Image unavailable. Empty Sets show No image.
-There is no Detail or Edit action.
+Each tile has an Edit action; there is no Detail view.
 
 Folder-backed references are hydrated at runtime, with object URLs released on
 refresh. New Set references use the explicit stamp-die-images marker. Existing
@@ -163,8 +165,42 @@ existing shared-library images. Only new image/thumbnail files may be created du
 Save. No Set path calls image deletion, folder scanning, or thumbnail repair.
 
 Standard/iPad backups still exclude Stamp & Die Set records and images. No backup,
-import/export, automatic folder discovery/Set creation, Edit, Detail, Library search
+import/export, automatic folder discovery/Set creation, Detail, Library search
 or filtering, Card relationships, or image-deletion workflow was added.
+
+## Edit Set (Phase 2B2)
+
+Edit uses the same dialog, validation, image selection, and global tag picker as Add.
+It reloads the persisted Set and allows changes to Set Name, Release Year, Favorite,
+Tags, and Images. Renaming preserves the stable ID; Save updates that record through
+the existing storage path and refreshes the Library. Creation metadata is preserved
+internally and is not a form field. Legacy Sets without a Release Year may leave it
+unknown on Edit; entering a year uses the existing 1990-2100 validation.
+
+Existing images load as references with previews, without copying originals,
+regenerating thumbnails, or converting folder references to embedded images.
+Supported path, embedded, library, and thumbnail fields survive saving. Missing
+files display an unavailable placeholder and retain their references.
+
+Removing an image is catalog-only: Save omits its reference, never touches its file
+or thumbnail, and never removes tags. New images use the existing native/fallback
+picker and persistence path. Inference runs only when new images are selected,
+with Die before Mask before Stamp; it never runs on Edit initialization or Save.
+Manual removal of an inferred tag is respected, and unrelated tags remain intact.
+
+Library and Add/Edit previews use stable Stamp -> Die -> Mask ordering. Save retains
+that order in imageRefs; within each type, original relative order is preserved.
+Classification stays derived from the filename (or path basename for legacy refs),
+with no new persisted taxonomy. An older interleaved record is grouped on display
+and its next save; image reference contents and tag assignments are not reinterpreted.
+
+Cancel/Escape discards fields, added images, and reference removals without writing
+the record or image files. Reopening reloads persisted data. A session token prevents
+late reads from a canceled Edit entering a reopened draft for the same record ID.
+Failed saves retain the draft for retry. Existing accepted failed-save file debt
+also applies to newly selected Edit images; no deletion/rollback was added.
+
+No database, schema, backup, Settings, or Paper/Card image behavior changed.
 
 ## Verification
 

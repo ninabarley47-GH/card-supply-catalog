@@ -52,12 +52,15 @@ export async function chooseStampImages(environment = globalThis, directory = nu
 export function removeDraftStampImage(images, index) {
   const next = [...images];
   const [removed] = next.splice(index, 1);
-  clearSelectedCardImage(removed);
+  clearDraftStampImages(removed ? [removed] : []);
   return next;
 }
 
 export function clearDraftStampImages(images) {
-  images.forEach(clearSelectedCardImage);
+  for (const image of images) {
+    if (image.existingReference) clearImageReferenceObjectUrls(image.existingReference);
+    else clearSelectedCardImage(image);
+  }
 }
 
 export async function prepareStampImagesForSave(images, services = {}) {
@@ -71,6 +74,11 @@ export async function prepareStampImagesForSave(images, services = {}) {
   let usedFallback = false;
   // Sequential writes preserve order and avoid collisions within a selection.
   for (const image of images) {
+    // Existing references are catalog metadata, not files to copy or regenerate.
+    if (image.existingReference) {
+      imageRefs.push(image.existingReference);
+      continue;
+    }
     if (image.preparedReference && await sameDirectory(image.preparedDirectory, directory)) {
       imageRefs.push(image.preparedReference);
       usedFallback ||= image.preparedReference.imageStorageStrategy === 'embedded-indexed-db';

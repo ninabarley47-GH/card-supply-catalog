@@ -229,3 +229,25 @@ test('failed Set transaction leaves both image references and inferred global ta
     assert.deepEqual(await storage.loadGlobalTagCatalog(), catalog);
   } finally { globalThis.window = previousWindow; }
 });
+
+test('Edit replaces the same stored ID and preserves mixed image fields on reload without disturbing other stores', async () => {
+  const harness = databaseHarness();
+  const previousWindow = globalThis.window;
+  globalThis.window = { indexedDB: harness.indexedDB, localStorage: { getItem: () => 'true' } };
+  try {
+    const storage = await import('./storage.js?edit-roundtrip');
+    await storage.saveStampDieSet(setRecord());
+    const before = structuredClone(harness.stores);
+    const edited = { ...setRecord(), name: 'Renamed', releaseYear: 2025, favorite: false, imageRefs: [
+      { imagePath: 'Stamp.jpg', thumbnailImagePath: 'Stamp.thumb.jpg', imageLibrary: 'stamp-die-images', imageStorageStrategy: 'local-folder' },
+      { imageSrc: 'data:image/jpeg;base64,YQ==', thumbnailImageSrc: 'data:image/jpeg;base64,Yg==', imageStorageStrategy: 'embedded-indexed-db' }
+    ] };
+    await storage.saveStampDieSet(edited);
+    const reloaded = await import('./storage.js?edit-roundtrip-reload');
+    assert.deepEqual(await reloaded.loadSavedStampDieSets(), [normalizeStampDieSet(edited, catalog)]);
+    for (const [name, records] of before) if (name !== 'stampDieSets') assert.deepEqual(harness.stores.get(name), records);
+    harness.failNextCommit();
+    await assert.rejects(storage.saveStampDieSet({ ...edited, name: 'Failed', imageRefs: [] }));
+    assert.deepEqual(await reloaded.loadSavedStampDieSets(), [normalizeStampDieSet(edited, catalog)]);
+  } finally { globalThis.window = previousWindow; }
+});

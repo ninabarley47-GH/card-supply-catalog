@@ -98,7 +98,9 @@ async function harness(t, otherCatalogServices = {}) {
       calls += 1;
       if (commitGate) await commitGate;
       if (failure) throw new Error('Storage unavailable');
-      records.push(structuredClone(record));
+      const index = records.findIndex((entry) => entry.id === record.id);
+      if (index === -1) records.push(structuredClone(record));
+      else records[index] = structuredClone(record);
     },
     ...otherCatalogServices
   });
@@ -403,4 +405,150 @@ test('cancel during image loading discards late results without restoring draft 
   await h.add.emit('click');
   assert.equal(h.form.querySelector('.stamp-set-draft-images').children.length, 0);
   assert.equal(h.records.length, 0);
+});
+
+async function seedEdit(h, overrides = {}) {
+  h.records.push(createStampDieSetRecord({ id: 'set-existing', name: 'Original',
+    dateCreated: '2020-01-02', releaseYear: 2022, favorite: true,
+    tagIds: ['stable-paper'], imageRefs: [], ...overrides }, initialCatalog()));
+  await h.document.emit('catalog:global-tags-updated');
+  await h.gallery.querySelector('button').emit('click');
+}
+
+const editReferences = () => [
+  { imageName: 'Stamp.jpg', imageSrc: 'data:image/jpeg;base64,YQ==', thumbnailImageSrc: 'data:image/jpeg;base64,Yg==', imageStorageStrategy: 'embedded-indexed-db' },
+  { imageName: 'Dies.jpg', imagePath: 'Dies.jpg', imageLibrary: 'stamp-die-images', thumbnailImagePath: 'Dies.thumb.jpg', imageStorageStrategy: 'local-folder' }
+];
+
+test('Edit loads fields and existing images without inference; unchanged save preserves ID, metadata, tags and image fields', async (t) => {
+  const h = await harness(t, { hydrateStampImages: async () => {} });
+  await seedEdit(h, { imageRefs: editReferences() });
+  const before = structuredClone(h.records[0]);
+  assert.match(h.dialog.textContent, /Edit Stamp & Die Set/);
+  assert.equal(h.name.value, 'Original');
+  assert.equal(h.year.value, '2022');
+  assert.equal(h.favorite.checked, true);
+  assert.equal(h.form.querySelector('[data-tag-id="stable-paper"]').checked, true);
+  assert.equal(h.form.querySelectorAll('[data-tag-id]').length, 2);
+  assert.deepEqual(h.form.querySelectorAll('img').map((image) => image.alt), ['Stamp.jpg', 'Dies.jpg']);
+  await h.form.emit('submit');
+  assert.equal(h.dialog.open, false);
+  assert.deepEqual(h.records, [before]);
+});
+
+test('Edit rename, Release Year, Favorite and canonical tag changes update one stable record', async (t) => {
+  const h = await harness(t);
+  await seedEdit(h);
+  h.name.value = '  Renamed  ';
+  h.year.value = '2025';
+  h.favorite.checked = false;
+  await h.select('stable-card');
+  await h.form.emit('submit');
+  assert.deepEqual(h.records, [{ schemaVersion: CATALOG_SCHEMA_VERSION, id: 'set-existing', name: 'Renamed', dateCreated: '2020-01-02', releaseYear: 2025, favorite: false, tagIds: ['stable-paper', 'stable-card'], imageRefs: [] }]);
+  assert.match(h.gallery.textContent, /Renamed.*2025/);
+});
+
+test('Edit duplicate conflict and storage failure preserve draft for retry', async (t) => {
+  const h = await harness(t);
+  await seedEdit(h);
+  h.records.push(createStampDieSetRecord({ id: 'another', name: 'Other Set', dateCreated: '2020-01-01', favorite: false, tagIds: [], imageRefs: [] }, initialCatalog()));
+  h.name.value = '  OTHER   set  ';
+  await h.form.emit('submit');
+  assert.match(h.form.textContent, /already exists/);
+  assert.equal(h.name.value, '  OTHER   set  ');
+  assert.equal(h.records[0].name, 'Original');
+  h.name.value = 'Corrected';
+  h.setFailure(true);
+  await h.form.emit('submit');
+  assert.equal(h.dialog.open, true);
+  assert.equal(h.name.value, 'Corrected');
+  h.setFailure(false);
+  await h.form.emit('submit');
+  assert.equal(h.records.length, 2);
+  assert.equal(h.records[0].name, 'Corrected');
+});
+
+for (const dismiss of ['cancel', 'escape']) {
+  test(`Edit ${dismiss} discards added/removed images and fields; reopen reads persisted state`, async (t) => {
+    let prepared = 0;
+    const h = await harness(t, {
+      hydrateStampImages: async () => {},
+      selectStampImageFiles: async (files) => files.map((file) => ({ name: file.name, file, previewSrc: 'data:image/jpeg;base64,YQ==' })),
+      prepareStampImagesForSave: async () => { prepared++; throw new Error('Unexpected image write'); }
+    });
+    await seedEdit(h, { imageRefs: editReferences() });
+    const before = structuredClone(h.records);
+    await h.form.querySelector('.stamp-set-draft-images').querySelector('button').emit('click');
+    const input = h.form.querySelector('input[type="file"]');
+    input.files = [{ name: 'new masks.jpg' }];
+    await input.emit('change');
+    h.name.value = 'Discard me';
+    if (dismiss === 'cancel') await h.cancel.emit('click');
+    else { const event = await h.dialog.emit('cancel'); if (!event.defaultPrevented) await h.dialog.close(); }
+    assert.deepEqual(h.records, before);
+    assert.equal(prepared, 0);
+    await h.gallery.querySelector('button').emit('click');
+    assert.equal(h.name.value, 'Original');
+    assert.deepEqual(h.form.querySelectorAll('img').map((image) => image.alt), ['Stamp.jpg', 'Dies.jpg']);
+    assert.equal(h.form.querySelectorAll('[data-tag-id]').length, 2);
+  });
+}
+
+test('Edit new images infer all types only at selection; manual removal survives Save and removal keeps tags', async (t) => {
+  const catalog = initialCatalog();
+  for (const name of ['Stamp', 'Die', 'Mask']) catalog.tags.push({ id: name, name, categoryIds: [] });
+  const h = await harness(t, {
+    loadGlobalTagCatalog: async () => structuredClone(catalog),
+    hydrateStampImages: async () => {},
+    selectStampImageFiles: async (files) => files.map((file) => ({ name: file.name, file, previewSrc: 'data:image/jpeg;base64,YQ==' })),
+    prepareStampImagesForSave: async (images) => ({ usedFallback: false, imageRefs: images.map((image) => image.existingReference || { imageName: image.name, imageSrc: 'data:image/jpeg;base64,YQ==' }) })
+  });
+  await seedEdit(h, { imageRefs: editReferences() });
+  const input = h.form.querySelector('input[type="file"]');
+  input.files = ['Masks 1.jpg', 'DIES MASK.jpg', 'Flower 1.jpg', 'Masks 2.jpg', 'dies 2.jpg', 'Flower 2.jpg'].map((name) => ({ name }));
+  await input.emit('change');
+  for (const id of ['Stamp', 'Die', 'Mask']) assert.equal(h.form.querySelector(`[data-tag-id="${id}"]`).checked, true);
+  const expected = ['Stamp.jpg', 'Flower 1.jpg', 'Flower 2.jpg', 'Dies.jpg', 'DIES MASK.jpg', 'dies 2.jpg', 'Masks 1.jpg', 'Masks 2.jpg'];
+  assert.deepEqual(h.form.querySelectorAll('img').map((image) => image.alt), expected);
+  const die = h.form.querySelector('[data-tag-id="Die"]');
+  die.checked = false;
+  await h.form.querySelector('.global-tag-picker').emit('change', { target: die });
+  // Remove every Mask image; its tag must remain assigned.
+  for (let i = 0; i < 2; i++) {
+    const buttons = h.form.querySelector('.stamp-set-draft-images').querySelectorAll('button');
+    await buttons.at(-1).emit('click');
+  }
+  await h.form.emit('submit');
+  assert.equal(h.records.length, 1);
+  assert.deepEqual(h.records[0].tagIds, ['stable-paper', 'Mask', 'Stamp']);
+  assert.deepEqual(h.records[0].imageRefs.map((image) => image.imageName), expected.slice(0, -2));
+  assert.deepEqual(h.gallery.querySelectorAll('img').map((image) => image.alt), expected.slice(0, -2).filter((name) => name !== 'Dies.jpg'));
+  assert.match(h.gallery.textContent, /Image unavailable/);
+});
+
+test('late image reads from canceled Edit cannot enter a reopened session for the same ID', async (t) => {
+  let release;
+  const h = await harness(t, { selectStampImageFiles: () => new Promise((resolve) => { release = resolve; }) });
+  await seedEdit(h);
+  const input = h.form.querySelector('input[type="file"]');
+  input.files = [{ name: 'Late die.jpg' }];
+  const selecting = input.emit('change');
+  await h.cancel.emit('click');
+  await h.gallery.querySelector('button').emit('click');
+  release([{ name: 'Late die.jpg', previewSrc: 'data:image/jpeg;base64,YQ==' }]);
+  await selecting;
+  assert.equal(h.form.querySelectorAll('img').length, 0);
+  assert.equal(h.form.querySelectorAll('[data-tag-id]').length, 2);
+  await h.form.emit('submit');
+  assert.deepEqual(h.records[0].imageRefs, []);
+});
+
+test('unchanged legacy Edit leaves an unknown Release Year absent instead of inventing one', async (t) => {
+  const h = await harness(t);
+  await seedEdit(h, { releaseYear: undefined });
+  const before = structuredClone(h.records);
+  assert.equal(h.year.value, '');
+  await h.form.emit('submit');
+  assert.equal(h.dialog.open, false);
+  assert.deepEqual(h.records, before);
 });

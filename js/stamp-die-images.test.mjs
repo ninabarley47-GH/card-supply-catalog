@@ -10,7 +10,7 @@ import {
   hydrateImageReference, clearImageReferenceObjectUrls
 } from './image-references.js';
 import { normalizeImageReference } from './stamp-die-sets.js';
-import { inferStampDieImageTags, reconcileStampDieImageTags } from './stamp-die-image-tags.js';
+import { inferStampDieImageTags, reconcileStampDieImageTags, orderStampDieImages } from './stamp-die-image-tags.js';
 
 const file = (name, contents = name) => new File([contents], name, { type: 'image/jpeg' });
 const thumbnail = async () => new Blob(['thumbnail'], { type: 'image/jpeg' });
@@ -268,4 +268,30 @@ test('missing Mask is an ordinary draft global tag; reconciliation respects manu
   const reconciled = reconcileStampDieImageTags({ tagIds: inferred.tagIds }, current, inferred.inferredTags);
   assert.deepEqual(reconciled.record.tagIds, ['existing-mask']);
   assert.equal(reconciled.catalog.tags.length, 1);
+});
+
+test('presentation sorting is stable within Stamp, Die and Mask and never mutates stored input', () => {
+  const names = ['Mask 1.jpg', 'DIE MASK 1.jpg', 'Stamp 1.jpg', 'Mask 2.jpg', 'Die 2.jpg', 'Stamp 2.jpg'];
+  const refs = names.map((imageName) => ({ imageName }));
+  assert.deepEqual(orderStampDieImages(refs).map((image) => image.imageName), ['Stamp 1.jpg', 'Stamp 2.jpg', 'DIE MASK 1.jpg', 'Die 2.jpg', 'Mask 1.jpg', 'Mask 2.jpg']);
+  assert.deepEqual(refs.map((image) => image.imageName), names);
+});
+
+test('existing Edit references bypass all image writes; removing a reference leaves shared files unchanged', async () => {
+  const library = directoryHarness({ 'Die.jpg': 'original', 'Die.thumb.jpg': 'thumbnail' });
+  const refs = [
+    { imageName: 'Die.jpg', imagePath: 'Die.jpg', thumbnailImagePath: 'Die.thumb.jpg', imageLibrary: 'stamp-die-images', imageStorageStrategy: 'local-folder' },
+    { imageName: 'Stamp.jpg', imageSrc: 'data:image/jpeg;base64,YQ==', thumbnailImageSrc: 'data:image/jpeg;base64,Yg==', imageStorageStrategy: 'embedded-indexed-db' }
+  ];
+  const draft = refs.map((existingReference) => ({ existingReference }));
+  const services = { loadDirectory: async () => library.directory,
+    prepareFolder: async () => assert.fail('Existing file must not be prepared'),
+    prepareEmbedded: async () => assert.fail('Existing image must not be encoded') };
+  assert.deepEqual((await prepareStampImagesForSave(draft, services)).imageRefs, refs);
+  const remaining = removeDraftStampImage(draft, 0);
+  assert.deepEqual((await prepareStampImagesForSave(remaining, services)).imageRefs, [refs[1]]);
+  clearDraftStampImages(remaining);
+  assert.deepEqual(library.writes, []);
+  assert.equal(await library.files.get('Die.jpg').text(), 'original');
+  assert.equal(await library.files.get('Die.thumb.jpg').text(), 'thumbnail');
 });

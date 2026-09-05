@@ -3,7 +3,7 @@ import {
   prepareStampImagesForSave, hydrateStampImages, clearStampImageSources,
   clearDraftStampImages, removeDraftStampImage, getStampLibraryImageSource
 } from './stamp-die-images.js';
-import { inferStampDieImageTags, reconcileStampDieImageTags } from './stamp-die-image-tags.js';
+import { inferStampDieImageTags, reconcileStampDieImageTags, orderStampDieImages } from './stamp-die-image-tags.js';
 import { supportsOpenFilePicker, supportsDirectoryPicker } from './browser-capabilities.js';
 import { loadGlobalTagCatalog, loadSavedStampDieSets, saveStampDieSet } from './storage.js';
 import { createTagPicker, projectTagNames } from './tag-picker.js';
@@ -40,11 +40,13 @@ export async function initializeStampDieLibrary(services = {}) {
   const gallery = screen.querySelector('[data-set-library]');
   const status = screen.querySelector('[data-set-library-status]');
   status.className += ' form-message';
-  const view = createAddSetView();
+  const view = createSetFormView();
   document.body.append(view.dialog);
   let catalog;
   let picker;
   let draftId;
+  let draftSession = 0;
+  let editingRecord = null;
   let saving = false;
   let selecting = false;
   let draftImages = [];
@@ -53,6 +55,7 @@ export async function initializeStampDieLibrary(services = {}) {
   let displayedRecords = [];
 
   function reset() {
+    draftSession++;
     clearDraftStampImages(draftImages);
     draftImages = [];
     inferredTags = [];
@@ -64,10 +67,12 @@ export async function initializeStampDieLibrary(services = {}) {
     view.form.reset();
     view.name.setCustomValidity('');
     view.releaseYear.value = String(new Date().getFullYear());
+    view.releaseYear.required = true;
     picker?.reset();
     view.message.textContent = '';
     view.message.dataset.tone = '';
     draftId = null;
+    editingRecord = null;
   }
 
   async function refresh() {
@@ -79,7 +84,7 @@ export async function initializeStampDieLibrary(services = {}) {
       clearStampImageSources(displayedRecords);
       displayedRecords = records;
       if (!view.dialog.open) catalog = nextCatalog;
-      renderStampDieLibrary(gallery, records, nextCatalog);
+      renderStampDieLibrary(gallery, records, nextCatalog, (id) => openForm(id));
       status.dataset.tone = '';
       status.textContent = `${records.length} set${records.length === 1 ? '' : 's'}`;
     } catch {
@@ -88,7 +93,8 @@ export async function initializeStampDieLibrary(services = {}) {
     }
   }
 
-  add.addEventListener('click', async () => {
+  async function openForm(id = null) {
+    if (view.dialog.open || add.disabled) return;
     add.disabled = true;
     try {
       catalog = await storage.loadGlobalTagCatalog();
@@ -97,24 +103,55 @@ export async function initializeStampDieLibrary(services = {}) {
         picker = createTagPicker({ label: 'Tags', productType: 'stamp', catalog });
         view.tags.append(picker.element);
       } else picker.setCatalog(catalog);
+      if (id) {
+        const records = await storage.loadSavedStampDieSets();
+        const record = records.find((entry) => entry.id === id);
+        if (!record) throw new Error('Set no longer available');
+        editingRecord = record;
+        await storage.hydrateStampImages([record]);
+        view.name.value = record.name;
+        view.releaseYear.value = record.releaseYear === undefined ? '' : String(record.releaseYear);
+        view.releaseYear.required = record.releaseYear !== undefined;
+        view.favorite.checked = record.favorite;
+        picker.setSelectedTagIds(record.tagIds);
+        draftImages = record.imageRefs.map((reference) => ({
+          existingReference: reference,
+          name: reference.imageName || reference.imagePath?.split('/').pop() || 'Set image',
+          previewSrc: getStampLibraryImageSource(reference)
+        }));
+        renderDraftImages();
+      }
       imageDirectory = await storage.loadStampImageDirectory('read').catch(() => null);
       view.folderMessage.textContent = imageDirectory
         ? `Image folder: ${imageDirectory.name}` : 'Without an accessible image folder, images are saved in this browser.';
-      draftId = createSetId();
+      draftId = id || createSetId();
+      view.title.textContent = id ? 'Edit Stamp & Die Set' : 'Add Stamp & Die Set';
       view.dialog.showModal();
       view.name.focus();
     } catch {
+      reset();
       status.dataset.tone = 'error';
-      status.textContent = 'Add Set could not be opened. Please try again.';
+      status.textContent = `${id ? 'Edit' : 'Add'} Set could not be opened. Please try again.`;
     } finally { add.disabled = false; }
-  });
+  }
+  add.addEventListener('click', () => openForm());
 
   function renderDraftImages() {
+    draftImages = orderStampDieImages(draftImages);
     view.previews.replaceChildren(...draftImages.map((image, index) => {
       const item = document.createElement('div');
       item.className = 'stamp-set-draft-image';
       const preview = document.createElement('img');
-      preview.src = image.previewSrc;
+      if (image.previewSrc) preview.src = image.previewSrc;
+      const missing = document.createElement('span');
+      missing.textContent = 'Image unavailable';
+      missing.hidden = Boolean(image.previewSrc);
+      preview.hidden = !image.previewSrc;
+      preview.addEventListener('error', () => {
+        const full = image.existingReference?.imagePreviewSrc || image.existingReference?.imageSrc;
+        if (full && preview.src !== full) preview.src = full;
+        else { preview.hidden = true; missing.hidden = false; }
+      });
       preview.alt = image.name;
       const remove = document.createElement('button');
       remove.className = 'button';
@@ -127,13 +164,13 @@ export async function initializeStampDieLibrary(services = {}) {
         renderDraftImages();
         // Removing an image never removes inferred or manually chosen tags.
       });
-      item.append(preview, remove);
+      item.append(preview, missing, remove);
       return item;
     }));
   }
 
   async function receiveImages(selection) {
-    const currentDraft = draftId;
+    const currentDraft = draftSession;
     selecting = true;
     view.save.disabled = true;
     view.chooseImages.disabled = true;
@@ -141,7 +178,7 @@ export async function initializeStampDieLibrary(services = {}) {
     view.imageMessage.dataset.tone = '';
     try {
       const images = await selection;
-      if (currentDraft !== draftId) { clearDraftStampImages(images || []); return; }
+      if (currentDraft !== draftSession) { clearDraftStampImages(images || []); return; }
       if (!images?.length) { view.imageMessage.textContent = ''; return; }
       const inferred = inferStampDieImageTags(catalog, picker.getSelectedTagIds(), images.map((image) => image.name));
       inferredTags.push(...inferred.inferredTags.filter((tag) => !catalog.tags.some((existing) => existing.id === tag.id)));
@@ -152,11 +189,11 @@ export async function initializeStampDieLibrary(services = {}) {
       renderDraftImages();
       view.imageMessage.textContent = 'Stamp/Die/Mask tags added from filenames. You can change them below.';
     } catch (error) {
-      if (currentDraft !== draftId) return;
+      if (currentDraft !== draftSession) return;
       view.imageMessage.textContent = error?.name === 'AbortError' ? '' : 'Images could not be selected. Choose JPEG, PNG, WebP, or GIF files and try again.';
       view.imageMessage.dataset.tone = 'error';
     } finally {
-      if (currentDraft === draftId) {
+      if (currentDraft === draftSession) {
         selecting = false;
         view.save.disabled = false;
         view.chooseImages.disabled = false;
@@ -208,7 +245,7 @@ export async function initializeStampDieLibrary(services = {}) {
       // This is a Set-only data-quality check; generated IDs remain identity.
       const existingSets = await storage.loadSavedStampDieSets();
       const nameKey = getTagKey(view.name.value);
-      if (existingSets.some((record) => getTagKey(record.name) === nameKey)) {
+      if (existingSets.some((record) => record.id !== draftId && getTagKey(record.name) === nameKey)) {
         view.message.dataset.tone = 'error';
         view.message.textContent = 'A Stamp & Die Set with this name already exists. Enter a different Set Name.';
         return;
@@ -218,15 +255,16 @@ export async function initializeStampDieLibrary(services = {}) {
       const record = createStampDieSetRecord({
         id: draftId,
         name: view.name.value,
-        dateCreated: getLocalDateValue(),
-        releaseYear: Number(view.releaseYear.value),
+        dateCreated: editingRecord?.dateCreated || getLocalDateValue(),
+        releaseYear: editingRecord && editingRecord.releaseYear === undefined && !view.releaseYear.value
+          ? undefined : Number(view.releaseYear.value),
         favorite: view.favorite.checked,
         tagIds: reconciled.record.tagIds
       }, reconciled.catalog);
       const prepared = await storage.prepareStampImagesForSave(draftImages);
       record.imageRefs = prepared.imageRefs;
       usedFallback = prepared.usedFallback;
-      await storage.saveStampDieSet(record, { inferredTags });
+      await storage.saveStampDieSet(normalizeStampDieSet(record, reconciled.catalog), { inferredTags });
       saved = true;
     } catch {
       view.message.dataset.tone = 'error';
@@ -253,7 +291,7 @@ export async function initializeStampDieLibrary(services = {}) {
   await refresh();
 }
 
-function createAddSetView() {
+function createSetFormView() {
   const dialog = document.createElement('dialog');
   dialog.className = 'stamp-set-dialog';
   dialog.setAttribute('aria-labelledby', 'stamp-set-add-title');
@@ -326,7 +364,7 @@ function createAddSetView() {
   actions.append(cancel, save);
   form.append(fields, actions);
   dialog.append(header, form);
-  return { dialog, form, fields, name, releaseYear, favorite, tags, message, cancel, save, chooseImages, imageInput, chooseFolder, folderMessage, imageMessage, previews };
+  return { dialog, title, form, fields, name, releaseYear, favorite, tags, message, cancel, save, chooseImages, imageInput, chooseFolder, folderMessage, imageMessage, previews };
 }
 
 function createField(text, input) {
@@ -336,7 +374,7 @@ function createField(text, input) {
   return label;
 }
 
-export function renderStampDieLibrary(gallery, records, catalog) {
+export function renderStampDieLibrary(gallery, records, catalog, onEdit) {
   const tiles = records.map((record) => {
     const tile = document.createElement('article');
     tile.className = 'stamp-set-tile';
@@ -367,6 +405,15 @@ export function renderStampDieLibrary(gallery, records, catalog) {
       }
       content.append(tags);
     }
+    if (onEdit) {
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'button';
+      edit.textContent = 'Edit';
+      edit.setAttribute('aria-label', `Edit ${record.name}`);
+      edit.addEventListener('click', () => onEdit(record.id));
+      content.append(edit);
+    }
     tile.append(placeholder, content);
     return tile;
   });
@@ -388,7 +435,7 @@ function createSetImageGrid(references = []) {
     empty.textContent = 'No image';
     grid.append(empty);
   }
-  for (const [index, reference] of references.entries()) {
+  for (const [index, reference] of orderStampDieImages(references).entries()) {
     const frame = document.createElement('div');
     const missing = document.createElement('div');
     missing.className = 'stamp-set-placeholder';
