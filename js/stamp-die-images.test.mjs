@@ -236,9 +236,10 @@ for (const [filename, expected] of [
   ['Frosted Pines Masks.jpg', 'mask-id'],
   ['Frosted Pines MASK.JPG', 'mask-id'],
   ['Frosted Pines mAsKs.jpg', 'mask-id'],
-  ['Frosted Pines Dies Masks.jpg', 'mask-id']
+  ['Frosted Pines Dies Masks.jpg', 'die-id'],
+  ['Frosted Pines MASKS dIeS.jpg', 'die-id']
 ]) {
-  test(`Mask-first inference: ${filename} selects only ${expected}`, () => {
+  test(`Die-first inference: ${filename} selects only ${expected}`, () => {
     const result = inferStampDieImageTags(catalog(), ['manual'], [filename]);
     assert.deepEqual(result.tagIds, ['manual', expected]);
     assert.equal(result.tagIds.includes('supplies'), false);

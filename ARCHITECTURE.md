@@ -270,7 +270,7 @@ Legacy path-only and empty references remain readable; no database/store upgrade
 or bulk migration is needed. Backup-envelope version 3 is unchanged, and Set
 backup support is still deferred.
 
-Filename inference uses case-insensitive Mask, then Die, then Stamp precedence.
+Filename inference uses case-insensitive Die, then Mask, then Stamp precedence.
 It creates missing ordinary Stamp/Die/Mask tags only in draft memory.
 Still-selected new tags and their Set commit together through the existing storage
 transaction helper. Inference never runs at reload or re-adds manually removed tags

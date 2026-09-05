@@ -127,8 +127,8 @@ assigned. Deprecated appliesTo metadata does not restrict Set assignments. Ordin
 tag creation remains in Settings; there is no inline tag-creation form.
 
 For each newly selected image, filename inference uses this case-insensitive order:
-contains `mask` adds ordinary global Mask; else contains `die` adds ordinary global
-Die; otherwise adds ordinary global Stamp. Mask takes precedence when both words
+contains `die` adds ordinary global Die; else contains `mask` adds ordinary global
+Mask; otherwise adds ordinary global Stamp. Die takes precedence when both words
 occur. A mixed selection may add all three. Inference only adds assignments, preserving manual tags. Removing an
 image does not remove a tag. Users may remove either inferred tag before saving;
 Save and reload never recalculate it. Selecting another image can add its inferred
@@ -169,7 +169,7 @@ or filtering, Card relationships, or image-deletion workflow was added.
 
 Automated tests cover multiple selection and order, safe folder copies/references,
 collision handling, embedded and thumbnail-unavailable fallback, thumbnail metadata,
-Mask-first filename inference (including mixed selections and case variants), manual overrides, categories, cancel/removal/late reads,
+Die-first filename inference (including mixed selections and case variants), manual overrides, categories, cancel/removal/late reads,
 Library image rendering, atomic inferred-tag/Set writes, and reload. Existing
 Paper/Card and global-tag tests remain in the full suite. DOM, directory, and
 IndexedDB API harnesses do not modify real user files. Real picker permissions,

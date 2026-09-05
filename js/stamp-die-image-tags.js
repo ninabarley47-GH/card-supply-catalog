@@ -8,7 +8,7 @@ export function inferStampDieImageTags(catalog, tagIds, filenames) {
   let nextCatalog = catalog;
   const selected = new Set(tagIds);
   const inferredTags = [];
-  for (const name of new Set(filenames.map((filename) => /mask/i.test(filename) ? 'Mask' : /die/i.test(filename) ? 'Die' : 'Stamp'))) {
+  for (const name of new Set(filenames.map((filename) => /die/i.test(filename) ? 'Die' : /mask/i.test(filename) ? 'Mask' : 'Stamp'))) {
     let tag = nextCatalog.tags.find((entry) => getTagKey(entry.name) === getTagKey(name));
     if (!tag) {
       const added = addGlobalTag(nextCatalog, { name, allowFuzzy: true });
