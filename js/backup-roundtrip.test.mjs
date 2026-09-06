@@ -100,6 +100,7 @@ test("compact iPad backup round-trip carries the global catalog and tagIds", asy
     paperPacks: [paperPack], colorsById: { [color.id]: color },
     services: {
       loadSavedCards: async () => [card], loadGlobalTagCatalog: async () => migrated.catalog,
+      loadSavedStampDieSets: async () => [],
       hydrateCardImageSources: async () => {}
     }
   });

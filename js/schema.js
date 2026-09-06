@@ -1,5 +1,5 @@
 export const CATALOG_SCHEMA_VERSION = 6;
-export const BACKUP_SCHEMA_VERSION = 3;
+export const BACKUP_SCHEMA_VERSION = 4;
 
 export function addCatalogSchemaVersion(record) {
   return {
@@ -13,7 +13,7 @@ export function getCatalogSchemaVersion(record) {
     return record.catalogSchemaVersion;
   }
 
-  if (record?.app === "card-supply-catalog" && [2, BACKUP_SCHEMA_VERSION].includes(record.schemaVersion)) {
+  if (record?.app === "card-supply-catalog" && [2, 3, BACKUP_SCHEMA_VERSION].includes(record.schemaVersion)) {
     return CATALOG_SCHEMA_VERSION;
   }
 

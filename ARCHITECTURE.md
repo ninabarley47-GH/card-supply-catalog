@@ -133,9 +133,9 @@ Each color's JSON entry includes a color ID derived from the name, name, HEX val
 
 Backups are explicit, user-triggered JSON exports rather than automatic rolling snapshots.
 
-- Standard backup: includes paper packs, Cards, colors, the versioned global tag catalog, `tagIds` assignments, embedded fallback images, and relative references to folder-backed Paper and Card images. The image folders must be backed up separately.
-- iPad backup: includes the same global tag catalog and `tagIds` assignments while embedding compressed copies of accessible Paper and Card images so the catalog can be restored where folder access is unavailable.
-- Import: validates and reconciles the complete taxonomy and all catalog records in memory before writing; then persists the global catalog and selected Paper/Card records in one IndexedDB transaction. Any unresolved identity conflict, validation, preparation, or transaction failure leaves IndexedDB and in-memory catalog state unchanged. Legacy name-based backups remain importable through the approved conversion rules.
+- Standard backup: includes Paper Packs, Cards, Stamp & Die Sets, colors, the versioned global tag catalog, `tagIds` assignments, embedded fallback images, and relative references to folder-backed Paper, Card, and Stamp & Die images. The image folders must be backed up separately.
+- iPad backup: includes the same global tag catalog and `tagIds` assignments while embedding compressed copies of accessible Paper, Card, and Stamp & Die images so the catalog can be restored where folder access is unavailable.
+- Import: validates and reconciles the complete taxonomy and all catalog records in memory before writing; then persists the global catalog and selected Paper/Card/Set records, colors, and Owners in one IndexedDB transaction. Any unresolved identity conflict, validation, preparation, or transaction failure leaves IndexedDB and in-memory catalog state unchanged. Legacy name-based backups remain importable through the approved conversion rules.
 - Destination: if the selected image-library folder is writable, export saves there; otherwise it uses a browser download.
 
 ## Schema Version Boundaries
@@ -261,7 +261,7 @@ IndexedDB version 6 adds the `stampDieSets` store without changing existing reco
 `storage.js` supplies minimal load/save support; `stamp-die-sets.js` validates and
 serializes metadata using the existing catalog schema helper. Global tag usage and
 delete operations include sets. Add Set and multiple-image persistence are now
-implemented; relationships and backup/restore support remain deferred. See [feature_stamp_die_catalog.md](feature_stamp_die_catalog.md)
+implemented, including backup/restore parity; relationships remain deferred. See [feature_stamp_die_catalog.md](feature_stamp_die_catalog.md)
 for the agreed record shape and Phase 1 boundaries.
 
 ### Stamp & Die Release Year
@@ -287,7 +287,7 @@ Supporting embedded images and thumbnail fields changes persisted reference
 validation/serialization, so the shared catalog schema advances from 4 to 5.
 Legacy path-only and empty references remain readable; no database/store upgrade
 or bulk migration is needed. Backup-envelope version 3 is unchanged, and Set
-backup support is still deferred.
+backup support was deferred at Phase 2B and is now covered by the parity phase below.
 
 Filename inference uses case-insensitive Die, then Mask, then Stamp precedence.
 It creates missing ordinary Stamp/Die/Mask tags only in draft memory.
@@ -330,5 +330,34 @@ use the existing disabled presentation and embedded-image fallback messaging.
 Stamp storage retains Phase 2B's root copies and sibling thumbnails. Selection,
 reconnection, health checks, reference removal, and Set deletion never mutate
 shared-library files (Decision 32). Existing references are not migrated or rewritten.
-The backup payload and versions remain unchanged; Stamp descriptive library backup
-metadata is explicitly deferred along with broader Stamp backup integration.
+Phase 2E left the backup payload and versions unchanged and deferred Stamp backup
+metadata. The backup/restore parity phase below supersedes that deferral.
+
+### Stamp & Die backup/restore parity
+
+Backup envelope 4 adds `stampDieSets` and standard-only
+`imageStorage.configuredStampDieLibrary` using the same descriptive serializer as
+Paper/Card (strategy, folder name, selectedAt). Catalog schema 6 and database version
+6 are unchanged: the existing Set fields and store already suffice.
+`normalizeStampDieSet` is the shared export/import validation and serialization
+boundary, preserving dateCreated, optional owner/year, canonical tagIds, Favorite,
+and all supported ordered image-reference fields while excluding transient state.
+
+Standard export preserves embedded originals/thumbnails and relative paths without
+reading source files. Compact export hydrates through the existing Set resolver,
+uses the shared Card compressor, and normalizes results to the existing embedded
+Set strategy. Successful compression omits redundant paths/thumbnails; failed
+compression retains the original reference/fallback and reports unavailable images.
+
+Set tag IDs participate in existing taxonomy reconciliation. Owner registries retain
+stable IDs even when two device registries contain the same display name. Import
+uses the existing ID-based skip/replace plan, validates before persistence, and
+includes `stampDieSets` in the same transaction as Paper/Card/color/Owner/settings
+updates. Only a successful commit refreshes Set views and the cached global catalog.
+An absent Set section is an empty import, never a clear operation. Legacy envelopes
+remain supported; future backup/catalog versions are rejected before writing.
+
+Directory handles remain local settings, excluded from JSON and untouched by
+restore. No automatic reconnection, migration, folder scan, or image creation runs
+for imported Sets. Decision 32 prohibits any source-file cleanup or destructive
+filesystem operation. The Phase 2E backup deferral is superseded by this phase.

@@ -1,7 +1,11 @@
+import { normalizeStampDieSet, normalizeImageReference } from './stamp-die-sets.js';
+import { hydrateStampImages, clearStampImageSources, STAMP_IMAGE_LIBRARY_SETTING_ID } from './stamp-die-images.js';
 import {
   loadCatalogSetting,
   loadGlobalTagCatalog,
   loadSavedCards,
+  loadSavedStampDieSets,
+  loadSavedStampDieRecordsForRestore,
   loadSavedCardRecordsForRestore,
   loadSavedPaperPack,
   isCard,
@@ -10,7 +14,7 @@ import {
   restoreCatalogRecords,
   saveCatalogSetting
 } from "./storage.js";
-import { buildOwnerRegistry, isOwner, migratePaperPackOwners, serializePaperPackOwner } from "./owners.js";
+import { buildOwnerRegistry, isOwner, normalizeOwnerName, migratePaperPackOwners, serializePaperPackOwner } from "./owners.js";
 import { createEmptyGlobalTagCatalog, migrateLegacyTagData, validateGlobalTagCatalog, validateItemTagAssignments } from "./global-tag-catalog.js";
 import { dehydrateCardTagNames, dehydratePaperTagNames, hydratePaperTagNames } from "./global-tag-persistence.js";
 import { reconcileBackupTagData } from "./tag-backup-reconciliation.js";
@@ -164,6 +168,11 @@ export function initializeCatalogBackup({ paperPacks, colorsById, owners = [], o
 
       try {
         const backup = await readBackupFile(backupFile);
+        const validation = validateBackup(backup);
+        if (!validation.ok) {
+          renderBackupMessage(message, validation.message, "error");
+          return;
+        }
         const overwriteExisting = overwriteExistingInput?.checked === true;
         const overwriteSummary = await summarizeBackupOverwrites(backup, paperPacks, colorsById);
 
@@ -201,6 +210,8 @@ export function initializeCatalogBackup({ paperPacks, colorsById, owners = [], o
           colorsSkipped: 0,
           cardsImported: 0,
           cardsSkipped: 0,
+          setsImported: 0,
+          setsSkipped: 0,
           imagesImported: 0,
           folderImageReferencesImported: 0,
           notes: [],
@@ -592,11 +603,14 @@ async function copyDiagnosticText(text, textarea) {
   if (!document.execCommand?.("copy")) throw new Error("Clipboard copy is unavailable.");
 }
 
-async function summarizeBackupOverwrites(backup, paperPacks, colorsById) {
+export async function summarizeBackupOverwrites(backup, paperPacks, colorsById, services = {}) {
   const importedPaperPacks = Array.isArray(backup?.paperPacks) ? backup.paperPacks : [];
   const importedColors = backup?.colors && typeof backup.colors === "object" ? Object.values(backup.colors) : [];
   const importedCards = Array.isArray(backup?.cards) ? backup.cards : [];
-  const savedCards = await loadSavedCards();
+  const savedCards = await (services.loadSavedCards || loadSavedCards)();
+  const importedSets = backup.stampDieSets || [];
+  const savedSets = importedSets.length ? await (services.loadSavedStampDieRecordsForRestore || loadSavedStampDieRecordsForRestore)() : [];
+  const setPlan = createImportPlan(importedSets, savedSets, true);
   const packPlan = createImportPlan(importedPaperPacks, paperPacks, true);
   const colorPlan = createImportPlan(importedColors, Object.values(colorsById), true);
   const cardPlan = createImportPlan(importedCards, savedCards, true);
@@ -620,6 +634,8 @@ async function summarizeBackupOverwrites(backup, paperPacks, colorsById) {
     overwriteParts.push(`${cardOverwriteCount} Card${cardOverwriteCount === 1 ? "" : "s"}`);
   }
 
+  if (setPlan.matchingCount > 0) overwriteParts.push(`${setPlan.matchingCount} Stamp & Die Set${setPlan.matchingCount === 1 ? "" : "s"}`);
+
   if (overwriteParts.length === 0) {
     return {
       requiresConfirmation: false,
@@ -632,46 +648,44 @@ async function summarizeBackupOverwrites(backup, paperPacks, colorsById) {
     message: [
       "Replace matching catalog entries?",
       "",
-      `This will replace ${overwriteParts.join(" and ")} already in the catalog. Only image data and references belonging to matching paper packs and Cards can change; all other catalog images will remain untouched. Files in your selected image folders will not be deleted.`,
+      `This will replace ${overwriteParts.join(" and ")} already in the catalog. Only image data and references belonging to matching paper packs, Cards, and Sets can change; all other catalog images will remain untouched. Files in your selected image folders will not be deleted.`,
       "",
-      `The import will also add ${newPackCount} new paper pack${newPackCount === 1 ? "" : "s"}, ${newColorCount} new color${newColorCount === 1 ? "" : "s"}, and ${newCardCount} new Card${newCardCount === 1 ? "" : "s"}.`,
+      `The import will also add ${newPackCount} new paper pack${newPackCount === 1 ? "" : "s"}, ${newColorCount} new color${newColorCount === 1 ? "" : "s"}, ${newCardCount} new Card${newCardCount === 1 ? "" : "s"}, and ${setPlan.newCount} new Stamp & Die Set${setPlan.newCount === 1 ? "" : "s"}.`,
       "",
       "Continue with replacement import?"
     ].join("\n")
   };
 }
-async function createCatalogBackup({ paperPacks, colorsById, owners = [] }) {
-  const [imageLibrary, cardImageLibrary, cards, tagCatalog] = await Promise.all([
-    loadCatalogSetting(IMAGE_LIBRARY_SETTING_ID),
-    loadCatalogSetting(CARD_IMAGE_LIBRARY_SETTING_ID),
-    loadSavedCards(),
-    loadGlobalTagCatalog()
+export async function createCatalogBackup({ paperPacks, colorsById, owners = [], services = {} }) {
+  const loadSetting = services.loadCatalogSetting || loadCatalogSetting;
+  const [imageLibrary, cardImageLibrary, stampImageLibrary, cards, stampDieSets, tagCatalog] = await Promise.all([
+    loadSetting(IMAGE_LIBRARY_SETTING_ID), loadSetting(CARD_IMAGE_LIBRARY_SETTING_ID),
+    loadSetting(STAMP_IMAGE_LIBRARY_SETTING_ID),
+    (services.loadSavedCards || loadSavedCards)(),
+    (services.loadSavedStampDieSets || loadSavedStampDieSets)(),
+    (services.loadGlobalTagCatalog || loadGlobalTagCatalog)()
   ]);
-  return createCatalogBackupSnapshot({
-    paperPacks,
-    colorsById,
-    cards,
-    owners,
-    imageLibrary,
-    cardImageLibrary,
-    tagCatalog
-  });
+  return createCatalogBackupSnapshot({ paperPacks, colorsById, cards, stampDieSets, owners,
+    imageLibrary, cardImageLibrary, stampImageLibrary, tagCatalog });
 }
 
 export function createCatalogBackupSnapshot({
   paperPacks,
   colorsById,
   cards = [],
+  stampDieSets = [],
   owners = [],
   imageLibrary = null,
   cardImageLibrary = null,
+  stampImageLibrary = null,
   tagCatalog = null,
   tagVocabularies = {}
 }) {
-  const effectiveOwners = buildOwnerRegistry(owners, paperPacks);
+  const effectiveOwners = buildBackupOwnerRegistry(owners, paperPacks);
+  assertStampOwnerReferences(stampDieSets, effectiveOwners);
   const ownedPaperPacks = migratePaperPackOwners(paperPacks, effectiveOwners);
-  const imageSummary = summarizeImageStorage(ownedPaperPacks, cards);
-  const taxonomy = prepareBackupTaxonomy({ paperPacks: ownedPaperPacks, cards, tagCatalog, tagVocabularies });
+  const imageSummary = summarizeImageStorage(ownedPaperPacks, cards, stampDieSets);
+  const taxonomy = prepareBackupTaxonomy({ paperPacks: ownedPaperPacks, cards, stampDieSets, tagCatalog, tagVocabularies });
 
   return {
     schemaVersion: BACKUP_SCHEMA_VERSION,
@@ -682,27 +696,31 @@ export function createCatalogBackupSnapshot({
       strategy: imageSummary.folderImageReferences > 0 ? "local-folder-with-fallback" : "embedded-indexed-db",
       configuredLibrary: createSerializableImageLibrarySetting(imageLibrary),
       configuredCardLibrary: createSerializableImageLibrarySetting(cardImageLibrary),
+      configuredStampDieLibrary: createSerializableImageLibrarySetting(stampImageLibrary),
       embeddedImages: imageSummary.embeddedImages,
       folderImageReferences: imageSummary.folderImageReferences,
       note:
-        "Backup stores folder-backed images as relative imagePath references. Back up or share the Paper and Card image folders separately, then reconnect them after import."
+        "Backup stores folder-backed images as relative imagePath references. Back up or share the Paper, Card, and Stamp & Die image folders separately, then reconnect them after import."
     },
     colors: sortObjectByKey(colorsById),
     owners: effectiveOwners.map(({ id, name, archived }) => ({ id, name, ...(archived === true ? { archived: true } : {}) })),
     paperPacks: taxonomy.paperPacks.map(createSerializablePaperPack),
     cards: taxonomy.cards.map(createSerializableCard),
+    stampDieSets: taxonomy.stampDieSets,
     tagCatalog: taxonomy.tagCatalog
   };
 }
 
 export async function createIpadCatalogBackup({ paperPacks, colorsById, owners = [], services = {} }) {
-  const effectiveOwners = buildOwnerRegistry(owners, paperPacks);
+  const effectiveOwners = buildBackupOwnerRegistry(owners, paperPacks);
   const ownedPaperPacks = migratePaperPackOwners(paperPacks, effectiveOwners);
   const compressedPaperPacks = [];
-  const [cards, tagCatalog] = await Promise.all([
+  const [cards, tagCatalog, stampDieSets] = await Promise.all([
     (services.loadSavedCards || loadSavedCards)(),
-    (services.loadGlobalTagCatalog || loadGlobalTagCatalog)()
+    (services.loadGlobalTagCatalog || loadGlobalTagCatalog)(),
+    (services.loadSavedStampDieSets || loadSavedStampDieSets)()
   ]);
+  assertStampOwnerReferences(stampDieSets, effectiveOwners);
   await (services.hydrateCardImageSources || hydrateCardImageSources)(cards);
   const compressedCards = [];
   const imageSummary = {
@@ -731,7 +749,26 @@ export async function createIpadCatalogBackup({ paperPacks, colorsById, owners =
     imageSummary.folderImageReferences += result.folderImageReferences;
   }
 
-  const taxonomy = prepareBackupTaxonomy({ paperPacks: compressedPaperPacks, cards: compressedCards, tagCatalog });
+  const compressedSets = [];
+  try {
+    await (services.hydrateStampImages || hydrateStampImages)(stampDieSets);
+    for (const record of stampDieSets) {
+      const imageRefs = [];
+      for (const ref of record.imageRefs) {
+        const result = await createSerializableCardWithCompressedImage(ref, services.compressImageSource || compressImageSource);
+        // Compact encoding follows Cards; persist only fields accepted by the Set schema.
+        const image = result.card;
+        if (result.compressedImages) image.imageStorageStrategy = 'embedded-indexed-db';
+        imageRefs.push(normalizeImageReference(image));
+        for (const key of Object.keys(imageSummary)) imageSummary[key] += result[key];
+      }
+      compressedSets.push({ ...record, imageRefs });
+    }
+  } finally {
+    clearStampImageSources(stampDieSets);
+  }
+
+  const taxonomy = prepareBackupTaxonomy({ paperPacks: compressedPaperPacks, cards: compressedCards, stampDieSets: compressedSets, tagCatalog });
   return {
     schemaVersion: BACKUP_SCHEMA_VERSION,
     catalogSchemaVersion: CATALOG_SCHEMA_VERSION,
@@ -754,11 +791,28 @@ export async function createIpadCatalogBackup({ paperPacks, colorsById, owners =
     owners: effectiveOwners.map(({ id, name, archived }) => ({ id, name, ...(archived === true ? { archived: true } : {}) })),
     paperPacks: taxonomy.paperPacks,
     cards: taxonomy.cards,
+    stampDieSets: taxonomy.stampDieSets,
     tagCatalog: taxonomy.tagCatalog
   };
 }
 
-function prepareBackupTaxonomy({ paperPacks = [], cards = [], tagCatalog, tagVocabularies = {} }) {
+function assertStampOwnerReferences(records, owners) {
+  const ids = new Set(owners.map((owner) => owner.id));
+  if (records.some((record) => record.ownerId !== undefined && !ids.has(record.ownerId))) {
+    throw new TypeError("A Stamp & Die Set references an unknown owner.");
+  }
+}
+
+function buildBackupOwnerRegistry(owners, paperPacks) {
+  const registry = buildOwnerRegistry(owners, paperPacks);
+  const byId = new Map(registry.map((owner) => [owner.id, owner]));
+  for (const owner of owners.filter(isOwner)) {
+    byId.set(owner.id, { id: owner.id, name: normalizeOwnerName(owner.name), ...(owner.archived === true ? { archived: true } : {}) });
+  }
+  return [...byId.values()];
+}
+
+function prepareBackupTaxonomy({ paperPacks = [], cards = [], stampDieSets = [], tagCatalog, tagVocabularies = {} }) {
   if (tagCatalog) {
     if (!validateGlobalTagCatalog(tagCatalog).ok) throw new TypeError("Cannot export an invalid global tag catalog.");
     const migrated = migrateLegacyTagData({ catalog: tagCatalog, paperRecords: paperPacks, cardRecords: cards });
@@ -766,6 +820,7 @@ function prepareBackupTaxonomy({ paperPacks = [], cards = [], tagCatalog, tagVoc
     const cardIds = new Map(migrated.cardAssignments.map((entry) => [entry.recordId, entry.tagIds]));
     return {
       tagCatalog: cloneJsonSafe(migrated.catalog),
+      stampDieSets: stampDieSets.map((record) => normalizeStampDieSet(record, migrated.catalog)),
       paperPacks: paperPacks.map((record) => Array.isArray(record.tagIds)
         ? dehydratePaperTagNames(record, migrated.catalog)
         : withoutLegacyTags(record, paperIds.get(record.id) || [], "keywords")),
@@ -782,6 +837,7 @@ function prepareBackupTaxonomy({ paperPacks = [], cards = [], tagCatalog, tagVoc
   const cardIds = new Map(migrated.cardAssignments.map((entry) => [entry.recordId, entry.tagIds]));
   return {
     tagCatalog: migrated.catalog,
+    stampDieSets: stampDieSets.map((record) => normalizeStampDieSet(record, migrated.catalog)),
     paperPacks: paperPacks.map((record) => withoutLegacyTags(record, paperIds.get(record.id) || [], "keywords")),
     cards: cards.map((record) => withoutLegacyTags(record, cardIds.get(record.id) || [], "tags"))
   };
@@ -793,7 +849,7 @@ function withoutLegacyTags(record, tagIds, legacyField) {
   return normalized;
 }
 
-function summarizeImageStorage(paperPacks, cards = []) {
+function summarizeImageStorage(paperPacks, cards = [], stampDieSets = []) {
   const summary = paperPacks.reduce(
     (summary, paperPack) => {
       summary.embeddedImages += countEmbeddedPatternImages(paperPack);
@@ -806,7 +862,7 @@ function summarizeImageStorage(paperPacks, cards = []) {
     }
   );
 
-  for (const card of cards) {
+  for (const card of [...cards, ...stampDieSets.flatMap((record) => record.imageRefs)]) {
     summary.embeddedImages += card.imageSrc ? 1 : 0;
     summary.folderImageReferences += card.imagePath ? 1 : 0;
   }
@@ -964,6 +1020,8 @@ export async function restoreCatalogBackup({
     colorsSkipped: 0,
     cardsImported: 0,
     cardsSkipped: 0,
+    setsImported: 0,
+    setsSkipped: 0,
     imagesImported: 0,
     folderImageReferencesImported: 0,
     importedPaperPackIds: [],
@@ -999,12 +1057,13 @@ export async function restoreCatalogBackup({
 
   const importedColorsById = backup?.colors || {};
   const rawImportedPaperPacks = reconciliation.paperPacks;
-  const importedOwners = buildOwnerRegistry(
+  const importedOwners = buildBackupOwnerRegistry(
     [...owners, ...(Array.isArray(backup?.owners) ? backup.owners : [])],
     rawImportedPaperPacks
   );
   const importedPaperPacks = migratePaperPackOwners(rawImportedPaperPacks, importedOwners);
   const importedCards = reconciliation.cards;
+  const importedSets = reconciliation.stampDieSets;
   const savedCards = await (
     services.loadSavedCardRecordsForRestore || services.loadSavedCards || loadSavedCardRecordsForRestore
   )();
@@ -1015,6 +1074,15 @@ export async function restoreCatalogBackup({
   );
   const paperPackPlan = createImportPlan(importedPaperPacks, paperPacks, overwriteExisting);
   const cardPlan = createImportPlan(importedCards, savedCards, overwriteExisting);
+  let savedSets;
+  try {
+    savedSets = importedSets.length ? await (services.loadSavedStampDieRecordsForRestore || loadSavedStampDieRecordsForRestore)() : [];
+  } catch {
+    summary.errors.push("Nothing was imported because existing Sets could not be loaded.");
+    return summary;
+  }
+  const setPlan = createImportPlan(importedSets, savedSets, overwriteExisting);
+  summary.setsSkipped = setPlan.skippedCount;
   summary.colorsSkipped = colorPlan.skippedCount;
   summary.packsSkipped = paperPackPlan.skippedCount;
   summary.cardsSkipped = cardPlan.skippedCount;
@@ -1063,6 +1131,7 @@ export async function restoreCatalogBackup({
       paperPacks: preparedPaperPacks,
       colors: colorPlan.recordsToImport,
       cards: preparedCards,
+      stampDieSets: setPlan.recordsToImport.map((record) => normalizeStampDieSet(record, reconciliation.catalog)),
       owners: importedOwners,
       tagCatalog: reconciliation.catalog
     });
@@ -1100,6 +1169,17 @@ export async function restoreCatalogBackup({
   summary.colorsImported = colorPlan.recordsToImport.length;
   summary.packsImported = preparedPaperPacks.length;
   summary.cardsImported = preparedCards.length;
+  summary.setsImported = setPlan.recordsToImport.length;
+  for (const record of setPlan.recordsToImport) {
+    for (const ref of record.imageRefs) {
+      summary.imagesImported += ref.imageSrc ? 1 : 0;
+      summary.folderImageReferencesImported += ref.imagePath ? 1 : 0;
+    }
+  }
+  if (summary.setsImported > 0) {
+    if (services.dispatchStampSetsRestored) services.dispatchStampSetsRestored();
+    else document.dispatchEvent(new CustomEvent("catalog:stamp-sets-restored"));
+  }
 
   if (summary.cardsImported > 0) {
     if (services.dispatchCardsRestored) {
@@ -1114,14 +1194,15 @@ export async function restoreCatalogBackup({
   if (
     summary.folderImageReferencesImported > 0 ||
     backup.imageStorage?.configuredLibrary ||
-    backup.imageStorage?.configuredCardLibrary
+    backup.imageStorage?.configuredCardLibrary ||
+    backup.imageStorage?.configuredStampDieLibrary
   ) {
     summary.warnings.push(
-      "Folder-backed image files are not inside the backup JSON. Choose or reconnect the Paper and Card image folders after import."
+      "Folder-backed image files are not inside the backup JSON. Choose or reconnect the Paper, Card, and Stamp & Die image folders after import."
     );
   }
 
-  if (summary.packsSkipped > 0 || summary.colorsSkipped > 0 || summary.cardsSkipped > 0) {
+  if (summary.packsSkipped > 0 || summary.colorsSkipped > 0 || summary.cardsSkipped > 0 || summary.setsSkipped > 0) {
     summary.notes.push("Existing catalog entries were left unchanged.");
   }
 
@@ -1496,7 +1577,8 @@ export function validateBackup(backup) {
     typeof backup.colors !== "object" ||
     Array.isArray(backup.colors) ||
     !Array.isArray(backup.paperPacks) ||
-    (backup.cards !== undefined && !Array.isArray(backup.cards))
+    (backup.cards !== undefined && !Array.isArray(backup.cards)) ||
+    (backup.stampDieSets !== undefined && !Array.isArray(backup.stampDieSets))
   ) {
     return {
       ok: false,
@@ -1504,6 +1586,12 @@ export function validateBackup(backup) {
     };
   }
 
+  if (backup.schemaVersion > BACKUP_SCHEMA_VERSION || backup.catalogSchemaVersion > CATALOG_SCHEMA_VERSION) {
+    return { ok: false, message: "This backup requires a newer version of CSC. Nothing was imported." };
+  }
+  if (backup.stampDieSets?.length && !backup.tagCatalog) {
+    return { ok: false, message: "Stamp & Die Sets require a global tag catalog. Nothing was imported." };
+  }
   const isModern = backup.schemaVersion >= 3 || backup.tagCatalog !== undefined;
   if (isModern) {
     if (!backup.tagCatalog || !validateGlobalTagCatalog(backup.tagCatalog).ok) {
@@ -1515,7 +1603,7 @@ export function validateBackup(backup) {
     const assignmentError = validateModernBackupAssignments(backup);
     if (assignmentError) return { ok: false, message: assignmentError };
   } else {
-    const mixedRecord = [...backup.paperPacks, ...(backup.cards || [])].find((record) => "tagIds" in record);
+    const mixedRecord = [...backup.paperPacks, ...(backup.cards || [])].find((record) => record && "tagIds" in record);
     if (mixedRecord) return { ok: false, message: "Nothing was imported because a legacy backup contains new-format tag assignments." };
   }
 
@@ -1552,7 +1640,10 @@ export function validateBackup(backup) {
   const recordCollections = [
     { label: "color", records: colors, validator: isColor },
     { label: "paper pack", records: backup.paperPacks, validator: isCompatiblePaperPack },
-    { label: "Card", records: cards, validator: isCard }
+    { label: "Card", records: cards, validator: isCard },
+    { label: "Stamp & Die Set", records: backup.stampDieSets || [], validator: (record) => {
+      try { normalizeStampDieSet(record, backup.tagCatalog); return true; } catch { return false; }
+    } }
   ];
 
   for (const { label, records, validator } of recordCollections) {
@@ -1589,6 +1680,10 @@ export function validateBackup(backup) {
   if (duplicateOwnerId) {
     return { ok: false, message: `Nothing was imported because the backup contains duplicate owner ID "${duplicateOwnerId}".` };
   }
+  const stampOwnerIds = new Set(owners.map((owner) => owner.id));
+  if ((backup.stampDieSets || []).some((record) => record.ownerId && !stampOwnerIds.has(record.ownerId))) {
+    return { ok: false, message: "Nothing was imported because a Stamp & Die Set references an unknown owner." };
+  }
   if (owners.length > 0) {
     const ownerIds = new Set(owners.map((owner) => owner.id));
     const invalidOwnerReference = backup.paperPacks.find((paperPack) => paperPack.ownerId && !ownerIds.has(paperPack.ownerId));
@@ -1618,10 +1713,11 @@ function upsertPaperPack(paperPacks, paperPack) {
 function validateModernBackupAssignments(backup) {
   for (const { records, productType, legacyField } of [
     { records: backup.paperPacks, productType: "paper", legacyField: "keywords" },
-    { records: backup.cards || [], productType: "card", legacyField: "tags" }
+    { records: backup.cards || [], productType: "card", legacyField: "tags" },
+    { records: backup.stampDieSets || [], productType: "stamp", legacyField: "tags" }
   ]) {
     for (const record of records) {
-      if (!Array.isArray(record.tagIds) || legacyField in record) {
+      if (!record || !Array.isArray(record.tagIds) || legacyField in record) {
         return "Nothing was imported because the backup contains malformed mixed legacy/new tag data.";
       }
       if (!validateItemTagAssignments({ catalog: backup.tagCatalog, productType, tagIds: record.tagIds }).ok) {
@@ -1725,7 +1821,7 @@ function createSerializableCard(card) {
   }));
 }
 
-async function createSerializableCardWithCompressedImage(card) {
+async function createSerializableCardWithCompressedImage(card, compress = compressImageSource) {
   const serializableCard = createSerializableCard(card);
   const imageSource = getCardDetailImageSource(card);
   const hadFolderImage = Boolean(card?.imagePath);
@@ -1733,7 +1829,7 @@ async function createSerializableCardWithCompressedImage(card) {
 
   if (imageSource) {
     try {
-      compressedImageSrc = await compressImageSource(imageSource);
+      compressedImageSrc = await compress(imageSource);
     } catch (error) {
       compressedImageSrc = "";
     }
@@ -1972,6 +2068,8 @@ function renderRestoreSummary(message, summary) {
     createSummaryItem("Existing colors skipped", summary.colorsSkipped || 0),
     createSummaryItem("Cards imported", summary.cardsImported || 0),
     createSummaryItem("Existing Cards skipped", summary.cardsSkipped || 0),
+    createSummaryItem("Sets imported", summary.setsImported || 0),
+    createSummaryItem("Existing Sets skipped", summary.setsSkipped || 0),
     createSummaryItem("Embedded images imported", summary.imagesImported),
     createSummaryItem("Folder image references imported", summary.folderImageReferencesImported || 0)
   );

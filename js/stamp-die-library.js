@@ -472,6 +472,7 @@ export async function initializeStampDieLibrary(services = {}) {
     document.dispatchEvent(new CustomEvent('catalog:global-tags-updated', { detail: { source: 'stamp-die-save' } }));
   });
 
+  document.addEventListener('catalog:stamp-sets-restored', () => refresh());
   document.addEventListener('catalog:global-tags-updated', (event) => { if (event.detail?.source !== 'stamp-die-save') return refresh(); });
   document.addEventListener('catalog:owners-updated', () => {
     filters.refreshOwners();

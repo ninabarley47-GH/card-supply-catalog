@@ -18,6 +18,7 @@ function reconcileModern(localCatalog, backup) {
   assertCatalog(backup.tagCatalog, "imported");
   assertRecordShape(backup.paperPacks || [], "keywords");
   assertRecordShape(backup.cards || [], "tags");
+  assertRecordShape(backup.stampDieSets || [], "tags");
   const catalog = cloneCatalog(localCatalog);
   const report = createReport();
   const categoryIdMap = new Map();
@@ -127,7 +128,8 @@ function finish(catalog, backup, tagIdMap, report) {
   assertCatalog(catalog, "reconciled");
   const paperPacks = remapRecords(backup.paperPacks || [], tagIdMap, "paper", catalog);
   const cards = remapRecords(backup.cards || [], tagIdMap, "card", catalog);
-  return { ok: true, conflicts: [], catalog, paperPacks, cards, report };
+  const stampDieSets = remapRecords(backup.stampDieSets || [], tagIdMap, "stamp", catalog);
+  return { ok: true, conflicts: [], catalog, paperPacks, cards, stampDieSets, report };
 }
 
 function remapRecords(records, tagIdMap, productType, catalog) {

@@ -300,3 +300,54 @@ test('Set and new owner commit atomically and survive reload', async () => {
     assert.deepEqual(h.stores.get('owners').get(owner.id), owner);
   } finally { globalThis.window = previous; }
 });
+
+for (const failCommit of [false, true]) {
+  test(`backup restore writes all catalog stores atomically (commit failure=${failCommit}) and preserves local handles`, async (t) => {
+    const h = databaseHarness();
+    const previousWindow = globalThis.window;
+    t.after(() => { globalThis.window = previousWindow; });
+    globalThis.window = { indexedDB: h.indexedDB, localStorage: { getItem: () => 'true' } };
+    const storage = await import(`./storage.js?backup-atomic-${failCommit}`);
+    await storage.loadSavedStampDieRecordsForRestore();
+    for (const id of ['imageLibrary', 'cardImageLibrary', 'stampDieImageLibrary']) {
+      h.stores.get('settings').set(id, { id, value: { directoryHandle: { name: `Local ${id}` }, selectedAt: 'local' } });
+    }
+    const before = structuredClone(h.stores);
+    const records = {
+      paperPacks: [{ id: 'restored-paper', name: 'Paper', ownerId: 'restored-owner', releaseYear: 2024,
+        patternCount: 0, colors: [], tagIds: ['stable-one'], patterns: [] }],
+      cards: [{ id: 'restored-card', dateCreated: '2026-09-05', size: { width: 4, height: 6 }, tagIds: ['stable-one'],
+        paperPackIds: [], colorIds: [], favorite: false }],
+      colors: [{ id: 'restored-color', name: 'Blue' }],
+      owners: [{ id: 'restored-owner', name: 'Tester' }], tagCatalog: catalog,
+      stampDieSets: [{ ...setRecord(), ownerId: 'restored-owner', favorite: true }]
+    };
+    if (failCommit) {
+      h.failNextCommit();
+      await assert.rejects(storage.restoreCatalogRecords(records));
+      assert.deepEqual(h.stores, before, 'Paper/Card/Set/color/owner/tag/settings writes must all roll back');
+    } else {
+      await storage.restoreCatalogRecords(records);
+      assert.deepEqual(await storage.loadSavedStampDieRecordsForRestore(), [normalizeStampDieSet(records.stampDieSets[0], catalog)]);
+      assert.ok(h.stores.get('paperPacks').has('restored-paper'));
+      assert.ok(h.stores.get('cards').has('restored-card'));
+      assert.ok(h.stores.get('colors').has('restored-color'));
+      assert.ok(h.stores.get('owners').has('restored-owner'));
+      assert.deepEqual(h.stores.get('settings').get('globalTagCatalog').value, catalog);
+      for (const id of ['imageLibrary', 'cardImageLibrary', 'stampDieImageLibrary']) {
+        assert.deepEqual(h.stores.get('settings').get(id), before.get('settings').get(id));
+      }
+      // Older backups pass no Sets: even replacement mode must not clear local Sets.
+      await storage.restoreCatalogRecords({ owners: records.owners, tagCatalog: catalog });
+      assert.equal((await storage.loadSavedStampDieRecordsForRestore()).length, 1);
+    }
+  });
+}
+
+test('atomic restore rejects invalid Set data and unknown owners before touching IndexedDB', async () => {
+  const storage = await import('./storage.js?invalid-stamp-restore');
+  await assert.rejects(storage.restoreCatalogRecords({ tagCatalog: catalog,
+    stampDieSets: [{ ...setRecord(), imageRefs: [{ imagePath: '../bad.jpg' }] }] }), /Invalid imagePath/);
+  await assert.rejects(storage.restoreCatalogRecords({ tagCatalog: catalog,
+    stampDieSets: [{ ...setRecord(), ownerId: 'unknown' }] }), /unknown owner/);
+});

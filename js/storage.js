@@ -140,6 +140,11 @@ export async function loadSavedStampDieSets() {
   return records.map((record) => normalizeStampDieSet(record, catalog));
 }
 
+// Restore planning reads stable records without hydrating against the local tag catalog.
+export async function loadSavedStampDieRecordsForRestore() {
+  return getAllFromStore(await openCatalogDatabase(), STAMP_DIE_SETS_STORE);
+}
+
 export async function saveStampDieSet(record, { inferredTags = [], owner = null } = {}) {
   const database = await openCatalogDatabase();
   const catalog = await ensureGlobalTagPersistence(database);
@@ -279,14 +284,19 @@ export async function saveCard(card) {
   });
 }
 
-export async function restoreCatalogRecords({ paperPacks = [], colors = [], cards = [], owners = [], tagCatalog = null, tagVocabularies = null }) {
+export async function restoreCatalogRecords({ paperPacks = [], colors = [], cards = [], stampDieSets = [], owners = [], tagCatalog = null, tagVocabularies = null }) {
   if (tagCatalog && !validateGlobalTagCatalog(tagCatalog).ok) throw new TypeError("Cannot restore an invalid global tag catalog.");
+  const normalizedSets = stampDieSets.map((record) => normalizeStampDieSet(record, tagCatalog));
+  const ownerIds = new Set(owners.map((owner) => owner.id));
+  if (normalizedSets.some((record) => record.ownerId && !ownerIds.has(record.ownerId))) {
+    throw new TypeError("Cannot restore a Set with an unknown owner.");
+  }
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
 
   await writeTransaction(
     database,
-    [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE, COLORS_STORE, CARDS_STORE, OWNERS_STORE, SETTINGS_STORE],
+    [PAPER_PACKS_STORE, DELETED_PAPER_PACK_IDS_STORE, COLORS_STORE, CARDS_STORE, STAMP_DIE_SETS_STORE, OWNERS_STORE, SETTINGS_STORE],
     (transaction) => {
       const paperPackStore = transaction.objectStore(PAPER_PACKS_STORE);
       const deletedPaperPackIdStore = transaction.objectStore(DELETED_PAPER_PACK_IDS_STORE);
@@ -296,6 +306,7 @@ export async function restoreCatalogRecords({ paperPacks = [], colors = [], card
       const ownerStore = transaction.objectStore(OWNERS_STORE);
 
       owners.forEach((owner) => ownerStore.put(owner));
+      normalizedSets.forEach((record) => transaction.objectStore(STAMP_DIE_SETS_STORE).put(record));
 
       for (const paperPack of paperPacks) {
         paperPackStore.put(normalizePaperPackForStorage(paperPack, tagCatalog));
@@ -320,6 +331,7 @@ export async function restoreCatalogRecords({ paperPacks = [], colors = [], card
       }
     }
   );
+  if (tagCatalog) globalTagMigrationPromise = Promise.resolve(tagCatalog);
 }
 
 export async function deleteCard(cardId) {

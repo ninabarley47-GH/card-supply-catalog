@@ -4,7 +4,7 @@
 
 Phases 1, 2A, 2B1, 2B2, 2C, 2D, and 2E are implemented: Library and Detail views, a shared
 Add/Edit Set workflow, ordered multiple-image selection/persistence, and Library search/filtering.
-Card relationships and backup/restore remain out of scope.
+Backup/restore parity is implemented. Card relationships remain out of scope.
 
 A Stamp & Die Set is one catalog record for stamps only, dies only, or coordinating
 stamps and dies. There are no individual stamp/die records, separate stampIds or
@@ -46,7 +46,7 @@ raised the catalog schema from 3 to 4; Phase 2B1 raises it to 5 because persiste
 image references now accept embedded image data and thumbnail fields that the old
 normalizer rejected or discarded. These are shared catalog versions, not Set-specific
 versions. Older path-only/no-image records remain readable. IndexedDB stays at
-version 6; the backup envelope stays at 3. No bulk record rewrite is needed.
+version 6; the backup envelope stayed at 3 until the backup parity phase. No bulk record rewrite is needed.
 
 ## Image references and shared utilities
 
@@ -167,7 +167,8 @@ catalog record must never delete, rename, move, overwrite, or otherwise modify
 existing shared-library images. Only new image/thumbnail files may be created during
 Save. No Set path calls image deletion, folder scanning, or thumbnail repair.
 
-Standard/iPad backups still exclude Stamp & Die Set records and images. No backup,
+At Phase 2B, standard/iPad backups excluded Stamp & Die Set records and images;
+the backup/restore parity phase below supersedes that limitation. No backup,
 import/export, automatic folder discovery/Set creation, Card relationships, or
 image-deletion workflow was added by the image phases. Library search/filtering
 is covered by Phase 2D below.
@@ -418,5 +419,32 @@ originals and missing sibling thumbnails using the existing collision-safe rules
 
 No catalog/database schema or backup payload change is made in Phase 2E. Unlike the
 existing descriptive Paper/Card backup metadata, Stamp library metadata remains
-excluded by explicit scope decision; broader Stamp backup integration is deferred.
+excluded by explicit scope decision at that phase. The backup/restore parity
+phase below now supersedes that deferral.
 Folder handles remain device-local browser settings, never portable backup data.
+
+## Backup/restore parity
+
+Standard and compact iPad backups now include persisted Stamp & Die Sets alongside
+Paper and Cards. Stable ID, name, dateCreated, optional Owner/Release Year,
+Favorite, canonical tagIds, and ordered imageRefs use the existing Set normalizer.
+Standard export retains relative original/thumbnail paths, image name/library,
+embedded originals/thumbnails, and strategy; it strips runtime previews and handles.
+Compact export follows the shared 400px JPEG policy and preserves unresolved
+references/fallbacks when images cannot be embedded.
+
+Standard backup includes descriptive Stamp library strategy, folder name, and
+selection timestamp, matching Paper/Card. Compact backups omit descriptive folder
+settings for all three. Directory handles and permissions remain device-local;
+restore never changes them or automatically reconnects a library.
+
+Envelope version 4 deliberately adds the Set collection and descriptive setting.
+Catalog schema 6 and IndexedDB version 6 do not change. Older backups with no Sets
+remain valid and do not remove existing Sets. Import skips existing IDs by default;
+Replace updates matching IDs and adds new ones without removing absent records.
+
+Set validation, Owner references, and global tag/category reconciliation precede
+the existing atomic catalog transaction, now including the Set store. Malformed
+Sets or transaction failure abort the whole restore. Decision 32 remains in force:
+restoring references never writes or cleans up shared-library image files. Reconnect
+the correct library in Settings to resolve restored folder references.
