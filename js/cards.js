@@ -101,7 +101,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     }
   };
 
-  renderCurrent();
+  // Keep the shell loading message until the initial records and images resolve.
   document.body.append(detailView.overlay, addCardView.overlay);
   loadAvailablePaperPacks(addCardView, paperPacks);
 
@@ -1146,7 +1146,7 @@ function createCardTile(card, index, paperPackNamesById) {
   favorite.setAttribute('aria-pressed', String(Boolean(card.favorite)));
   favorite.title = card.favorite ? 'Remove from favorites' : 'Add to favorites';
   favorite.textContent = '♥';
-  image.append(favorite);
+
 
   const metadata = createCardLibraryMetadata(card, paperPackNamesById);
   const actions = createCardLibraryActions(card);
@@ -1161,7 +1161,10 @@ function createCardTile(card, index, paperPackNamesById) {
     tagList.append(item);
   });
 
-  tile.append(image, tagList, metadata, actions);
+  const titleRow = document.createElement('div');
+  titleRow.className = 'card-title-row card-library-title-row';
+  titleRow.append(tagList, favorite);
+  tile.append(image, titleRow, metadata, actions);
   return tile;
 }
 

@@ -251,3 +251,21 @@ test('Edit replaces the same stored ID and preserves mixed image fields on reloa
     assert.deepEqual(await reloaded.loadSavedStampDieSets(), [normalizeStampDieSet(edited, catalog)]);
   } finally { globalThis.window = previousWindow; }
 });
+
+test('Delete removes only the Set store record; failed commit preserves references and all other stores', async () => {
+  const h = databaseHarness();
+  const previous = globalThis.window;
+  globalThis.window = { indexedDB: h.indexedDB, localStorage: { getItem: () => 'true' } };
+  try {
+    const storage = await import('./storage.js?set-delete');
+    await storage.saveStampDieSet(setRecord());
+    await storage.saveStampDieSet({ ...setRecord(), id: 'keep' });
+    const before = structuredClone(h.stores);
+    h.failNextCommit();
+    await assert.rejects(storage.deleteStampDieSet(setRecord().id));
+    assert.deepEqual(h.stores, before);
+    await storage.deleteStampDieSet(setRecord().id);
+    assert.deepEqual((await storage.loadSavedStampDieSets()).map((record) => record.id), ['keep']);
+    for (const [name, records] of before) if (name !== 'stampDieSets') assert.deepEqual(h.stores.get(name), records);
+  } finally { globalThis.window = previous; }
+});

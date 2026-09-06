@@ -155,6 +155,13 @@ export async function saveStampDieSet(record, { inferredTags = [] } = {}) {
   globalTagMigrationPromise = Promise.resolve(reconciled.catalog);
 }
 
+export async function deleteStampDieSet(id) {
+  const database = await openCatalogDatabase();
+  await writeTransaction(database, [STAMP_DIE_SETS_STORE], (transaction) => {
+    transaction.objectStore(STAMP_DIE_SETS_STORE).delete(id);
+  });
+}
+
 export async function loadSavedCards() {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);

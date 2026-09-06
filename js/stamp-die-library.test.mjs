@@ -159,7 +159,7 @@ test('save persists Favorite and universal stable tag IDs, then renders a no-ima
   assert.deepEqual(record, { schemaVersion: CATALOG_SCHEMA_VERSION, id: record.id, name: 'Garden', dateCreated: getLocalDateValue(), releaseYear: 2024, favorite: true, tagIds: ['stable-paper', 'stable-card'], imageRefs: [] });
   assert.equal(h.dialog.open, false);
   assert.equal(saves, 1);
-  assert.match(h.gallery.textContent, /No image.*Garden.*2024.*Favorite.*Floral.*Birthday/);
+  assert.match(h.gallery.textContent, /No image.*Garden.*2024.*Floral.*Birthday/);
   assert.equal(h.gallery.querySelector('img'), null);
   h.renameTag();
   await h.document.emit('catalog:global-tags-updated');
@@ -673,4 +673,61 @@ test('Detail resolves renamed global tags without changing assignments', async (
   await h.document.emit('catalog:global-tags-updated');
   assert.match(setDetail(h).textContent, /Botanical/);
   assert.deepEqual(h.records[0].tagIds, ['stable-paper']);
+});
+
+test('Delete requires confirmation, targets selected Set, and clears Detail after commit', async (t) => {
+  let target;
+  const h = await harness(t, { deleteStampDieSet: async (id) => {
+    target = id;
+    h.records.splice(h.records.findIndex((record) => record.id === id), 1);
+  } });
+  await seedEdit(h, { imageRefs: editReferences() });
+  await h.cancel.emit('click');
+  await h.gallery.querySelector('article').emit('click');
+  const detail = setDetail(h);
+  const remove = detail.querySelectorAll('button').find((button) => button.textContent === 'Delete Set');
+  let confirmation;
+  window.confirm = (message) => { confirmation = message; return false; };
+  await remove.emit('click');
+  assert.match(confirmation, /Original.*from CSC.*Image files will not be deleted/);
+  assert.equal(target, undefined);
+  assert.equal(h.records.length, 1);
+  assert.equal(detail.open, true);
+  window.confirm = () => true;
+  await remove.emit('click');
+  assert.equal(target, 'set-existing');
+  assert.deepEqual(h.records, []);
+  assert.equal(detail.open, false);
+  assert.doesNotMatch(detail.textContent, /Original/);
+  assert.match(h.gallery.textContent, /No sets yet/);
+  assert.equal(window.location.hash, '#stamps-dies');
+});
+
+test('failed Delete keeps persisted record and Detail intact with a visible error', async (t) => {
+  const h = await harness(t, { deleteStampDieSet: async () => { throw new Error('Failed'); } });
+  await seedEdit(h, { imageRefs: editReferences() });
+  await h.cancel.emit('click');
+  const before = structuredClone(h.records);
+  await h.gallery.querySelector('article').emit('click');
+  window.confirm = () => true;
+  await setDetail(h).querySelectorAll('button').find((button) => button.textContent === 'Delete Set').emit('click');
+  assert.deepEqual(h.records, before);
+  assert.equal(setDetail(h).open, true);
+  assert.match(setDetail(h).textContent, /Original.*could not be deleted/);
+});
+
+test('Set Favorite is an inline heart with Paper colors for either state and does not edit storage', async (t) => {
+  const h = await harness(t);
+  await seedEdit(h);
+  await h.cancel.emit('click');
+  let heart = h.gallery.querySelector('.stamp-set-favorite');
+  assert.equal(heart.dataset.favorite, 'true');
+  assert.equal(heart.textContent, '\u2665');
+  assert.equal(heart.tagName, 'span');
+  h.records[0].favorite = false;
+  await h.document.emit('catalog:global-tags-updated');
+  heart = h.gallery.querySelector('.stamp-set-favorite');
+  assert.equal(heart.dataset.favorite, 'false');
+  assert.equal(heart.getAttribute('aria-label'), 'Not a favorite');
+  assert.equal(h.calls(), 0);
 });

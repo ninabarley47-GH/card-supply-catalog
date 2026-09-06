@@ -5,7 +5,7 @@ import {
 } from './stamp-die-images.js';
 import { inferStampDieImageTags, reconcileStampDieImageTags, orderStampDieImages } from './stamp-die-image-tags.js';
 import { supportsOpenFilePicker, supportsDirectoryPicker } from './browser-capabilities.js';
-import { loadGlobalTagCatalog, loadSavedStampDieSets, saveStampDieSet } from './storage.js';
+import { loadGlobalTagCatalog, loadSavedStampDieSets, saveStampDieSet, deleteStampDieSet } from './storage.js';
 import { createTagPicker, projectTagNames } from './tag-picker.js';
 import { normalizeStampDieSet } from './stamp-die-sets.js';
 import { getLocalDateValue } from './ui.js';
@@ -31,7 +31,7 @@ function createSetId() {
 }
 
 export async function initializeStampDieLibrary(services = {}) {
-  const storage = { loadGlobalTagCatalog, loadSavedStampDieSets, saveStampDieSet,
+  const storage = { loadGlobalTagCatalog, loadSavedStampDieSets, saveStampDieSet, deleteStampDieSet,
     chooseStampImages, selectStampImageFiles, chooseStampImageDirectory, loadStampImageDirectory,
     prepareStampImagesForSave, hydrateStampImages, ...services };
   const screen = document.getElementById('stamps-dies');
@@ -67,18 +67,51 @@ export async function initializeStampDieLibrary(services = {}) {
     detail.body.replaceChildren(createSetImageGrid(record.imageRefs, true), metadata);
   }
   function openDetail(id, source) {
+    detail.message.textContent = '';
     selectedSetId = id;
     detailSource = source;
     renderDetail(displayedRecords, catalog);
     detail.dialog.showModal();
     detail.close.focus();
   }
+  let deleting = false;
+  detail.remove.addEventListener('click', async () => {
+    if (deleting || !selectedSetId) return;
+    const id = selectedSetId;
+    const record = displayedRecords.find((entry) => entry.id === id);
+    if (!window.confirm(`Remove "${record?.name || 'this Stamp & Die Set'}" from CSC? Image files will not be deleted.`)) return;
+    deleting = true;
+    detail.remove.disabled = detail.edit.disabled = detail.close.disabled = true;
+    detail.message.textContent = '';
+    try {
+      await storage.deleteStampDieSet(id);
+    } catch {
+      detail.message.textContent = 'The set could not be deleted. Please try again.';
+      return;
+    } finally {
+      deleting = false;
+      detail.remove.disabled = detail.edit.disabled = detail.close.disabled = false;
+    }
+    const removed = displayedRecords.filter((entry) => entry.id === id);
+    displayedRecords = displayedRecords.filter((entry) => entry.id !== id);
+    clearStampImageSources(removed);
+    if (view.dialog.open) view.dialog.close();
+    detail.dialog.close();
+    renderStampDieLibrary(gallery, displayedRecords, catalog, (setId) => openForm(setId), openDetail);
+    window.location.hash = '#stamps-dies';
+    await refresh();
+    add.focus();
+    document.dispatchEvent(new CustomEvent('catalog:stamp-die-set-saved'));
+  });
+  detail.dialog.addEventListener('cancel', (event) => { if (deleting) event.preventDefault(); });
   detail.close.addEventListener('click', () => detail.dialog.close());
-  detail.dialog.addEventListener('click', (event) => { if (event.target === detail.dialog) detail.dialog.close(); });
+  detail.dialog.addEventListener('click', (event) => { if (!deleting && event.target === detail.dialog) detail.dialog.close(); });
   detail.dialog.addEventListener('close', () => {
     selectedSetId = null;
+    detail.title.textContent = '';
     detail.body.replaceChildren();
     const currentTile = [...gallery.querySelectorAll('[data-set-id]')].find((tile) => tile.dataset.setId === detailSource?.dataset.setId);
+    detailSource = null;
     (currentTile || add).focus();
   });
   detail.edit.addEventListener('click', () => openForm(selectedSetId));
@@ -444,11 +477,16 @@ export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetai
       ? 'Release year not recorded'
       : `Release year: ${record.releaseYear}`;
     content.append(name, release);
-    if (record.favorite) {
-      const favorite = document.createElement('p');
-      favorite.textContent = '♥ Favorite';
-      content.append(favorite);
-    }
+    const favorite = document.createElement('span');
+    favorite.className = 'stamp-set-favorite';
+    favorite.dataset.favorite = String(Boolean(record.favorite));
+    favorite.textContent = '\u2665';
+    favorite.setAttribute('aria-label', record.favorite ? 'Favorite' : 'Not a favorite');
+    favorite.title = record.favorite ? 'Favorite' : 'Not a favorite';
+    const titleRow = document.createElement('div');
+    titleRow.className = 'card-title-row';
+    titleRow.append(name, favorite);
+    content.replaceChildren(titleRow, release);
     const names = projectTagNames(catalog, record.tagIds, 'stamp');
     if (names.length) {
       const tags = document.createElement('ul');
@@ -535,7 +573,15 @@ function createSetDetailView() {
   edit.textContent = 'Edit';
   const body = document.createElement('div');
   body.className = 'stamp-set-detail-body';
-  header.append(close, title, edit);
-  dialog.append(header, body);
-  return { dialog, title, close, edit, body };
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'button';
+  remove.textContent = 'Delete Set';
+  const message = document.createElement('p');
+  message.className = 'form-message';
+  message.dataset.tone = 'error';
+  message.setAttribute('role', 'alert');
+  header.append(close, title, edit, remove);
+  dialog.append(header, body, message);
+  return { dialog, title, close, edit, remove, message, body };
 }

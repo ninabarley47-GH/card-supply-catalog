@@ -231,6 +231,25 @@ the Library and that same open Detail, including changed images and tag names.
 Cancel returns to the unchanged Detail. No alternate Edit implementation, Favorite
 toggle, schema change, or storage change was introduced.
 
+## Delete Set and Library polish (Phase 2C1)
+
+Detail exposes Delete Set. A native confirmation asks whether to remove the named
+Set from CSC and states that image files will not be deleted. Cancel changes nothing.
+Confirmed deletion commits a transaction against only the stampDieSets store. The
+record and its embedded data/references disappear together; global tags, settings,
+other records, original files, and shared thumbnails remain untouched. No filesystem
+cleanup runs. Runtime preview URLs are released after success.
+
+Only after commit does Detail close and clear its selected record, and the Library
+refresh. A failed transaction retains the record and open Detail with a red error
+and allows retry. No schema or database version change is required.
+
+Cards and Sets now show the same initial loading-message style as Paper Packs.
+Library Favorites share Paper's inline heart styling (muted off, rose on); Card's
+existing toggle remains, while Set's heart is read-only and Favorite is edited via
+Edit. Card and Set grid items stretch to their row's tallest module, with native
+auto-sized rows and existing responsive column widths.
+
 ## Verification
 
 Detail tests cover tile/keyboard navigation, metadata, global-tag renames, full and

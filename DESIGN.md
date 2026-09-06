@@ -157,3 +157,8 @@ When in doubt, remove something instead of adding something.
 Before adding any feature or visual element, ask:
 
 Does this help the user find paper, or is it just adding interface?
+
+Library modules within the same grid row stretch to equal height. Rows size independently
+to their content; shorter modules may leave blank space at the bottom. Responsive
+column widths remain unchanged. Library Favorite hearts use the Paper Pack inline
+muted/rose presentation without changing each catalog's existing editing behavior.
