@@ -2048,14 +2048,19 @@ button.pattern {
   color: #9b5364;
 }
 
-.paper-pack-favorite:hover,
+/* Heart color reflects saved Favorite state, including after touch taps. */
 .paper-pack-favorite:focus-visible,
-.card-library-favorite:hover,
 .card-library-favorite:focus-visible,
-.stamp-set-favorite:hover,
 .stamp-set-favorite:focus-visible {
-  color: #9b5364;
   transform: scale(1.08);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .paper-pack-favorite:hover,
+  .card-library-favorite:hover,
+  .stamp-set-favorite:hover {
+    transform: scale(1.08);
+  }
 }
 
 .paper-pack-favorite:disabled,
