@@ -1,3 +1,4 @@
+import { STAMP_IMAGE_LIBRARY_SETTING_ID, chooseStampImageDirectory, checkStampImageLibraryHealth } from './stamp-die-images.js';
 import {
   checkImageLibraryHealth,
   generateMissingImageThumbnails,
@@ -44,6 +45,7 @@ export function initializeSettings(options = {}) {
   initializeSetupStatus(options);
   initializeImageLibrarySettings(options);
   initializeCardImageLibrarySettings(options);
+  initializeStampImageLibrarySettings(options);
   initializeBulkOwnerSettings(options);
   initializeTagSettings(options);
 }
@@ -586,6 +588,51 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
   return row;
 }
 
+export async function initializeStampImageLibrarySettings({ paperPacks = [] } = {}, services = {}) {
+  const environment = services.environment || window;
+  const loadSetting = services.loadCatalogSetting || loadCatalogSetting;
+  const chooseDirectory = services.chooseStampImageDirectory || chooseStampImageDirectory;
+  const choose = document.querySelector("[data-choose-stamp-image-library]");
+  const reconnect = document.querySelector("[data-reconnect-stamp-image-library]");
+  const status = document.querySelector("[data-stamp-image-library-status]");
+  const health = document.querySelector("[data-stamp-image-library-health]");
+  if (!choose || !status) return;
+  if (!supportsDirectoryPicker(environment)) {
+    choose.disabled = true;
+    if (reconnect) reconnect.disabled = true;
+    renderImageLibraryStatus(status, "Stamp & Die image folder selection is not supported in this browser. IndexedDB will remain the fallback.", "error");
+    return;
+  }
+  const select = async (prefix) => {
+    try {
+      const directory = await chooseDirectory(environment, services);
+      if (!directory) return;
+      renderImageLibraryStatus(status, `${prefix}: ${directory.name}.`, "success");
+      renderImageLibraryHealth(health, null);
+      document.dispatchEvent(new CustomEvent("catalog:stamp-image-library-selected"));
+      await (services.renderSetupStatus || renderSetupStatus)(document.querySelector("[data-setup-status]"), paperPacks);
+    } catch (error) {
+      renderImageLibraryStatus(status, error?.name === "AbortError"
+        ? "Stamp & Die image folder selection was cancelled." : getFolderSelectionErrorMessage(error),
+        error?.name === "AbortError" ? "" : "error");
+    }
+  };
+  choose.addEventListener("click", () => select("Stamp & Die image folder selected"));
+  reconnect?.addEventListener("click", () => select("Stamp & Die image folder reconnected"));
+  try {
+    const setting = await loadSetting(STAMP_IMAGE_LIBRARY_SETTING_ID);
+    const directory = setting?.directoryHandle;
+    const permission = await getDirectoryPermissionState(directory);
+    renderImageLibraryStatus(status, !directory
+      ? "No Stamp & Die image folder selected. New Set images will use fallback browser storage."
+      : permission === "granted" ? `Stamp & Die image folder ready: ${directory.name}.`
+      : `Saved Stamp & Die image folder: ${directory.name}. Reconnect may be needed before images can be read.`,
+      directory && permission === "granted" ? "success" : "");
+  } catch {
+    renderImageLibraryStatus(status, "The saved Stamp & Die image folder could not be loaded. Images will use fallback browser storage.", "error");
+  }
+}
+
 async function initializeCardImageLibrarySettings({ paperPacks = [] } = {}) {
   const chooseButton = document.querySelector("[data-choose-card-image-library]");
   const reconnectButton = document.querySelector("[data-reconnect-card-image-library]");
@@ -858,13 +905,15 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
   });
 
   checkButton?.addEventListener("click", async () => {
-    await checkBothImageLibraries({
+    await checkAllImageLibraries({
       button: checkButton,
       paperPacks,
       paperStatus: status,
       paperHealth: health,
       cardStatus: document.querySelector("[data-card-image-library-status]"),
-      cardHealth: document.querySelector("[data-card-image-library-health]")
+      cardHealth: document.querySelector("[data-card-image-library-health]"),
+      stampStatus: document.querySelector("[data-stamp-image-library-status]"),
+      stampHealth: document.querySelector("[data-stamp-image-library-health]")
     });
     renderSetupStatus(document.querySelector("[data-setup-status]"), paperPacks);
   });
@@ -1003,15 +1052,18 @@ async function renderSetupStatus(container, paperPacks = []) {
     return;
   }
 
-  const [imageLibrary, cardImageLibrary, cards, lastBackupExportedAt, lastBackupImportedAt] = await Promise.all([
+  const [imageLibrary, cardImageLibrary, cards, lastBackupExportedAt, lastBackupImportedAt, stampImageLibrary] = await Promise.all([
     loadCatalogSetting(IMAGE_LIBRARY_SETTING_ID),
     loadCatalogSetting(CARD_IMAGE_LIBRARY_SETTING_ID),
     loadSavedCards(),
     loadCatalogSetting(LAST_BACKUP_EXPORT_SETTING_ID),
-    loadCatalogSetting(LAST_BACKUP_IMPORT_SETTING_ID)
+    loadCatalogSetting(LAST_BACKUP_IMPORT_SETTING_ID),
+    loadCatalogSetting(STAMP_IMAGE_LIBRARY_SETTING_ID).catch(() => null)
   ]);
   const directoryHandle = imageLibrary?.directoryHandle;
   const cardDirectoryHandle = cardImageLibrary?.directoryHandle;
+  const stampDirectoryHandle = stampImageLibrary?.directoryHandle;
+  const stampFolderPermission = await getDirectoryPermissionState(stampDirectoryHandle);
   const folderPermission = directoryHandle ? await getDirectoryPermissionState(directoryHandle) : "";
   const cardFolderPermission = cardDirectoryHandle ? await getDirectoryPermissionState(cardDirectoryHandle) : "";
   const imageHealth =
@@ -1046,6 +1098,12 @@ async function renderSetupStatus(container, paperPacks = []) {
       detail: getImageFolderStatusDetail(cardDirectoryHandle, cardFolderPermission, "Card image"),
       badge: getImageFolderStatusBadge(cardDirectoryHandle, cardFolderPermission),
       status: getImageFolderStatusTone(cardDirectoryHandle, cardFolderPermission)
+    }),
+    createSetupStatusItem({
+      title: "Stamp & Die image folder",
+      detail: getImageFolderStatusDetail(stampDirectoryHandle, stampFolderPermission, "Stamp & Die image"),
+      badge: getImageFolderStatusBadge(stampDirectoryHandle, stampFolderPermission),
+      status: getImageFolderStatusTone(stampDirectoryHandle, stampFolderPermission)
     }),
     createSetupStatusItem({
       title: "Paper Pack image references",
@@ -1257,40 +1315,31 @@ async function checkImageLibraryReferences({ button, health, paperPacks, status,
   }
 }
 
-async function checkBothImageLibraries({
-  button,
-  paperPacks,
-  paperStatus,
-  paperHealth,
-  cardStatus,
-  cardHealth
-}) {
+export async function checkAllImageLibraries({
+  button, paperPacks, paperStatus, paperHealth, cardStatus, cardHealth, stampStatus, stampHealth
+}, services = {}) {
   button.disabled = true;
-  renderImageLibraryStatus(paperStatus, "Checking Paper image library references...", "");
-  renderImageLibraryStatus(cardStatus, "Checking Card image library references...", "");
-
+  const libraries = [
+    { label: "Paper", kind: "paper", status: paperStatus, health: paperHealth,
+      check: () => (services.checkImageLibraryHealth || checkImageLibraryHealth)(paperPacks) },
+    { label: "Card", kind: "card", status: cardStatus, health: cardHealth,
+      check: async () => (services.checkCardImageLibraryHealth || checkCardImageLibraryHealth)(await (services.loadSavedCards || loadSavedCards)()) },
+    { label: "Stamp & Die", kind: "stamp", status: stampStatus, health: stampHealth,
+      check: async () => (services.checkStampImageLibraryHealth || checkStampImageLibraryHealth)(await (services.loadSavedStampDieSets || loadSavedStampDieSets)()) }
+  ];
   try {
-    const cards = await loadSavedCards();
-    const [paperResult, cardResult] = await Promise.all([
-      checkImageLibraryHealth(paperPacks),
-      checkCardImageLibraryHealth(cards)
-    ]);
-
-    renderImageLibraryStatus(
-      paperStatus,
-      formatHealthStatus(paperResult),
-      paperResult.summary.imagesMissing > 0 || paperResult.needsFolder ? "error" : "success"
-    );
-    renderImageLibraryHealth(paperHealth, paperResult.summary, "paper");
-    renderImageLibraryStatus(
-      cardStatus,
-      formatHealthStatus(cardResult),
-      cardResult.summary.imagesMissing > 0 || cardResult.needsFolder ? "error" : "success"
-    );
-    renderImageLibraryHealth(cardHealth, cardResult.summary, "card");
-  } catch (error) {
-    renderImageLibraryStatus(paperStatus, "Paper image library references could not be checked.", "error");
-    renderImageLibraryStatus(cardStatus, "Card image library references could not be checked.", "error");
+    await Promise.allSettled(libraries.map(async ({ label, kind, status, health, check }) => {
+      renderImageLibraryStatus(status, `Checking ${label} image library references...`, "");
+      try {
+        const result = await check();
+        renderImageLibraryStatus(status, formatHealthStatus(result),
+          result.summary.imagesMissing > 0 || result.needsFolder ? "error" : "success");
+        renderImageLibraryHealth(health, result.summary, kind);
+      } catch {
+        renderImageLibraryHealth(health, null);
+        renderImageLibraryStatus(status, `${label} image library references could not be checked.`, "error");
+      }
+    }));
   } finally {
     button.disabled = false;
   }
@@ -1328,7 +1377,7 @@ function renderImageLibraryHealth(container, summary, imageKind = "paper") {
   overview.className = "image-library-health-list";
 
   overview.append(
-    createHealthItem(imageKind === "card" ? "Cards checked" : "Packs checked", imageKind === "card" ? summary.cardsChecked : summary.packsChecked),
+    createHealthItem(imageKind === "stamp" ? "Sets checked" : imageKind === "card" ? "Cards checked" : "Packs checked", imageKind === "stamp" ? summary.setsChecked : imageKind === "card" ? summary.cardsChecked : summary.packsChecked),
     createHealthItem("Folder images", summary.folderImages),
     createHealthItem("Images found", summary.imagesFound),
     createHealthItem("Missing images", summary.imagesMissing),
@@ -1367,7 +1416,13 @@ function renderImageLibraryHealth(container, summary, imageKind = "paper") {
     const list = document.createElement("ul");
     list.className = "image-library-missing-list";
 
-    if (imageKind === "card") {
+    if (imageKind === "stamp") {
+      for (const missingSet of summary.missingImages) {
+        const item = document.createElement("li");
+        item.textContent = `${missingSet.setLabel}: ${missingSet.imagePath}`;
+        list.append(item);
+      }
+    } else if (imageKind === "card") {
       for (const missingCard of summary.missingImages) {
         const item = document.createElement("li");
         item.textContent = `${missingCard.cardLabel}: ${missingCard.imagePath}`;

@@ -3,7 +3,7 @@ import { initializeOwnerPicker, resolveOwnerPicker, setOwnerPickerValue, refresh
 import { isActiveOwner } from './owners.js';
 import { loadDefaultOwnerId } from './settings.js';
 import {
-  chooseStampImages, selectStampImageFiles, chooseStampImageDirectory, loadStampImageDirectory,
+  chooseStampImages, selectStampImageFiles, loadStampImageDirectory,
   prepareStampImagesForSave, hydrateStampImages, clearStampImageSources,
   clearDraftStampImages, removeDraftStampImage, getStampLibraryImageSource, getStampDetailImageSource
 } from './stamp-die-images.js';
@@ -39,7 +39,7 @@ function createSetId() {
 
 export async function initializeStampDieLibrary(services = {}) {
   const storage = { loadGlobalTagCatalog, loadSavedStampDieSets, saveStampDieSet, deleteStampDieSet,
-    chooseStampImages, selectStampImageFiles, chooseStampImageDirectory, loadStampImageDirectory,
+    chooseStampImages, selectStampImageFiles, loadStampImageDirectory,
     prepareStampImagesForSave, hydrateStampImages, loadDefaultOwnerId, loadCatalogSetting, saveCatalogSetting, ...services };
   const owners = services.owners || [];
   const screen = document.getElementById('stamps-dies');
@@ -212,6 +212,7 @@ export async function initializeStampDieLibrary(services = {}) {
     inferredTags = [];
     selecting = false;
     view.chooseImages.disabled = false;
+    view.chooseLibrary.disabled = false;
     view.save.disabled = false;
     view.previews.replaceChildren();
     view.imageMessage.textContent = '';
@@ -290,9 +291,7 @@ export async function initializeStampDieLibrary(services = {}) {
         const ownerId = [defaultId, lastId].find((id) => owners.some((owner) => isActiveOwner(owner) && owner.id === id));
         setOwnerPickerValue(view.owner, view.newOwner, ownerId, '', owners);
       }
-      imageDirectory = await storage.loadStampImageDirectory('read').catch(() => null);
-      view.folderMessage.textContent = imageDirectory
-        ? `Image folder: ${imageDirectory.name}` : 'Without an accessible image folder, images are saved in this browser.';
+      await refreshImageDirectory();
       draftId = id || createSetId();
       view.title.textContent = id ? 'Edit Stamp & Die Set' : 'Add Stamp & Die Set';
       view.dialog.showModal();
@@ -343,6 +342,7 @@ export async function initializeStampDieLibrary(services = {}) {
     selecting = true;
     view.save.disabled = true;
     view.chooseImages.disabled = true;
+    view.chooseLibrary.disabled = true;
     view.imageMessage.textContent = 'Loading images...';
     view.imageMessage.dataset.tone = '';
     try {
@@ -366,31 +366,34 @@ export async function initializeStampDieLibrary(services = {}) {
         selecting = false;
         view.save.disabled = false;
         view.chooseImages.disabled = false;
+        view.chooseLibrary.disabled = false;
         view.imageInput.value = '';
       }
     }
   }
 
+  async function refreshImageDirectory() {
+    imageDirectory = await storage.loadStampImageDirectory('read').catch(() => null);
+    view.chooseLibrary.hidden = !supportsOpenFilePicker(globalThis) || !imageDirectory;
+    view.folderMessage.textContent = !supportsDirectoryPicker(globalThis)
+      ? 'Image folder selection is not supported in this browser. Add Images saves images in this browser.'
+      : imageDirectory
+      ? `Image folder: ${imageDirectory.name}. Manage this library in Settings.`
+      : 'Choose or reconnect a Stamp & Die image folder in Settings. Without an accessible folder, images are saved in this browser.';
+  }
   view.chooseImages.addEventListener('click', () => {
     if (saving || selecting) return;
-    if (supportsOpenFilePicker(globalThis)) return receiveImages(storage.chooseStampImages(globalThis, imageDirectory));
     view.imageInput.click();
   });
   view.imageInput.addEventListener('change', () => receiveImages(storage.selectStampImageFiles([...view.imageInput.files])));
-  view.chooseFolder.hidden = !supportsDirectoryPicker(globalThis);
-  view.chooseFolder.addEventListener('click', async () => {
-    if (saving || selecting) return;
-    try {
-      imageDirectory = await storage.chooseStampImageDirectory();
-      if (imageDirectory) {
-        view.folderMessage.textContent = `Image folder: ${imageDirectory.name}`;
-        await refresh();
-      }
-    } catch (error) {
-      if (error?.name !== 'AbortError') {
-        view.folderMessage.textContent = 'Folder unavailable. Images will be saved in this browser.';
-      }
-    }
+  view.chooseLibrary.hidden = true;
+  view.chooseLibrary.addEventListener('click', () => {
+    if (saving || selecting || !imageDirectory) return;
+    return receiveImages(storage.chooseStampImages(globalThis, imageDirectory));
+  });
+  document.addEventListener('catalog:stamp-image-library-selected', async () => {
+    await refreshImageDirectory();
+    await refresh();
   });
 
   view.cancel.addEventListener('click', () => { if (!saving) view.dialog.close(); });
@@ -524,23 +527,23 @@ function createSetFormView() {
   const chooseImages = document.createElement('button');
   chooseImages.type = 'button';
   chooseImages.className = 'button';
-  chooseImages.textContent = 'Choose Images';
+  chooseImages.textContent = 'Add Images';
   const imageInput = document.createElement('input');
   imageInput.type = 'file';
   imageInput.accept = '.jpg,.jpeg,.png,.webp,.gif';
   imageInput.multiple = true;
   imageInput.hidden = true;
-  const chooseFolder = document.createElement('button');
-  chooseFolder.type = 'button';
-  chooseFolder.className = 'button';
-  chooseFolder.textContent = 'Choose Image Folder';
+  const chooseLibrary = document.createElement('button');
+  chooseLibrary.type = 'button';
+  chooseLibrary.className = 'button';
+  chooseLibrary.textContent = 'Add from Stamp & Die Library';
   const folderMessage = document.createElement('p');
   const imageMessage = document.createElement('p');
   imageMessage.className = 'form-message';
   imageMessage.setAttribute('role', 'status');
   const previews = document.createElement('div');
   previews.className = 'stamp-set-draft-images';
-  imageControls.append(imageHeading, chooseImages, imageInput, chooseFolder, folderMessage, imageMessage, previews);
+  imageControls.append(imageHeading, chooseLibrary, chooseImages, imageInput, folderMessage, imageMessage, previews);
   const tags = document.createElement('div');
   const message = document.createElement('p');
   message.className = 'form-message';
@@ -559,7 +562,7 @@ function createSetFormView() {
   actions.append(cancel, save);
   form.append(fields, actions);
   dialog.append(header, form);
-  return { dialog, title, form, fields, name, owner, newOwner, releaseYear, favorite, tags, message, cancel, save, chooseImages, imageInput, chooseFolder, folderMessage, imageMessage, previews };
+  return { dialog, title, form, fields, name, owner, newOwner, releaseYear, favorite, tags, message, cancel, save, chooseImages, imageInput, chooseLibrary, folderMessage, imageMessage, previews };
 }
 
 function createField(text, ...inputs) {

@@ -2,9 +2,9 @@
 
 ## Status
 
-Phases 1, 2A, 2B1, 2B2, 2C, and 2D are implemented: Library and Detail views, a shared
+Phases 1, 2A, 2B1, 2B2, 2C, 2D, and 2E are implemented: Library and Detail views, a shared
 Add/Edit Set workflow, ordered multiple-image selection/persistence, and Library search/filtering.
-Card relationships, Settings/library-folder configuration, and backup/restore remain out of scope.
+Card relationships and backup/restore remain out of scope.
 
 A Stamp & Die Set is one catalog record for stamps only, dies only, or coordinating
 stamps and dies. There are no individual stamp/die records, separate stampIds or
@@ -85,16 +85,18 @@ image encoders or the folder-reference format.
 
 ## Add Set image workflow
 
-Choose Images accepts multiple images in one operation. Native open-file selection
-is used where available; other browsers, including iPad, use a multiple file input.
+Add Images accepts multiple images through the standard file input, including on
+iPad. Add from Stamp & Die Library uses native multiple-file selection when an
+accessible library is configured in Settings and the browser supports the picker.
 Images are grouped Stamp first, Die second, Mask last. Selection order is retained
 within each type, and later selections append within their type.
 Compact previews have Remove buttons. No image classification input is present.
 
-Choose Image Folder is available on browsers supporting directory selection. It
-stores a separate directory handle under `stampDieImageLibrary` in existing Settings
-storage, without a Settings redesign. Users can choose the same folder again to
-reconnect it. Selecting a folder does not import/scan it or write image files.
+Settings provides Choose Image Folder for Stamps & Dies and Reconnect for Stamps &
+Dies alongside the Paper/Card controls on supported browsers. The separate handle
+is stored under `stampDieImageLibrary` in existing Settings storage. Users can
+choose the same folder again to reconnect it. Selecting a folder does not
+import/scan it or write image files.
 
 On Save, a selected file already within that folder is referenced at its relative
 path using the directory handle's resolve method. Files selected elsewhere are
@@ -377,3 +379,44 @@ first, then muted Owner and Release Year text separated by a middle dot, and the
 shared Edit button at the bottom right. Color swatches and Paper availability are
 omitted because those fields do not apply to Sets. Metadata reserves space above
 the action so wrapped text cannot overlap Edit.
+
+## Image library Settings (Phase 2E)
+
+Paper Packs, Cards, and Stamps & Dies each use independently configured image
+libraries through the shared CSC library-management architecture. No common parent
+folder is assumed. Settings uses the same button hierarchy, folder-name/permission
+status, reconnect interaction, and health presentation for all three products.
+The Stamp setting stores `{ strategy: 'local-folder', directoryHandle, selectedAt }`
+in IndexedDB's existing `settings` store; older handle-only settings still work.
+
+Both Add and Edit read this setting when opened. Add from Stamp & Die Library
+opens the existing native multiple-file picker in the connected folder. Settings
+selection/reconnection refreshes the Library and Detail images without saving Sets.
+General Add Images remains available independently through a multiple-file input.
+Previews, filename inference (Die, then Mask, then Stamp), display ordering (Stamp,
+Die, Mask), and embedded fallback are unchanged.
+
+Unsupported browsers receive disabled Settings folder controls and the established
+IndexedDB fallback message. The library-specific picker is hidden when unsupported
+or no readable folder is connected. Missing/revoked write access keeps newly
+selected images in browser storage through the existing embedded fallback path.
+
+Check Image Libraries checks Stamp-marked relative references and reports Sets
+checked, available/missing originals, and embedded fallback images. Each library
+reports independently, including when another library or its record load fails.
+Checks do not scan for new Sets, generate thumbnails, or alter records/files.
+
+Existing embedded references remain embedded, and existing library markers retain
+their resolution rules, including legacy Paper/Card references. Selection never
+rewrites imageRefs, migrates records, or relocates files. A replacement root must
+contain the referenced relative paths for those images to resolve from that root.
+
+Decision 32 applies: these are non-destructive shared libraries. Selecting/changing
+folders, checking libraries, removing image references, and deleting Sets never
+delete, move, rename, or overwrite source files. Explicit image Save may create new
+originals and missing sibling thumbnails using the existing collision-safe rules.
+
+No catalog/database schema or backup payload change is made in Phase 2E. Unlike the
+existing descriptive Paper/Card backup metadata, Stamp library metadata remains
+excluded by explicit scope decision; broader Stamp backup integration is deferred.
+Folder handles remain device-local browser settings, never portable backup data.

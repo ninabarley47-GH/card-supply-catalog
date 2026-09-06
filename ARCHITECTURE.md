@@ -85,7 +85,7 @@ The application has three storage layers:
 
 1. `data/paper-packs.json` and `data/colors.json` provide version-controlled base data.
 2. IndexedDB stores writable paper packs, cards, deleted base-pack IDs, user-added colors, and settings. Saved paper-pack records are merged with base JSON at startup; cards are user-created records with no bundled base-data layer.
-3. User-selected Paper and Card image-library folders are the preferred durable locations for image files on supported desktop browsers. Records store paths relative to their applicable folder. New Cards reference images already inside the separate Card folder without copying; images selected elsewhere are copied into its root. A sibling `.thumb.jpg` is created in either case. Legacy Card paths without an image-library marker continue resolving from the Paper image folder. Embedded data URLs in IndexedDB remain the compatibility fallback.
+3. User-selected Paper, Card, and Stamp & Die image-library folders are the preferred durable locations for image files on supported desktop browsers. Records store paths relative to their applicable folder. New Cards reference images already inside the separate Card folder without copying; images selected elsewhere are copied into its root. A sibling `.thumb.jpg` is created in either case. Legacy Card paths without an image-library marker continue resolving from the Paper image folder. Embedded data URLs in IndexedDB remain the compatibility fallback.
 
 Directory handles are permission-scoped browser objects and may require the user to reconnect or grant access again. A cloud-synced local folder such as OneDrive can be selected, but the app does not call a cloud-storage API directly.
 
@@ -309,3 +309,26 @@ names by ID, including archived owners, and refresh after owner renames.
 New owners commit atomically with the Set and any inferred tags. Cancel or failed
 saves do not add owners. The catalog schema advances to 6 for this persisted field;
 IndexedDB and backup-envelope versions are unchanged.
+
+### Independent image-library Settings (Stamp & Die Phase 2E)
+
+Paper Packs, Cards, and Stamps & Dies support independently configured image
+libraries through the same shared CSC library-management architecture. Settings
+uses `imageLibrary`, `cardImageLibrary`, and `stampDieImageLibrary` respectively in
+the existing IndexedDB settings store. Each stores a permission-scoped
+`directoryHandle`, `strategy`, and `selectedAt`; roots need not share a parent.
+Capability detection, permission checks, relative references, embedded fallback,
+and safe image writes reuse the existing modules. No database upgrade is needed.
+
+Stamp Add/Edit load their configured root and offer the native library picker
+alongside general multiple-file input. Settings emits
+`catalog:stamp-image-library-selected` to refresh runtime images without persisting
+Set changes. Health checks report each library independently; a failed check or
+record load cannot suppress another library's result. Unsupported folder controls
+use the existing disabled presentation and embedded-image fallback messaging.
+
+Stamp storage retains Phase 2B's root copies and sibling thumbnails. Selection,
+reconnection, health checks, reference removal, and Set deletion never mutate
+shared-library files (Decision 32). Existing references are not migrated or rewritten.
+The backup payload and versions remain unchanged; Stamp descriptive library backup
+metadata is explicitly deferred along with broader Stamp backup integration.

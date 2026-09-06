@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 test("Paper, Card, and Stamp image-library code never calls the destructive directory removal API", async () => {
   const sources = await Promise.all([
     readFile(new URL("./images.js", import.meta.url), "utf8"),
+    readFile(new URL("./settings.js", import.meta.url), "utf8"),
     readFile(new URL("./card-images.js", import.meta.url), "utf8"),
     readFile(new URL("./library.js", import.meta.url), "utf8"),
     readFile(new URL("./cards.js", import.meta.url), "utf8"),

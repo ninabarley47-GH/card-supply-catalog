@@ -3,23 +3,50 @@ import { supportsOpenFilePicker, supportsDirectoryPicker } from './browser-capab
 import { createCardImageFromFile, clearSelectedCardImage, getCardLibraryImageSource, getCardDetailImageSource } from './card-images.js';
 import {
   prepareFolderBackedImage, prepareEmbeddedImage, hasDirectoryPermission,
-  hydrateImageReference, clearImageReferenceObjectUrls
+  hydrateImageReference, clearImageReferenceObjectUrls, getFileFromRelativePath
 } from './image-references.js';
 
 export const STAMP_IMAGE_LIBRARY_SETTING_ID = 'stampDieImageLibrary';
 export const STAMP_IMAGE_LIBRARY_MARKER = 'stamp-die-images';
 
-export async function loadStampImageDirectory(mode = 'read', requestPermission = false) {
-  const setting = await loadCatalogSetting(STAMP_IMAGE_LIBRARY_SETTING_ID);
+export async function loadStampImageDirectory(mode = 'read', requestPermission = false, services = {}) {
+  const setting = await (services.loadCatalogSetting || loadCatalogSetting)(STAMP_IMAGE_LIBRARY_SETTING_ID);
   const handle = setting?.directoryHandle;
   return await hasDirectoryPermission(handle, mode, requestPermission) ? handle : null;
 }
 
-export async function chooseStampImageDirectory(environment = globalThis) {
+export async function chooseStampImageDirectory(environment = globalThis, services = {}) {
   if (!supportsDirectoryPicker(environment)) return null;
   const directoryHandle = await environment.showDirectoryPicker({ id: 'csc-stamp-images', mode: 'readwrite' });
-  await saveCatalogSetting(STAMP_IMAGE_LIBRARY_SETTING_ID, { directoryHandle });
+  await (services.saveCatalogSetting || saveCatalogSetting)(STAMP_IMAGE_LIBRARY_SETTING_ID, {
+    strategy: 'local-folder', directoryHandle, selectedAt: new Date().toISOString()
+  });
   return directoryHandle;
+}
+
+export async function checkStampImageLibraryHealth(records = [], services = {}) {
+  const directory = await (services.loadDirectory || loadStampImageDirectory)('read', true);
+  const summary = {
+    folderName: directory?.name || '', setsChecked: records.length,
+    folderImages: 0, imagesFound: 0, imagesMissing: 0, embeddedImages: 0, missingImages: []
+  };
+  for (const record of records) {
+    for (const ref of record.imageRefs || []) {
+      if (ref.imageLibrary === STAMP_IMAGE_LIBRARY_MARKER && ref.imagePath) {
+        summary.folderImages++;
+        try {
+          if (!directory) throw new Error('Folder permission needed');
+          await getFileFromRelativePath(directory, ref.imagePath);
+          summary.imagesFound++;
+        } catch {
+          summary.imagesMissing++;
+          summary.missingImages.push({ setLabel: record.name || 'Untitled Set', imagePath: ref.imagePath });
+        }
+      } else if (ref.imageSrc) summary.embeddedImages++;
+    }
+  }
+  return { ok: Boolean(directory) || summary.folderImages === 0,
+    needsFolder: !directory && summary.folderImages > 0, summary };
 }
 
 export async function selectStampImageFiles(files, environment = globalThis) {

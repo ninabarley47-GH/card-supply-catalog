@@ -1155,3 +1155,89 @@ test('Set tile metadata follows Paper placement: tag chips, owner/year, and bott
   await tile.children.at(-1).emit('click');
   assert.equal(h.name.value, 'Original');
 });
+
+for (const mode of ['Add', 'Edit']) {
+  test(`${mode} uses the Settings Stamp library for multiple selection and preserves inference and presentation order`, async (t) => {
+    const previousPicker = globalThis.showOpenFilePicker;
+    const previousDirectoryPicker = globalThis.showDirectoryPicker;
+    t.after(() => { globalThis.showOpenFilePicker = previousPicker; globalThis.showDirectoryPicker = previousDirectoryPicker; });
+    globalThis.showOpenFilePicker = () => {};
+    globalThis.showDirectoryPicker = () => {};
+    const root = { name: 'Independent Stamp folder' };
+    let selections = 0;
+    const imageCatalog = initialCatalog();
+    imageCatalog.tags.push(...['Stamp', 'Die', 'Mask'].map((name) => ({ id: name.toLowerCase(), name, categoryIds: [] })));
+    const h = await harness(t, {
+      loadGlobalTagCatalog: async () => structuredClone(imageCatalog),
+      loadStampImageDirectory: async () => root,
+      hydrateStampImages: async () => {},
+      chooseStampImages: async (environment, directory) => {
+        assert.equal(environment, globalThis); assert.equal(directory, root); selections++;
+        return ['Set Masks.jpg', 'Set Dies Masks.jpg', 'Set.jpg'].map((name) => ({ name, previewSrc: 'data:image/jpeg;base64,YQ==' }));
+      }
+    });
+    if (mode === 'Edit') await seedEdit(h);
+    else await h.add.emit('click');
+    const button = h.form.querySelectorAll('button').find((button) => button.textContent === 'Add from Stamp & Die Library');
+    assert.equal(button.hidden, false);
+    const general = h.form.querySelectorAll('button').find((button) => button.textContent === 'Add Images');
+    assert.ok(button.parentElement.children.indexOf(button) < button.parentElement.children.indexOf(general));
+    assert.match(h.form.textContent, /Independent Stamp folder.*Settings/);
+    await button.emit('click');
+    assert.equal(selections, 1);
+    assert.deepEqual(h.form.querySelector('.stamp-set-draft-images').querySelectorAll('img').map((image) => image.alt),
+      ['Set.jpg', 'Set Dies Masks.jpg', 'Set Masks.jpg']);
+    for (const id of ['stamp', 'die', 'mask']) assert.equal(h.form.querySelector(`[data-tag-id="${id}"]`).checked, true);
+    assert.equal(h.calls(), 0);
+    await h.cancel.emit('click');
+  });
+}
+
+for (const state of ['unsupported', 'unconfigured', 'revoked']) {
+  test(`general Add Images remains usable with ${state} library access`, async (t) => {
+    const previousPicker = globalThis.showOpenFilePicker;
+    t.after(() => { globalThis.showOpenFilePicker = previousPicker; });
+    globalThis.showOpenFilePicker = state === 'unsupported' ? undefined : () => {};
+    const h = await harness(t, {
+      loadStampImageDirectory: async () => state === 'unsupported' ? { name: 'Previously saved' } : null,
+      selectStampImageFiles: async (files) => files.map((file) => ({ file, name: file.name, previewSrc: 'data:image/jpeg;base64,YQ==' }))
+    });
+    await h.add.emit('click');
+    const library = h.form.querySelectorAll('button').find((button) => button.textContent === 'Add from Stamp & Die Library');
+    assert.equal(library.hidden, true);
+    const general = h.form.querySelectorAll('button').find((button) => button.textContent === 'Add Images');
+    const input = h.form.querySelector('input[type="file"]');
+    let clicks = 0; input.click = () => { clicks++; };
+    await general.emit('click'); assert.equal(clicks, 1); assert.equal(general.disabled, false);
+    assert.equal(input.multiple, true);
+    input.files = [{ name: 'Stamp.jpg' }, { name: 'Dies.jpg' }];
+    await input.emit('change');
+    assert.equal(h.form.querySelector('.stamp-set-draft-images').querySelectorAll('img').length, 2);
+  });
+}
+
+test('Settings library changes refresh existing Set display without save, inference, migration or draft loss', async (t) => {
+  const previousPicker = globalThis.showOpenFilePicker;
+  const previousDirectoryPicker = globalThis.showDirectoryPicker;
+  t.after(() => { globalThis.showOpenFilePicker = previousPicker; globalThis.showDirectoryPicker = previousDirectoryPicker; });
+  globalThis.showOpenFilePicker = () => {};
+  globalThis.showDirectoryPicker = () => {};
+  let root = null;
+  const h = await harness(t, {
+    loadStampImageDirectory: async () => root,
+    hydrateStampImages: async () => {},
+    prepareStampImagesForSave: () => assert.fail('Settings cannot prepare images')
+  });
+  await seedEdit(h, { imageRefs: editReferences() });
+  const before = structuredClone(h.records);
+  h.name.value = 'Unsaved edit';
+  for (const name of ['First root', 'Replacement root']) {
+    root = { name };
+    await h.document.emit('catalog:stamp-image-library-selected');
+    assert.equal(h.name.value, 'Unsaved edit');
+    assert.match(h.form.textContent, new RegExp(name));
+    assert.equal(h.calls(), 0);
+    assert.deepEqual(h.records, before);
+    assert.equal(h.form.querySelectorAll('[data-tag-id]').length, 2);
+  }
+});
