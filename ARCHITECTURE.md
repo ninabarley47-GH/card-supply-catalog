@@ -277,3 +277,16 @@ transaction helper. Inference never runs at reload or re-adds manually removed t
 on Save. Folder files created before a failed record commit may remain; rollback
 never deletes shared-library files. Existing originals and thumbnails are never
 overwritten by the shared save path.
+
+
+## Stamp & Die Ownership
+
+Sets persist an optional stable `ownerId` from the shared owner registry. New Sets
+require Owner and use the device Default Owner, then the last owner used for a new
+Set. Add/Edit reuse the shared owner picker, including Add new owner. Existing
+Sets without ownership remain readable and editable without automatic assignment;
+they display "Owner not recorded". Library tiles and Detail resolve current owner
+names by ID, including archived owners, and refresh after owner renames.
+New owners commit atomically with the Set and any inferred tags. Cancel or failed
+saves do not add owners. The catalog schema advances to 6 for this persisted field;
+IndexedDB and backup-envelope versions are unchanged.

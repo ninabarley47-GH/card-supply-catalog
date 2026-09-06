@@ -162,3 +162,9 @@ Library modules within the same grid row stretch to equal height. Rows size inde
 to their content; shorter modules may leave blank space at the bottom. Responsive
 column widths remain unchanged. Library Favorite hearts use the Paper Pack inline
 muted/rose presentation without changing each catalog's existing editing behavior.
+
+
+Stamp & Die Owner follows the shared Paper owner picker in New/Edit Set. Library
+tiles show owner beside Release Year; Detail labels Owner explicitly. Legacy sets
+show "Owner not recorded" until assigned. The device default takes precedence over
+the last owner used for a new Set; Edit preserves the saved assignment.

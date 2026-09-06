@@ -107,9 +107,10 @@ function createOwnerSettingsRow(owner, owners, paperPacks, message, render, onPa
     message.dataset.tone = "success";
     render();
     onPaperPacksUpdated?.();
+    document.dispatchEvent(new CustomEvent("catalog:owners-updated"));
   });
   deleteButton.addEventListener("click", async () => {
-    if (!window.confirm(`Delete ${owner.name} from the owner list? Existing Paper Packs and Cards will keep their owner.`)) return;
+    if (!window.confirm(`Delete ${owner.name} from the owner list? Existing Paper Packs, Cards, and Stamp & Die Sets will keep their owner.`)) return;
     const wasDefault = selectDefaultOwnerId(owner.id);
     await saveOwner({ id: owner.id, name: owner.name, archived: true });
     owner.archived = true;

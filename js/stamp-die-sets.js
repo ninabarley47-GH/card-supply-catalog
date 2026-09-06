@@ -9,6 +9,9 @@ export function normalizeStampDieSet(record, catalog) {
       !isCalendarDate(record.dateCreated) || !Array.isArray(record.imageRefs)) {
     throw new TypeError('Invalid Stamp & Die Set record.');
   }
+  if (record.ownerId !== undefined && (typeof record.ownerId !== 'string' || !record.ownerId.trim())) {
+    throw new TypeError('Invalid Stamp & Die Set ownerId.');
+  }
   if (record.releaseYear !== undefined &&
       (!Number.isInteger(record.releaseYear) || record.releaseYear < 1990 || record.releaseYear > 2100)) {
     throw new TypeError('Release Year must be a whole year between 1990 and 2100.');
@@ -19,6 +22,7 @@ export function normalizeStampDieSet(record, catalog) {
   return addCatalogSchemaVersion({
     id: record.id,
     name: record.name.trim(),
+    ...(record.ownerId === undefined ? {} : { ownerId: record.ownerId }),
     imageRefs: record.imageRefs.map(normalizeImageReference),
     tagIds: [...record.tagIds],
     favorite: record.favorite,

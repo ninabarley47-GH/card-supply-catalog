@@ -14,9 +14,10 @@ dieIds, or required per-image classifications. Every image belongs to the same S
 
 ```js
 {
-  schemaVersion: 5,
+  schemaVersion: 6,
   id: 'stable-set-id',
   name: 'Set name',
+  ownerId: 'stable-owner-id',
   imageRefs: [],
   tagIds: [],
   favorite: false,
@@ -31,7 +32,7 @@ Normalized duplicates within the Stamp & Die Catalog are rejected: case,
 surrounding whitespace, and repeated internal whitespace do not distinguish names.
 The existing `getTagKey()` helper supplies the comparison key. Add/Edit reads saved
 Sets at submit time, excluding the current stable ID during Edit, and never checks other catalog types. A duplicate error keeps
-the entire draft intact. Future ownership data will describe who owns one Set
+the entire draft intact. Ownership describes who owns one Set
 rather than requiring duplicate records for different owners.
 
 Release Year matches DSP: a required whole year from 1990 to 2100, defaulting to
@@ -263,3 +264,16 @@ Library image rendering, atomic inferred-tag/Set writes, and reload. Existing
 Paper/Card and global-tag tests remain in the full suite. DOM, directory, and
 IndexedDB API harnesses do not modify real user files. Real picker permissions,
 iPad selection, and visual layout still require browser verification.
+
+
+## Stamp & Die Ownership
+
+Sets persist an optional stable `ownerId` from the shared owner registry. New Sets
+require Owner and use the device Default Owner, then the last owner used for a new
+Set. Add/Edit reuse the shared owner picker, including Add new owner. Existing
+Sets without ownership remain readable and editable without automatic assignment;
+they display "Owner not recorded". Library tiles and Detail resolve current owner
+names by ID, including archived owners, and refresh after owner renames.
+New owners commit atomically with the Set and any inferred tags. Cancel or failed
+saves do not add owners. The catalog schema advances to 6 for this persisted field;
+IndexedDB and backup-envelope versions are unchanged.

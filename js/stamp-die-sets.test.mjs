@@ -269,3 +269,34 @@ test('Delete removes only the Set store record; failed commit preserves referenc
     for (const [name, records] of before) if (name !== 'stampDieSets') assert.deepEqual(h.stores.get(name), records);
   } finally { globalThis.window = previous; }
 });
+
+
+test('Set owner IDs persist without names and legacy sets remain readable', () => {
+  const record = normalizeStampDieSet({ ...setRecord(), ownerId: 'owner-nina', owner: 'Old name' }, catalog);
+  assert.equal(record.ownerId, 'owner-nina');
+  assert.equal('owner' in record, false);
+  assert.equal('ownerId' in normalizeStampDieSet(setRecord(), catalog), false);
+  for (const ownerId of [null, 1, '', '  ']) {
+    assert.throws(() => normalizeStampDieSet({ ...setRecord(), ownerId }, catalog));
+  }
+});
+
+test('Set and new owner commit atomically and survive reload', async () => {
+  const h = databaseHarness();
+  const previous = globalThis.window;
+  globalThis.window = { indexedDB: h.indexedDB, localStorage: { getItem: () => 'true' } };
+  try {
+    const storage = await import('./storage.js?set-owner-atomic');
+    await storage.loadSavedStampDieSets();
+    const owner = { id: 'owner-jordan', name: 'Jordan' };
+    const record = { ...setRecord(), ownerId: owner.id };
+    h.failNextCommit();
+    await assert.rejects(storage.saveStampDieSet(record, { owner }));
+    assert.equal(h.stores.get('owners').has(owner.id), false);
+    assert.deepEqual(await storage.loadSavedStampDieSets(), []);
+    await storage.saveStampDieSet(record, { owner });
+    const reloaded = await import('./storage.js?set-owner-reload');
+    assert.equal((await reloaded.loadSavedStampDieSets())[0].ownerId, owner.id);
+    assert.deepEqual(h.stores.get('owners').get(owner.id), owner);
+  } finally { globalThis.window = previous; }
+});

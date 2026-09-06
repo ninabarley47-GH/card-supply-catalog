@@ -11,4 +11,4 @@ const { paperPacks, owners } = await initializeLibraryShell();
 const cards = await initializeCardLibrary({ paperPacks, owners });
 setCardsForPaperPackDetails(cards);
 
-await initializeStampDieLibrary();
+await initializeStampDieLibrary({ owners });

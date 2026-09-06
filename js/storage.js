@@ -140,13 +140,16 @@ export async function loadSavedStampDieSets() {
   return records.map((record) => normalizeStampDieSet(record, catalog));
 }
 
-export async function saveStampDieSet(record, { inferredTags = [] } = {}) {
+export async function saveStampDieSet(record, { inferredTags = [], owner = null } = {}) {
   const database = await openCatalogDatabase();
   const catalog = await ensureGlobalTagPersistence(database);
   const reconciled = reconcileStampDieImageTags(record, catalog, inferredTags);
   const normalized = normalizeStampDieSet(reconciled.record, reconciled.catalog);
+  if (owner && (!isOwner(owner) || owner.id !== normalized.ownerId)) throw new TypeError('Invalid Set owner.');
   const stores = reconciled.catalog === catalog ? [STAMP_DIE_SETS_STORE] : [STAMP_DIE_SETS_STORE, SETTINGS_STORE];
+  if (owner) stores.push(OWNERS_STORE);
   await writeTransaction(database, stores, (transaction) => {
+    if (owner) transaction.objectStore(OWNERS_STORE).put(owner);
     transaction.objectStore(STAMP_DIE_SETS_STORE).put(normalized);
     if (reconciled.catalog !== catalog) {
       transaction.objectStore(SETTINGS_STORE).put({ id: GLOBAL_TAG_CATALOG_SETTING_ID, value: reconciled.catalog });

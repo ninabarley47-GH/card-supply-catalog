@@ -30,6 +30,8 @@ class Element {
   }
   set textContent(value) { this.ownText = value; this.children = []; }
   get textContent() { return this.ownText + this.children.map((child) => child.textContent).join(''); }
+  get options() { return this.children; }
+  get parentElement() { return this.parent; }
   get childElementCount() { return this.children.length; }
   append(...children) { for (const child of children) { child.parent = this; this.children.push(child); } }
   replaceChildren(...children) { this.children = []; this.ownText = ''; this.append(...children); }
@@ -70,7 +72,7 @@ class Element {
 }
 
 async function harness(t, otherCatalogServices = {}) {
-  const previous = { document: globalThis.document, window: globalThis.window };
+  const previous = { document: globalThis.document, window: globalThis.window, Option: globalThis.Option };
   t.after(() => Object.assign(globalThis, previous));
   const document = new Element('document');
   document.createElement = (name) => new Element(name);
@@ -84,6 +86,7 @@ async function harness(t, otherCatalogServices = {}) {
   const status = new Element('p'); status.dataset.setLibraryStatus = '';
   screen.append(add, gallery, status);
   document.body.append(screen);
+  globalThis.Option = function(text, value) { return Object.assign(new Element('option'), { textContent: text, value }); };
   globalThis.document = document;
   globalThis.window = { location: { hash: '#stamps-dies' } };
   const records = [];
@@ -91,7 +94,12 @@ async function harness(t, otherCatalogServices = {}) {
   let failure = false;
   let commitGate;
   let calls = 0;
+  const owners = [{ id: 'owner-nina', name: 'Nina' }, { id: 'owner-amanda', name: 'Amanda' }];
   await initializeStampDieLibrary({
+    owners,
+    loadDefaultOwnerId: async () => 'owner-nina',
+    loadCatalogSetting: async () => '',
+    saveCatalogSetting: async () => {},
     loadGlobalTagCatalog: async () => structuredClone(catalog),
     loadSavedStampDieSets: async () => structuredClone(records),
     saveStampDieSet: async (record) => {
@@ -115,7 +123,7 @@ async function harness(t, otherCatalogServices = {}) {
     input.checked = true;
     await form.querySelector('.global-tag-picker').emit('change', { target: input });
   }
-  return { document, add, gallery, status, dialog, form, name, year, favorite, cancel, records, select,
+  return { owners, owner: form.querySelector('select[name="ownerId"]'), newOwner: form.querySelector('input[name="owner"]'), document, add, gallery, status, dialog, form, name, year, favorite, cancel, records, select,
     calls: () => calls, setFailure: (value) => { failure = value; }, setGate: (value) => { commitGate = value; },
     renameTag: () => { catalog.tags[0].name = 'Botanical'; } };
 }
@@ -156,7 +164,7 @@ test('save persists Favorite and universal stable tag IDs, then renders a no-ima
   await h.form.emit('submit');
   const record = h.records[0];
   assert.match(record.id, /^set-/);
-  assert.deepEqual(record, { schemaVersion: CATALOG_SCHEMA_VERSION, id: record.id, name: 'Garden', dateCreated: getLocalDateValue(), releaseYear: 2024, favorite: true, tagIds: ['stable-paper', 'stable-card'], imageRefs: [] });
+  assert.deepEqual(record, { schemaVersion: CATALOG_SCHEMA_VERSION, id: record.id, ownerId: 'owner-nina', name: 'Garden', dateCreated: getLocalDateValue(), releaseYear: 2024, favorite: true, tagIds: ['stable-paper', 'stable-card'], imageRefs: [] });
   assert.equal(h.dialog.open, false);
   assert.equal(saves, 1);
   assert.match(h.gallery.textContent, /No image.*Garden.*2024.*Floral.*Birthday/);
@@ -310,7 +318,7 @@ test('record creation rejects malformed dates/category assignments and supports 
 
 test('Add Set is wired into the application and offline shell with isolated image handling', async () => {
   const [app, shell, html, source, settings] = await Promise.all(['app.js', '../sw.js', '../index.html', 'stamp-die-library.js', 'settings.js'].map((file) => readFile(new URL(file, import.meta.url), 'utf8')));
-  assert.match(app, /await initializeStampDieLibrary\(\)/);
+  assert.match(app, /await initializeStampDieLibrary\(\{ owners \}\)/);
   assert.match(shell, /\.\/js\/stamp-die-library\.js/);
   assert.match(shell, /\.\/js\/ui\.js/);
   assert.match(html, /data-add-set>Add Set/);
@@ -730,4 +738,71 @@ test('Set Favorite is an inline heart with Paper colors for either state and doe
   assert.equal(heart.dataset.favorite, 'false');
   assert.equal(heart.getAttribute('aria-label'), 'Not a favorite');
   assert.equal(h.calls(), 0);
+});
+
+
+test('Set owner defaults, edits, rename display, and cancel use the shared registry', async (t) => {
+  const h = await harness(t);
+  await h.add.emit('click');
+  assert.equal(h.owner.value, 'owner-nina');
+  h.name.value = 'Owned set';
+  h.owner.value = 'owner-amanda';
+  await h.form.emit('submit');
+  assert.equal(h.records[0].ownerId, 'owner-amanda');
+  assert.equal('owner' in h.records[0], false);
+  assert.match(h.gallery.textContent, /Amanda/);
+  await h.gallery.querySelector('article').emit('click');
+  const detail = setDetail(h);
+  assert.match(detail.textContent, /Owner: Amanda/);
+  h.owners[1].name = 'Mandy';
+  await h.document.emit('catalog:owners-updated');
+  assert.match(h.gallery.textContent, /Mandy/);
+  assert.match(detail.textContent, /Owner: Mandy/);
+  await detail.querySelectorAll('button').find((b) => b.textContent === 'Edit').emit('click');
+  assert.equal(h.owner.value, 'owner-amanda');
+  h.owner.value = 'owner-nina';
+  await h.cancel.emit('click');
+  assert.equal(h.records[0].ownerId, 'owner-amanda');
+  await detail.querySelectorAll('button').find((b) => b.textContent === 'Edit').emit('click');
+  h.owner.value = 'owner-nina';
+  await h.form.emit('submit');
+  assert.equal(h.records[0].ownerId, 'owner-nina');
+  assert.match(detail.textContent, /Owner: Nina/);
+});
+
+test('New owner stays in draft on failure and joins the registry after successful save', async (t) => {
+  const h = await harness(t);
+  await h.add.emit('click');
+  h.name.value = 'New owner set';
+  h.owner.value = '__new_owner__';
+  await h.owner.emit('change');
+  h.newOwner.value = '  Jordan  ';
+  h.setFailure(true);
+  await h.form.emit('submit');
+  assert.equal(h.owners.length, 2);
+  assert.equal(h.newOwner.value, '  Jordan  ');
+  h.setFailure(false);
+  await h.form.emit('submit');
+  assert.equal(h.owners[2].name, 'Jordan');
+  assert.equal(h.records[0].ownerId, h.owners[2].id);
+});
+
+test('Legacy sets keep missing ownership until explicitly assigned', async (t) => {
+  const h = await harness(t);
+  await seedEdit(h);
+  assert.equal(h.owner.value, '');
+  assert.equal(h.owner.required, false);
+  await h.form.emit('submit');
+  assert.equal('ownerId' in h.records[0], false);
+  assert.match(h.gallery.textContent, /Owner not recorded/);
+});
+
+test('Add Set requires an owner and falls back to the last used owner', async (t) => {
+  const h = await harness(t, { loadDefaultOwnerId: async () => 'missing', loadCatalogSetting: async () => 'owner-amanda' });
+  await h.add.emit('click');
+  assert.equal(h.owner.value, 'owner-amanda');
+  h.name.value = 'Needs owner';
+  h.owner.value = '';
+  await h.form.emit('submit');
+  assert.equal(h.records.length, 0);
 });

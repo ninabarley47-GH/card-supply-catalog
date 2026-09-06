@@ -1,3 +1,6 @@
+import { initializeOwnerPicker, resolveOwnerPicker, setOwnerPickerValue, refreshOwnerOptions, notifyOwnerRegistryUpdated } from './owner-picker.js';
+import { isActiveOwner } from './owners.js';
+import { loadDefaultOwnerId } from './settings.js';
 import {
   chooseStampImages, selectStampImageFiles, chooseStampImageDirectory, loadStampImageDirectory,
   prepareStampImagesForSave, hydrateStampImages, clearStampImageSources,
@@ -5,11 +8,13 @@ import {
 } from './stamp-die-images.js';
 import { inferStampDieImageTags, reconcileStampDieImageTags, orderStampDieImages } from './stamp-die-image-tags.js';
 import { supportsOpenFilePicker, supportsDirectoryPicker } from './browser-capabilities.js';
-import { loadGlobalTagCatalog, loadSavedStampDieSets, saveStampDieSet, deleteStampDieSet } from './storage.js';
+import { loadCatalogSetting, saveCatalogSetting, loadGlobalTagCatalog, loadSavedStampDieSets, saveStampDieSet, deleteStampDieSet } from './storage.js';
 import { createTagPicker, projectTagNames } from './tag-picker.js';
 import { normalizeStampDieSet } from './stamp-die-sets.js';
 import { getLocalDateValue } from './ui.js';
 import { getTagKey } from './tag-utils.js';
+
+const LAST_OWNER_SETTING = 'addStampDieLastOwnerId';
 
 export function createStampDieSetRecord(values, catalog) {
   return normalizeStampDieSet({
@@ -17,6 +22,7 @@ export function createStampDieSetRecord(values, catalog) {
     name: values.name,
     dateCreated: values.dateCreated,
     releaseYear: values.releaseYear,
+    ownerId: values.ownerId,
     favorite: values.favorite,
     tagIds: values.tagIds,
     imageRefs: values.imageRefs || []
@@ -33,7 +39,8 @@ function createSetId() {
 export async function initializeStampDieLibrary(services = {}) {
   const storage = { loadGlobalTagCatalog, loadSavedStampDieSets, saveStampDieSet, deleteStampDieSet,
     chooseStampImages, selectStampImageFiles, chooseStampImageDirectory, loadStampImageDirectory,
-    prepareStampImagesForSave, hydrateStampImages, ...services };
+    prepareStampImagesForSave, hydrateStampImages, loadDefaultOwnerId, loadCatalogSetting, saveCatalogSetting, ...services };
+  const owners = services.owners || [];
   const screen = document.getElementById('stamps-dies');
   if (!screen) return;
   const add = screen.querySelector('[data-add-set]');
@@ -41,6 +48,7 @@ export async function initializeStampDieLibrary(services = {}) {
   const status = screen.querySelector('[data-set-library-status]');
   status.className += ' form-message';
   const view = createSetFormView();
+  initializeOwnerPicker(view.owner, view.newOwner, owners);
   const detail = createSetDetailView();
   document.body.append(view.dialog, detail.dialog);
   let selectedSetId = null;
@@ -63,7 +71,9 @@ export async function initializeStampDieLibrary(services = {}) {
       tag.textContent = name;
       tags.append(tag);
     }
-    metadata.append(year, favorite, tags);
+    const owner = document.createElement('p');
+    owner.textContent = `Owner: ${getSetOwnerName(record, owners)}`;
+    metadata.append(owner, year, favorite, tags);
     detail.body.replaceChildren(createSetImageGrid(record.imageRefs, true), metadata);
   }
   function openDetail(id, source) {
@@ -97,7 +107,7 @@ export async function initializeStampDieLibrary(services = {}) {
     clearStampImageSources(removed);
     if (view.dialog.open) view.dialog.close();
     detail.dialog.close();
-    renderStampDieLibrary(gallery, displayedRecords, catalog, (setId) => openForm(setId), openDetail);
+    renderStampDieLibrary(gallery, displayedRecords, catalog, (setId) => openForm(setId), openDetail, owners);
     window.location.hash = '#stamps-dies';
     await refresh();
     add.focus();
@@ -141,6 +151,8 @@ export async function initializeStampDieLibrary(services = {}) {
     view.name.setCustomValidity('');
     view.releaseYear.value = String(new Date().getFullYear());
     view.releaseYear.required = true;
+    view.owner.required = true;
+    setOwnerPickerValue(view.owner, view.newOwner, '', '', owners);
     picker?.reset();
     view.message.textContent = '';
     view.message.dataset.tone = '';
@@ -157,7 +169,7 @@ export async function initializeStampDieLibrary(services = {}) {
       clearStampImageSources(displayedRecords);
       displayedRecords = records;
       if (!view.dialog.open) catalog = nextCatalog;
-      renderStampDieLibrary(gallery, records, nextCatalog, (id) => openForm(id), openDetail);
+      renderStampDieLibrary(gallery, records, nextCatalog, (id) => openForm(id), openDetail, owners);
       if (selectedSetId) renderDetail(records, nextCatalog);
       status.dataset.tone = '';
       status.textContent = `${records.length} set${records.length === 1 ? '' : 's'}`;
@@ -173,6 +185,7 @@ export async function initializeStampDieLibrary(services = {}) {
     try {
       catalog = await storage.loadGlobalTagCatalog();
       reset();
+      initializeOwnerPicker(view.owner, view.newOwner, owners);
       if (!picker) {
         picker = createTagPicker({ label: 'Tags', productType: 'stamp', catalog });
         view.tags.append(picker.element);
@@ -184,6 +197,12 @@ export async function initializeStampDieLibrary(services = {}) {
         editingRecord = record;
         await storage.hydrateStampImages([record]);
         view.name.value = record.name;
+        setOwnerPickerValue(view.owner, view.newOwner, record.ownerId, '', owners);
+        view.owner.required = Boolean(record.ownerId);
+        if (record.ownerId && !owners.some((owner) => isActiveOwner(owner) && owner.id === record.ownerId)) {
+          view.owner.append(new Option(getSetOwnerName(record, owners), record.ownerId));
+          view.owner.value = record.ownerId;
+        }
         view.releaseYear.value = record.releaseYear === undefined ? '' : String(record.releaseYear);
         view.releaseYear.required = record.releaseYear !== undefined;
         view.favorite.checked = record.favorite;
@@ -194,6 +213,14 @@ export async function initializeStampDieLibrary(services = {}) {
           previewSrc: getStampLibraryImageSource(reference)
         }));
         renderDraftImages();
+      }
+      if (!id) {
+        const [defaultId, lastId] = await Promise.all([
+          storage.loadDefaultOwnerId().catch(() => ''),
+          storage.loadCatalogSetting(LAST_OWNER_SETTING).catch(() => '')
+        ]);
+        const ownerId = [defaultId, lastId].find((id) => owners.some((owner) => isActiveOwner(owner) && owner.id === id));
+        setOwnerPickerValue(view.owner, view.newOwner, ownerId, '', owners);
       }
       imageDirectory = await storage.loadStampImageDirectory('read').catch(() => null);
       view.folderMessage.textContent = imageDirectory
@@ -307,6 +334,10 @@ export async function initializeStampDieLibrary(services = {}) {
     if (saving || selecting) return;
     view.name.setCustomValidity(view.name.value.trim() ? '' : 'Enter a Set Name.');
     if (!view.form.reportValidity()) return;
+    const owner = resolveOwnerPicker(view.owner, view.newOwner, owners) ||
+      (editingRecord?.ownerId === view.owner.value ? owners.find((entry) => entry.id === editingRecord.ownerId) : null);
+    if (!owner && view.owner.value !== '' && view.owner.value !== editingRecord?.ownerId) return;
+    if (!owner && view.owner.required && view.owner.value !== editingRecord?.ownerId) return;
     saving = true;
     view.fields.disabled = true;
     view.save.disabled = true;
@@ -329,6 +360,7 @@ export async function initializeStampDieLibrary(services = {}) {
       const record = createStampDieSetRecord({
         id: draftId,
         name: view.name.value,
+        ownerId: owner?.id || editingRecord?.ownerId,
         dateCreated: editingRecord?.dateCreated || getLocalDateValue(),
         releaseYear: editingRecord && editingRecord.releaseYear === undefined && !view.releaseYear.value
           ? undefined : Number(view.releaseYear.value),
@@ -338,7 +370,15 @@ export async function initializeStampDieLibrary(services = {}) {
       const prepared = await storage.prepareStampImagesForSave(draftImages);
       record.imageRefs = prepared.imageRefs;
       usedFallback = prepared.usedFallback;
-      await storage.saveStampDieSet(normalizeStampDieSet(record, reconciled.catalog), { inferredTags });
+      await storage.saveStampDieSet(normalizeStampDieSet(record, reconciled.catalog), { inferredTags, owner });
+      if (owner && !owners.some((entry) => entry.id === owner.id && entry.archived === owner.archived)) {
+        const index = owners.findIndex((entry) => entry.id === owner.id);
+        if (index < 0) owners.push(owner);
+        else owners.splice(index, 1, owner);
+        refreshOwnerOptions(owners);
+        notifyOwnerRegistryUpdated();
+      }
+      if (!editingRecord && owner) storage.saveCatalogSetting(LAST_OWNER_SETTING, owner.id).catch(() => {});
       saved = true;
     } catch {
       view.message.dataset.tone = 'error';
@@ -362,6 +402,10 @@ export async function initializeStampDieLibrary(services = {}) {
   });
 
   document.addEventListener('catalog:global-tags-updated', (event) => { if (event.detail?.source !== 'stamp-die-save') return refresh(); });
+  document.addEventListener('catalog:owners-updated', () => {
+    renderStampDieLibrary(gallery, displayedRecords, catalog, (id) => openForm(id), openDetail, owners);
+    if (selectedSetId) renderDetail(displayedRecords, catalog);
+  });
   await refresh();
 }
 
@@ -383,6 +427,14 @@ function createSetFormView() {
   name.name = 'name';
   name.type = 'text';
   name.required = true;
+  const owner = document.createElement('select');
+  owner.name = 'ownerId';
+  owner.required = true;
+  const newOwner = document.createElement('input');
+  newOwner.name = 'owner';
+  newOwner.type = 'text';
+  newOwner.placeholder = 'New owner name';
+  newOwner.setAttribute('aria-label', 'New owner name');
   const releaseYear = document.createElement('input');
   releaseYear.name = 'releaseYear';
   releaseYear.type = 'number';
@@ -424,7 +476,7 @@ function createSetFormView() {
   const message = document.createElement('p');
   message.className = 'form-message';
   message.setAttribute('role', 'status');
-  fields.append(createField('Set Name', name), createField('Release Year', releaseYear), favoriteLabel, imageControls, tags, message);
+  fields.append(createField('Set Name', name), createField('Owner', owner, newOwner), createField('Release Year', releaseYear), favoriteLabel, imageControls, tags, message);
   const actions = document.createElement('div');
   actions.className = 'card-add-actions';
   const cancel = document.createElement('button');
@@ -438,17 +490,17 @@ function createSetFormView() {
   actions.append(cancel, save);
   form.append(fields, actions);
   dialog.append(header, form);
-  return { dialog, title, form, fields, name, releaseYear, favorite, tags, message, cancel, save, chooseImages, imageInput, chooseFolder, folderMessage, imageMessage, previews };
+  return { dialog, title, form, fields, name, owner, newOwner, releaseYear, favorite, tags, message, cancel, save, chooseImages, imageInput, chooseFolder, folderMessage, imageMessage, previews };
 }
 
-function createField(text, input) {
+function createField(text, ...inputs) {
   const label = document.createElement('label');
   label.className = 'card-add-field';
-  label.append(document.createTextNode(text), input);
+  label.append(document.createTextNode(text), ...inputs);
   return label;
 }
 
-export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetail) {
+export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetail, owners = []) {
   const tiles = records.map((record) => {
     const tile = document.createElement('article');
     tile.className = 'stamp-set-tile';
@@ -476,6 +528,7 @@ export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetai
     release.textContent = record.releaseYear === undefined
       ? 'Release year not recorded'
       : `Release year: ${record.releaseYear}`;
+    release.textContent = `${getSetOwnerName(record, owners)} \u00b7 ${release.textContent}`;
     content.append(name, release);
     const favorite = document.createElement('span');
     favorite.className = 'stamp-set-favorite';
@@ -584,4 +637,8 @@ function createSetDetailView() {
   header.append(close, title, edit, remove);
   dialog.append(header, body, message);
   return { dialog, title, close, edit, remove, message, body };
+}
+
+function getSetOwnerName(record, owners) {
+  return owners.find((owner) => owner.id === record.ownerId)?.name || 'Owner not recorded';
 }
