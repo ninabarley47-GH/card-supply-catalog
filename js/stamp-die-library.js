@@ -72,9 +72,9 @@ export async function initializeStampDieLibrary(services = {}) {
     favorite.title = record.favorite ? 'Favorite' : 'Not a favorite';
     facts.append(
       createSetDetailFact('Owner', getSetOwnerName(record, owners)),
-      createSetDetailFact('Release Year', record.releaseYear === undefined ? 'Not recorded' : String(record.releaseYear)),
-      createSetDetailFact('Favorite', favorite)
+      createSetDetailFact('Release Year', record.releaseYear === undefined ? 'Not recorded' : String(record.releaseYear))
     );
+    detail.titleRow.replaceChildren(detail.title, favorite);
     info.append(facts);
     const tagSection = createSetDetailSection('Tags');
     const tags = document.createElement('ul');
@@ -557,14 +557,14 @@ export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetai
     const placeholder = createSetImageGrid(record.imageRefs);
     const content = document.createElement('div');
     content.className = 'stamp-set-tile-content';
-    const name = document.createElement('h3');
+    const name = document.createElement('h4');
     name.textContent = record.name;
     const release = document.createElement('p');
     release.textContent = record.releaseYear === undefined
       ? 'Release year not recorded'
       : `Release year: ${record.releaseYear}`;
     release.textContent = `${getSetOwnerName(record, owners)} \u00b7 ${release.textContent}`;
-    content.append(name, release);
+    content.append(release);
     const favorite = document.createElement('span');
     favorite.className = 'stamp-set-favorite';
     favorite.dataset.favorite = String(Boolean(record.favorite));
@@ -574,7 +574,7 @@ export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetai
     const titleRow = document.createElement('div');
     titleRow.className = 'card-title-row';
     titleRow.append(name, favorite);
-    content.replaceChildren(titleRow, release);
+
     const names = projectTagNames(catalog, record.tagIds, 'stamp');
     if (names.length) {
       const tags = document.createElement('ul');
@@ -596,7 +596,7 @@ export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetai
       edit.addEventListener('click', () => onEdit(record.id));
       content.append(edit);
     }
-    tile.append(placeholder, content);
+    tile.append(titleRow, placeholder, content);
     return tile;
   });
   if (!tiles.length) {
@@ -676,7 +676,10 @@ function createSetDetailView() {
   const context = document.createElement('p');
   context.className = 'eyebrow';
   context.textContent = 'Stamps & Dies';
-  heading.append(context, title);
+  const titleRow = document.createElement('div');
+  titleRow.className = 'card-title-row stamp-set-detail-title-row';
+  titleRow.append(title);
+  heading.append(context, titleRow);
   header.append(heading, close);
   const actions = createSetDetailSection('Actions');
   actions.className += ' detail-actions';
@@ -685,7 +688,7 @@ function createSetDetailView() {
   row.append(edit, remove);
   actions.append(row, message);
   dialog.append(header, body);
-  return { dialog, title, close, edit, remove, message, body, actions };
+  return { dialog, title, titleRow, close, edit, remove, message, body, actions };
 }
 
 function getSetOwnerName(record, owners) {

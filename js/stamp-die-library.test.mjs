@@ -183,7 +183,7 @@ test('save persists Favorite and universal stable tag IDs, then renders a no-ima
   assert.deepEqual(record, { schemaVersion: CATALOG_SCHEMA_VERSION, id: record.id, ownerId: 'owner-nina', name: 'Garden', dateCreated: getLocalDateValue(), releaseYear: 2024, favorite: true, tagIds: ['stable-paper', 'stable-card'], imageRefs: [] });
   assert.equal(h.dialog.open, false);
   assert.equal(saves, 1);
-  assert.match(h.gallery.textContent, /No image.*Garden.*2024.*Floral.*Birthday/);
+  assert.match(h.gallery.textContent, /Garden.*No image.*2024.*Floral.*Birthday/);
   assert.equal(h.gallery.querySelector('img'), null);
   h.renameTag();
   await h.document.emit('catalog:global-tags-updated');
@@ -587,7 +587,7 @@ test('Library click and keyboard open correct Detail metadata and canonical tags
   await tile.emit('click');
   const detail = setDetail(h);
   assert.equal(detail.open, true);
-  assert.match(detail.textContent, /Original.*No image.*2022.*Favorite.*Floral/);
+  assert.match(detail.textContent, /Original.*No image.*2022.*Floral/);
   assert.equal(h.calls(), 0);
   await detail.querySelector('button').emit('click');
   assert.equal(detail.open, false);
@@ -601,7 +601,7 @@ test('Library click and keyboard open correct Detail metadata and canonical tags
   h.records.push(createStampDieSetRecord({ id: 'second', name: 'Second Set', dateCreated: '2020-01-01', favorite: false, tagIds: ['stable-card'], imageRefs: [] }, initialCatalog()));
   await h.document.emit('catalog:global-tags-updated');
   await h.gallery.querySelectorAll('article')[1].emit('click');
-  assert.match(detail.textContent, /Second Set.*Release YearNot recorded.*Favorite.*Birthday/);
+  assert.match(detail.textContent, /Second Set.*Release YearNot recorded.*Birthday/);
   assert.doesNotMatch(detail.textContent, /Original|Floral/);
 });
 
@@ -673,7 +673,7 @@ test('Edit from Detail reuses form, preserves ID, refreshes selected Set and ret
   await h.form.emit('submit');
   assert.equal(h.dialog.open, false);
   assert.equal(detail.open, true);
-  assert.match(detail.textContent, /Edited in Detail.*2024.*Favorite.*Birthday/);
+  assert.match(detail.textContent, /Edited in Detail.*2024.*Birthday/);
   assert.equal(h.records.length, 1);
   assert.equal(h.records[0].id, 'set-existing');
   assert.equal(detail.querySelector('img').alt, 'New stamp.jpg');
@@ -1012,6 +1012,10 @@ test('Set Detail reuses context/title/close header and places destructive action
   assert.equal(header.querySelector('.eyebrow').textContent, 'Stamps & Dies');
   assert.equal(header.querySelector('h3').textContent, 'Original');
   assert.equal(header.querySelectorAll('button').length, 1);
+  const titleRow = header.querySelector('.card-title-row');
+  assert.equal(titleRow.children[0], header.querySelector('h3'));
+  assert.equal(titleRow.children[1].className, 'stamp-set-favorite');
+  assert.equal(detail.querySelector('.detail-metadata').querySelector('.stamp-set-favorite'), null);
   const close = header.querySelector('button');
   assert.equal(close.className, 'card-detail-close');
   assert.equal(close.textContent, '\u00d7');
@@ -1024,7 +1028,7 @@ test('Set Detail reuses context/title/close header and places destructive action
   assert.deepEqual(metadata.querySelectorAll('h4').map((heading) => heading.textContent), ['Set Info', 'Tags', 'Actions']);
   const facts = metadata.querySelector('dl');
   assert.equal(facts.className, 'detail-meta-list');
-  assert.deepEqual(facts.querySelectorAll('dt').map((term) => term.textContent), ['Owner', 'Release Year', 'Favorite']);
+  assert.deepEqual(facts.querySelectorAll('dt').map((term) => term.textContent), ['Owner', 'Release Year']);
   assert.equal(facts.querySelectorAll('dd')[0].textContent, 'Nina');
   assert.equal(facts.querySelectorAll('dd')[1].textContent, '2022');
   assert.equal(metadata.querySelector('.card-detail-chips').textContent, 'Floral');
@@ -1054,4 +1058,18 @@ for (const favorite of [false, true]) test(`Detail Favorite heart is read-only w
   assert.equal(detail.querySelector('.card-detail-empty').textContent, 'No tags');
   await heart.emit('click');
   assert.deepEqual(h.records, before); assert.equal(h.calls(), 0);
+});
+
+
+test('Set Library tiles place the name and heart together above the image gallery like Paper', async (t) => {
+  const h = await harness(t);
+  await seedEdit(h); await h.cancel.emit('click');
+  const tile = h.gallery.querySelector('article');
+  assert.equal(tile.children[0].className, 'card-title-row');
+  assert.equal(tile.children[0].querySelector('h4').textContent, 'Original');
+  assert.ok(tile.children[0].querySelector('.stamp-set-favorite'));
+  assert.ok(tile.children[1].className.includes('stamp-set-images'));
+  assert.equal(tile.children[2].className, 'stamp-set-tile-content');
+  await tile.emit('click');
+  assert.equal(setDetail(h).querySelector('.card-title-row').querySelector('h3').textContent, 'Original');
 });

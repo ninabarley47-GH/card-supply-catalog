@@ -845,5 +845,5 @@
 .card-library-title-row .card-library-tags { padding: 0; }
 .stamp-set-detail .form-message:empty { display: none; }
 
-.stamp-set-tile-content .card-title-row { padding: 0; }
-.stamp-set-tile-content .card-title-row h3 { margin: 0; }
+.stamp-set-tile > .card-title-row { padding-bottom: var(--space-4); }
+.stamp-set-detail-title-row { padding: 0; align-items: center; }

@@ -342,13 +342,14 @@ Tag Filtering rules for selection cleanup after actual usage/membership changes.
 ## Detail presentation consistency
 
 Set Detail follows the Paper/Card header convention: Stamps & Dies context label,
-Set Name, and an accessible close (x) control. The content places the existing
+Set Name with the read-only Favorite heart alongside it, and an accessible close (x) control. The content places the existing
 large, uncropped Stamp -> Die -> Mask gallery beside a compact metadata column.
 At tablet/narrow widths the metadata stacks below the gallery. Existing image
 resolution, responsive gallery sizing, and fallback behavior are retained.
 
-Set Info uses Paper's label/value blocks for Owner, Release Year, and a read-only
-Favorite heart using the existing muted/rose styling. Tags use Card Detail chips,
+Set Info uses Paper's label/value blocks for Owner and Release Year. The Favorite
+heart beside the title uses the existing muted/rose styling. Library tiles likewise
+place the Set Name and heart together above the image gallery, matching Paper. Tags use Card Detail chips,
 with a compact No tags state. An Actions section in the metadata column contains
 Edit Set (primary) and Delete Set (destructive), with delete errors beside the
 actions. Closing restores Library focus; Edit/Delete behavior and filter state
