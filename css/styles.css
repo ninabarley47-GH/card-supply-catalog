@@ -2262,6 +2262,27 @@ button.pattern {
   color: var(--color-muted);
 }
 
+.image-library-groups {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.image-library-buttons {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  max-width: 42rem;
+}
+
+.image-library-buttons .button {
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
+}
+
+.image-library-group .settings-message {
+  margin-top: var(--space-2);
+}
+
 .device-default-field { max-width: 24rem; margin-bottom: 0; }
 .owner-settings-list { display: grid; gap: var(--space-2); max-width: 32rem; margin-top: var(--space-4); }
 .owner-settings-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--space-2); align-items: center; }
