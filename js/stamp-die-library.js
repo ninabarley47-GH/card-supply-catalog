@@ -590,15 +590,15 @@ export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetai
     }
     const placeholder = createSetImageGrid(record.imageRefs);
     const content = document.createElement('div');
-    content.className = 'stamp-set-tile-content';
+    content.className = 'card-body stamp-set-tile-content';
     const name = document.createElement('h4');
     name.textContent = record.name;
     const release = document.createElement('p');
     release.textContent = record.releaseYear === undefined
       ? 'Release year not recorded'
-      : `Release year: ${record.releaseYear}`;
+      : String(record.releaseYear);
     release.textContent = `${getSetOwnerName(record, owners)} \u00b7 ${release.textContent}`;
-    content.append(release);
+    release.className = 'card-meta';
     const favorite = createSetFavoriteButton(record, onFavorite);
     const titleRow = document.createElement('div');
     titleRow.className = 'card-title-row';
@@ -607,7 +607,7 @@ export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetai
     const names = projectTagNames(catalog, record.tagIds, 'stamp');
     if (names.length) {
       const tags = document.createElement('ul');
-      tags.className = 'card-library-tags';
+      tags.className = 'keyword-list';
       tags.setAttribute('aria-label', 'Tags');
       for (const text of names) {
         const tag = document.createElement('li');
@@ -616,16 +616,17 @@ export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetai
       }
       content.append(tags);
     }
+    content.append(release);
+    tile.append(titleRow, placeholder, content);
     if (onEdit) {
       const edit = document.createElement('button');
       edit.type = 'button';
-      edit.className = 'button';
+      edit.className = 'card-edit-button';
       edit.textContent = 'Edit';
       edit.setAttribute('aria-label', `Edit ${record.name}`);
       edit.addEventListener('click', () => onEdit(record.id));
-      content.append(edit);
+      tile.append(edit);
     }
-    tile.append(titleRow, placeholder, content);
     return tile;
   });
   if (!tiles.length) {

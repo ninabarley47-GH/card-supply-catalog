@@ -183,7 +183,7 @@ test('save persists Favorite and universal stable tag IDs, then renders a no-ima
   assert.deepEqual(record, { schemaVersion: CATALOG_SCHEMA_VERSION, id: record.id, ownerId: 'owner-nina', name: 'Garden', dateCreated: getLocalDateValue(), releaseYear: 2024, favorite: true, tagIds: ['stable-paper', 'stable-card'], imageRefs: [] });
   assert.equal(h.dialog.open, false);
   assert.equal(saves, 1);
-  assert.match(h.gallery.textContent, /Garden.*No image.*2024.*Floral.*Birthday/);
+  assert.match(h.gallery.textContent, /Garden.*No image.*Floral.*Birthday.*2024/);
   assert.equal(h.gallery.querySelector('img'), null);
   h.renameTag();
   await h.document.emit('catalog:global-tags-updated');
@@ -1069,7 +1069,7 @@ test('Set Library tiles place the name and heart together above the image galler
   assert.equal(tile.children[0].querySelector('h4').textContent, 'Original');
   assert.ok(tile.children[0].querySelector('.stamp-set-favorite'));
   assert.ok(tile.children[1].className.includes('stamp-set-images'));
-  assert.equal(tile.children[2].className, 'stamp-set-tile-content');
+  assert.equal(tile.children[2].className, 'card-body stamp-set-tile-content');
   await tile.emit('click');
   assert.equal(setDetail(h).querySelector('.card-title-row').querySelector('h3').textContent, 'Original');
 });
@@ -1137,4 +1137,21 @@ test('removing Favorite re-applies filters and restores usable focus in Library 
   assert.match(h.gallery.textContent, /No sets match/);
   assert.equal(setDetail(h).open, true);
   assert.equal(h.document.activeElement, setDetail(h).querySelector('.stamp-set-favorite'));
+});
+
+
+test('Set tile metadata follows Paper placement: tag chips, owner/year, and bottom-right Edit', async (t) => {
+  const h = await harness(t);
+  await seedEdit(h, { ownerId: 'owner-nina' }); await h.cancel.emit('click');
+  const tile = h.gallery.querySelector('article');
+  const body = tile.querySelector('.card-body');
+  assert.equal(body.children[0].className, 'keyword-list');
+  assert.equal(body.children[0].textContent, 'Floral');
+  assert.equal(body.children[1].className, 'card-meta');
+  assert.equal(body.children[1].textContent, 'Nina \u00b7 2022');
+  assert.equal(tile.children.at(-1).className, 'card-edit-button');
+  assert.equal(tile.children.at(-1).textContent, 'Edit');
+  assert.equal(body.querySelector('.pack-color-list'), null);
+  await tile.children.at(-1).emit('click');
+  assert.equal(h.name.value, 'Original');
 });

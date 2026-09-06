@@ -789,6 +789,7 @@
 .stamp-set-fields > p:empty { display: none; }
 
 .stamp-set-tile {
+  position: relative;
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-medium);
@@ -805,12 +806,7 @@
   color: var(--color-muted);
 }
 
-.stamp-set-tile-content {
-  display: grid;
-  gap: var(--space-3);
-  padding: var(--space-4);
-}
-.stamp-set-tile-content .card-library-tags { padding: 0; }
+.stamp-set-tile-content { padding-bottom: calc(var(--space-6) + 2rem); }
 
 .stamp-set-image-controls { display: grid; gap: var(--space-3); }
 .stamp-set-draft-images {

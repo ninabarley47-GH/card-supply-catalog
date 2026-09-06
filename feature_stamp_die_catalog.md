@@ -370,3 +370,10 @@ filters, and restores focus to the heart (or Add Set if its tile no longer match
 Failed saves keep the previous value and enable retry with an error alert. The
 existing Set save path preserves all other metadata and image references; toggling
 does not prepare, hydrate, copy, or delete image files. No schema change is needed.
+
+
+Library metadata beneath Set images follows Paper tile placement: shared tag chips
+first, then muted Owner and Release Year text separated by a middle dot, and the
+shared Edit button at the bottom right. Color swatches and Paper availability are
+omitted because those fields do not apply to Sets. Metadata reserves space above
+the action so wrapped text cannot overlap Edit.
