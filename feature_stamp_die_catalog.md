@@ -329,3 +329,11 @@ Focused tests cover searchable fields/normalization, identity and rename behavio
 inactive owners, all tag/category semantics, favorites/years, combined constraints,
 reset, empty states, filtered Detail/Edit/Delete/Add, and read-only filtering.
 Existing Paper/Card and global filter regression tests remain in the full suite.
+
+
+Stamps & Dies participates in the shared usage-based global filter presentation:
+choices come from the complete unfiltered Set Library, categorized tags appear only
+under relevant categories, and unused children/empty categories are hidden. Search
+and active filters do not shrink these choices. Add/Edit remains universal; matching
+semantics and canonical assignments are unchanged. See DESIGN.md's Category-Aware
+Tag Filtering rules for selection cleanup after actual usage/membership changes.

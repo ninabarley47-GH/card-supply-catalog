@@ -838,7 +838,7 @@ test('Set sidebar combines filters, clears tags independently, resets all, and n
   c.owner.value = 'owner-nina'; await c.owner.emit('change');
   c.year.value = '2022'; await c.year.emit('change');
   await c.favorites.emit('click');
-  const floral = c.tagFilters.querySelector('input[name="set-library-tags"][data-global-tag-id="stable-paper"]');
+  const floral = c.tagFilters.querySelector('input[data-filter-category-member="nature"][data-global-tag-id="stable-paper"]');
   floral.checked = true; await c.tagFilters.emit('change', { target: floral });
   assert.equal(h.gallery.querySelectorAll('article').length, 1);
   assert.equal(h.gallery.querySelector('article').dataset.setId, 'set-existing');
@@ -974,4 +974,30 @@ test('Edit can stop matching without clearing filters or losing the open Detail 
   assert.equal(h.document.activeElement, h.add);
   await h.filterControls.clear.emit('click');
   assert.equal(h.gallery.querySelector('article').dataset.setId, 'set-existing');
+});
+
+test('Set filter options stay stable under search and selections, then clear after last usage is removed', async (t) => {
+  const h = await harness(t);
+  await seedEdit(h); await h.cancel.emit('click');
+  h.records.push(createStampDieSetRecord({ id: 'other', name: 'Other', dateCreated: '2020-01-01', releaseYear: 2026, favorite: false, tagIds: ['stable-card'] }, initialCatalog()));
+  await h.document.emit('catalog:global-tags-updated');
+  const c = h.filterControls;
+  const options = c.tagFilters.querySelector('[data-global-tag-filter-options]');
+  assert.equal(c.tagFilters.querySelector('input[name="set-library-tags"][data-global-tag-id="stable-paper"]'), null);
+  c.search.value = 'Original'; await c.search.emit('input');
+  assert.equal(c.tagFilters.querySelector('[data-global-tag-filter-options]'), options);
+  const birthday = c.tagFilters.querySelector('input[name="set-library-tags"][data-global-tag-id="stable-card"]');
+  birthday.checked = true; await c.tagFilters.emit('change', { target: birthday });
+  assert.match(h.gallery.textContent, /No sets match/);
+  assert.equal(c.tagFilters.querySelector('[data-global-tag-filter-options]'), options);
+  assert.ok(c.tagFilters.querySelector('input[data-filter-category-id="nature"]'));
+  h.records.splice(h.records.findIndex((record) => record.id === 'other'), 1);
+  await h.document.emit('catalog:global-tags-updated');
+  assert.equal(c.tagFilters.querySelector('input[data-global-tag-id="stable-card"]'), null);
+  assert.equal(c.clearTags.hidden, true);
+  assert.equal(c.search.value, 'Original');
+  assert.match(h.gallery.textContent, /Original/);
+  assert.equal(h.calls(), 0);
+  await h.add.emit('click');
+  assert.ok(h.form.querySelector('[data-tag-id="stable-card"]'));
 });

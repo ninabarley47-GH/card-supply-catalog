@@ -86,8 +86,8 @@ export function initializeStampDieFilters(owners, onChange) {
   return {
     read,
     refreshOwners() { refreshOwnerFilter(owner, owners); updateControls(); },
-    refreshCatalog(catalog) {
-      renderGlobalTagFilter(tags, catalog, { inputPrefix: 'set-library', optionsDataAttribute: 'setTagFilterOptions' });
+    refreshCatalog(catalog, items) {
+      renderGlobalTagFilter(tags, catalog, { inputPrefix: 'set-library', optionsDataAttribute: 'setTagFilterOptions', items });
       updateControls();
     },
     refreshYears(records) {

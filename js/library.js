@@ -560,6 +560,7 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById, owner
   let tagCatalog = initialTagCatalog;
 
   function renderCurrent() {
+    renderGlobalTagFilter(tagFilter, tagCatalog, { inputPrefix: "library", optionsDataAttribute: "libraryFilterOptions", items: paperPacks });
     const filterState = getLibraryFilterState(
       input,
       tagFilter,
@@ -606,7 +607,7 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById, owner
     };
   }
 
-  renderGlobalTagFilter(tagFilter, tagCatalog, { inputPrefix: "library", optionsDataAttribute: "libraryFilterOptions" });
+  renderGlobalTagFilter(tagFilter, tagCatalog, { inputPrefix: "library", optionsDataAttribute: "libraryFilterOptions", items: paperPacks });
   refreshLibraryColorFilters(colorFilter, getAvailableColors(paperPacks, colorsById));
   refreshOwnerFilter(ownerFilter, owners);
   initializeLibraryColorTypeahead(colorFilter, renderCurrent);
@@ -652,7 +653,6 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById, owner
   });
   document.addEventListener("catalog:global-tags-updated", async () => {
     tagCatalog = await loadGlobalTagCatalog();
-    renderGlobalTagFilter(tagFilter, tagCatalog, { inputPrefix: "library", optionsDataAttribute: "libraryFilterOptions" });
     renderCurrent();
   });
   form.addEventListener("submit", (event) => event.preventDefault());

@@ -12,6 +12,20 @@ export function createGlobalTagFilterModel(catalog) {
   return { tags, categories };
 }
 
+// Presentation is usage-based; matching still uses the complete canonical catalog.
+export function getRelevantTagFilterOptions(items, catalog) {
+  const usedIds = new Set(items.flatMap((item) => item.tagIds || []));
+  const model = createGlobalTagFilterModel(catalog);
+  return {
+    tags: model.tags.filter((tag) => usedIds.has(tag.id) && tag.categoryIds.length === 0),
+    categories: model.categories.map((category) => ({
+      ...category, tags: category.tags.filter((tag) => usedIds.has(tag.id))
+    })).filter((category) => category.tags.length > 0)
+  };
+}
+
+const renderedFilterModels = new WeakMap();
+
 export function matchesGlobalTagFilters(itemTagIds = [], filters = {}, catalog) {
   assertCatalog(catalog);
   const assigned = new Set(itemTagIds || []);
@@ -57,19 +71,23 @@ export function matchesHolidayFilter(itemTagIds = [], mode = '', identity = {}, 
   return mode === 'exclude' ? !hasHoliday : hasHoliday;
 }
 
-export function renderGlobalTagFilter(container, catalog, { inputPrefix, optionsDataAttribute }) {
+export function renderGlobalTagFilter(container, catalog, { inputPrefix, optionsDataAttribute, items = [] }) {
   if (!container) return;
-  const previous = readGlobalTagFilter(container);
+  const model = getRelevantTagFilterOptions(items, catalog);
+  const signature = JSON.stringify([inputPrefix, optionsDataAttribute, model]);
   const existing = container.querySelector('[data-global-tag-filter-options]');
+  if (existing && renderedFilterModels.get(container) === signature) return;
+  const previous = readGlobalTagFilter(container);
+  const expandedIds = new Set([...container.querySelectorAll('details[data-filter-category]')]
+    .filter((details) => details.open).map((details) => details.dataset.filterCategory));
   const hidden = existing?.hidden || false;
-  const model = createGlobalTagFilterModel(catalog);
   const options = document.createElement('div');
   options.className = 'global-library-tag-filter';
   options.dataset.globalTagFilterOptions = '';
   options.dataset[optionsDataAttribute] = '';
   options.hidden = hidden;
 
-  options.append(createHeading('All Tags'));
+  if (model.tags.length) options.append(createHeading('Tags'));
   const tags = document.createElement('div');
   tags.className = 'keyword-picker-options library-tag-filter-options';
   tags.append(...model.tags.map((tag) => createOption(tag, `${inputPrefix}-tags`, previous.individualTagIds.includes(tag.id))));
@@ -77,9 +95,16 @@ export function renderGlobalTagFilter(container, catalog, { inputPrefix, options
 
   if (model.categories.length) options.append(createHeading('Categories'));
   for (const category of model.categories) {
-    const selection = previous.categories.find((entry) => entry.categoryId === category.id);
+    const previousSelection = previous.categories.find((entry) => entry.categoryId === category.id);
+    const memberIds = new Set(category.tags.map((tag) => tag.id));
+    const remainingMembers = previousSelection?.memberTagIds.filter((id) => memberIds.has(id)) || [];
+    // Losing the final refinement clears this constraint; it must not broaden to Any.
+    const selection = previousSelection && (!previousSelection.memberTagIds.length || remainingMembers.length)
+      ? { ...previousSelection, memberTagIds: remainingMembers } : null;
     const details = document.createElement('details');
     details.className = 'library-tag-category';
+    details.dataset.filterCategory = category.id;
+    details.open = expandedIds.has(category.id);
     const summary = document.createElement('summary');
     summary.textContent = `${category.name} (${category.tags.length})`;
     const members = document.createElement('div');
@@ -101,6 +126,7 @@ export function renderGlobalTagFilter(container, catalog, { inputPrefix, options
   }
   existing?.remove();
   container.append(options);
+  renderedFilterModels.set(container, signature);
 }
 
 export function readGlobalTagFilter(container) {

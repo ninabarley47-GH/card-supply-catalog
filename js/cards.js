@@ -70,6 +70,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   }
 
   const renderCurrent = () => {
+    renderGlobalTagFilter(tagFilter, tagCatalog, { inputPrefix: 'card-library', optionsDataAttribute: 'cardTagFilterOptions', items: cards });
     const selectedTags = readGlobalTagFilter(tagFilter);
     const favoritesOnly = favoritesButton?.getAttribute('aria-pressed') === 'true';
     const hasActiveFilters = Boolean(
@@ -110,7 +111,6 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     await hydrateCardImageSources(savedCards);
     sortCards(savedCards);
     cards.splice(0, cards.length, ...savedCards);
-    renderGlobalTagFilter(tagFilter, tagCatalog, { inputPrefix: 'card-library', optionsDataAttribute: 'cardTagFilterOptions' });
     renderCurrent();
   };
 

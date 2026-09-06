@@ -143,6 +143,7 @@ export async function initializeStampDieLibrary(services = {}) {
 
   function renderCurrent() {
     if (!libraryCatalog) return;
+    filters.refreshCatalog(libraryCatalog, displayedRecords);
     const visible = filterStampDieSets(displayedRecords, filters.read(), libraryCatalog, owners);
     renderStampDieLibrary(gallery, visible, libraryCatalog, (id) => openForm(id), openDetail, owners, displayedRecords.length);
     status.dataset.tone = '';
@@ -182,7 +183,6 @@ export async function initializeStampDieLibrary(services = {}) {
       displayedRecords = records;
       if (!view.dialog.open) catalog = nextCatalog;
       libraryCatalog = nextCatalog;
-      filters.refreshCatalog(libraryCatalog);
       filters.refreshYears(records);
       renderCurrent();
       if (selectedSetId) renderDetail(records, nextCatalog);

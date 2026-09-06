@@ -78,7 +78,7 @@ Every module should have one clear job. The current modules are:
 | `ui.js` | Shared UI helpers |
 | `search.js` | Reserved boundary for future extraction of search/filter logic; current filtering remains in `library.js` |
 | `tag-picker.js` | Reusable ID-based global tag selection for product Add/Edit forms, including categories, selected-tag summaries, and picker-local search |
-| `global-tag-filter.js` | Shared stable-ID tag/category filter semantics, filter UI rendering, tag-name search projection, and Holiday identity resolution for Paper and Card Libraries |
+| `global-tag-filter.js` | Shared stable-ID tag/category filter semantics, usage-based filter UI rendering for Paper/Card/Set Libraries, tag-name search projection, and Holiday identity resolution |
 
 # Data Storage
 The application has three storage layers:
@@ -153,7 +153,18 @@ Paper and Card Add/Edit forms select global tags by stable ID through the shared
 
 Every global tag is assignable to Paper Packs, Cards, and Stamp Sets. Assignment validation checks that each `tagId` identifies a real tag and never a category; it does not filter by product type. The legacy `appliesTo` field is optional, deprecated compatibility metadata. Existing catalogs and backups may retain and round-trip it, but current selection, search, validation, legacy fallback resolution, and runtime projections ignore it. Newly created tags omit it without changing the catalog or backup schema version.
 
-Paper and Card Library tag filters consume canonical item `tagIds`. Individual tag constraints use AND semantics. Each category constraint resolves its current member IDs from the global catalog and uses OR semantics; selected category members replace the full membership set as a refinement. Independent tag and category constraints combine with AND semantics. General Library search resolves assigned tag IDs to current display names, so renaming a tag changes searchable text without changing persisted assignments. Category names are not general-search terms. The retained Holiday quick filter resolves the current Holiday tag (or a Holiday/Holidays category fallback) to stable identity before evaluating item IDs.
+Paper, Card, and Stamp & Die Library tag filters consume canonical item `tagIds`. Individual tag constraints use AND semantics. Each category constraint resolves its current member IDs from the global catalog and uses OR semantics; selected category members replace the full membership set as a refinement. Independent tag and category constraints combine with AND semantics. General Library search resolves assigned tag IDs to current display names, so renaming a tag changes searchable text without changing persisted assignments. Category names are not general-search terms. The retained Holiday quick filter resolves the current Holiday tag (or a Holiday/Holidays category fallback) to stable identity before evaluating item IDs.
+
+`getRelevantTagFilterOptions(items, catalog)` derives filter presentation from the
+complete product Library's canonical `tagIds`. It exposes only used uncategorized
+tags standalone and used categorized tags through their categories, hiding unused
+children and empty categories. Multiple-category membership remains intact.
+Search/current filter results never determine relevance. The shared renderer keeps
+unchanged controls in place and reconciles selections when options actually change;
+removed controls cannot leave hidden constraints. Matching still uses the complete
+global catalog and existing AND/OR semantics. Add/Edit pickers and Settings remain
+universal. This is runtime UI data only; no record, taxonomy, or schema changes.
+
 
 The old product-specific vocabulary stores, vocabulary loaders/writers, inline name-to-tag creation bridge, and Paper/Card-specific tag update events have been removed. The legacy `paperTagVocabulary` and `cardTagVocabulary` setting IDs are still read during the idempotent one-time migration and may be written only while restoring an older backup; they are not current taxonomy stores. Legacy Paper `keywords` and Card `tags` are likewise accepted only by migration/import compatibility paths. A side-effect-free legacy-vocabulary merge export remains as an upgrade shim because an older service-worker-cached `storage.js` may briefly import it while the browser replaces the module graph; current runtime code does not call it.
 

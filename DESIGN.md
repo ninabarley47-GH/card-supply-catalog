@@ -134,7 +134,21 @@ Paper and Card Add/Edit forms use one shared global tag picker, with the same be
 
 # Category-Aware Tag Filtering
 
-Paper and Card Libraries share the same global-tag filter semantics. All Tags provides individual tag choices; multiple individual tags use AND behavior. Categories are compact, expandable filter groups. Selecting a category matches any of its member tags, while selecting members within that category narrows it using OR behavior. Separate categories and individual tags combine with AND behavior. Categories remain organizational and are never assigned to items. Library search matches tag display names by resolving each item's stable `tagIds` through the current global catalog; category names are not part of general search.
+Paper, Card, and Stamps & Dies Libraries share the same global-tag filter semantics. Standalone Tags provides uncategorized individual tag choices; multiple individual tags use AND behavior. Categories are compact, expandable filter groups. Selecting a category matches any of its member tags, while selecting members within that category narrows it using OR behavior. Separate categories and individual tags combine with AND behavior. Categories remain organizational and are never assigned to items. Library search matches tag display names by resolving each item's stable `tagIds` through the current global catalog; category names are not part of general search.
+
+Library filter choices are product-specific and usage-based: derive relevant IDs from
+the complete unfiltered Library, never from search results or the current matching
+subset. Used uncategorized tags appear standalone. Categorized tags appear only
+inside their categories, including each applicable category when membership is
+multiple. Hide unused children and categories with no used children. Add/Edit and
+Settings retain the universal global catalog, including unused tags; deprecated
+`appliesTo` does not affect availability.
+
+Valid filter selections and expanded categories survive refreshes. When actual
+usage or category membership changes remove a selected control, clear that
+constraint instead of retaining a hidden filter or translating its semantics.
+If a category refinement loses all selected children, clear that category
+constraint rather than broadening it to every remaining child.
 
 # Global Tag Data Rules
 
