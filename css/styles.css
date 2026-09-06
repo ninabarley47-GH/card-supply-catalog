@@ -2051,13 +2051,16 @@ button.pattern {
 .paper-pack-favorite:hover,
 .paper-pack-favorite:focus-visible,
 .card-library-favorite:hover,
-.card-library-favorite:focus-visible {
+.card-library-favorite:focus-visible,
+.stamp-set-favorite:hover,
+.stamp-set-favorite:focus-visible {
   color: #9b5364;
   transform: scale(1.08);
 }
 
 .paper-pack-favorite:disabled,
-.card-library-favorite:disabled {
+.card-library-favorite:disabled,
+.stamp-set-favorite:disabled {
   cursor: wait;
   opacity: 0.7;
 }
@@ -2933,5 +2936,3 @@ button.pattern {
     grid-template-columns: 1fr;
   }
 }
-
-.stamp-set-favorite { cursor: default; }

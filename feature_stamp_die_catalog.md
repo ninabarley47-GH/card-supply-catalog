@@ -213,7 +213,7 @@ control, Escape, or clicking the backdrop closes Detail and returns focus to
 the Library tile. The application hash and shell are unchanged; no history stack
 was added.
 
-Detail displays Set Name, Release Year (or unknown), read-only Favorite state,
+Detail displays Set Name, Release Year (or unknown), directly editable Favorite state,
 ordinary global tag names resolved from canonical tagIds, and every image. Tags
 are not editable in Detail; categories remain organizational metadata.
 
@@ -248,8 +248,8 @@ and allows retry. No schema or database version change is required.
 
 Cards and Sets now show the same initial loading-message style as Paper Packs.
 Library Favorites share Paper's inline heart styling (muted off, rose on); Card's
-existing toggle remains, while Set's heart is read-only and Favorite is edited via
-Edit. Card and Set grid items stretch to their row's tallest module, with native
+existing toggle remains. Set hearts now toggle Favorite directly in Library and
+Detail, as described below. Card and Set grid items stretch to their row's tallest module, with native
 auto-sized rows and existing responsive column widths.
 
 ## Verification
@@ -342,7 +342,7 @@ Tag Filtering rules for selection cleanup after actual usage/membership changes.
 ## Detail presentation consistency
 
 Set Detail follows the Paper/Card header convention: Stamps & Dies context label,
-Set Name with the read-only Favorite heart alongside it, and an accessible close (x) control. The content places the existing
+Set Name with the clickable Favorite heart alongside it, and an accessible close (x) control. The content places the existing
 large, uncropped Stamp -> Die -> Mask gallery beside a compact metadata column.
 At tablet/narrow widths the metadata stacks below the gallery. Existing image
 resolution, responsive gallery sizing, and fallback behavior are retained.
@@ -354,3 +354,19 @@ with a compact No tags state. An Actions section in the metadata column contains
 Edit Set (primary) and Delete Set (destructive), with delete errors beside the
 actions. Closing restores Library focus; Edit/Delete behavior and filter state
 are unchanged. No record fields, persistence, or shared visual rules were added.
+
+
+### Direct Favorite toggles
+
+Library and Detail hearts are buttons that toggle the existing `favorite` field
+without opening Edit, following Paper's save-first interaction. They use the shared
+muted/rose, hover, focus, and disabled styling, native keyboard activation, and
+`aria-pressed` plus Add/Remove from favorites labels. Clicking the Library heart
+does not open Detail.
+
+While a save is pending, repeated toggles and competing Edit/Delete actions are
+blocked. A successful save updates Library and open Detail, reapplies active
+filters, and restores focus to the heart (or Add Set if its tile no longer matches).
+Failed saves keep the previous value and enable retry with an error alert. The
+existing Set save path preserves all other metadata and image references; toggling
+does not prepare, hydrate, copy, or delete image files. No schema change is needed.

@@ -63,13 +63,8 @@ export async function initializeStampDieLibrary(services = {}) {
     const info = createSetDetailSection('Set Info');
     const facts = document.createElement('dl');
     facts.className = 'detail-meta-list';
-    const favorite = document.createElement('span');
-    favorite.className = 'stamp-set-favorite';
-    favorite.dataset.favorite = String(record.favorite);
-    favorite.textContent = '\u2665';
-    favorite.setAttribute('role', 'img');
-    favorite.setAttribute('aria-label', record.favorite ? 'Favorite' : 'Not a favorite');
-    favorite.title = record.favorite ? 'Favorite' : 'Not a favorite';
+    const favorite = createSetFavoriteButton(record, toggleFavorite);
+    favorite.disabled = savingFavorite || deleting;
     facts.append(
       createSetDetailFact('Owner', getSetOwnerName(record, owners)),
       createSetDetailFact('Release Year', record.releaseYear === undefined ? 'Not recorded' : String(record.releaseYear))
@@ -107,12 +102,14 @@ export async function initializeStampDieLibrary(services = {}) {
     detail.close.focus();
   }
   let deleting = false;
+  let savingFavorite = false;
   detail.remove.addEventListener('click', async () => {
-    if (deleting || !selectedSetId) return;
+    if (deleting || savingFavorite || !selectedSetId) return;
     const id = selectedSetId;
     const record = displayedRecords.find((entry) => entry.id === id);
     if (!window.confirm(`Remove "${record?.name || 'this Stamp & Die Set'}" from CSC? Image files will not be deleted.`)) return;
     deleting = true;
+    setFavoriteButtonsDisabled(true);
     detail.remove.disabled = detail.edit.disabled = detail.close.disabled = true;
     detail.message.textContent = '';
     try {
@@ -122,6 +119,7 @@ export async function initializeStampDieLibrary(services = {}) {
       return;
     } finally {
       deleting = false;
+      setFavoriteButtonsDisabled(false);
       detail.remove.disabled = detail.edit.disabled = detail.close.disabled = false;
     }
     const removed = displayedRecords.filter((entry) => entry.id === id);
@@ -166,9 +164,45 @@ export async function initializeStampDieLibrary(services = {}) {
     if (!libraryCatalog) return;
     filters.refreshCatalog(libraryCatalog, displayedRecords);
     const visible = filterStampDieSets(displayedRecords, filters.read(), libraryCatalog, owners);
-    renderStampDieLibrary(gallery, visible, libraryCatalog, (id) => openForm(id), openDetail, owners, displayedRecords.length);
+    renderStampDieLibrary(gallery, visible, libraryCatalog, (id) => openForm(id), openDetail, owners, displayedRecords.length, toggleFavorite);
+    setFavoriteButtonsDisabled(savingFavorite || deleting);
     status.dataset.tone = '';
     status.textContent = `Showing ${visible.length} of ${displayedRecords.length} sets`;
+  }
+
+  function setFavoriteButtonsDisabled(disabled) {
+    for (const container of [gallery, detail.dialog]) {
+      for (const button of container.querySelectorAll('[data-toggle-set-favorite]')) button.disabled = disabled;
+    }
+  }
+
+  async function toggleFavorite(id, button) {
+    if (savingFavorite || deleting || saving || view.dialog.open) return;
+    const record = displayedRecords.find((entry) => entry.id === id);
+    if (!record) return;
+    const updated = { ...record, favorite: !record.favorite };
+    const fromDetail = Boolean(button.closest('.stamp-set-detail'));
+    savingFavorite = true;
+    setFavoriteButtonsDisabled(true);
+    detail.edit.disabled = detail.remove.disabled = true;
+    try {
+      await storage.saveStampDieSet(updated);
+      const index = displayedRecords.findIndex((entry) => entry.id === id);
+      displayedRecords.splice(index, 1, updated);
+      renderCurrent();
+      if (selectedSetId) renderDetail(displayedRecords, libraryCatalog);
+      document.dispatchEvent(new CustomEvent('catalog:stamp-die-set-saved'));
+    } catch {
+      window.alert('The set favorite status could not be saved.');
+    } finally {
+      savingFavorite = false;
+      setFavoriteButtonsDisabled(false);
+      detail.edit.disabled = detail.remove.disabled = false;
+      const container = fromDetail && detail.dialog.open ? detail.dialog : gallery;
+      const current = [...container.querySelectorAll('[data-toggle-set-favorite]')]
+        .find((entry) => entry.dataset.toggleSetFavorite === id);
+      (current || (detail.dialog.open ? detail.close : add)).focus();
+    }
   }
 
   function reset() {
@@ -214,7 +248,7 @@ export async function initializeStampDieLibrary(services = {}) {
   }
 
   async function openForm(id = null) {
-    if (view.dialog.open || add.disabled) return;
+    if (view.dialog.open || add.disabled || savingFavorite || deleting) return;
     add.disabled = true;
     try {
       catalog = await storage.loadGlobalTagCatalog();
@@ -535,7 +569,7 @@ function createField(text, ...inputs) {
   return label;
 }
 
-export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetail, owners = [], totalCount = records.length) {
+export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetail, owners = [], totalCount = records.length, onFavorite) {
   const tiles = records.map((record) => {
     const tile = document.createElement('article');
     tile.className = 'stamp-set-tile';
@@ -565,12 +599,7 @@ export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetai
       : `Release year: ${record.releaseYear}`;
     release.textContent = `${getSetOwnerName(record, owners)} \u00b7 ${release.textContent}`;
     content.append(release);
-    const favorite = document.createElement('span');
-    favorite.className = 'stamp-set-favorite';
-    favorite.dataset.favorite = String(Boolean(record.favorite));
-    favorite.textContent = '\u2665';
-    favorite.setAttribute('aria-label', record.favorite ? 'Favorite' : 'Not a favorite');
-    favorite.title = record.favorite ? 'Favorite' : 'Not a favorite';
+    const favorite = createSetFavoriteButton(record, onFavorite);
     const titleRow = document.createElement('div');
     titleRow.className = 'card-title-row';
     titleRow.append(name, favorite);
@@ -713,4 +742,18 @@ function createSetDetailFact(label, value) {
   else description.append(value);
   row.append(term, description);
   return row;
+}
+
+function createSetFavoriteButton(record, onToggle) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'stamp-set-favorite';
+  button.dataset.toggleSetFavorite = record.id;
+  button.dataset.favorite = String(Boolean(record.favorite));
+  button.textContent = '\u2665';
+  button.setAttribute('aria-pressed', String(Boolean(record.favorite)));
+  button.setAttribute('aria-label', record.favorite ? 'Remove set from favorites' : 'Add set to favorites');
+  button.title = record.favorite ? 'Remove from favorites' : 'Add to favorites';
+  button.addEventListener('click', () => onToggle?.(record.id, button));
+  return button;
 }

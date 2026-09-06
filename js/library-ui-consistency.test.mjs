@@ -28,14 +28,14 @@ test('module grids stretch per row without fixed/global row heights; Paper retai
   assert.doesNotMatch(css.match(/\.card-library-grid\s*\{([^}]*)}/)[1], /grid-auto-rows:|height:/);
 });
 
-test('Card and Set hearts share Paper styling while Card toggle and Set read-only behavior remain', async () => {
+test('Card and Set hearts share Paper styling and direct toggle controls', async () => {
   const [css, cards, sets] = await Promise.all([read('../css/styles.css'), read('./cards.js'), read('./stamp-die-library.js')]);
   assert.match(css, /\.paper-pack-favorite,\s*\.card-library-favorite,\s*\.stamp-set-favorite\s*\{/);
   assert.match(css, /\.stamp-set-favorite\[data-favorite="true"\]\s*\{\s*color: #9b5364/);
   assert.match(cards, /titleRow.append\(tagList, favorite\)/);
   assert.doesNotMatch(cards, /image.append\(favorite\)/);
   assert.match(cards, /favorite.dataset.toggleCardFavorite = card.id/);
-  assert.match(sets, /favorite.className = 'stamp-set-favorite'/);
+  assert.match(sets, /button.className = 'stamp-set-favorite'/);
 });
 
 test('Set deletion has a catalog-only transaction with no image helper or recursive deletion calls', async () => {

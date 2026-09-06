@@ -436,7 +436,7 @@ async function seedEdit(h, overrides = {}) {
     dateCreated: '2020-01-02', releaseYear: 2022, favorite: true,
     tagIds: ['stable-paper'], imageRefs: [], ...overrides }, initialCatalog()));
   await h.document.emit('catalog:global-tags-updated');
-  await h.gallery.querySelector('button').emit('click');
+  await h.gallery.querySelector('button[aria-label="Edit Original"]').emit('click');
 }
 
 const editReferences = () => [
@@ -511,7 +511,7 @@ for (const dismiss of ['cancel', 'escape']) {
     else { const event = await h.dialog.emit('cancel'); if (!event.defaultPrevented) await h.dialog.close(); }
     assert.deepEqual(h.records, before);
     assert.equal(prepared, 0);
-    await h.gallery.querySelector('button').emit('click');
+    await h.gallery.querySelector('button[aria-label="Edit Original"]').emit('click');
     assert.equal(h.name.value, 'Original');
     assert.deepEqual(h.form.querySelectorAll('img').map((image) => image.alt), ['Stamp.jpg', 'Dies.jpg']);
     assert.equal(h.form.querySelectorAll('[data-tag-id]').length, 2);
@@ -558,7 +558,7 @@ test('late image reads from canceled Edit cannot enter a reopened session for th
   input.files = [{ name: 'Late die.jpg' }];
   const selecting = input.emit('change');
   await h.cancel.emit('click');
-  await h.gallery.querySelector('button').emit('click');
+  await h.gallery.querySelector('button[aria-label="Edit Original"]').emit('click');
   release([{ name: 'Late die.jpg', previewSrc: 'data:image/jpeg;base64,YQ==' }]);
   await selecting;
   assert.equal(h.form.querySelectorAll('img').length, 0);
@@ -589,7 +589,7 @@ test('Library click and keyboard open correct Detail metadata and canonical tags
   assert.equal(detail.open, true);
   assert.match(detail.textContent, /Original.*No image.*2022.*Floral/);
   assert.equal(h.calls(), 0);
-  await detail.querySelector('button').emit('click');
+  await detail.querySelector('.card-detail-close').emit('click');
   assert.equal(detail.open, false);
   assert.equal(h.document.activeElement, tile);
   await tile.emit('keydown', { key: 'Enter' });
@@ -684,7 +684,7 @@ test('Edit from Detail reuses form, preserves ID, refreshes selected Set and ret
   assert.equal(detail.open, true);
   assert.match(detail.textContent, /Edited in Detail/);
   assert.doesNotMatch(detail.textContent, /Discard this/);
-  await detail.querySelector('button').emit('click');
+  await detail.querySelector('.card-detail-close').emit('click');
   assert.equal(h.document.activeElement, h.gallery.querySelector('article'));
 });
 
@@ -747,12 +747,12 @@ test('Set Favorite is an inline heart with Paper colors for either state and doe
   let heart = h.gallery.querySelector('.stamp-set-favorite');
   assert.equal(heart.dataset.favorite, 'true');
   assert.equal(heart.textContent, '\u2665');
-  assert.equal(heart.tagName, 'span');
+  assert.equal(heart.tagName, 'button');
   h.records[0].favorite = false;
   await h.document.emit('catalog:global-tags-updated');
   heart = h.gallery.querySelector('.stamp-set-favorite');
   assert.equal(heart.dataset.favorite, 'false');
-  assert.equal(heart.getAttribute('aria-label'), 'Not a favorite');
+  assert.equal(heart.getAttribute('aria-label'), 'Add set to favorites');
   assert.equal(h.calls(), 0);
 });
 
@@ -1011,12 +1011,12 @@ test('Set Detail reuses context/title/close header and places destructive action
   assert.equal(header.className, 'card-detail-header');
   assert.equal(header.querySelector('.eyebrow').textContent, 'Stamps & Dies');
   assert.equal(header.querySelector('h3').textContent, 'Original');
-  assert.equal(header.querySelectorAll('button').length, 1);
+  assert.equal(header.querySelectorAll('button').length, 2);
   const titleRow = header.querySelector('.card-title-row');
   assert.equal(titleRow.children[0], header.querySelector('h3'));
   assert.equal(titleRow.children[1].className, 'stamp-set-favorite');
   assert.equal(detail.querySelector('.detail-metadata').querySelector('.stamp-set-favorite'), null);
-  const close = header.querySelector('button');
+  const close = header.querySelector('.card-detail-close');
   assert.equal(close.className, 'card-detail-close');
   assert.equal(close.textContent, '\u00d7');
   assert.equal(close.getAttribute('aria-label'), 'Close set details');
@@ -1042,22 +1042,22 @@ test('Set Detail reuses context/title/close header and places destructive action
   assert.equal(detail.open, false); assert.equal(h.document.activeElement, tile);
 });
 
-for (const favorite of [false, true]) test(`Detail Favorite heart is read-only with state ${favorite}`, async (t) => {
+for (const favorite of [false, true]) test(`Detail Favorite heart toggles directly from state ${favorite}`, async (t) => {
   const h = await harness(t);
   await seedEdit(h, { favorite, tagIds: [] }); await h.cancel.emit('click');
   const before = structuredClone(h.records);
   await h.gallery.querySelector('article').emit('click');
   const detail = setDetail(h);
   const heart = detail.querySelector('.stamp-set-favorite');
-  assert.equal(heart.tagName, 'span');
+  assert.equal(heart.tagName, 'button');
   assert.equal(heart.dataset.favorite, String(favorite));
-  assert.equal(heart.getAttribute('role'), 'img');
-  assert.equal(heart.getAttribute('aria-label'), favorite ? 'Favorite' : 'Not a favorite');
+  assert.equal(heart.getAttribute('aria-pressed'), String(favorite));
+  assert.equal(heart.getAttribute('aria-label'), favorite ? 'Remove set from favorites' : 'Add set to favorites');
   assert.equal(heart.textContent, '\u2665');
   assert.doesNotMatch(detail.textContent, /Not a favorite/);
   assert.equal(detail.querySelector('.card-detail-empty').textContent, 'No tags');
   await heart.emit('click');
-  assert.deepEqual(h.records, before); assert.equal(h.calls(), 0);
+  assert.deepEqual(h.records, [{ ...before[0], favorite: !favorite }]); assert.equal(h.calls(), 1);
 });
 
 
@@ -1072,4 +1072,69 @@ test('Set Library tiles place the name and heart together above the image galler
   assert.equal(tile.children[2].className, 'stamp-set-tile-content');
   await tile.emit('click');
   assert.equal(setDetail(h).querySelector('.card-title-row').querySelector('h3').textContent, 'Original');
+});
+
+test('Library heart saves only Favorite, stays out of Detail, and does not prepare or hydrate images', async (t) => {
+  let hydrated = 0;
+  const h = await harness(t, {
+    hydrateStampImages: async () => { hydrated++; },
+    prepareStampImagesForSave: async () => { throw new Error('Unexpected image preparation'); }
+  });
+  await seedEdit(h, { ownerId: 'owner-nina', imageRefs: editReferences() }); await h.cancel.emit('click');
+  const before = structuredClone(h.records[0]); const reads = hydrated;
+  const tile = h.gallery.querySelector('article');
+  const heart = tile.querySelector('.stamp-set-favorite');
+  await heart.emit('click');
+  await tile.emit('click', { target: heart });
+  assert.equal(setDetail(h).open, undefined);
+  assert.deepEqual(h.records[0], { ...before, favorite: false });
+  assert.equal(hydrated, reads);
+  assert.equal(h.document.activeElement, h.gallery.querySelector('.stamp-set-favorite'));
+  assert.equal(h.document.activeElement.getAttribute('aria-pressed'), 'false');
+  await h.gallery.querySelector('article').emit('click');
+  assert.equal(setDetail(h).querySelector('.stamp-set-favorite').getAttribute('aria-pressed'), 'false');
+});
+
+test('pending Favorite save blocks repeated clicks and Edit/Delete; failure retains state for retry', async (t) => {
+  const h = await harness(t);
+  await seedEdit(h); await h.cancel.emit('click');
+  await h.gallery.querySelector('article').emit('click');
+  const detail = setDetail(h); const heart = detail.querySelector('.stamp-set-favorite');
+  let release; h.setGate(new Promise((resolve) => { release = resolve; })); h.setFailure(true);
+  let alert = ''; window.alert = (message) => { alert = message; };
+  const before = structuredClone(h.records);
+  const pending = heart.emit('click');
+  assert.equal(heart.disabled, true);
+  assert.equal(h.gallery.querySelector('.stamp-set-favorite').disabled, true);
+  await heart.emit('click');
+  await detail.querySelectorAll('button').find((button) => button.textContent === 'Edit Set').emit('click');
+  await detail.querySelectorAll('button').find((button) => button.textContent === 'Delete Set').emit('click');
+  assert.equal(h.dialog.open, false);
+  assert.equal(h.calls(), 1);
+  release(); await pending;
+  assert.deepEqual(h.records, before);
+  assert.equal(heart.disabled, false);
+  assert.match(alert, /favorite status could not be saved/);
+  h.setFailure(false); await heart.emit('click');
+  assert.equal(h.records[0].favorite, false);
+  assert.equal(detail.querySelector('.stamp-set-favorite').getAttribute('aria-pressed'), 'false');
+  assert.equal(h.gallery.querySelector('.stamp-set-favorite').getAttribute('aria-pressed'), 'false');
+});
+
+test('removing Favorite re-applies filters and restores usable focus in Library and Detail', async (t) => {
+  const h = await harness(t);
+  await seedEdit(h); await h.cancel.emit('click');
+  await h.filterControls.favorites.emit('click');
+  await h.gallery.querySelector('.stamp-set-favorite').emit('click');
+  assert.match(h.gallery.textContent, /No sets match/);
+  assert.equal(h.document.activeElement, h.add);
+  assert.equal(h.filterControls.favorites.getAttribute('aria-pressed'), 'true');
+  await h.filterControls.clear.emit('click');
+  await h.gallery.querySelector('.stamp-set-favorite').emit('click');
+  await h.filterControls.favorites.emit('click');
+  await h.gallery.querySelector('article').emit('click');
+  await setDetail(h).querySelector('.stamp-set-favorite').emit('click');
+  assert.match(h.gallery.textContent, /No sets match/);
+  assert.equal(setDetail(h).open, true);
+  assert.equal(h.document.activeElement, setDetail(h).querySelector('.stamp-set-favorite'));
 });
