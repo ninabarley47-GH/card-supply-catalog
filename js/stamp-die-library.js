@@ -59,23 +59,44 @@ export async function initializeStampDieLibrary(services = {}) {
     if (!record) { if (detail.dialog.open) detail.dialog.close(); return; }
     detail.title.textContent = record.name;
     const metadata = document.createElement('div');
-    metadata.className = 'stamp-set-tile-content';
-    const year = document.createElement('p');
-    year.textContent = record.releaseYear === undefined ? 'Release year not recorded' : `Release year: ${record.releaseYear}`;
-    const favorite = document.createElement('p');
-    favorite.textContent = record.favorite ? '\u2665 Favorite' : 'Not a favorite';
+    metadata.className = 'detail-metadata';
+    const info = createSetDetailSection('Set Info');
+    const facts = document.createElement('dl');
+    facts.className = 'detail-meta-list';
+    const favorite = document.createElement('span');
+    favorite.className = 'stamp-set-favorite';
+    favorite.dataset.favorite = String(record.favorite);
+    favorite.textContent = '\u2665';
+    favorite.setAttribute('role', 'img');
+    favorite.setAttribute('aria-label', record.favorite ? 'Favorite' : 'Not a favorite');
+    favorite.title = record.favorite ? 'Favorite' : 'Not a favorite';
+    facts.append(
+      createSetDetailFact('Owner', getSetOwnerName(record, owners)),
+      createSetDetailFact('Release Year', record.releaseYear === undefined ? 'Not recorded' : String(record.releaseYear)),
+      createSetDetailFact('Favorite', favorite)
+    );
+    info.append(facts);
+    const tagSection = createSetDetailSection('Tags');
     const tags = document.createElement('ul');
-    tags.className = 'card-library-tags';
+    tags.className = 'card-detail-chips';
     tags.setAttribute('aria-label', 'Tags');
     for (const name of projectTagNames(tagCatalog, record.tagIds, 'stamp')) {
       const tag = document.createElement('li');
       tag.textContent = name;
       tags.append(tag);
     }
-    const owner = document.createElement('p');
-    owner.textContent = `Owner: ${getSetOwnerName(record, owners)}`;
-    metadata.append(owner, year, favorite, tags);
-    detail.body.replaceChildren(createSetImageGrid(record.imageRefs, true), metadata);
+    if (tags.childElementCount) tagSection.append(tags);
+    else {
+      const empty = document.createElement('p');
+      empty.className = 'card-detail-empty';
+      empty.textContent = 'No tags';
+      tagSection.append(empty);
+    }
+    metadata.append(info, tagSection, detail.actions);
+    const content = document.createElement('div');
+    content.className = 'card-detail-content stamp-set-detail-content';
+    content.append(createSetImageGrid(record.imageRefs, true), metadata);
+    detail.body.replaceChildren(content);
   }
   function openDetail(id, source) {
     detail.message.textContent = '';
@@ -634,27 +655,59 @@ function createSetDetailView() {
   title.id = 'stamp-set-detail-title';
   const close = document.createElement('button');
   close.type = 'button';
-  close.className = 'button';
-  close.textContent = 'Back to Stamps & Dies';
+  close.className = 'card-detail-close';
+  close.setAttribute('aria-label', 'Close set details');
+  close.textContent = '\u00d7';
   const edit = document.createElement('button');
   edit.type = 'button';
   edit.className = 'button button-primary';
-  edit.textContent = 'Edit';
+  edit.textContent = 'Edit Set';
   const body = document.createElement('div');
-  body.className = 'stamp-set-detail-body';
+  body.className = 'card-detail-body stamp-set-detail-body';
   const remove = document.createElement('button');
   remove.type = 'button';
-  remove.className = 'button';
+  remove.className = 'button button-danger';
   remove.textContent = 'Delete Set';
   const message = document.createElement('p');
   message.className = 'form-message';
   message.dataset.tone = 'error';
   message.setAttribute('role', 'alert');
-  header.append(close, title, edit, remove);
-  dialog.append(header, body, message);
-  return { dialog, title, close, edit, remove, message, body };
+  const heading = document.createElement('div');
+  const context = document.createElement('p');
+  context.className = 'eyebrow';
+  context.textContent = 'Stamps & Dies';
+  heading.append(context, title);
+  header.append(heading, close);
+  const actions = createSetDetailSection('Actions');
+  actions.className += ' detail-actions';
+  const row = document.createElement('div');
+  row.className = 'detail-action-row';
+  row.append(edit, remove);
+  actions.append(row, message);
+  dialog.append(header, body);
+  return { dialog, title, close, edit, remove, message, body, actions };
 }
 
 function getSetOwnerName(record, owners) {
   return owners.find((owner) => owner.id === record.ownerId)?.name || 'Owner not recorded';
+}
+
+function createSetDetailSection(label) {
+  const section = document.createElement('section');
+  section.className = 'detail-section';
+  const heading = document.createElement('h4');
+  heading.textContent = label;
+  section.append(heading);
+  return section;
+}
+
+function createSetDetailFact(label, value) {
+  const row = document.createElement('div');
+  const term = document.createElement('dt');
+  term.textContent = label;
+  const description = document.createElement('dd');
+  if (typeof value === 'string') description.textContent = value;
+  else description.append(value);
+  row.append(term, description);
+  return row;
 }

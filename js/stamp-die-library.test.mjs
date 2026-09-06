@@ -51,7 +51,7 @@ class Element {
     selector = selector.replace(/:not\([^)]+\)/g, '');
     if (selector.includes(':checked') && !this.checked) return false;
     selector = selector.replace(/:checked/g, '');
-    const tag = selector.match(/^[a-z]+/);
+    const tag = selector.match(/^[a-z][a-z0-9]*/);
     if (tag && this.tagName !== tag[0]) return false;
     const className = selector.match(/\.([\w-]+)/);
     if (className && !this.className.split(' ').includes(className[1])) return false;
@@ -579,7 +579,7 @@ test('unchanged legacy Edit leaves an unknown Release Year absent instead of inv
 
 function setDetail(h) { return h.document.querySelector('.stamp-set-detail'); }
 
-test('Library click and keyboard open correct Detail metadata and canonical tags; Back and Escape return focus', async (t) => {
+test('Library click and keyboard open correct Detail metadata and canonical tags; close and Escape return focus', async (t) => {
   const h = await harness(t);
   await seedEdit(h);
   await h.cancel.emit('click');
@@ -601,7 +601,7 @@ test('Library click and keyboard open correct Detail metadata and canonical tags
   h.records.push(createStampDieSetRecord({ id: 'second', name: 'Second Set', dateCreated: '2020-01-01', favorite: false, tagIds: ['stable-card'], imageRefs: [] }, initialCatalog()));
   await h.document.emit('catalog:global-tags-updated');
   await h.gallery.querySelectorAll('article')[1].emit('click');
-  assert.match(detail.textContent, /Second Set.*Release year not recorded.*Not a favorite.*Birthday/);
+  assert.match(detail.textContent, /Second Set.*Release YearNot recorded.*Favorite.*Birthday/);
   assert.doesNotMatch(detail.textContent, /Original|Floral/);
 });
 
@@ -659,7 +659,7 @@ test('Edit from Detail reuses form, preserves ID, refreshes selected Set and ret
   await h.cancel.emit('click');
   await h.gallery.querySelector('article').emit('click');
   const detail = setDetail(h);
-  const edit = detail.querySelectorAll('button').find((button) => button.textContent === 'Edit');
+  const edit = detail.querySelectorAll('button').find((button) => button.textContent === 'Edit Set');
   await edit.emit('click');
   assert.equal(h.dialog.open, true);
   assert.equal(h.name.value, 'Original');
@@ -673,7 +673,7 @@ test('Edit from Detail reuses form, preserves ID, refreshes selected Set and ret
   await h.form.emit('submit');
   assert.equal(h.dialog.open, false);
   assert.equal(detail.open, true);
-  assert.match(detail.textContent, /Edited in Detail.*2024.*Not a favorite.*Birthday/);
+  assert.match(detail.textContent, /Edited in Detail.*2024.*Favorite.*Birthday/);
   assert.equal(h.records.length, 1);
   assert.equal(h.records[0].id, 'set-existing');
   assert.equal(detail.querySelector('img').alt, 'New stamp.jpg');
@@ -769,21 +769,21 @@ test('Set owner defaults, edits, rename display, and cancel use the shared regis
   assert.match(h.gallery.textContent, /Amanda/);
   await h.gallery.querySelector('article').emit('click');
   const detail = setDetail(h);
-  assert.match(detail.textContent, /Owner: Amanda/);
+  assert.match(detail.textContent, /OwnerAmanda/);
   h.owners[1].name = 'Mandy';
   await h.document.emit('catalog:owners-updated');
   assert.match(h.gallery.textContent, /Mandy/);
-  assert.match(detail.textContent, /Owner: Mandy/);
-  await detail.querySelectorAll('button').find((b) => b.textContent === 'Edit').emit('click');
+  assert.match(detail.textContent, /OwnerMandy/);
+  await detail.querySelectorAll('button').find((b) => b.textContent === 'Edit Set').emit('click');
   assert.equal(h.owner.value, 'owner-amanda');
   h.owner.value = 'owner-nina';
   await h.cancel.emit('click');
   assert.equal(h.records[0].ownerId, 'owner-amanda');
-  await detail.querySelectorAll('button').find((b) => b.textContent === 'Edit').emit('click');
+  await detail.querySelectorAll('button').find((b) => b.textContent === 'Edit Set').emit('click');
   h.owner.value = 'owner-nina';
   await h.form.emit('submit');
   assert.equal(h.records[0].ownerId, 'owner-nina');
-  assert.match(detail.textContent, /Owner: Nina/);
+  assert.match(detail.textContent, /OwnerNina/);
 });
 
 test('New owner stays in draft on failure and joins the registry after successful save', async (t) => {
@@ -914,7 +914,7 @@ test('filtered Detail/Edit/Delete keep stable identity and filter state; Add sti
   await h.gallery.querySelector('article').emit('click');
   const detail = setDetail(h);
   assert.match(detail.textContent, /Original/);
-  await detail.querySelectorAll('button').find((button) => button.textContent === 'Edit').emit('click');
+  await detail.querySelectorAll('button').find((button) => button.textContent === 'Edit Set').emit('click');
   assert.equal(h.name.value, 'Original');
   h.name.value = 'Edited visible'; await h.form.emit('submit');
   assert.equal(c.year.value, '2022');
@@ -963,14 +963,14 @@ test('Edit can stop matching without clearing filters or losing the open Detail 
   h.filterControls.year.value = '2022'; await h.filterControls.year.emit('change');
   await h.gallery.querySelector('article').emit('keydown', { key: 'Enter' });
   const detail = setDetail(h);
-  await detail.querySelectorAll('button').find((button) => button.textContent === 'Edit').emit('click');
+  await detail.querySelectorAll('button').find((button) => button.textContent === 'Edit Set').emit('click');
   h.year.value = '2026'; await h.form.emit('submit');
   assert.equal(detail.open, true);
   assert.match(detail.textContent, /2026/);
   assert.equal(h.records[0].id, 'set-existing');
   assert.equal(h.filterControls.year.value, '2022');
   assert.match(h.gallery.textContent, /No sets match/);
-  await detail.querySelectorAll('button').find((button) => button.textContent === 'Back to Stamps & Dies').emit('click');
+  await detail.querySelectorAll('button').find((button) => button.getAttribute('aria-label') === 'Close set details').emit('click');
   assert.equal(h.document.activeElement, h.add);
   await h.filterControls.clear.emit('click');
   assert.equal(h.gallery.querySelector('article').dataset.setId, 'set-existing');
@@ -1000,4 +1000,58 @@ test('Set filter options stay stable under search and selections, then clear aft
   assert.equal(h.calls(), 0);
   await h.add.emit('click');
   assert.ok(h.form.querySelector('[data-tag-id="stable-card"]'));
+});
+
+test('Set Detail reuses context/title/close header and places destructive actions inside metadata', async (t) => {
+  const h = await harness(t);
+  await seedEdit(h, { ownerId: 'owner-nina' }); await h.cancel.emit('click');
+  const tile = h.gallery.querySelector('article'); await tile.emit('click');
+  const detail = setDetail(h);
+  const header = detail.querySelector('header');
+  assert.equal(header.className, 'card-detail-header');
+  assert.equal(header.querySelector('.eyebrow').textContent, 'Stamps & Dies');
+  assert.equal(header.querySelector('h3').textContent, 'Original');
+  assert.equal(header.querySelectorAll('button').length, 1);
+  const close = header.querySelector('button');
+  assert.equal(close.className, 'card-detail-close');
+  assert.equal(close.textContent, '\u00d7');
+  assert.equal(close.getAttribute('aria-label'), 'Close set details');
+  assert.doesNotMatch(detail.textContent, /Back to Stamps/);
+  const content = detail.querySelector('.stamp-set-detail-content');
+  assert.ok(content.className.includes('card-detail-content'));
+  assert.ok(content.children[0].className.includes('stamp-set-detail-images'));
+  const metadata = content.querySelector('.detail-metadata');
+  assert.deepEqual(metadata.querySelectorAll('h4').map((heading) => heading.textContent), ['Set Info', 'Tags', 'Actions']);
+  const facts = metadata.querySelector('dl');
+  assert.equal(facts.className, 'detail-meta-list');
+  assert.deepEqual(facts.querySelectorAll('dt').map((term) => term.textContent), ['Owner', 'Release Year', 'Favorite']);
+  assert.equal(facts.querySelectorAll('dd')[0].textContent, 'Nina');
+  assert.equal(facts.querySelectorAll('dd')[1].textContent, '2022');
+  assert.equal(metadata.querySelector('.card-detail-chips').textContent, 'Floral');
+  const actions = metadata.querySelector('.detail-actions');
+  assert.deepEqual(actions.querySelectorAll('button').map((button) => button.textContent), ['Edit Set', 'Delete Set']);
+  assert.ok(actions.querySelectorAll('button')[0].className.includes('button-primary'));
+  assert.ok(actions.querySelectorAll('button')[1].className.includes('button-danger'));
+  assert.ok(actions.querySelector('.detail-action-row'));
+  assert.equal(h.calls(), 0);
+  await close.emit('click');
+  assert.equal(detail.open, false); assert.equal(h.document.activeElement, tile);
+});
+
+for (const favorite of [false, true]) test(`Detail Favorite heart is read-only with state ${favorite}`, async (t) => {
+  const h = await harness(t);
+  await seedEdit(h, { favorite, tagIds: [] }); await h.cancel.emit('click');
+  const before = structuredClone(h.records);
+  await h.gallery.querySelector('article').emit('click');
+  const detail = setDetail(h);
+  const heart = detail.querySelector('.stamp-set-favorite');
+  assert.equal(heart.tagName, 'span');
+  assert.equal(heart.dataset.favorite, String(favorite));
+  assert.equal(heart.getAttribute('role'), 'img');
+  assert.equal(heart.getAttribute('aria-label'), favorite ? 'Favorite' : 'Not a favorite');
+  assert.equal(heart.textContent, '\u2665');
+  assert.doesNotMatch(detail.textContent, /Not a favorite/);
+  assert.equal(detail.querySelector('.card-detail-empty').textContent, 'No tags');
+  await heart.emit('click');
+  assert.deepEqual(h.records, before); assert.equal(h.calls(), 0);
 });

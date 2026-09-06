@@ -208,8 +208,8 @@ No database, schema, backup, Settings, or Paper/Card image behavior changed.
 
 Click a Library tile, or focus it and press Enter/Space, to open its modal Detail.
 This follows the Paper/Card modal-panel interaction and Card header styling, using
-Set's existing native dialog mechanics for focus containment and Escape. Back to
-Stamps & Dies, Escape, or clicking the backdrop closes Detail and returns focus to
+Set's existing native dialog mechanics for focus containment and Escape. The close
+control, Escape, or clicking the backdrop closes Detail and returns focus to
 the Library tile. The application hash and shell are unchanged; no history stack
 was added.
 
@@ -337,3 +337,19 @@ under relevant categories, and unused children/empty categories are hidden. Sear
 and active filters do not shrink these choices. Add/Edit remains universal; matching
 semantics and canonical assignments are unchanged. See DESIGN.md's Category-Aware
 Tag Filtering rules for selection cleanup after actual usage/membership changes.
+
+
+## Detail presentation consistency
+
+Set Detail follows the Paper/Card header convention: Stamps & Dies context label,
+Set Name, and an accessible close (x) control. The content places the existing
+large, uncropped Stamp -> Die -> Mask gallery beside a compact metadata column.
+At tablet/narrow widths the metadata stacks below the gallery. Existing image
+resolution, responsive gallery sizing, and fallback behavior are retained.
+
+Set Info uses Paper's label/value blocks for Owner, Release Year, and a read-only
+Favorite heart using the existing muted/rose styling. Tags use Card Detail chips,
+with a compact No tags state. An Actions section in the metadata column contains
+Edit Set (primary) and Delete Set (destructive), with delete errors beside the
+actions. Closing restores Library focus; Edit/Delete behavior and filter state
+are unchanged. No record fields, persistence, or shared visual rules were added.

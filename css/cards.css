@@ -827,8 +827,12 @@
 
 /* Set Detail reuses the modal/header conventions, with room for complete sets. */
 .stamp-set-detail { width: min(76rem, calc(100% - 2rem)); }
-.stamp-set-detail .card-detail-header { flex-wrap: wrap; gap: var(--space-3); }
-.stamp-set-detail-body { overflow-y: auto; min-height: 0; padding: var(--space-4); }
+.stamp-set-detail .card-detail-header > div { min-width: 0; overflow-wrap: anywhere; }
+.stamp-set-detail-content { grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem); }
+.stamp-set-detail-content .detail-metadata { overflow-wrap: anywhere; }
+@media (max-width: 64rem) {
+  .stamp-set-detail-content { grid-template-columns: minmax(0, 1fr); }
+}
 .stamp-set-detail-images {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
   gap: var(--space-4);
