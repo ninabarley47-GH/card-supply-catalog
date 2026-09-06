@@ -51,7 +51,7 @@ test('existing hash navigation opens Stamps & Dies and returns to Paper and Card
     setAttribute(key, value) { this.attributes[key] = value; },
     removeAttribute(key) { delete this.attributes[key]; }
   }));
-  const groups = ['library', 'cards'].map((id) => ({ dataset: { sidebarControls: id } }));
+  const groups = ['library', 'cards', 'stamps-dies'].map((id) => ({ dataset: { sidebarControls: id } }));
   const oldWindow = globalThis.window;
   const oldDocument = globalThis.document;
   let onHashChange;

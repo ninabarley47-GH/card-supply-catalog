@@ -12,7 +12,8 @@ import {
 } from "./images.js";
 import { initializeSettings } from "./settings.js";
 import { getCardLibraryImageSource } from "./card-images.js";
-import { isActiveOwner } from "./owners.js";
+import { refreshOwnerFilter } from "./owner-picker.js";
+import { normalizeFilterText } from "./search.js";
 import { resolveItemTagIds } from "./tag-picker.js";
 import {
   clearGlobalTagFilter,
@@ -607,7 +608,7 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById, owner
 
   renderGlobalTagFilter(tagFilter, tagCatalog, { inputPrefix: "library", optionsDataAttribute: "libraryFilterOptions" });
   refreshLibraryColorFilters(colorFilter, getAvailableColors(paperPacks, colorsById));
-  refreshPaperOwnerFilter(ownerFilter, owners);
+  refreshOwnerFilter(ownerFilter, owners);
   initializeLibraryColorTypeahead(colorFilter, renderCurrent);
   input.addEventListener("input", renderCurrent);
   favoritesButton?.addEventListener("click", () => {
@@ -646,7 +647,7 @@ function initializeLibrarySearch(paperPackLibrary, paperPacks, colorsById, owner
   });
   sortControl?.addEventListener("change", renderCurrent);
   document.addEventListener("catalog:owners-updated", () => {
-    refreshPaperOwnerFilter(ownerFilter, owners);
+    refreshOwnerFilter(ownerFilter, owners);
     renderCurrent();
   });
   document.addEventListener("catalog:global-tags-updated", async () => {
@@ -682,25 +683,6 @@ function hasActivePaperPackFilters(filterState) {
     filterState.selectedTags.categories.length > 0 ||
     filterState.selectedColors.length > 0
   );
-}
-
-function refreshPaperOwnerFilter(select, owners = []) {
-  if (!select) {
-    return;
-  }
-
-  const selectedOwnerId = select.value;
-  select.replaceChildren(
-    new Option("All", ""),
-    ...owners
-      .filter(isActiveOwner)
-      .slice()
-      .sort((first, second) => first.name.localeCompare(second.name, undefined, { sensitivity: "base" }))
-      .map((owner) => new Option(owner.name, owner.id))
-  );
-  select.value = [...select.options].some((option) => option.value === selectedOwnerId)
-    ? selectedOwnerId
-    : "";
 }
 
 function updatePaperQuickFilterStates({ favoritesButton, ownerFilter, holidayFilter }) {
@@ -1056,14 +1038,6 @@ function getSearchableColorText(paperPack, colorsById) {
       ...(color.aliases || [])
     ];
   });
-}
-
-function normalizeFilterText(value) {
-  return String(value || "")
-    .trim()
-    .toLocaleLowerCase()
-    .replace(/[-_]+/g, " ")
-    .replace(/\s+/g, " ");
 }
 
 function renderPaperPackLibrary(container, paperPacks, colorsById, options = {}) {

@@ -1,3 +1,4 @@
+import { filterStampDieSets, initializeStampDieFilters } from './stamp-die-filter.js';
 import { initializeOwnerPicker, resolveOwnerPicker, setOwnerPickerValue, refreshOwnerOptions, notifyOwnerRegistryUpdated } from './owner-picker.js';
 import { isActiveOwner } from './owners.js';
 import { loadDefaultOwnerId } from './settings.js';
@@ -80,7 +81,7 @@ export async function initializeStampDieLibrary(services = {}) {
     detail.message.textContent = '';
     selectedSetId = id;
     detailSource = source;
-    renderDetail(displayedRecords, catalog);
+    renderDetail(displayedRecords, libraryCatalog);
     detail.dialog.showModal();
     detail.close.focus();
   }
@@ -107,7 +108,7 @@ export async function initializeStampDieLibrary(services = {}) {
     clearStampImageSources(removed);
     if (view.dialog.open) view.dialog.close();
     detail.dialog.close();
-    renderStampDieLibrary(gallery, displayedRecords, catalog, (setId) => openForm(setId), openDetail, owners);
+    renderCurrent();
     window.location.hash = '#stamps-dies';
     await refresh();
     add.focus();
@@ -136,6 +137,17 @@ export async function initializeStampDieLibrary(services = {}) {
   let inferredTags = [];
   let imageDirectory = null;
   let displayedRecords = [];
+  let libraryCatalog;
+  const filters = initializeStampDieFilters(owners, renderCurrent);
+  filters.refreshOwners();
+
+  function renderCurrent() {
+    if (!libraryCatalog) return;
+    const visible = filterStampDieSets(displayedRecords, filters.read(), libraryCatalog, owners);
+    renderStampDieLibrary(gallery, visible, libraryCatalog, (id) => openForm(id), openDetail, owners, displayedRecords.length);
+    status.dataset.tone = '';
+    status.textContent = `Showing ${visible.length} of ${displayedRecords.length} sets`;
+  }
 
   function reset() {
     draftSession++;
@@ -169,10 +181,11 @@ export async function initializeStampDieLibrary(services = {}) {
       clearStampImageSources(displayedRecords);
       displayedRecords = records;
       if (!view.dialog.open) catalog = nextCatalog;
-      renderStampDieLibrary(gallery, records, nextCatalog, (id) => openForm(id), openDetail, owners);
+      libraryCatalog = nextCatalog;
+      filters.refreshCatalog(libraryCatalog);
+      filters.refreshYears(records);
+      renderCurrent();
       if (selectedSetId) renderDetail(records, nextCatalog);
-      status.dataset.tone = '';
-      status.textContent = `${records.length} set${records.length === 1 ? '' : 's'}`;
     } catch {
       status.dataset.tone = 'error';
       status.textContent = 'Sets could not be loaded. Reload to try again.';
@@ -403,8 +416,9 @@ export async function initializeStampDieLibrary(services = {}) {
 
   document.addEventListener('catalog:global-tags-updated', (event) => { if (event.detail?.source !== 'stamp-die-save') return refresh(); });
   document.addEventListener('catalog:owners-updated', () => {
-    renderStampDieLibrary(gallery, displayedRecords, catalog, (id) => openForm(id), openDetail, owners);
-    if (selectedSetId) renderDetail(displayedRecords, catalog);
+    filters.refreshOwners();
+    renderCurrent();
+    if (selectedSetId) renderDetail(displayedRecords, libraryCatalog);
   });
   await refresh();
 }
@@ -500,7 +514,7 @@ function createField(text, ...inputs) {
   return label;
 }
 
-export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetail, owners = []) {
+export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetail, owners = [], totalCount = records.length) {
   const tiles = records.map((record) => {
     const tile = document.createElement('article');
     tile.className = 'stamp-set-tile';
@@ -567,7 +581,9 @@ export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetai
   if (!tiles.length) {
     const empty = document.createElement('p');
     empty.className = 'card-library-empty';
-    empty.textContent = 'No sets yet. Add a Stamp & Die Set to start your library.';
+    empty.textContent = totalCount > 0
+      ? 'No sets match the current filters.'
+      : 'No sets yet. Add a Stamp & Die Set to start your library.';
     tiles.push(empty);
   }
   gallery.replaceChildren(...tiles);

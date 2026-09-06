@@ -44,7 +44,13 @@ class Element {
     return event;
   }
   dispatchEvent(event) { return this.emit(event.type, { target: event.target || this, detail: event.detail }); }
+  remove() { this.parent.children = this.parent.children.filter((child) => child !== this); }
+  get classList() { return { toggle() {} }; }
   matches(selector) {
+    for (const match of selector.matchAll(/:not\(([^)]+)\)/g)) if (this.matches(match[1])) return false;
+    selector = selector.replace(/:not\([^)]+\)/g, '');
+    if (selector.includes(':checked') && !this.checked) return false;
+    selector = selector.replace(/:checked/g, '');
     const tag = selector.match(/^[a-z]+/);
     if (tag && this.tagName !== tag[0]) return false;
     const className = selector.match(/\.([\w-]+)/);
@@ -86,6 +92,15 @@ async function harness(t, otherCatalogServices = {}) {
   const status = new Element('p'); status.dataset.setLibraryStatus = '';
   screen.append(add, gallery, status);
   document.body.append(screen);
+  const filterForm = new Element('form'); filterForm.dataset.setLibraryFilterForm = '';
+  const filterControls = {};
+  for (const [key, tag] of Object.entries({ search: 'input', owner: 'select', year: 'select', favorites: 'button', clear: 'button', clearTags: 'button', toggleTags: 'button', tagFilters: 'fieldset' })) {
+    const control = new Element(tag);
+    control.dataset['setLibrary' + key[0].toUpperCase() + key.slice(1)] = '';
+    filterControls[key] = control;
+    filterForm.append(control);
+  }
+  document.body.append(filterForm);
   globalThis.Option = function(text, value) { return Object.assign(new Element('option'), { textContent: text, value }); };
   globalThis.document = document;
   globalThis.window = { location: { hash: '#stamps-dies' } };
@@ -94,6 +109,7 @@ async function harness(t, otherCatalogServices = {}) {
   let failure = false;
   let commitGate;
   let calls = 0;
+  let recordReads = 0;
   const owners = [{ id: 'owner-nina', name: 'Nina' }, { id: 'owner-amanda', name: 'Amanda' }];
   await initializeStampDieLibrary({
     owners,
@@ -101,7 +117,7 @@ async function harness(t, otherCatalogServices = {}) {
     loadCatalogSetting: async () => '',
     saveCatalogSetting: async () => {},
     loadGlobalTagCatalog: async () => structuredClone(catalog),
-    loadSavedStampDieSets: async () => structuredClone(records),
+    loadSavedStampDieSets: async () => { recordReads++; return structuredClone(records); },
     saveStampDieSet: async (record) => {
       calls += 1;
       if (commitGate) await commitGate;
@@ -123,8 +139,8 @@ async function harness(t, otherCatalogServices = {}) {
     input.checked = true;
     await form.querySelector('.global-tag-picker').emit('change', { target: input });
   }
-  return { owners, owner: form.querySelector('select[name="ownerId"]'), newOwner: form.querySelector('input[name="owner"]'), document, add, gallery, status, dialog, form, name, year, favorite, cancel, records, select,
-    calls: () => calls, setFailure: (value) => { failure = value; }, setGate: (value) => { commitGate = value; },
+  return { filterControls, owners, owner: form.querySelector('select[name="ownerId"]'), newOwner: form.querySelector('input[name="owner"]'), document, add, gallery, status, dialog, form, name, year, favorite, cancel, records, select,
+    recordReads: () => recordReads, calls: () => calls, setFailure: (value) => { failure = value; }, setGate: (value) => { commitGate = value; },
     renameTag: () => { catalog.tags[0].name = 'Botanical'; } };
 }
 
@@ -805,4 +821,157 @@ test('Add Set requires an owner and falls back to the last used owner', async (t
   h.owner.value = '';
   await h.form.emit('submit');
   assert.equal(h.records.length, 0);
+});
+
+test('Set sidebar combines filters, clears tags independently, resets all, and never reloads images on filter changes', async (t) => {
+  let imageReads = 0;
+  const h = await harness(t, { hydrateStampImages: async () => { imageReads++; } });
+  await seedEdit(h, { ownerId: 'owner-nina' });
+  await h.cancel.emit('click');
+  h.records.push(createStampDieSetRecord({ id: 'second', name: 'Other', dateCreated: '2020-01-01', releaseYear: 2026, favorite: false, ownerId: 'owner-amanda', tagIds: ['stable-card'] }, initialCatalog()));
+  await h.document.emit('catalog:global-tags-updated');
+  const before = structuredClone(h.records);
+  const imagesBefore = imageReads;
+  const readsBefore = h.recordReads();
+  const c = h.filterControls;
+  c.search.value = 'original'; await c.search.emit('input');
+  c.owner.value = 'owner-nina'; await c.owner.emit('change');
+  c.year.value = '2022'; await c.year.emit('change');
+  await c.favorites.emit('click');
+  const floral = c.tagFilters.querySelector('input[name="set-library-tags"][data-global-tag-id="stable-paper"]');
+  floral.checked = true; await c.tagFilters.emit('change', { target: floral });
+  assert.equal(h.gallery.querySelectorAll('article').length, 1);
+  assert.equal(h.gallery.querySelector('article').dataset.setId, 'set-existing');
+  assert.equal(h.status.textContent, 'Showing 1 of 2 sets');
+  assert.equal(c.clear.hidden, false);
+  c.owner.value = 'owner-amanda'; await c.owner.emit('change');
+  assert.match(h.gallery.textContent, /No sets match the current filters/);
+  assert.equal(c.search.value, 'original');
+  await c.clearTags.emit('click');
+  assert.equal(floral.checked, false);
+  assert.equal(c.year.value, '2022');
+  await c.clear.emit('click');
+  assert.equal(h.gallery.querySelectorAll('article').length, 2);
+  assert.equal(c.search.value, ''); assert.equal(c.owner.value, ''); assert.equal(c.year.value, '');
+  assert.equal(c.favorites.getAttribute('aria-pressed'), 'false');
+  assert.equal(c.clear.hidden, true);
+  assert.equal(h.document.activeElement, c.search);
+  assert.deepEqual(h.records, before);
+  assert.equal(h.calls(), 0);
+  assert.equal(imageReads, imagesBefore);
+  assert.equal(h.recordReads(), readsBefore);
+});
+
+test('Set category controls refine members, combine with owner, preserve renamed tags, and reset', async (t) => {
+  const h = await harness(t);
+  await seedEdit(h, { ownerId: 'owner-nina' }); await h.cancel.emit('click');
+  const c = h.filterControls;
+  const member = c.tagFilters.querySelector('input[data-filter-category-member="nature"]');
+  member.checked = true; await c.tagFilters.emit('change', { target: member });
+  assert.equal(c.tagFilters.querySelector('input[data-filter-category-id="nature"]').checked, true);
+  c.owner.value = 'owner-nina'; await c.owner.emit('change');
+  assert.equal(h.gallery.querySelectorAll('article').length, 1);
+  h.renameTag(); await h.document.emit('catalog:global-tags-updated');
+  assert.match(c.tagFilters.textContent, /Botanical/);
+  assert.equal(c.tagFilters.querySelector('input[data-filter-category-member="nature"]').checked, true);
+  assert.equal(h.records[0].tagIds[0], 'stable-paper');
+  const category = c.tagFilters.querySelector('input[data-filter-category-id="nature"]');
+  category.checked = false; await c.tagFilters.emit('change', { target: category });
+  assert.equal(c.tagFilters.querySelector('input[data-filter-category-member="nature"]').checked, false);
+  await c.clear.emit('click');
+  assert.equal(c.tagFilters.querySelectorAll('input:checked').length, 0);
+});
+
+test('Set owner dropdown matches Paper: active names, canonical values, rename retention, inactive selection reset', async (t) => {
+  const h = await harness(t);
+  await seedEdit(h, { ownerId: 'owner-nina' }); await h.cancel.emit('click');
+  const c = h.filterControls;
+  c.owner.value = 'owner-nina'; await c.owner.emit('change');
+  const before = structuredClone(h.records);
+  h.owners[0].name = 'Renamed Nina'; await h.document.emit('catalog:owners-updated');
+  assert.equal(c.owner.value, 'owner-nina');
+  assert.match(c.owner.textContent, /Renamed Nina/);
+  assert.match(h.gallery.textContent, /Renamed Nina/);
+  h.owners[0].archived = true; await h.document.emit('catalog:owners-updated');
+  assert.equal(c.owner.value, '');
+  assert.doesNotMatch(c.owner.textContent, /Renamed Nina/);
+  assert.equal(h.gallery.querySelectorAll('article').length, 1);
+  assert.match(h.gallery.textContent, /Renamed Nina/);
+  assert.deepEqual(h.records, before);
+});
+
+test('filtered Detail/Edit/Delete keep stable identity and filter state; Add still reapplies filters', async (t) => {
+  let deleted;
+  const h = await harness(t, { deleteStampDieSet: async (id) => {
+    deleted = id;
+    h.records.splice(h.records.findIndex((record) => record.id === id), 1);
+  } });
+  await seedEdit(h, { ownerId: 'owner-nina' }); await h.cancel.emit('click');
+  h.records.unshift(createStampDieSetRecord({ id: 'hidden-set', name: 'Hidden', dateCreated: '2020-01-01', releaseYear: 2025, favorite: false, tagIds: [] }, initialCatalog()));
+  await h.document.emit('catalog:global-tags-updated');
+  const c = h.filterControls;
+  c.year.value = '2022'; await c.year.emit('change');
+  await h.gallery.querySelector('article').emit('click');
+  const detail = setDetail(h);
+  assert.match(detail.textContent, /Original/);
+  await detail.querySelectorAll('button').find((button) => button.textContent === 'Edit').emit('click');
+  assert.equal(h.name.value, 'Original');
+  h.name.value = 'Edited visible'; await h.form.emit('submit');
+  assert.equal(c.year.value, '2022');
+  assert.equal(h.records.find((record) => record.id === 'set-existing').name, 'Edited visible');
+  assert.match(detail.textContent, /Edited visible/);
+  globalThis.window.confirm = () => true;
+  await detail.querySelectorAll('button').find((button) => button.textContent === 'Delete Set').emit('click');
+  assert.equal(deleted, 'set-existing');
+  assert.equal(h.records[0].id, 'hidden-set');
+  assert.equal(c.year.value, '2022');
+  assert.match(h.gallery.textContent, /No sets match/);
+  await h.add.emit('click'); h.name.value = 'New matching'; h.year.value = '2022';
+  await h.form.emit('submit');
+  assert.equal(c.year.value, '2022');
+  assert.match(h.gallery.textContent, /New matching/);
+  await c.clear.emit('click');
+  assert.equal(h.gallery.querySelectorAll('article').length, 2);
+});
+
+test('Set empty catalog differs from zero matching records', async (t) => {
+  const h = await harness(t);
+  assert.match(h.gallery.textContent, /No sets yet/);
+  assert.equal(h.status.textContent, 'Showing 0 of 0 sets');
+  await seedEdit(h); await h.cancel.emit('click');
+  h.filterControls.search.value = 'no-match'; await h.filterControls.search.emit('input');
+  assert.match(h.gallery.textContent, /No sets match the current filters/);
+  assert.equal(h.status.textContent, 'Showing 0 of 1 sets');
+});
+
+
+test('Stamps sidebar uses the shared navigation group and quick-filter styles', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const group = html.slice(html.indexOf('<div data-sidebar-controls="stamps-dies"'), html.indexOf('<details class="app-version"'));
+  for (const name of ['search', 'owner', 'year', 'favorites', 'tag-filters', 'clear', 'clear-tags']) {
+    assert.ok(group.includes(`data-set-library-${name}`));
+  }
+  assert.match(group, /class="card-library-quick-filter card-library-select-filter"/);
+  assert.match(group, /data-sidebar-controls="stamps-dies" hidden/);
+  assert.doesNotMatch(group, /data-card-library|data-library-owner|data-set-library-status|data-set-library-holiday/);
+});
+
+
+test('Edit can stop matching without clearing filters or losing the open Detail record', async (t) => {
+  const h = await harness(t);
+  await seedEdit(h); await h.cancel.emit('click');
+  h.filterControls.year.value = '2022'; await h.filterControls.year.emit('change');
+  await h.gallery.querySelector('article').emit('keydown', { key: 'Enter' });
+  const detail = setDetail(h);
+  await detail.querySelectorAll('button').find((button) => button.textContent === 'Edit').emit('click');
+  h.year.value = '2026'; await h.form.emit('submit');
+  assert.equal(detail.open, true);
+  assert.match(detail.textContent, /2026/);
+  assert.equal(h.records[0].id, 'set-existing');
+  assert.equal(h.filterControls.year.value, '2022');
+  assert.match(h.gallery.textContent, /No sets match/);
+  await detail.querySelectorAll('button').find((button) => button.textContent === 'Back to Stamps & Dies').emit('click');
+  assert.equal(h.document.activeElement, h.add);
+  await h.filterControls.clear.emit('click');
+  assert.equal(h.gallery.querySelector('article').dataset.setId, 'set-existing');
 });

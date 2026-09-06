@@ -2,9 +2,9 @@
 
 ## Status
 
-Phases 1, 2A, 2B1, 2B2, and 2C are implemented: Library and Detail views, a shared
-Add/Edit Set workflow, and ordered multiple-image selection/persistence. Filtering, search,
-Card relationships, and backup/restore remain out of scope.
+Phases 1, 2A, 2B1, 2B2, 2C, and 2D are implemented: Library and Detail views, a shared
+Add/Edit Set workflow, ordered multiple-image selection/persistence, and Library search/filtering.
+Card relationships, Settings/library-folder configuration, and backup/restore remain out of scope.
 
 A Stamp & Die Set is one catalog record for stamps only, dies only, or coordinating
 stamps and dies. There are no individual stamp/die records, separate stampIds or
@@ -166,8 +166,9 @@ existing shared-library images. Only new image/thumbnail files may be created du
 Save. No Set path calls image deletion, folder scanning, or thumbnail repair.
 
 Standard/iPad backups still exclude Stamp & Die Set records and images. No backup,
-import/export, automatic folder discovery/Set creation, Library search
-or filtering, Card relationships, or image-deletion workflow was added.
+import/export, automatic folder discovery/Set creation, Card relationships, or
+image-deletion workflow was added by the image phases. Library search/filtering
+is covered by Phase 2D below.
 
 ## Edit Set (Phase 2B2)
 
@@ -277,3 +278,54 @@ names by ID, including archived owners, and refresh after owner renames.
 New owners commit atomically with the Set and any inferred tags. Cancel or failed
 saves do not add owners. The catalog schema advances to 6 for this persisted field;
 IndexedDB and backup-envelope versions are unchanged.
+
+
+## Search & Filter (Phase 2D)
+
+Stamps & Dies uses the existing sidebar navigation group, search field, quick-filter
+styles, collapsible Tags section, Clear tags, and Clear all interaction. Text search
+matches Set Name, Release Year, current Owner display name, and assigned global tag
+names. Paper's shared normalization trims text, ignores case, treats hyphens and
+underscores as spaces, and collapses repeated whitespace. Filenames, paths,
+thumbnails, generated IDs, category names, and dateCreated are not searched.
+
+Owner uses canonical ownerId and the global registry, with the same shared dropdown
+helper as Paper and Cards. The initial filter is All, matching Paper. Only active
+owners appear as choices, sorted by current name. Renames preserve selection by ID;
+archiving a selected owner returns that control to All. Sets retain their ownership
+and remain visible under All, with archived owner names still displayed/searchable.
+No Owner or tag display names are persisted in Set records.
+
+Tags and Categories use global-tag-filter.js without product restrictions. Stamp,
+Die, and Mask are ordinary universally available tags, regardless of deprecated
+appliesTo values. Explicit tag selections use AND. A category matches any member tag
+(OR), optionally refined to selected members (OR). Categories and independent tags
+combine with AND; categories themselves are never Set assignments. Renames refresh
+labels/search text while retaining stable selected IDs and record assignments.
+
+Favorites matches the existing boolean favorite field. Release Year is an exact-year
+quick-filter dropdown with All plus recorded years in descending order. Paper has
+year search/sorting but no dedicated year filter, so this uses the existing select
+quick-filter pattern. Legacy Sets without releaseYear match All but not a specific
+year. A selected year remains selected even after its last matching Set is edited
+or deleted, so unrelated constraints are not silently cleared.
+
+Search, Owner, tags/categories, Favorite, and Release Year all combine with AND.
+Every control change filters the complete in-memory Set collection without database
+reads, image hydration, folder scans, file access, or persistence. Matching counts
+show "Showing N of M sets". An empty catalog retains the Add Set invitation;
+a populated catalog with zero results says "No sets match the current filters."
+
+Clear all clears search, Owner, Favorite, Release Year, and all tag/category choices,
+shows all Sets, and returns focus to Search. Clear tags affects only tag/category
+constraints. Filter state stays in the current page through Detail, Edit, Delete,
+Add, and switching library screens. Detail/Edit/Delete target stable Set IDs in the
+complete collection, even when only one tile is visible. Successful record changes
+reapply the active constraints; an edited Set may cease matching while its open
+Detail still reflects the saved record. No navigation history or persisted filter
+settings were added.
+
+Focused tests cover searchable fields/normalization, identity and rename behavior,
+inactive owners, all tag/category semantics, favorites/years, combined constraints,
+reset, empty states, filtered Detail/Edit/Delete/Add, and read-only filtering.
+Existing Paper/Card and global filter regression tests remain in the full suite.

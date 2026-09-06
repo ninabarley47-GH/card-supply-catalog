@@ -173,6 +173,54 @@
             </form>
           </div>
 
+          <div data-sidebar-controls="stamps-dies" hidden>
+            <form class="search-form nav-search" role="search" aria-label="Filter sets" data-set-library-filter-form>
+              <div class="filter-heading-row">
+                <h3>Filter Sets</h3>
+                <button class="filter-clear-button" type="button" data-set-library-clear hidden>Clear all</button>
+              </div>
+              <label class="search-label" for="set-library-search">Search</label>
+              <div class="search-control">
+                <input
+                  id="set-library-search"
+                  name="set-library-search"
+                  type="search"
+                  placeholder="Search names, tags, owners, or years"
+                  autocomplete="off"
+                  data-set-library-search
+                >
+              </div>
+              <fieldset class="card-library-quick-filters" data-set-library-quick-filters>
+                <legend>Quick Filters</legend>
+                <div class="card-library-quick-filter-grid">
+                  <button class="card-library-quick-filter card-library-favorites-filter" type="button" aria-pressed="false" data-set-library-favorites>
+                    <span class="card-library-favorites-icon" aria-hidden="true">♡</span>
+                    <span>Favorites</span>
+                  </button>
+                  <label class="card-library-quick-filter card-library-select-filter">
+                    <span class="card-library-quick-filter-label">Owner</span>
+                    <select aria-label="Filter sets by owner" data-set-library-owner>
+                      <option value="">All</option>
+                    </select>
+                  </label>
+                  <label class="card-library-quick-filter card-library-select-filter">
+                    <span class="card-library-quick-filter-label">Release Year</span>
+                    <select aria-label="Filter sets by release year" data-set-library-year>
+                      <option value="">All</option>
+                    </select>
+                  </label>
+                </div>
+              </fieldset>
+              <fieldset class="library-tag-filter" data-set-library-tag-filters>
+                <legend class="visually-hidden">Set tags</legend>
+                <div class="library-tag-filter-header">
+                  <button class="filter-toggle" type="button" aria-expanded="true" data-set-library-toggle-tags>Tags</button>
+                  <button class="filter-clear-icon" type="button" data-set-library-clear-tags aria-label="Clear Set tag filters" hidden>&times;</button>
+                </div>
+              </fieldset>
+            </form>
+          </div>
+
           <details class="app-version" data-app-version>
             <summary data-version-summary>Version 0.1.0 · Build local</summary>
             <dl class="app-version-details">

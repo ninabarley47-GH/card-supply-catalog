@@ -69,3 +69,22 @@ function updateNewOwnerInput(select, input) {
   input.required = addingOwner;
   if (!addingOwner) input.value = '';
 }
+
+export function refreshOwnerFilter(select, owners = []) {
+  if (!select) {
+    return;
+  }
+
+  const selectedOwnerId = select.value;
+  select.replaceChildren(
+    new Option("All", ""),
+    ...owners
+      .filter(isActiveOwner)
+      .slice()
+      .sort((first, second) => first.name.localeCompare(second.name, undefined, { sensitivity: "base" }))
+      .map((owner) => new Option(owner.name, owner.id))
+  );
+  select.value = [...select.options].some((option) => option.value === selectedOwnerId)
+    ? selectedOwnerId
+    : "";
+}

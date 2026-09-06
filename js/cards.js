@@ -1,7 +1,7 @@
 import { getLocalDateValue } from './ui.js';
 import { deleteCard, loadCatalogSetting, loadGlobalTagCatalog, loadSavedCards, saveCard, saveCatalogSetting, saveOwner } from './storage.js';
 import { loadDefaultOwnerId } from './settings.js';
-import { initializeOwnerPicker, notifyOwnerRegistryUpdated, refreshOwnerOptions, resolveOwnerPicker, setOwnerPickerValue } from './owner-picker.js';
+import { refreshOwnerFilter, initializeOwnerPicker, notifyOwnerRegistryUpdated, refreshOwnerOptions, resolveOwnerPicker, setOwnerPickerValue } from './owner-picker.js';
 import { isActiveOwner } from './owners.js';
 import {
   clearGlobalTagFilter,
@@ -63,7 +63,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   const paperPackNamesById = new Map(paperPacks.map((paperPack) => [paperPack.id, paperPack.name]));
   let activeTile = null;
 
-  refreshCardOwnerFilter(ownerFilter, owners);
+  refreshOwnerFilter(ownerFilter, owners);
   const defaultOwnerId = await loadDefaultOwnerId().catch(() => '');
   if (ownerFilter && owners.some((owner) => isActiveOwner(owner) && owner.id === defaultOwnerId)) {
     ownerFilter.value = defaultOwnerId;
@@ -176,7 +176,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     searchInput.focus();
   });
   document.addEventListener('catalog:owners-updated', () => {
-    refreshCardOwnerFilter(ownerFilter, owners);
+    refreshOwnerFilter(ownerFilter, owners);
     renderCurrent();
   });
   clearTagsButton?.addEventListener('click', () => {
@@ -1036,22 +1036,6 @@ export function filterAndSortCards(cards, options = {}) {
   });
 
   return sortCards(filteredCards, options.sortOrder);
-}
-
-function refreshCardOwnerFilter(select, owners = []) {
-  if (!select) return;
-
-  const selectedOwnerId = select.value;
-  select.replaceChildren(
-    new Option('All', ''),
-    ...owners.filter(isActiveOwner)
-      .slice()
-      .sort((first, second) => first.name.localeCompare(second.name, undefined, { sensitivity: 'base' }))
-      .map((owner) => new Option(owner.name, owner.id))
-  );
-  select.value = [...select.options].some((option) => option.value === selectedOwnerId)
-    ? selectedOwnerId
-    : '';
 }
 
 function updateCardQuickFilterStates({ favoritesButton, ownerFilter, holidayFilter, statusFilter }) {

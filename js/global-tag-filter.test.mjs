@@ -109,7 +109,7 @@ test('migrated filter and search code does not read runtime tag-name projections
   const cards = await readFile(new URL('./cards.js', import.meta.url), 'utf8');
   const shared = await readFile(new URL('./global-tag-filter.js', import.meta.url), 'utf8');
   const paperFilter = library.slice(library.indexOf('export function matchesPaperPackFilters'), library.indexOf('function getSearchableColorText'));
-  const cardFilter = cards.slice(cards.indexOf('export function filterAndSortCards'), cards.indexOf('function refreshCardOwnerFilter'));
+  const cardFilter = cards.slice(cards.indexOf('export function filterAndSortCards'), cards.indexOf('function updateCardQuickFilterStates'));
   assert.doesNotMatch(paperFilter, /keywords/);
   assert.doesNotMatch(cardFilter, /card\.tags|tags \|\|/);
   assert.doesNotMatch(shared, /image|directory|folder/i);
