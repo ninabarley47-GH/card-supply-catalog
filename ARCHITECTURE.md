@@ -245,6 +245,14 @@ Do not create competing writable sources of truth. IndexedDB is authoritative fo
 Never duplicate business logic across modules.
 Prefer extending existing modules over creating unnecessary new ones.
 
+## Shared Product View Layout
+
+Library and Detail renderers for every product follow the metadata and action
+placement defined in [DESIGN.md](DESIGN.md#shared-product-layout). Reuse existing
+layout classes, metadata blocks, title/Favorite rows, action sections, and close
+controls. Keep product-specific rendering limited to the fields and image layouts
+that differ; avoid separate layout conventions for each product.
+
 ## Stamp & Die Catalog ? Phase 1
 
 The Stamps & Dies shell reuses shared hash navigation and Library styles. A set is

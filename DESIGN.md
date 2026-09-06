@@ -126,6 +126,29 @@ Cancel always on the left.
 Dialogs behave consistently.
 Similar actions use the same wording throughout the app.
 
+# Shared Product Layout
+
+All products, including Paper Packs, Cards, Stamps & Dies, and future product types,
+follow the same placement of metadata and calls to action in both Library and
+Detail views. Use the established Paper/Card layout conventions when adding or
+updating a product view.
+
+- Library tiles place the product name, when the product has one, and Favorite
+  indicator together at the top, above the images. Supporting metadata, colors,
+  and tag chips follow the images; tile actions occupy the consistent lower action
+  area. Preserve established context bars above the tile content.
+- Detail views place the context label, product title, and Favorite indicator at
+  the top, with the close control in the established upper-right position. Keep
+  images prominent, with compact metadata and tag sections beside them on wide
+  screens and below them when space is limited. Group Edit, Delete, and other
+  applicable calls to action in the content area's Actions section, using the
+  existing button hierarchy and destructive styling.
+
+Product-specific fields may differ, and image galleries may need different amounts
+of space, but metadata hierarchy, action placement, spacing, typography, and
+responsive reading order must remain consistent. Do not invent titles, metadata,
+or actions for products that do not support them merely to fill the layout.
+
 # Flat Tag and Category Management
 Tags appear once in the flat alphabetical Settings inventory. Categories are managed separately in a compact area, and category membership is displayed as removable metadata chips on each tag row. A tag may belong to multiple categories while retaining one stable identity. Settings does not present the taxonomy as a hierarchy or category tree.
 
