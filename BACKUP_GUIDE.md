@@ -159,3 +159,6 @@ tag IDs are reconciled with the local catalog using the existing rules.
 Decision 32 applies: import/export never deletes, moves, renames, overwrites, or
 cleans up source images or folders. Standard export creates a backup JSON file;
 compact export reads accessible images. Restore writes catalog metadata only.
+
+After a successful restore, CSC refreshes shared Owner and tag/category views,
+including Settings usage counts, without requiring an app reload.

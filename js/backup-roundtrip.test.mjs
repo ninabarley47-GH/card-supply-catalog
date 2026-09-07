@@ -256,3 +256,40 @@ test("failed atomic restore leaves all in-memory catalog collections unchanged",
   assert.equal(summary.colorsImported, 0);
   assert.equal(summary.cardsImported, 0);
 });
+
+for (const fail of [false, true]) {
+  test(`shared metadata refresh happens only after successful restore (failure=${fail})`, async () => {
+    const backup = createCatalogBackupSnapshot({ paperPacks: [], colorsById: {},
+      owners: [{ id: 'owner-new', name: 'New Owner' }],
+      tagCatalog: { schemaVersion: 1, tags: [{ id: 'tag-new', name: 'New Tag', categoryIds: ['category-new'] }],
+        categories: [{ id: 'category-new', name: 'New Category' }] }
+    });
+    const owners = []; let committed = false; let refreshes = 0;
+    const summary = await restoreCatalogBackup({ backup, paperPacks: [], colorsById: {}, owners, services: {
+      loadSavedCards: async () => [],
+      restoreCatalogRecords: async () => { if (fail) throw new Error('Simulated failure'); committed = true; },
+      dispatchCatalogRestored: () => {
+        assert.equal(committed, true);
+        assert.equal(owners[0].id, 'owner-new');
+        refreshes++;
+      }
+    } });
+    assert.equal(refreshes, fail ? 0 : 1);
+    assert.equal(summary.errors.length > 0, fail);
+    assert.equal(summary.cardsImported, 0);
+    assert.equal(summary.setsImported, 0);
+  });
+}
+
+test('restore broadcasts the shared owner and taxonomy events used by existing views', async (t) => {
+  const previous = globalThis.document;
+  t.after(() => { globalThis.document = previous; });
+  const events = [];
+  globalThis.document = { dispatchEvent: (event) => events.push([event.type, event.detail]) };
+  const backup = createCatalogBackupSnapshot({ paperPacks: [], colorsById: {} });
+  await restoreCatalogBackup({ backup, paperPacks: [], colorsById: {}, services: {
+    loadGlobalTagCatalog: async () => ({ schemaVersion: 1, tags: [], categories: [] }),
+    loadSavedCards: async () => [], restoreCatalogRecords: async () => {}
+  } });
+  assert.deepEqual(events, [['catalog:owners-updated', null], ['catalog:global-tags-updated', { source: 'restore' }]]);
+});

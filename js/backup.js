@@ -1122,6 +1122,14 @@ export async function restoreCatalogBackup({
     }
   }
 
+  // Refresh shared metadata even when the import only changes taxonomy or skips all item IDs.
+  if (services.dispatchCatalogRestored) {
+    services.dispatchCatalogRestored();
+  } else if (typeof document !== "undefined") {
+    document.dispatchEvent(new CustomEvent("catalog:owners-updated"));
+    document.dispatchEvent(new CustomEvent("catalog:global-tags-updated", { detail: { source: "restore" } }));
+  }
+
   summary.diagnosticReport = await reportImportDiagnostic(importDiagnostic);
 
   if (

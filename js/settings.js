@@ -327,6 +327,17 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
   document.addEventListener("catalog:paper-pack-saved", refreshAfterItemSave);
   document.addEventListener("catalog:card-saved", refreshAfterItemSave);
   document.addEventListener("catalog:stamp-die-set-saved", refreshAfterItemSave);
+  document.addEventListener("catalog:global-tags-updated", async (event) => {
+    if (event.detail?.source !== "restore") return;
+    try {
+      [catalog, cards, stampSets] = await Promise.all([
+        loadGlobalTagCatalog(), loadSavedCards(), loadSavedStampDieSets()
+      ]);
+      render();
+    } catch {
+      announce("Restored tags could not be refreshed. Reload the app to try again.", "error");
+    }
+  });
   render();
 }
 

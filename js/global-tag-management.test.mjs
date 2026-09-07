@@ -300,3 +300,13 @@ test("persistent deletion is one transaction over taxonomy and assignment stores
   assert.match(body, /writeTransaction\(database, \[PAPER_PACKS_STORE, CARDS_STORE, STAMP_DIE_SETS_STORE, SETTINGS_STORE\]/);
   assert.equal(/removeEntry|remove\(|imageLibrary|directoryHandle/.test(body), false);
 });
+
+test('Settings reloads the restored taxonomy and all product usage counts before rendering', async () => {
+  const source = await readFile(new URL('./settings.js', import.meta.url), 'utf8');
+  const start = source.indexOf('document.addEventListener("catalog:global-tags-updated", async (event)');
+  const handler = source.slice(start, source.indexOf('  render();\n}', start));
+  assert.match(handler, /source !== "restore"/);
+  assert.match(handler, /\[catalog, cards, stampSets\] = await Promise.all/);
+  assert.match(handler, /loadGlobalTagCatalog\(\), loadSavedCards\(\), loadSavedStampDieSets\(\)/);
+  assert.match(handler, /render\(\)/);
+});
