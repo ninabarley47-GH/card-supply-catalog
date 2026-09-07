@@ -375,7 +375,7 @@ denied, and failed setting access resolve to the browser-download path.
 and generated cover-sheet PNGs. It reuses `fileExists` and `writeFile` from the shared
 image-reference utilities without introducing new filesystem storage. Filenames
 start with the resolved device Default Owner name and `CSC` (or just `CSC` when
-no Owner can be resolved), followed by a UTC date/time timestamp through seconds, with no random suffix.
+no Owner can be resolved), followed by a Pacific date/time timestamp through seconds (`America/Los_Angeles`, automatic PST/PDT, `-PT` suffix), with no random suffix.
 Exports within a page are serialized to prevent same-second write races. Collision checks choose a new numbered
 name, and the writer checks again before creating a file. Lookup/write/close errors
 preserve the generated Blob for download; no folder scan or cleanup is performed.

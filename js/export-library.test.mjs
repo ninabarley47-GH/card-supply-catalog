@@ -118,7 +118,7 @@ test('writable folder receives a complete timestamped backup without changing un
   const directory = folder({ 'unrelated.txt': 'keep me' });
   const result = await saveJsonBackup({ test: true }, 'backup', directory, { ...clock, download: () => assert.fail('should save directly') });
   assert.equal(result.savedToFolder, true); assert.equal(result.folderName, 'Exports');
-  assert.equal(result.fileName, 'CSC-backup-2026-09-07T12-34-56Z.json');
+  assert.equal(result.fileName, 'CSC-backup-2026-09-07T05-34-56-PT.json');
   assert.deepEqual(JSON.parse(directory.files.get(result.fileName)), { test: true });
   assert.equal(directory.files.get('unrelated.txt'), 'keep me'); assert.equal(directory.files.size, 2);
 });
@@ -148,8 +148,8 @@ test('concurrent exports in the same second get short collision suffixes without
   const directory = folder();
   const results = await Promise.all([1, 2].map((number) => saveExportFile(new Blob([String(number)]),
     { directoryHandle: directory }, { ...clock, download: () => assert.fail('should save') })));
-  assert.equal(results[0].fileName, 'CSC-backup-2026-09-07T12-34-56Z.json');
-  assert.equal(results[1].fileName, 'CSC-backup-2026-09-07T12-34-56Z-2.json');
+  assert.equal(results[0].fileName, 'CSC-backup-2026-09-07T05-34-56-PT.json');
+  assert.equal(results[1].fileName, 'CSC-backup-2026-09-07T05-34-56-PT-2.json');
   assert.equal(directory.files.get(results[0].fileName), '1');
   assert.equal(directory.files.get(results[1].fileName), '2');
 });
@@ -214,7 +214,7 @@ test('export prefixes the configured default Owner name, not another catalog Own
     loadOwners: async () => [{ id: 'other', name: 'Amanda' }, { id: 'owner-nina', name: 'Nina Barley' }],
     download: (_blob, name) => { downloaded = name; }
   });
-  assert.equal(downloaded, 'Nina-Barley-CSC-backup-2026-09-07T12-34-56Z.json');
+  assert.equal(downloaded, 'Nina-Barley-CSC-backup-2026-09-07T05-34-56-PT.json');
   assert.equal(result.fileName, downloaded);
 });
 
@@ -225,5 +225,16 @@ test('Owner prefix is filename-safe and a missing/stale Default Owner still perm
     const result = await saveExportFile(new Blob(['backup']), {}, { ...clock, loadCatalogSetting,
       loadOwners: async () => [], download: () => {} });
     assert.match(result.fileName, /^CSC-backup-/);
+  }
+});
+
+test('export timestamps use Pacific time in summer, winter, and across date boundaries', () => {
+  for (const [instant, expected] of [
+    ['2026-09-07T12:34:56Z', '2026-09-07T05-34-56-PT'],
+    ['2026-01-07T12:34:56Z', '2026-01-07T04-34-56-PT'],
+    ['2026-01-01T02:00:00Z', '2025-12-31T18-00-00-PT'],
+    ['2026-09-07T07:00:00Z', '2026-09-07T00-00-00-PT']
+  ]) {
+    assert.equal(createExportFileName('backup', 'json', { now: () => new Date(instant) }), `CSC-backup-${expected}.json`);
   }
 });

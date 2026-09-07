@@ -26,7 +26,11 @@ export async function loadWritableExportDirectory(environment = globalThis, serv
 let exportWriteQueue = Promise.resolve();
 
 export function createExportFileName(label, extension, services = {}) {
-  const timestamp = (services.now?.() || new Date()).toISOString().slice(0, 19).replace(/:/g, '-') + 'Z';
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+  }).formatToParts(services.now?.() || new Date()).map(({ type, value }) => [type, value]));
+  const timestamp = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}-${parts.minute}-${parts.second}-PT`;
   const safeLabel = String(label).replace(/[^a-zA-Z0-9_-]+/g, '-');
   const safeExtension = String(extension).replace(/[^a-zA-Z0-9]/g, '');
   const ownerName = String(services.ownerName || '').trim()

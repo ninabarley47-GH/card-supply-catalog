@@ -41,11 +41,11 @@ download when that picker is unavailable; a direct folder-write failure download
 the generated file.
 
 Automatically saved exports use names such as
-`Nina-CSC-backup-2026-09-07T12-34-56Z.json`.
+`Nina-CSC-backup-2026-09-07T05-34-56-PT.json`.
 The prefix uses this device's Default Owner name, with filename-unsafe characters
 and spaces replaced by hyphens. If no Default Owner can be resolved, the name starts
 with `CSC`.
-The UTC timestamp uses hours, minutes, and seconds, with hyphens instead of colons
+The Pacific Time (PT) timestamp automatically follows PST/PDT and uses hours, minutes, and seconds, with hyphens instead of colons
 for filename compatibility. Existing-file checks prevent automatic replacement. If a name is occupied, CSC adds a numbered suffix.
 CSC never automatically deletes old exports, renames files, creates an Export
 subfolder in an image library, or cleans up the selected folder. A failed write may
