@@ -169,3 +169,20 @@ test('failed Set load and save before loading finishes preserve saved relationsh
   assert.deepEqual(view.availableStampDieSets, [{ id: 'set-b', name: 'Current Set' }]);
   assert.deepEqual(createCardRecord(view).stampDieSetIds, []);
 });
+
+
+test('Add and Edit expose only the lookup Stamp selector while preserving legacy saved metadata', async (t) => {
+  const view = harness(t);
+  for (const open of [() => openAddCardView(view), () => openEditCardView(view, card())]) {
+    await open();
+    assert.deepEqual(view.form.querySelectorAll('h4').map(el => el.textContent).filter(label => /stamp|dies/i.test(label)), ['Stamps & Dies Used']);
+    assert.equal(view.form.querySelectorAll('input').filter(el => el.getAttribute('aria-label') === 'Add stamp sets').length, 0);
+    assert.equal(view.form.querySelectorAll('input').filter(el => el.getAttribute('aria-label') === 'Search stamp & die sets by name').length, 1);
+    await select(view, 'set-b');
+    assert.ok(createCardRecord(view).stampDieSetIds.includes('set-b'));
+  }
+  const saved = createCardRecord(view);
+  assert.deepEqual(saved.stampSets, card().stampSets);
+  assert.deepEqual(saved.paperPackIds, card().paperPackIds);
+  assert.deepEqual(saved.stampDieSetIds, ['set-a', 'missing-set', 'set-b']);
+});

@@ -348,7 +348,6 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   });
 
   addCardView.form.addEventListener('submit', async () => {
-    addStampSetsFromInput(addCardView, false);
     const isNewCard = !addCardView.existingCard;
     const owner = resolveOwnerPicker(addCardView.owner, addCardView.newOwner, owners);
     if (!owner) return;
@@ -490,8 +489,6 @@ export function createAddCardView({ owners = [], tagCatalog, loadStampDieSets = 
     dimensions,
     createFavoriteField(favorite)
   );
-  const stampSetPicker = createStampSetPicker();
-  controls.append(stampSetPicker.section);
   const tagPicker = createTagPicker({
     label: 'Tags',
     productType: 'card',
@@ -545,8 +542,7 @@ export function createAddCardView({ owners = [], tagCatalog, loadStampDieSets = 
     width,
     height,
     favorite,
-    stampSetInput: stampSetPicker.input,
-    stampSetList: stampSetPicker.selected,
+    // Retain legacy text metadata on save without offering a second input.
     stampSets: [],
     tagCatalog,
     tagPicker,
@@ -587,20 +583,6 @@ export function createAddCardView({ owners = [], tagCatalog, loadStampDieSets = 
     renderStampDiePicker(addCardView);
   });
   sizePreset.addEventListener('change', () => applyCardSizePreset(addCardView));
-  stampSetPicker.add.addEventListener('click', () => addStampSetsFromInput(addCardView));
-  stampSetPicker.input.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ',') {
-      event.preventDefault();
-      addStampSetsFromInput(addCardView);
-    }
-  });
-  stampSetPicker.selected.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-remove-stamp-set]');
-
-    if (button) {
-      removeStampSet(addCardView, button.dataset.removeStampSet);
-    }
-  });
   imagePicker.choose.addEventListener('click', async () => {
     if (imagePicker.selectionMode === 'standard-file-input') {
       imagePicker.fileInput.click();
@@ -680,7 +662,6 @@ export function openEditCardView(addCardView, card) {
   addCardView.stampDieSetIds = normalizeStampDieSetIds(card.stampDieSetIds);
   addCardView.existingImageSource = getCardDetailImageSource(card);
   addCardView.imageMessage.textContent = card.imageName || '';
-  renderSelectedStampSets(addCardView);
   renderSelectedPaperPacks(addCardView);
   renderPaperPackSearchResults(addCardView);
   renderSelectedCardImage(addCardView);
@@ -716,84 +697,6 @@ function createFavoriteField(control) {
   text.textContent = 'Favorite';
   label.append(control, text);
   return label;
-}
-
-function createStampSetPicker() {
-  const section = document.createElement('section');
-  section.className = 'card-add-stamp-sets';
-  const heading = document.createElement('h4');
-  heading.textContent = 'Stamp Sets';
-  const inputRow = document.createElement('div');
-  inputRow.className = 'card-add-stamp-set-input-row';
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.placeholder = 'Add a stamp set';
-  input.setAttribute('aria-label', 'Add stamp sets');
-  const add = document.createElement('button');
-  add.className = 'button';
-  add.type = 'button';
-  add.textContent = 'Add';
-  inputRow.append(input, add);
-  const help = document.createElement('p');
-  help.className = 'card-add-stamp-set-help';
-  help.textContent = 'Separate multiple stamp sets with commas.';
-  const selected = document.createElement('ul');
-  selected.className = 'card-add-selected-stamp-sets';
-  selected.setAttribute('aria-label', 'Selected stamp sets');
-  section.append(heading, inputRow, help, selected);
-  return { section, input, add, selected };
-}
-
-function addStampSetsFromInput(addCardView, shouldFocus = true) {
-  const candidates = addCardView.stampSetInput.value
-    .split(',')
-    .map(normalizeCardTag)
-    .filter(Boolean);
-  const existingStampSets = new Set(addCardView.stampSets.map((stampSet) => stampSet.toLocaleLowerCase()));
-
-  for (const candidate of candidates) {
-    const stampSetKey = candidate.toLocaleLowerCase();
-
-    if (!existingStampSets.has(stampSetKey)) {
-      addCardView.stampSets.push(candidate);
-      existingStampSets.add(stampSetKey);
-    }
-  }
-
-  addCardView.stampSetInput.value = '';
-  renderSelectedStampSets(addCardView);
-
-  if (shouldFocus) {
-    addCardView.stampSetInput.focus();
-  }
-}
-
-function removeStampSet(addCardView, stampSetKey) {
-  addCardView.stampSets = addCardView.stampSets.filter(
-    (stampSet) => stampSet.toLocaleLowerCase() !== stampSetKey
-  );
-  renderSelectedStampSets(addCardView);
-}
-
-function renderSelectedStampSets(addCardView) {
-  addCardView.stampSetList.replaceChildren();
-
-  for (const stampSet of addCardView.stampSets) {
-    const item = document.createElement('li');
-    const name = document.createElement('span');
-    name.textContent = stampSet;
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.dataset.removeStampSet = stampSet.toLocaleLowerCase();
-    remove.setAttribute('aria-label', `Remove ${stampSet}`);
-    remove.textContent = String.fromCodePoint(215);
-    item.append(name, remove);
-    addCardView.stampSetList.append(item);
-  }
-}
-
-function normalizeCardTag(tag) {
-  return String(tag || '').trim().replace(/\s+/g, ' ');
 }
 
 function createCardImagePicker() {
@@ -1039,7 +942,6 @@ function resetAddCardForm(addCardView) {
   applyCardSizePreset(addCardView);
   renderSelectedPaperPacks(addCardView);
   renderPaperPackSearchResults(addCardView);
-  renderSelectedStampSets(addCardView);
   renderSelectedCardImage(addCardView);
 }
 
