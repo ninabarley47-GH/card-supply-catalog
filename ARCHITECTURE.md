@@ -68,6 +68,7 @@ Every module should have one clear job. The current modules are:
 | `settings.js` | Image-library settings, setup status, and bulk owner changes |
 | `storage.js` | IndexedDB persistence for paper packs, cards, colors, settings, base-data merging, deletion markers, and legacy localStorage migration |
 | `backup.js` | User-triggered standard/iPad export and import |
+| `export-library.js` | Optional export destination, safe filenames, shared non-overwriting writes, and browser-download fallback |
 | `browser-capabilities.js` | Side-effect-free browser capability detection for filesystem and ordinary image-file workflows |
 | `card-images.js` | Card image selection, folder-backed storage, embedded fallback storage, thumbnail creation, and runtime hydration |
 | `cards.js` | Persisted Card gallery, shared Add/Edit Card workflow, Card detail rendering, and paper-pack relationship selection from the merged runtime catalog |
@@ -136,7 +137,7 @@ Backups are explicit, user-triggered JSON exports rather than automatic rolling 
 - Standard backup: includes Paper Packs, Cards, Stamp & Die Sets, colors, the versioned global tag catalog, `tagIds` assignments, embedded fallback images, and relative references to folder-backed Paper, Card, and Stamp & Die images. The image folders must be backed up separately.
 - iPad backup: includes the same global tag catalog and `tagIds` assignments while embedding compressed copies of accessible Paper, Card, and Stamp & Die images so the catalog can be restored where folder access is unavailable.
 - Import: validates and reconciles the complete taxonomy and all catalog records in memory before writing; then persists the global catalog and selected Paper/Card/Set records, colors, and Owners in one IndexedDB transaction. Any unresolved identity conflict, validation, preparation, or transaction failure leaves IndexedDB and in-memory catalog state unchanged. Legacy name-based backups remain importable through the approved conversion rules.
-- Destination: if the selected image-library folder is writable, export saves there; otherwise it uses a browser download.
+- Destination: the independently configured, optional Export Library receives exports when writable; otherwise exports use a browser download. Image-library roots are never chosen implicitly as export destinations.
 
 ## Schema Version Boundaries
 
@@ -361,3 +362,26 @@ Directory handles remain local settings, excluded from JSON and untouched by
 restore. No automatic reconnection, migration, folder scan, or image creation runs
 for imported Sets. Decision 32 prohibits any source-file cleanup or destructive
 filesystem operation. The Phase 2E backup deferral is superseded by this phase.
+
+### Export Library destination
+
+The optional `exportLibrary` setting uses the existing IndexedDB settings store and
+`{ strategy: 'local-folder', directoryHandle, selectedAt }` shape. Settings reuses
+shared directory capability detection and permission-status presentation. Export
+access uses the existing read/write permission helper; unsupported, missing,
+denied, and failed setting access resolve to the browser-download path.
+
+`export-library.js` handles standard/compact JSON backups, full diagnostic JSON,
+and generated cover-sheet PNGs. It reuses `fileExists` and `writeFile` from the shared
+image-reference utilities without introducing new filesystem storage. Filenames
+combine a UTC timestamp through milliseconds and UUID, with a compatible unique
+suffix when UUID generation is unavailable. Collision checks choose a new numbered
+name, and the writer checks again before creating a file. Lookup/write/close errors
+preserve the generated Blob for download; no folder scan or cleanup is performed.
+Cover sheets retain explicit Save As/cancellation when no export folder is usable.
+
+This setting controls destination only: no Export Library handle or configuration
+is serialized in backups or modified by restore. The three image-library settings
+and Check Image Libraries remain independent. No schema/version bump is required;
+backup contents and catalog records are unchanged. The new module is included in
+the offline app shell.

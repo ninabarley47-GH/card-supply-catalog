@@ -1,3 +1,4 @@
+import { loadWritableExportDirectory, saveExportFile, downloadExportFile } from './export-library.js';
 import { getAvailablePatternImages } from "./images.js";
 
 const COVER_SHEET_SIZE = 1800;
@@ -18,11 +19,8 @@ export async function createCoverSheetForPack(paperPack, colorsById) {
     return;
   }
 
-  const fileHandle = await chooseCoverSheetFile(paperPack);
-
-  if (fileHandle === false) {
-    return;
-  }
+  const destination = await chooseCoverSheetDestination(paperPack);
+  if (destination === false) return;
 
   const images = await loadPatternImages(imageEntries);
 
@@ -48,7 +46,7 @@ export async function createCoverSheetForPack(paperPack, colorsById) {
   }
 
   const blob = await addPngPrintResolution(canvasBlob, COVER_SHEET_PRINT_DPI);
-  await saveCoverSheet(blob, paperPack, fileHandle);
+  await saveCoverSheet(blob, paperPack, destination);
 }
 
 async function addPngPrintResolution(blob, dpi) {
@@ -314,12 +312,19 @@ function parseHexColor(hex) {
   return { red, green, blue };
 }
 
-async function chooseCoverSheetFile(paperPack) {
+export async function chooseCoverSheetDestination(paperPack, environment = globalThis, services = {}) {
+  const directoryHandle = await (services.loadWritableExportDirectory || loadWritableExportDirectory)(environment);
+  if (directoryHandle) return { directoryHandle };
+  const fileHandle = await chooseCoverSheetFile(paperPack, environment);
+  return fileHandle === false ? false : { fileHandle };
+}
+
+async function chooseCoverSheetFile(paperPack, environment) {
   const fileName = `${slugifyFileName(paperPack.name)}-cover-sheet.png`;
 
-  if ("showSaveFilePicker" in window) {
+  if (typeof environment.showSaveFilePicker === "function") {
     try {
-      return await window.showSaveFilePicker({
+      return await environment.showSaveFilePicker({
         suggestedName: fileName,
         types: [
           {
@@ -340,7 +345,10 @@ async function chooseCoverSheetFile(paperPack) {
   return null;
 }
 
-async function saveCoverSheet(blob, paperPack, fileHandle) {
+export async function saveCoverSheet(blob, paperPack, { directoryHandle, fileHandle }, services = {}) {
+  if (directoryHandle) {
+    return saveExportFile(blob, { label: `${slugifyFileName(paperPack.name)}-cover-sheet`, extension: "png", directoryHandle }, services);
+  }
   const fileName = `${slugifyFileName(paperPack.name)}-cover-sheet.png`;
 
   if (fileHandle) {
@@ -356,16 +364,7 @@ async function saveCoverSheet(blob, paperPack, fileHandle) {
     }
   }
 
-  downloadBlob(blob, fileName);
-}
-
-function downloadBlob(blob, fileName) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  URL.revokeObjectURL(url);
+  await (services.download || downloadExportFile)(blob, fileName);
 }
 
 function slugifyFileName(value) {

@@ -17,11 +17,41 @@ Card Supply Catalog keeps your data under your control. A complete backup includ
 1. Open the app.
 2. Go to Settings.
 3. Choose Export Backup.
-4. If an image library folder is selected, confirm the JSON file appears there. Otherwise, save the downloaded JSON file somewhere safe.
+4. If an Export Library folder is configured and writable, confirm the JSON file appears there. Otherwise, save the browser download somewhere safe.
 
 The JSON backup includes Paper Packs, Cards, Stamp & Die Sets, colors, the global tags/categories, Owners, and persisted metadata and image references.
 
 Current backups also preserve Card Status. A Card status is either `available` or `sent`; a legacy Card without a status is restored as `available`.
+
+## Optional Export Library
+
+Settings ? Export Library Folder lets you choose or reconnect a folder for generated
+files. It is independent of the Paper, Card, and Stamp & Die image libraries:
+
+- The three image libraries hold the source images referenced by catalog records.
+- The Export Library receives standard backups, compact iPad backups, diagnostic
+  JSON reports, and generated cover-sheet PNGs.
+
+The Export Library is optional. Supported browsers remember the selected folder on
+this device. If it is missing, inaccessible, or permission is denied, backups and
+reports use the normal browser download. Unsupported browsers, including Safari
+on iPad, show disabled folder controls with download-fallback messaging. Cover sheets
+retain their existing Save As picker when no Export Library is usable, with browser
+download when that picker is unavailable; a direct folder-write failure downloads
+the generated file.
+
+Automatically saved exports use names such as
+`card-supply-catalog-backup-2026-09-07T12-34-56-789Z-<unique-suffix>.json`.
+The UTC timestamp includes milliseconds; a unique suffix and existing-file checks
+prevent automatic replacement. If a name is occupied, CSC adds a numbered suffix.
+CSC never automatically deletes old exports, renames files, creates an Export
+subfolder in an image library, or cleans up the selected folder. A failed write may
+leave a new partial file; CSC preserves it and downloads the complete generated file.
+
+Export Library configuration is device-local and excluded from backup contents.
+Import does not change the destination for future exports. Check Image Libraries
+continues to check only Paper, Card, and Stamp & Die images; the Export Library has
+its own Choose/Reconnect controls and status.
 
 ## Backup and Catalog Schema Versions
 

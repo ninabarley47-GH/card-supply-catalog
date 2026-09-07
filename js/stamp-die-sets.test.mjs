@@ -309,7 +309,7 @@ for (const failCommit of [false, true]) {
     globalThis.window = { indexedDB: h.indexedDB, localStorage: { getItem: () => 'true' } };
     const storage = await import(`./storage.js?backup-atomic-${failCommit}`);
     await storage.loadSavedStampDieRecordsForRestore();
-    for (const id of ['imageLibrary', 'cardImageLibrary', 'stampDieImageLibrary']) {
+    for (const id of ['imageLibrary', 'cardImageLibrary', 'stampDieImageLibrary', 'exportLibrary']) {
       h.stores.get('settings').set(id, { id, value: { directoryHandle: { name: `Local ${id}` }, selectedAt: 'local' } });
     }
     const before = structuredClone(h.stores);
@@ -334,7 +334,7 @@ for (const failCommit of [false, true]) {
       assert.ok(h.stores.get('colors').has('restored-color'));
       assert.ok(h.stores.get('owners').has('restored-owner'));
       assert.deepEqual(h.stores.get('settings').get('globalTagCatalog').value, catalog);
-      for (const id of ['imageLibrary', 'cardImageLibrary', 'stampDieImageLibrary']) {
+      for (const id of ['imageLibrary', 'cardImageLibrary', 'stampDieImageLibrary', 'exportLibrary']) {
         assert.deepEqual(h.stores.get('settings').get(id), before.get('settings').get(id));
       }
       // Older backups pass no Sets: even replacement mode must not clear local Sets.
@@ -350,4 +350,15 @@ test('atomic restore rejects invalid Set data and unknown owners before touching
     stampDieSets: [{ ...setRecord(), imageRefs: [{ imagePath: '../bad.jpg' }] }] }), /Invalid imagePath/);
   await assert.rejects(storage.restoreCatalogRecords({ tagCatalog: catalog,
     stampDieSets: [{ ...setRecord(), ownerId: 'unknown' }] }), /unknown owner/);
+});
+
+test('Export Library configuration persists through a fresh storage session', async (t) => {
+  const h = databaseHarness(); const previousWindow = globalThis.window;
+  t.after(() => { globalThis.window = previousWindow; });
+  globalThis.window = { indexedDB: h.indexedDB, localStorage: { getItem: () => 'true' } };
+  const storage = await import('./storage.js?export-library-save');
+  const configuration = { strategy: 'local-folder', directoryHandle: { name: 'Exports' }, selectedAt: '2026-09-07T00:00:00Z' };
+  await storage.saveCatalogSetting('exportLibrary', configuration);
+  const fresh = await import('./storage.js?export-library-reload');
+  assert.deepEqual(await fresh.loadCatalogSetting('exportLibrary'), configuration);
 });

@@ -1,3 +1,4 @@
+import { loadWritableExportDirectory, saveExportFile } from './export-library.js';
 import { normalizeStampDieSet, normalizeImageReference } from './stamp-die-sets.js';
 import { hydrateStampImages, clearStampImageSources, STAMP_IMAGE_LIBRARY_SETTING_ID } from './stamp-die-images.js';
 import {
@@ -91,7 +92,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, owners = [], o
   if (exportButton) {
     exportButton.addEventListener("click", async () => {
       try {
-        const backupDirectory = await getWritableBackupDirectoryHandle();
+        const backupDirectory = await loadWritableExportDirectory();
         const backup = await createCatalogBackup({
           paperPacks,
           colorsById,
@@ -114,7 +115,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, owners = [], o
       renderBackupMessage(message, "Creating compact iPad backup with compressed images...", "");
 
       try {
-        const backupDirectory = await getWritableBackupDirectoryHandle();
+        const backupDirectory = await loadWritableExportDirectory();
         const backup = await createIpadCatalogBackup({
           paperPacks,
           colorsById,
@@ -259,8 +260,14 @@ export function initializeCatalogBackup({ paperPacks, colorsById, owners = [], o
     });
   }
 
-  downloadDiagnosticButton?.addEventListener("click", () => {
-    if (latestDiagnosticReport) downloadImportDiagnosticReport(latestDiagnosticReport);
+  downloadDiagnosticButton?.addEventListener("click", async () => {
+    if (!latestDiagnosticReport) return;
+    try {
+      const result = await downloadImportDiagnosticReport(latestDiagnosticReport);
+      renderBackupMessage(message, formatBackupSaveDestination(result, "Diagnostic report"), "success");
+    } catch {
+      renderBackupMessage(message, "The diagnostic report could not be exported. You can still copy it below.", "error");
+    }
   });
 
   copyDiagnosticButton?.addEventListener("click", async () => {
@@ -914,36 +921,9 @@ function createSerializableImageLibrarySetting(imageLibrary) {
   };
 }
 
-async function saveJsonBackup(backup, label = "backup", directoryHandle = null) {
-  const backupJson = JSON.stringify(backup, null, 2);
-  const blob = new Blob([backupJson], { type: "application/json" });
-  const fileName = `card-supply-catalog-${label}-${formatDateStamp(new Date())}.json`;
-
-  if (directoryHandle) {
-    try {
-      const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
-      const writable = await fileHandle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-
-      return {
-        savedToFolder: true,
-        folderName: directoryHandle.name || "the selected folder",
-        fileName,
-        fileSize: blob.size
-      };
-    } catch (error) {
-      // Fall back to a browser download if the selected folder cannot be written.
-    }
-  }
-
-  downloadJsonBackup(blob, fileName);
-  return {
-    savedToFolder: false,
-    folderName: "",
-    fileName,
-    fileSize: blob.size
-  };
+export async function saveJsonBackup(backup, label = "backup", directoryHandle = null, services = {}) {
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+  return saveExportFile(blob, { label, directoryHandle }, services);
 }
 
 export function shouldBlockOversizedIpadImport({ fileSize, userAgent = "", platform = "", maxTouchPoints = 0 }) {
@@ -952,53 +932,6 @@ export function shouldBlockOversizedIpadImport({ fileSize, userAgent = "", platf
   return isIpad && fileSize > MAX_SAFE_IPAD_IMPORT_BYTES;
 }
 
-function downloadJsonBackup(blob, fileName) {
-  if (blob.size === 0) {
-    throw new Error("The generated backup file is empty.");
-  }
-
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-
-  link.href = url;
-  link.download = fileName;
-  link.hidden = true;
-  document.body.append(link);
-  link.click();
-  link.remove();
-
-  // Safari may still be reading the object URL after the click handler returns.
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-}
-
-async function getWritableBackupDirectoryHandle() {
-  const imageLibrary = await loadCatalogSetting(IMAGE_LIBRARY_SETTING_ID);
-  const directoryHandle = imageLibrary?.directoryHandle;
-
-  if (!directoryHandle) {
-    return null;
-  }
-
-  if (!directoryHandle.queryPermission) {
-    return directoryHandle;
-  }
-
-  try {
-    const permission = { mode: "readwrite" };
-
-    if ((await directoryHandle.queryPermission(permission)) === "granted") {
-      return directoryHandle;
-    }
-
-    if (directoryHandle.requestPermission && (await directoryHandle.requestPermission(permission)) === "granted") {
-      return directoryHandle;
-    }
-  } catch (error) {
-    // A download will be used when saved-folder permission is unavailable.
-  }
-
-  return null;
-}
 
 async function readBackupFile(backupFile) {
   return JSON.parse(await backupFile.text());
@@ -1527,9 +1460,9 @@ async function createFailedDiagnosticReport(backupFile, error) {
   };
 }
 
-function downloadImportDiagnosticReport(report) {
-  const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
-  downloadJsonBackup(blob, `card-supply-catalog-import-diagnostic-${formatDateStamp(new Date())}.json`);
+export async function downloadImportDiagnosticReport(report, services = {}) {
+  const directoryHandle = await (services.loadWritableExportDirectory || loadWritableExportDirectory)();
+  return saveJsonBackup(report, "import-diagnostic", directoryHandle, services);
 }
 
 async function getStorageQuotaDiagnostic() {
@@ -2033,13 +1966,6 @@ function cloneJsonSafe(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function formatDateStamp(date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0")
-  ].join("-");
-}
 
 function renderBackupMessage(message, text, tone) {
   if (!message) {

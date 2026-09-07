@@ -379,6 +379,7 @@
               <a href="#global-tags-settings">Tags</a>
               <a href="#image-storage-settings">Image Storage</a>
               <a href="#catalog-maintenance-settings">Catalog Maintenance</a>
+              <a href="#export-library-settings">Export Library Folder</a>
               <a href="#catalog-backup-settings">Catalog Backup and Restore</a>
               <a href="#setup-status-settings">Setup Status</a>
             </nav>
@@ -505,13 +506,28 @@
               </details>
             </section>
 
+            <section class="settings-subsection" id="export-library-settings" aria-labelledby="export-library-title">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Export Storage</p>
+                  <h4 id="export-library-title">Export Library Folder</h4>
+                </div>
+                <p>Choose an optional folder for backups and other exports, independently of your image libraries.</p>
+              </div>
+              <div class="settings-actions image-library-buttons">
+                <button class="button" type="button" data-choose-export-library>Choose Export Library Folder</button>
+                <button class="button" type="button" data-reconnect-export-library>Reconnect Export Library</button>
+              </div>
+              <p class="settings-message" data-export-library-status aria-live="polite">Checking export folder support...</p>
+            </section>
+
             <section class="settings-subsection" id="catalog-backup-settings" aria-labelledby="backup-restore-title">
               <div class="section-heading">
                 <div>
                   <p class="eyebrow">Backup & Restore</p>
                   <h4 id="backup-restore-title">Catalog Backup and Restore</h4>
                 </div>
-                <p>Export or restore catalog data for sharing, safekeeping, or moving browsers. Exports are saved in the selected image folder when available.</p>
+                <p>Export or restore catalog data for sharing, safekeeping, or moving browsers. Exports are saved in your optional Export Library when available, or downloaded by the browser.</p>
               </div>
 
               <div class="settings-actions" aria-label="Backup and restore actions">

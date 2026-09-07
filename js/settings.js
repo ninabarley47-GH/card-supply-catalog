@@ -1,3 +1,4 @@
+import { EXPORT_LIBRARY_SETTING_ID, chooseExportDirectory } from './export-library.js';
 import { STAMP_IMAGE_LIBRARY_SETTING_ID, chooseStampImageDirectory, checkStampImageLibraryHealth } from './stamp-die-images.js';
 import {
   checkImageLibraryHealth,
@@ -46,6 +47,7 @@ export function initializeSettings(options = {}) {
   initializeImageLibrarySettings(options);
   initializeCardImageLibrarySettings(options);
   initializeStampImageLibrarySettings(options);
+  initializeExportLibrarySettings();
   initializeBulkOwnerSettings(options);
   initializeTagSettings(options);
 }
@@ -586,6 +588,45 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
   editor.append(input, save, cancel);
   row.append(display, editor, edit, remove);
   return row;
+}
+
+export async function initializeExportLibrarySettings(services = {}) {
+  const environment = services.environment || window;
+  const choose = document.querySelector("[data-choose-export-library]");
+  const reconnect = document.querySelector("[data-reconnect-export-library]");
+  const status = document.querySelector("[data-export-library-status]");
+  if (!choose || !status) return;
+  if (!supportsDirectoryPicker(environment)) {
+    choose.disabled = true;
+    if (reconnect) reconnect.disabled = true;
+    renderImageLibraryStatus(status, "Export folder selection is not supported in this browser. Exports will use the normal browser download.", "");
+    return;
+  }
+  const select = async (action) => {
+    try {
+      const directory = await chooseExportDirectory(environment, services);
+      if (directory) renderImageLibraryStatus(status, `Export folder ${action}: ${directory.name}.`, "success");
+    } catch (error) {
+      renderImageLibraryStatus(status, error?.name === "AbortError"
+        ? "Export folder selection was cancelled."
+        : "The Export Library could not be saved. Exports will use the normal browser download when the saved folder is unavailable.",
+        error?.name === "AbortError" ? "" : "error");
+    }
+  };
+  choose.addEventListener("click", () => select("selected"));
+  reconnect?.addEventListener("click", () => select("reconnected"));
+  try {
+    const setting = await (services.loadCatalogSetting || loadCatalogSetting)(EXPORT_LIBRARY_SETTING_ID);
+    const directory = setting?.directoryHandle;
+    const permission = await getDirectoryPermissionState(directory);
+    renderImageLibraryStatus(status, !directory
+      ? "No Export Library folder selected. Exports will use the normal browser download."
+      : permission === "granted" ? `Export folder ready: ${directory.name}.`
+      : `Saved Export folder: ${directory.name}. Reconnect to save exports here; otherwise they will download.`,
+      directory && permission === "granted" ? "success" : "");
+  } catch {
+    renderImageLibraryStatus(status, "The saved Export Library could not be loaded. Exports will use the normal browser download.", "error");
+  }
 }
 
 export async function initializeStampImageLibrarySettings({ paperPacks = [] } = {}, services = {}) {
