@@ -3,7 +3,7 @@ import { CATALOG_SCHEMA_VERSION } from './schema.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { initializeStampDieLibrary, createStampDieSetRecord } from './stamp-die-library.js';
+import { initializeStampDieLibrary, createStampDieSetRecord, findCardsUsingStampDieSet } from './stamp-die-library.js';
 import { getLocalDateValue } from './ui.js';
 
 const initialCatalog = () => ({
@@ -335,7 +335,7 @@ test('record creation rejects malformed dates/category assignments and supports 
 
 test('Add Set is wired into the application and offline shell with isolated image handling', async () => {
   const [app, shell, html, source, settings] = await Promise.all(['app.js', '../sw.js', '../index.html', 'stamp-die-library.js', 'settings.js'].map((file) => readFile(new URL(file, import.meta.url), 'utf8')));
-  assert.match(app, /await initializeStampDieLibrary\(\{ owners \}\)/);
+  assert.match(app, /await initializeStampDieLibrary\(\{ owners, cards \}\)/);
   assert.match(shell, /\.\/js\/stamp-die-library\.js/);
   assert.match(shell, /\.\/js\/ui\.js/);
   assert.match(html, /data-add-set>Add Set/);
@@ -1027,7 +1027,7 @@ test('Set Detail reuses context/title/close header and places destructive action
   assert.ok(content.className.includes('card-detail-content'));
   assert.ok(content.children[0].className.includes('stamp-set-detail-images'));
   const metadata = content.querySelector('.detail-metadata');
-  assert.deepEqual(metadata.querySelectorAll('h4').map((heading) => heading.textContent), ['Set Info', 'Tags', 'Actions']);
+  assert.deepEqual(metadata.querySelectorAll('h4').map((heading) => heading.textContent), ['Set Info', 'Tags', 'Related Cards', 'Actions']);
   const facts = metadata.querySelector('dl');
   assert.equal(facts.className, 'detail-meta-list');
   assert.deepEqual(facts.querySelectorAll('dt').map((term) => term.textContent), ['Owner', 'Release Year']);
@@ -1303,4 +1303,88 @@ test('Stamp dismissal clears shared history for Escape/backdrop and late native 
   await detail.emit('close'); // A queued notification from the previous visit.
   assert.equal(detail.open, true);
   assert.deepEqual(detailNavigation.getState(), { current: { type: 'stamp', id: 'set-existing' }, history: [{ type: 'card', id: 'A' }] });
+});
+
+
+const relationshipCard = (id, ids, extra = {}) => ({ id, stampDieSetIds: ids, dateCreated: '2026-09-07',
+  size: { width: 4.25, height: 5.5 }, paperPackIds: ['paper-X'], ...extra });
+
+test('Stamp reverse lookup uses exact Set IDs, includes all matches once, and never changes Cards', () => {
+  const cards = [relationshipCard('A', ['set-existing']), relationshipCard('B', ['other', 'set-existing', 'set-existing']),
+    relationshipCard('unrelated', ['other']), relationshipCard('legacy', undefined),
+    relationshipCard('malformed', 'set-existing'), null];
+  const before = structuredClone(cards);
+  assert.deepEqual(findCardsUsingStampDieSet(cards, 'set-existing').map(card => card.id), ['A', 'B']);
+  assert.deepEqual(findCardsUsingStampDieSet(cards, 'set'), []);
+  assert.deepEqual(findCardsUsingStampDieSet(cards, 'missing'), []);
+  assert.deepEqual(findCardsUsingStampDieSet(null, 'set-existing'), []);
+  assert.deepEqual(cards, before);
+});
+
+test('Stamp Detail displays multiple Related Cards with existing thumbnail conventions and no unrelated Cards', async (t) => {
+  const cards = [relationshipCard('card-A', ['set-existing'], { thumbnailImageSrc: 'data:image/jpeg;base64,YQ==' }),
+    relationshipCard('card-B', ['set-existing'], { dateCreated: '2026-09-06' }), relationshipCard('unrelated', [])];
+  const before = structuredClone(cards);
+  const h = await harness(t, { cards });
+  await seedEdit(h); await h.cancel.emit('click');
+  await h.gallery.querySelector('article').emit('click');
+  const section = setDetail(h).querySelector('.related-cards-section');
+  assert.equal(section.querySelector('h4').textContent, 'Related Cards');
+  assert.deepEqual(section.querySelectorAll('[data-related-card-id]').map(button => button.dataset.relatedCardId), ['card-A', 'card-B']);
+  assert.equal(section.querySelector('img').src, cards[0].thumbnailImageSrc);
+  assert.match(section.textContent, /2026-09-07.*2026-09-06/);
+  assert.match(section.textContent, /No image yet/);
+  assert.doesNotMatch(section.textContent, /card-A|card-B|unrelated/);
+  assert.match(section.querySelector('button').getAttribute('aria-label'), /2026-09-07.*4.25 by 5.5/);
+  await section.querySelector('img').emit('error');
+  assert.equal(section.querySelector('img'), null);
+  assert.deepEqual(cards, before);
+  assert.equal(h.calls(), 0, 'viewing never saves a Set');
+});
+
+test('Related Cards section remains visible when empty and reflects live relationship changes on reopening', async (t) => {
+  const cards = [relationshipCard('A', ['other'])];
+  const h = await harness(t, { cards });
+  await seedEdit(h); await h.cancel.emit('click');
+  detailNavigation.open('stamp', 'set-existing');
+  const section = () => setDetail(h).querySelector('.related-cards-section');
+  assert.match(section().textContent, /Related Cards.*No related Cards yet/);
+  assert.equal(section().querySelectorAll('button').length, 0);
+  detailNavigation.close();
+  cards.splice(0, cards.length, relationshipCard('A', ['set-existing']));
+  detailNavigation.open('stamp', 'set-existing');
+  assert.equal(section().querySelectorAll('button').length, 1);
+  detailNavigation.close();
+  cards[0].stampDieSetIds = [];
+  detailNavigation.open('stamp', 'set-existing');
+  assert.match(section().textContent, /No related Cards yet/);
+  assert.deepEqual(cards[0].paperPackIds, ['paper-X']);
+});
+
+test('Stamp Related Card click opens the correct Card and Back restores the Set with earlier history intact', async (t) => {
+  const cards = [relationshipCard('A', ['set-existing']), relationshipCard('B', ['set-existing'])];
+  const h = await harness(t, { cards });
+  await seedEdit(h); await h.cancel.emit('click');
+  let currentCard = null;
+  detailNavigation.register('card', { library: 'cards', exists: id => cards.some(card => card.id === id),
+    open: id => { currentCard = id; }, hide: () => { currentCard = null; } });
+  detailNavigation.open('card', 'A');
+  detailNavigation.open('stamp', 'set-existing', { related: true });
+  const detail = setDetail(h);
+  const link = detail.querySelector('[data-related-card-id="B"]');
+  let stopped = false;
+  await detail.querySelector('.stamp-set-detail-body').emit('click', { target: link, stopPropagation() { stopped = true; } });
+  assert.equal(stopped, true);
+  assert.equal(currentCard, 'B');
+  assert.equal(detail.open, false);
+  assert.deepEqual(detailNavigation.getState(), { current: { type: 'card', id: 'B' },
+    history: [{ type: 'card', id: 'A' }, { type: 'stamp', id: 'set-existing' }] });
+  detailNavigation.back();
+  assert.equal(detail.open, true);
+  assert.equal(detail.querySelector('h3').textContent, 'Original');
+  assert.equal(detail.querySelectorAll('[data-related-card-id]').length, 2);
+  assert.deepEqual(detailNavigation.getState().history, [{ type: 'card', id: 'A' }]);
+  await detail.querySelector('.card-detail-back').emit('click', { stopPropagation() {} });
+  assert.equal(currentCard, 'A');
+  assert.deepEqual(cards.map(card => card.stampDieSetIds), [['set-existing'], ['set-existing']]);
 });

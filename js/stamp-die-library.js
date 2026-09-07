@@ -1,3 +1,4 @@
+import { getCardLibraryImageSource } from './card-images.js';
 import { detailNavigation } from './detail-navigation.js';
 import { filterStampDieSets, initializeStampDieFilters } from './stamp-die-filter.js';
 import { initializeOwnerPicker, resolveOwnerPicker, setOwnerPickerValue, refreshOwnerOptions, notifyOwnerRegistryUpdated } from './owner-picker.js';
@@ -43,6 +44,8 @@ export async function initializeStampDieLibrary(services = {}) {
     chooseStampImages, selectStampImageFiles, loadStampImageDirectory,
     prepareStampImagesForSave, hydrateStampImages, loadDefaultOwnerId, loadCatalogSetting, saveCatalogSetting, ...services };
   const owners = services.owners || [];
+  // Share the live Card collection, as Paper Detail does; reverse links are never persisted.
+  const cards = Array.isArray(services.cards) ? services.cards : [];
   const screen = document.getElementById('stamps-dies');
   if (!screen) return;
   const add = screen.querySelector('[data-add-set]');
@@ -88,7 +91,7 @@ export async function initializeStampDieLibrary(services = {}) {
       empty.textContent = 'No tags';
       tagSection.append(empty);
     }
-    metadata.append(info, tagSection, detail.actions);
+    metadata.append(info, tagSection, createStampRelatedCardsSection(cards, record.id), detail.actions);
     const content = document.createElement('div');
     content.className = 'card-detail-content stamp-set-detail-content';
     content.append(createSetImageGrid(record.imageRefs, true), metadata);
@@ -145,6 +148,12 @@ export async function initializeStampDieLibrary(services = {}) {
     // A queued native close may belong to a previous visit to this same dialog.
     if (detail.dialog.open) return;
     detailNavigation.close('stamp');
+  });
+  detail.body.addEventListener('click', (event) => {
+    const link = event.target.closest('[data-related-card-id]');
+    if (!link) return;
+    event.stopPropagation();
+    detailNavigation.open('card', link.dataset.relatedCardId, { related: true });
   });
   detail.back.addEventListener('click', (event) => { event.stopPropagation(); detailNavigation.back(); });
   detail.edit.addEventListener('click', () => openForm(selectedSetId));
@@ -788,4 +797,54 @@ function createSetFavoriteButton(record, onToggle) {
   button.title = record.favorite ? 'Remove from favorites' : 'Add to favorites';
   button.addEventListener('click', () => onToggle?.(record.id, button));
   return button;
+}
+
+
+export function findCardsUsingStampDieSet(cards, setId) {
+  if (!setId || !Array.isArray(cards)) return [];
+  return cards.filter((card) => Array.isArray(card?.stampDieSetIds) && card.stampDieSetIds.includes(setId));
+}
+
+function createStampRelatedCardsSection(cards, setId) {
+  const section = createSetDetailSection('Related Cards');
+  section.className += ' related-cards-section';
+  const related = findCardsUsingStampDieSet(cards, setId);
+  if (!related.length) {
+    const empty = document.createElement('p');
+    empty.className = 'card-detail-empty';
+    empty.textContent = 'No related Cards yet.';
+    section.append(empty);
+    return section;
+  }
+  const grid = document.createElement('div');
+  grid.className = 'related-cards-grid';
+  for (const card of related) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'related-card-link';
+    button.dataset.relatedCardId = card.id;
+    const description = `Card created ${card.dateCreated}, ${card.size.width} by ${card.size.height} inches`;
+    button.setAttribute('aria-label', `Open ${description}`);
+    const placeholder = document.createElement('div');
+    placeholder.className = 'related-card-thumbnail related-card-thumbnail-missing';
+    placeholder.textContent = 'No image yet';
+    const source = getCardLibraryImageSource(card);
+    if (source) {
+      const image = document.createElement('img');
+      image.className = 'related-card-thumbnail';
+      image.src = source;
+      image.alt = description;
+      image.decoding = 'async';
+      image.addEventListener('error', () => button.replaceChildren(placeholder, caption), { once: true });
+      button.append(image);
+    } else {
+      button.append(placeholder);
+    }
+    const caption = document.createElement('span');
+    caption.textContent = `${card.dateCreated} \u00b7 ${card.size.width} \u00d7 ${card.size.height} inches`;
+    button.append(caption);
+    grid.append(button);
+  }
+  section.append(grid);
+  return section;
 }
