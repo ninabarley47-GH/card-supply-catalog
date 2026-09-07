@@ -362,3 +362,22 @@ test('Export Library configuration persists through a fresh storage session', as
   const fresh = await import('./storage.js?export-library-reload');
   assert.deepEqual(await fresh.loadCatalogSetting('exportLibrary'), configuration);
 });
+
+test('Card Notes survives storage reload, editing and clearing without rewriting legacy Cards on load', async (t) => {
+  const h = databaseHarness(); const previousWindow = globalThis.window;
+  t.after(() => { globalThis.window = previousWindow; });
+  globalThis.window = { indexedDB: h.indexedDB, localStorage: { getItem: () => 'true' } };
+  const storage = await import('./storage.js?card-notes-save');
+  await storage.loadSavedStampDieSets();
+  const legacy = { id: 'notes-card', dateCreated: '2026-09-07', size: { width: 4, height: 6 },
+    tagIds: ['stable-one'], paperPackIds: [], colorIds: [], favorite: false };
+  h.stores.get('cards').set(legacy.id, structuredClone(legacy));
+  assert.equal((await storage.loadSavedCards()).find(c => c.id === legacy.id).notes, '');
+  assert.deepEqual(h.stores.get('cards').get(legacy.id), legacy);
+  for (const notes of ['  First\n\nSecond  ', 'Changed\nText', '']) {
+    await storage.saveCard({ ...legacy, notes });
+    const fresh = await import(`./storage.js?card-notes-reload-${encodeURIComponent(notes)}`);
+    assert.equal((await fresh.loadSavedCards()).find(c => c.id === legacy.id).notes, notes.trim());
+    assert.equal(h.stores.get('cards').get(legacy.id).notes, notes.trim());
+  }
+});

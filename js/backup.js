@@ -10,6 +10,7 @@ import {
   loadSavedCardRecordsForRestore,
   loadSavedPaperPack,
   isCard,
+  normalizeCardNotes,
   isColor,
   isCompatiblePaperPack,
   restoreCatalogRecords,
@@ -1758,6 +1759,7 @@ function createSerializableCard(card) {
 
   return addCatalogSchemaVersion(cloneJsonSafe({
     ...serializableCard,
+    notes: normalizeCardNotes(serializableCard.notes),
     status: serializableCard.status === "sent" ? "sent" : "available"
   }));
 }

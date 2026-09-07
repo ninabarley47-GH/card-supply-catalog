@@ -63,12 +63,12 @@ The backup JSON contains two separate version numbers:
 - `schemaVersion` versions the backup envelope: the top-level JSON structure, collection layout, image-storage information, and import contract.
 - `catalogSchemaVersion` versions the catalog records stored inside that envelope, including the fields and allowed values on Cards, Paper Packs, and Stamp & Die Sets.
 
-The current combination is backup envelope version 4 and catalog-record version 6:
+The current combination is backup envelope version 4 and catalog-record version 7:
 
 ```json
 {
   "schemaVersion": 4,
-  "catalogSchemaVersion": 6
+  "catalogSchemaVersion": 7
 }
 ```
 
@@ -162,3 +162,7 @@ compact export reads accessible images. Restore writes catalog metadata only.
 
 After a successful restore, CSC refreshes shared Owner and tag/category views,
 including Settings usage counts, without requiring an app reload.
+
+Card Notes advances the catalog-record version to 7. Standard and iPad backups
+preserve its plain multiline text; older backups without Notes remain importable.
+The backup envelope and IndexedDB versions are unchanged by Notes.

@@ -755,6 +755,7 @@ export function normalizeCardForRuntime(card, catalog = null) {
 
   const runtimeCard = {
     ...cardWithoutLegacyStampSet,
+    notes: normalizeCardNotes(cardWithoutLegacyStampSet.notes),
     status: cardWithoutLegacyStampSet.status === "sent" ? "sent" : "available",
     tags,
     stampSets
@@ -764,10 +765,17 @@ export function normalizeCardForRuntime(card, catalog = null) {
     : runtimeCard;
 }
 
+export function normalizeCardNotes(notes) {
+  if (notes == null) return "";
+  if (typeof notes !== "string") throw new TypeError("Card Notes must be a string.");
+  return notes.trim();
+}
+
 export function isCard(card) {
   return (
     card &&
     typeof card.id === "string" &&
+    (card.notes == null || typeof card.notes === "string") &&
     (card.ownerId === undefined || typeof card.ownerId === "string") &&
     (card.status === undefined || card.status === "available" || card.status === "sent") &&
     typeof card.dateCreated === "string" &&

@@ -325,7 +325,8 @@
 }
 
 .card-add-field input,
-.card-add-field select {
+.card-add-field select,
+.card-add-field textarea {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--color-border);
@@ -843,3 +844,16 @@
 
 .stamp-set-tile > .card-title-row { padding-bottom: var(--space-4); }
 .stamp-set-detail-title-row { padding: 0; align-items: center; }
+
+.card-detail-notes {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.card-detail-notes p {
+  white-space: pre-wrap;
+}
+
+.card-add-controls textarea {
+  resize: vertical;
+}

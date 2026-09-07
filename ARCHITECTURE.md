@@ -386,3 +386,13 @@ is serialized in backups or modified by restore. The three image-library setting
 and Check Image Libraries remain independent. No schema/version bump is required;
 backup contents and catalog records are unchanged. The new module is included in
 the offline app shell.
+
+### Card Notes (catalog schema 7)
+
+Optional Card `notes` is plain text, normalized to an empty string when absent/null
+and trimmed only at its edges. Other non-string values are rejected. Shared Card
+normalization and backup serialization preserve multiline Notes; load normalization
+does not rewrite old records. Catalog schema advances from 6 to 7 for this persisted
+field under the record-only versioning policy. The backup envelope remains 4 and
+IndexedDB remains 6: no store or payload-wrapper changes are required. Older backups
+remain valid and restore missing Notes as empty text.

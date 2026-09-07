@@ -1,5 +1,5 @@
 import { getLocalDateValue } from './ui.js';
-import { deleteCard, loadCatalogSetting, loadGlobalTagCatalog, loadSavedCards, saveCard, saveCatalogSetting, saveOwner } from './storage.js';
+import { normalizeCardNotes, deleteCard, loadCatalogSetting, loadGlobalTagCatalog, loadSavedCards, saveCard, saveCatalogSetting, saveOwner } from './storage.js';
 import { loadDefaultOwnerId } from './settings.js';
 import { refreshOwnerFilter, initializeOwnerPicker, notifyOwnerRegistryUpdated, refreshOwnerOptions, resolveOwnerPicker, setOwnerPickerValue } from './owner-picker.js';
 import { isActiveOwner } from './owners.js';
@@ -500,6 +500,10 @@ function createAddCardView({ owners = [], tagCatalog } = {}) {
   controls.append(tagPicker.element);
   const paperPackPicker = createPaperPackPicker();
   controls.append(paperPackPicker.section);
+  const notes = document.createElement('textarea');
+  notes.name = 'notes';
+  notes.rows = 4;
+  controls.append(createAddCardField('Notes', notes));
   layout.append(imagePicker.container, controls);
   content.append(layout);
 
@@ -528,6 +532,7 @@ function createAddCardView({ owners = [], tagCatalog } = {}) {
     save,
     owners,
     dateCreated,
+    notes,
     status,
     owner,
     newOwner,
@@ -633,6 +638,7 @@ function openEditCardView(addCardView, card) {
   addCardView.title.textContent = 'Edit Card';
   addCardView.save.textContent = 'Save Changes';
   addCardView.dateCreated.value = card.dateCreated;
+  addCardView.notes.value = normalizeCardNotes(card.notes);
   addCardView.status.value = card.status;
   setOwnerPickerValue(addCardView.owner, addCardView.newOwner, card.ownerId, '', addCardView.owners);
   addCardView.sizePreset.value = getCardSizePreset(card.size);
@@ -913,6 +919,7 @@ function resetAddCardForm(addCardView) {
   clearSelectedCardImage(addCardView.selectedImage);
   addCardView.form.reset();
   addCardView.dateCreated.value = getLocalDateValue();
+  addCardView.notes.value = '';
   addCardView.status.value = 'available';
   addCardView.sizePreset.value = 'a2-portrait';
   addCardView.paperPackIds = [];
@@ -942,7 +949,7 @@ function applyCardSizePreset(addCardView) {
 }
 
 
-function createCardRecord(addCardView) {
+export function createCardRecord(addCardView) {
   const timestamp = new Date().toISOString();
   const existingCard = addCardView.existingCard;
   const selectedTags = addCardView.tagPicker.getSelectedTags();
@@ -952,6 +959,7 @@ function createCardRecord(addCardView) {
     id: existingCard?.id || createCardId(timestamp),
     status: addCardView.status.value === 'sent' ? 'sent' : 'available',
     dateCreated: addCardView.dateCreated.value,
+    notes: normalizeCardNotes(addCardView.notes.value),
     size: {
       preset: addCardView.sizePreset.value,
       width: Number(addCardView.width.value),
@@ -1362,12 +1370,27 @@ function createCardDetailContent(card, index, paperPacks) {
     createCardFacts(card),
     createCardDetailRelationshipMetadata(card, paperPacks),
     createChipSection('Tags', card.tags),
-    createChipSection('Colors', card.colorIds),
-    createCardDetailActions(card)
+    createChipSection('Colors', card.colorIds)
   );
+  const notesSection = createCardNotesSection(card.notes);
+  if (notesSection) metadata.append(notesSection);
+  metadata.append(createCardDetailActions(card));
 
   content.append(image, metadata);
   return content;
+}
+
+export function createCardNotesSection(notes) {
+  const text = normalizeCardNotes(notes);
+  if (!text) return null;
+  const section = document.createElement('section');
+  section.className = 'card-detail-section card-detail-notes';
+  const heading = document.createElement('h4');
+  heading.textContent = 'Notes';
+  const body = document.createElement('p');
+  body.textContent = text;
+  section.append(heading, body);
+  return section;
 }
 
 export function resolvePaperPackDisplayNames(paperPackIds = [], paperPacks = []) {

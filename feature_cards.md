@@ -60,3 +60,12 @@ Phase 7
 ### Notes
 - Existing full-resolution images remain unchanged
 - Paper Library falls back to full-resolution images when thumbnails are unavailable
+## Card Notes
+
+Cards support optional plain-string `notes`. Add and Edit provide a multiline Notes
+textarea after the structured metadata. Detail shows meaningful Notes as plain text,
+with line breaks and wrapping; empty Notes are hidden. Tiles and search are unchanged.
+Missing/null Notes normalize to an empty string; saving trims outer whitespace while
+preserving internal line breaks, without a character limit. Non-string values are
+invalid. Existing records need no bulk rewrite. Standard and iPad backups preserve
+Notes through restore, including backups from before Notes existed.
