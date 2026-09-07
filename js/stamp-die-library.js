@@ -93,7 +93,12 @@ export async function initializeStampDieLibrary(services = {}) {
     content.append(createSetImageGrid(record.imageRefs, true), metadata);
     detail.body.replaceChildren(content);
   }
-  function openDetail(id, source) {
+  function openDetail(id, source, cardContext = {}) {
+    if (!displayedRecords.some((record) => record.id === id)) return;
+    for (const key of ['sourceCardId', 'sourcePaperPackId']) {
+      if (cardContext[key]) detail.dialog.dataset[key] = cardContext[key];
+      else delete detail.dialog.dataset[key];
+    }
     detail.message.textContent = '';
     selectedSetId = id;
     detailSource = source;
@@ -138,6 +143,8 @@ export async function initializeStampDieLibrary(services = {}) {
   detail.dialog.addEventListener('click', (event) => { if (!deleting && event.target === detail.dialog) detail.dialog.close(); });
   detail.dialog.addEventListener('close', () => {
     selectedSetId = null;
+    delete detail.dialog.dataset.sourceCardId;
+    delete detail.dialog.dataset.sourcePaperPackId;
     detail.title.textContent = '';
     detail.body.replaceChildren();
     const currentTile = [...gallery.querySelectorAll('[data-set-id]')].find((tile) => tile.dataset.setId === detailSource?.dataset.setId);
@@ -472,6 +479,12 @@ export async function initializeStampDieLibrary(services = {}) {
     document.dispatchEvent(new CustomEvent('catalog:global-tags-updated', { detail: { source: 'stamp-die-save' } }));
   });
 
+  document.addEventListener('stamp-die-set:detail-request', (event) => {
+    const context = event.detail || {};
+    if (!displayedRecords.some((record) => record.id === context.stampDieSetId)) return;
+    window.location.hash = '#stamps-dies';
+    openDetail(context.stampDieSetId, null, context);
+  });
   document.addEventListener('catalog:stamp-sets-restored', () => refresh());
   document.addEventListener('catalog:global-tags-updated', (event) => { if (event.detail?.source !== 'stamp-die-save') return refresh(); });
   document.addEventListener('catalog:owners-updated', () => {

@@ -1241,3 +1241,36 @@ test('Settings library changes refresh existing Set display without save, infere
     assert.equal(h.form.querySelectorAll('[data-tag-id]').length, 2);
   }
 });
+
+
+test('Card relationship handoff opens the correct Set Detail and retains transient Card/Paper context only', async (t) => {
+  const h = await harness(t);
+  await seedEdit(h, { id: 'linked-set' });
+  await h.cancel.emit('click');
+  const { requestCardStampDieDetail } = await import('./cards.js');
+  const overlay = new Element('div');
+  overlay.hidden = false;
+  overlay.dataset.selectedCardId = 'origin-card';
+  overlay.dataset.sourcePaperPackId = 'origin-paper';
+  const body = new Element('div');
+  const back = new Element('button');
+  const before = structuredClone(h.records);
+  requestCardStampDieDetail({ overlay, body, back }, 'linked-set');
+  const detail = setDetail(h);
+  assert.equal(detail.open, true);
+  assert.equal(detail.querySelector('h3').textContent, 'Original');
+  assert.equal(window.location.hash, '#stamps-dies');
+  assert.equal(detail.dataset.sourceCardId, 'origin-card');
+  assert.equal(detail.dataset.sourcePaperPackId, 'origin-paper');
+  assert.equal(overlay.hidden, true);
+  assert.doesNotMatch(detail.textContent, /Back to|Related Cards/);
+  assert.deepEqual(h.records, before);
+  await detail.close();
+  assert.equal(detail.dataset.sourceCardId, undefined);
+  await h.gallery.querySelector('article').emit('click');
+  assert.equal(detail.dataset.sourceCardId, undefined);
+  assert.equal(detail.dataset.sourcePaperPackId, undefined);
+  await detail.close();
+  await h.document.emit('stamp-die-set:detail-request', { detail: { stampDieSetId: 'missing-set', sourceCardId: 'other-card' } });
+  assert.equal(detail.open, false);
+});

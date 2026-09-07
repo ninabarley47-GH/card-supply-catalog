@@ -290,6 +290,12 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     );
   });
   detailView.body.addEventListener('click', (event) => {
+    const stampDieLink = event.target.closest('[data-card-detail-stamp-die-set]');
+    if (stampDieLink) {
+      event.stopPropagation();
+      requestCardStampDieDetail(detailView, stampDieLink.dataset.cardDetailStampDieSet);
+      return;
+    }
     const paperPackLink = event.target.closest('[data-card-detail-paper-pack]');
 
     if (paperPackLink) {
@@ -1574,10 +1580,11 @@ function createCardDetailRelationshipMetadata(card, paperPacks) {
     resolvePaperPackReferences(card.paperPackIds, paperPacks)
   );
   appendCardLibraryMetadata(metadata, 'Stamp Sets', card.stampSets || []);
+  appendCardStampDieRelationships(metadata, card);
   return metadata;
 }
 
-function appendPaperPackDetailMetadata(metadata, label, references) {
+function appendPaperPackDetailMetadata(metadata, label, references, linkKey = 'cardDetailPaperPack') {
   if (references.length === 0) {
     return;
   }
@@ -1600,7 +1607,7 @@ function appendPaperPackDetailMetadata(metadata, label, references) {
     const button = document.createElement('button');
     button.className = 'card-detail-metadata-link';
     button.type = 'button';
-    button.dataset.cardDetailPaperPack = reference.id;
+    button.dataset[linkKey] = reference.id;
     button.setAttribute('aria-label', `Open ${reference.label}`);
     button.textContent = reference.label;
     description.append(button);
@@ -1608,4 +1615,35 @@ function appendPaperPackDetailMetadata(metadata, label, references) {
 
   group.append(term, description);
   metadata.append(group);
+  return group;
+}
+
+
+export async function appendCardStampDieRelationships(metadata, card, loadSets = loadSavedStampDieSets) {
+  const ids = normalizeStampDieSetIds(card.stampDieSetIds);
+  if (!ids.length) return;
+  const pending = appendPaperPackDetailMetadata(metadata, 'Stamps & Dies', [
+    { label: 'Loading stamp & die sets?', resolved: false }
+  ]);
+  let references;
+  try {
+    const sets = await loadSets();
+    const namesById = new Map(sets.map((set) => [set.id, set.name]));
+    references = ids.map((id) => ({
+      id, label: namesById.get(id) || 'Missing Stamp & Die Set', resolved: Boolean(namesById.get(id))
+    }));
+  } catch {
+    references = [{ label: 'Stamp & Die Sets could not be loaded. Reopen Card Detail to retry.', resolved: false }];
+  }
+  pending.remove();
+  appendPaperPackDetailMetadata(metadata, 'Stamps & Dies', references, 'cardDetailStampDieSet');
+}
+
+export function requestCardStampDieDetail(detailView, stampDieSetId) {
+  const { selectedCardId: sourceCardId, sourcePaperPackId } = detailView.overlay.dataset;
+  // Retain the originating Card and its Paper context in the same transient event handoff.
+  document.dispatchEvent(new CustomEvent('stamp-die-set:detail-request', {
+    detail: { stampDieSetId, sourceCardId, sourcePaperPackId }
+  }));
+  closeCardDetail(detailView, null);
 }

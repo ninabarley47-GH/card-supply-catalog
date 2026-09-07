@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAddCardView, openAddCardView, openEditCardView, createCardRecord } from './cards.js';
+import { appendCardStampDieRelationships, createAddCardView, openAddCardView, openEditCardView, createCardRecord } from './cards.js';
 
 // Minimal DOM harness follows the existing Stamp form tests.
 class Element {
@@ -21,7 +21,7 @@ class Element {
   get options() { return this.children; }
   get parentElement() { return this.parent; }
   get childElementCount() { return this.children.length; }
-  append(...children) { for (const child of children) { child.parent = this; this.children.push(child); } }
+  append(...children) { for (let child of children) { if (typeof child === 'string') child = Object.assign(new Element('text'), { textContent: child }); child.parent = this; this.children.push(child); } }
   replaceChildren(...children) { this.children = []; this.ownText = ''; this.append(...children); }
   setAttribute(key, value) { this.attributes[key] = value; }
   getAttribute(key) { return this.attributes[key]; }
@@ -185,4 +185,35 @@ test('Add and Edit expose only the lookup Stamp selector while preserving legacy
   assert.deepEqual(saved.stampSets, card().stampSets);
   assert.deepEqual(saved.paperPackIds, card().paperPackIds);
   assert.deepEqual(saved.stampDieSetIds, ['set-a', 'missing-set', 'set-b']);
+});
+
+
+test('Card Detail shows clickable current Set names and nonclickable missing placeholders without mutating IDs', async (t) => {
+  harness(t);
+  const metadata = new Element('dl');
+  const existing = card(); existing.stampDieSetIds.push('set-b', 'another-missing');
+  const before = structuredClone(existing);
+  await appendCardStampDieRelationships(metadata, existing, async () => sets);
+  assert.deepEqual(metadata.querySelectorAll('button').map(el => [el.textContent, el.dataset.cardDetailStampDieSet]),
+    [['Garden Flowers', 'set-a'], ['Garden Leaves', 'set-b']]);
+  assert.equal(metadata.querySelector('button').getAttribute('aria-label'), 'Open Garden Flowers');
+  assert.equal(metadata.textContent.match(/Missing Stamp & Die Set/g).length, 2);
+  assert.doesNotMatch(metadata.textContent, /set-a|set-b|missing-set|another-missing/);
+  assert.deepEqual(existing, before);
+});
+
+test('Card Detail omits empty Stamp relationships and distinguishes failed reads from missing Sets', async (t) => {
+  harness(t);
+  for (const ids of [undefined, []]) {
+    const metadata = new Element('dl');
+    await appendCardStampDieRelationships(metadata, { stampDieSetIds: ids }, () => assert.fail('no read needed'));
+    assert.equal(metadata.childElementCount, 0);
+  }
+  const metadata = new Element('dl');
+  const existing = card();
+  await appendCardStampDieRelationships(metadata, existing, async () => { throw new Error('Offline storage'); });
+  assert.match(metadata.textContent, /could not be loaded/);
+  assert.doesNotMatch(metadata.textContent, /Missing Stamp/);
+  assert.equal(metadata.querySelectorAll('button').length, 0);
+  assert.deepEqual(existing, card());
 });
