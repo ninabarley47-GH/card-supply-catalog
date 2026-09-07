@@ -1,5 +1,5 @@
 import { getLocalDateValue } from './ui.js';
-import { normalizeCardNotes, deleteCard, loadCatalogSetting, loadGlobalTagCatalog, loadSavedCards, saveCard, saveCatalogSetting, saveOwner } from './storage.js';
+import { loadSavedStampDieSets, normalizeStampDieSetIds, normalizeCardNotes, deleteCard, loadCatalogSetting, loadGlobalTagCatalog, loadSavedCards, saveCard, saveCatalogSetting, saveOwner } from './storage.js';
 import { loadDefaultOwnerId } from './settings.js';
 import { refreshOwnerFilter, initializeOwnerPicker, notifyOwnerRegistryUpdated, refreshOwnerOptions, resolveOwnerPicker, setOwnerPickerValue } from './owner-picker.js';
 import { isActiveOwner } from './owners.js';
@@ -411,7 +411,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   return cards;
 }
 
-function createAddCardView({ owners = [], tagCatalog } = {}) {
+export function createAddCardView({ owners = [], tagCatalog, loadStampDieSets = loadSavedStampDieSets } = {}) {
   const overlay = document.createElement('div');
   overlay.className = 'card-add-overlay';
   overlay.hidden = true;
@@ -500,6 +500,11 @@ function createAddCardView({ owners = [], tagCatalog } = {}) {
   controls.append(tagPicker.element);
   const paperPackPicker = createPaperPackPicker();
   controls.append(paperPackPicker.section);
+  const stampDiePicker = createPaperPackPicker({
+    heading: 'Stamps & Dies Used', search: 'Search stamp & die sets by name',
+    results: 'Stamp & die set search results', selected: 'Selected stamp & die sets'
+  });
+  controls.append(stampDiePicker.section);
   const notes = document.createElement('textarea');
   notes.name = 'notes';
   notes.rows = 4;
@@ -556,9 +561,31 @@ function createAddCardView({ owners = [], tagCatalog } = {}) {
     paperPackResults: paperPackPicker.results,
     paperPackSelected: paperPackPicker.selected,
     paperPackStatus: paperPackPicker.status,
+    stampDiePicker,
+    loadStampDieSets,
+    availableStampDieSets: [],
+    stampDieSetIds: [],
+    stampDieLoadSession: 0,
     availablePaperPacks: [],
     paperPackIds: []
   };
+  stampDiePicker.search.addEventListener('input', () => renderStampDiePicker(addCardView));
+  stampDiePicker.results.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-add-stamp-die-set]');
+    const id = button?.dataset.addStampDieSet;
+    if (!id || addCardView.stampDieSetIds.includes(id) ||
+        !addCardView.availableStampDieSets.some((set) => set.id === id)) return;
+    addCardView.stampDieSetIds.push(id);
+    stampDiePicker.search.value = '';
+    renderStampDiePicker(addCardView);
+    stampDiePicker.search.focus();
+  });
+  stampDiePicker.selected.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-remove-stamp-die-set]');
+    if (!button) return;
+    addCardView.stampDieSetIds = addCardView.stampDieSetIds.filter((id) => id !== button.dataset.removeStampDieSet);
+    renderStampDiePicker(addCardView);
+  });
   sizePreset.addEventListener('change', () => applyCardSizePreset(addCardView));
   stampSetPicker.add.addEventListener('click', () => addStampSetsFromInput(addCardView));
   stampSetPicker.input.addEventListener('keydown', (event) => {
@@ -625,14 +652,15 @@ function createAddCardView({ owners = [], tagCatalog } = {}) {
   return addCardView;
 }
 
-function openAddCardView(addCardView, ownerId = '') {
+export function openAddCardView(addCardView, ownerId = '') {
   resetAddCardForm(addCardView);
   setOwnerPickerValue(addCardView.owner, addCardView.newOwner, ownerId, '', addCardView.owners);
   addCardView.overlay.hidden = false;
   addCardView.close.focus();
+  return loadAvailableStampDieSets(addCardView);
 }
 
-function openEditCardView(addCardView, card) {
+export function openEditCardView(addCardView, card) {
   resetAddCardForm(addCardView);
   addCardView.existingCard = card;
   addCardView.title.textContent = 'Edit Card';
@@ -649,6 +677,7 @@ function openEditCardView(addCardView, card) {
   addCardView.stampSets = [...(card.stampSets || [])];
   addCardView.tagPicker.setSelectedTagIds(resolveItemTagIds(card, addCardView.tagCatalog, 'card', 'tags'));
   addCardView.paperPackIds = [...(card.paperPackIds || [])];
+  addCardView.stampDieSetIds = normalizeStampDieSetIds(card.stampDieSetIds);
   addCardView.existingImageSource = getCardDetailImageSource(card);
   addCardView.imageMessage.textContent = card.imageName || '';
   renderSelectedStampSets(addCardView);
@@ -657,6 +686,7 @@ function openEditCardView(addCardView, card) {
   renderSelectedCardImage(addCardView);
   addCardView.overlay.hidden = false;
   addCardView.close.focus();
+  return loadAvailableStampDieSets(addCardView);
 }
 
 function closeAddCardView(addCardView, addCardButton) {
@@ -820,24 +850,27 @@ function createDimensionInput(name) {
   return input;
 }
 
-function createPaperPackPicker() {
+function createPaperPackPicker(labels = {
+  heading: 'Paper Packs Used', search: 'Search paper packs by name',
+  results: 'Paper pack search results', selected: 'Selected paper packs'
+}) {
   const section = document.createElement('section');
   section.className = 'card-add-paper-packs';
   const heading = document.createElement('h4');
-  heading.textContent = 'Paper Packs Used';
+  heading.textContent = labels.heading;
   const search = document.createElement('input');
   search.type = 'search';
-  search.placeholder = 'Search paper packs by name';
-  search.setAttribute('aria-label', 'Search paper packs by name');
+  search.placeholder = labels.search;
+  search.setAttribute('aria-label', labels.search);
   const status = document.createElement('p');
   status.className = 'card-add-paper-pack-status';
   status.setAttribute('aria-live', 'polite');
   const results = document.createElement('ul');
   results.className = 'card-add-paper-pack-results';
-  results.setAttribute('aria-label', 'Paper pack search results');
+  results.setAttribute('aria-label', labels.results);
   const selected = document.createElement('ul');
   selected.className = 'card-add-selected-packs';
-  selected.setAttribute('aria-label', 'Selected paper packs');
+  selected.setAttribute('aria-label', labels.selected);
   section.append(heading, search, status, results, selected);
   return { section, search, status, results, selected };
 }
@@ -915,7 +948,78 @@ function renderSelectedPaperPacks(addCardView) {
   });
 }
 
+async function loadAvailableStampDieSets(view) {
+  const session = view.stampDieLoadSession;
+  view.stampDieLoading = true;
+  view.stampDieLoadError = false;
+  renderStampDiePicker(view);
+  try {
+    const sets = await view.loadStampDieSets();
+    if (session !== view.stampDieLoadSession) return;
+    view.availableStampDieSets = sets.filter((set) => set.id && set.name)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    if (session !== view.stampDieLoadSession) return;
+    view.stampDieLoadError = true;
+  }
+  if (session !== view.stampDieLoadSession) return;
+  view.stampDieLoading = false;
+  renderStampDiePicker(view);
+}
+
+function renderStampDiePicker(view) {
+  const { search, status, results, selected } = view.stampDiePicker;
+  results.replaceChildren();
+  selected.replaceChildren();
+  const setsById = new Map(view.availableStampDieSets.map((set) => [set.id, set]));
+  for (const id of view.stampDieSetIds) {
+    const set = setsById.get(id);
+    // Missing Sets stay in the draft IDs, just as missing Paper Pack selections do.
+    if (!set) continue;
+    const item = document.createElement('li');
+    const name = document.createElement('span');
+    name.textContent = set.name;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.dataset.removeStampDieSet = id;
+    remove.setAttribute('aria-label', `Remove ${set.name}`);
+    remove.textContent = String.fromCodePoint(215);
+    item.append(name, remove);
+    selected.append(item);
+  }
+  search.disabled = view.stampDieLoading || view.stampDieLoadError;
+  if (view.stampDieLoading || view.stampDieLoadError) {
+    status.textContent = view.stampDieLoading ? 'Loading stamp & die sets?'
+      : 'Stamp & die sets could not be loaded. Reopen this form to retry. Saved selections will be preserved.';
+    return;
+  }
+  const query = search.value.trim().toLowerCase();
+  if (!query) {
+    status.textContent = 'Type to search stamp & die sets.';
+    return;
+  }
+  const matches = view.availableStampDieSets.filter((set) =>
+    set.name.toLowerCase().includes(query) && !view.stampDieSetIds.includes(set.id));
+  status.textContent = matches.length ? '' : 'No matching stamp & die sets.';
+  for (const set of matches) {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.addStampDieSet = set.id;
+    button.textContent = set.name;
+    item.append(button);
+    results.append(item);
+  }
+}
+
 function resetAddCardForm(addCardView) {
+  addCardView.stampDieLoadSession += 1;
+  addCardView.stampDieSetIds = [];
+  addCardView.availableStampDieSets = [];
+  addCardView.stampDieLoading = false;
+  addCardView.stampDieLoadError = false;
+  addCardView.stampDiePicker.search.value = '';
+  renderStampDiePicker(addCardView);
   clearSelectedCardImage(addCardView.selectedImage);
   addCardView.form.reset();
   addCardView.dateCreated.value = getLocalDateValue();
@@ -969,6 +1073,7 @@ export function createCardRecord(addCardView) {
     tags: selectedTags.map((tag) => tag.name),
     stampSets: [...addCardView.stampSets],
     paperPackIds: [...addCardView.paperPackIds],
+    stampDieSetIds: normalizeStampDieSetIds(addCardView.stampDieSetIds ?? existingCard?.stampDieSetIds),
     colorIds: [...(existingCard?.colorIds || [])],
     favorite: addCardView.favorite.checked,
     createdAt: existingCard?.createdAt || timestamp,
