@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { applyPaperPackDetailCardSourceState, findCardsUsingPaperPack, sortPaperPacks } from "./library.js";
+import { findCardsUsingPaperPack, sortPaperPacks } from "./library.js";
 import {
-  applyCardDetailSourceState,
   resolvePaperPackDisplayNames,
   resolvePaperPackReferences
 } from "./cards.js";
@@ -44,25 +43,6 @@ test("Paper Library favorites-first sorting prioritizes favorites then names", (
   );
 });
 
-test("Card Detail preserves and clears its source paper-pack ID in transient UI state", () => {
-  const overlay = { dataset: {} };
-  const back = { hidden: true, textContent: "" };
-
-  applyCardDetailSourceState(overlay, "pack-a", back, "Paper Pack A");
-  assert.equal(overlay.dataset.sourcePaperPackId, "pack-a");
-  assert.equal(back.hidden, false);
-  assert.equal(back.textContent, "← Back to Paper Pack A");
-
-  applyCardDetailSourceState(overlay, "pack-b", back, "Paper Pack B");
-  assert.equal(overlay.dataset.sourcePaperPackId, "pack-b");
-  assert.equal(back.textContent, "← Back to Paper Pack B");
-
-  applyCardDetailSourceState(overlay, "", back);
-  assert.equal("sourcePaperPackId" in overlay.dataset, false);
-  assert.equal(back.hidden, true);
-  assert.equal(back.textContent, "");
-});
-
 test("Card Detail resolves one paper-pack ID to its display name", () => {
   assert.deepEqual(
     resolvePaperPackDisplayNames(["beautiful-gallery"], [
@@ -94,19 +74,4 @@ test("Card Detail paper-pack references retain IDs and only mark existing packs 
       { id: "pack-b", label: "Paper Pack B", resolved: true }
     ]
   );
-});
-
-test("Paper Pack Detail stores and clears its transient Card return context", () => {
-  const panel = { dataset: {} };
-  const back = { hidden: true };
-
-  applyPaperPackDetailCardSourceState(panel, back, "card-1", "pack-a");
-  assert.equal(panel.dataset.sourceCardId, "card-1");
-  assert.equal(panel.dataset.sourceCardPaperPackId, "pack-a");
-  assert.equal(back.hidden, false);
-
-  applyPaperPackDetailCardSourceState(panel, back);
-  assert.equal("sourceCardId" in panel.dataset, false);
-  assert.equal("sourceCardPaperPackId" in panel.dataset, false);
-  assert.equal(back.hidden, true);
 });

@@ -1,3 +1,4 @@
+import { detailNavigation } from './detail-navigation.js';
 import { CATALOG_SCHEMA_VERSION } from './schema.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -79,7 +80,7 @@ class Element {
 
 async function harness(t, otherCatalogServices = {}) {
   const previous = { document: globalThis.document, window: globalThis.window, Option: globalThis.Option };
-  t.after(() => Object.assign(globalThis, previous));
+  t.after(() => { detailNavigation.close(); Object.assign(globalThis, previous); });
   const document = new Element('document');
   document.createElement = (name) => new Element(name);
   document.createTextNode = (text) => Object.assign(new Element('text'), { textContent: text });
@@ -1011,7 +1012,8 @@ test('Set Detail reuses context/title/close header and places destructive action
   assert.equal(header.className, 'card-detail-header');
   assert.equal(header.querySelector('.eyebrow').textContent, 'Stamps & Dies');
   assert.equal(header.querySelector('h3').textContent, 'Original');
-  assert.equal(header.querySelectorAll('button').length, 2);
+  assert.equal(header.querySelectorAll('button').length, 3);
+  assert.equal(header.querySelector('.card-detail-back').hidden, true);
   const titleRow = header.querySelector('.card-title-row');
   assert.equal(titleRow.children[0], header.querySelector('h3'));
   assert.equal(titleRow.children[1].className, 'stamp-set-favorite');
@@ -1243,34 +1245,62 @@ test('Settings library changes refresh existing Set display without save, infere
 });
 
 
-test('Card relationship handoff opens the correct Set Detail and retains transient Card/Paper context only', async (t) => {
+test('Card relationship opens Stamp Detail with shared Back; ordinary tile opens a fresh session', async (t) => {
   const h = await harness(t);
   await seedEdit(h, { id: 'linked-set' });
   await h.cancel.emit('click');
-  const { requestCardStampDieDetail } = await import('./cards.js');
-  const overlay = new Element('div');
-  overlay.hidden = false;
-  overlay.dataset.selectedCardId = 'origin-card';
-  overlay.dataset.sourcePaperPackId = 'origin-paper';
-  const body = new Element('div');
-  const back = new Element('button');
+  let cardVisible = false;
+  detailNavigation.register('card', {
+    library: 'cards', exists: (id) => id === 'origin-card',
+    open: () => { cardVisible = true; }, hide: () => { cardVisible = false; }
+  });
+  detailNavigation.open('card', 'origin-card');
   const before = structuredClone(h.records);
-  requestCardStampDieDetail({ overlay, body, back }, 'linked-set');
+  await h.document.emit('stamp-die-set:detail-request', { detail: { stampDieSetId: 'linked-set' } });
   const detail = setDetail(h);
   assert.equal(detail.open, true);
+  assert.equal(cardVisible, false);
   assert.equal(detail.querySelector('h3').textContent, 'Original');
   assert.equal(window.location.hash, '#stamps-dies');
-  assert.equal(detail.dataset.sourceCardId, 'origin-card');
-  assert.equal(detail.dataset.sourcePaperPackId, 'origin-paper');
-  assert.equal(overlay.hidden, true);
-  assert.doesNotMatch(detail.textContent, /Back to|Related Cards/);
+  const back = detail.querySelector('.card-detail-back');
+  assert.equal(back.textContent, '\u2190 Back');
+  assert.equal(back.hidden, false);
   assert.deepEqual(h.records, before);
-  await detail.close();
-  assert.equal(detail.dataset.sourceCardId, undefined);
-  await h.gallery.querySelector('article').emit('click');
-  assert.equal(detail.dataset.sourceCardId, undefined);
-  assert.equal(detail.dataset.sourcePaperPackId, undefined);
-  await detail.close();
-  await h.document.emit('stamp-die-set:detail-request', { detail: { stampDieSetId: 'missing-set', sourceCardId: 'other-card' } });
+  let stopped = false;
+  await back.emit('click', { stopPropagation() { stopped = true; } });
+  assert.equal(stopped, true, 'Back must not bubble into the newly opened Detail backdrop handler');
+  assert.equal(cardVisible, true);
   assert.equal(detail.open, false);
+  await h.gallery.querySelector('article').emit('click');
+  assert.equal(back.hidden, true);
+  assert.equal(cardVisible, false);
+  await detail.close();
+  assert.deepEqual(detailNavigation.getState(), { current: null, history: [] });
+  await h.document.emit('stamp-die-set:detail-request', { detail: { stampDieSetId: 'missing-set' } });
+  assert.equal(detail.open, false);
+});
+
+
+test('Stamp dismissal clears shared history for Escape/backdrop and late native close cannot end a reopened Detail', async (t) => {
+  const h = await harness(t);
+  await seedEdit(h); await h.cancel.emit('click');
+  detailNavigation.register('card', { library: 'cards', exists: () => true, open() {}, hide() {} });
+  const detail = setDetail(h);
+  for (const mode of ['cancel', 'backdrop', 'close-button']) {
+    detailNavigation.open('card', 'A');
+    detailNavigation.open('stamp', 'set-existing', { related: true });
+    if (mode === 'cancel') await detail.emit('cancel');
+    else if (mode === 'backdrop') await detail.emit('click', { target: detail });
+    else await detail.querySelector('.card-detail-close').emit('click');
+    assert.deepEqual(detailNavigation.getState(), { current: null, history: [] });
+    assert.equal(detail.open, false);
+    assert.equal(window.location.hash, '#stamps-dies');
+  }
+  detailNavigation.open('card', 'A');
+  detailNavigation.open('stamp', 'set-existing', { related: true });
+  detailNavigation.back();
+  detailNavigation.open('stamp', 'set-existing', { related: true });
+  await detail.emit('close'); // A queued notification from the previous visit.
+  assert.equal(detail.open, true);
+  assert.deepEqual(detailNavigation.getState(), { current: { type: 'stamp', id: 'set-existing' }, history: [{ type: 'card', id: 'A' }] });
 });

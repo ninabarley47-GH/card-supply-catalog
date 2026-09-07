@@ -1,3 +1,4 @@
+import { detailNavigation } from './detail-navigation.js';
 import { getLocalDateValue } from './ui.js';
 import { loadSavedStampDieSets, normalizeStampDieSetIds, normalizeCardNotes, deleteCard, loadCatalogSetting, loadGlobalTagCatalog, loadSavedCards, saveCard, saveCatalogSetting, saveOwner } from './storage.js';
 import { loadDefaultOwnerId } from './settings.js';
@@ -62,6 +63,17 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   const toggleTagsButton = document.querySelector('[data-card-library-toggle-tags]');
   const paperPackNamesById = new Map(paperPacks.map((paperPack) => [paperPack.id, paperPack.name]));
   let activeTile = null;
+  detailNavigation.register('card', {
+    library: 'cards',
+    exists: (id) => Boolean(findCard(cards, id)),
+    open: (id) => {
+      activeTile = [...gallery.querySelectorAll('[data-card-id]')].find((tile) => tile.dataset.cardId === id) || null;
+      openCardDetail(detailView, findCard(cards, id), cards, paperPacks);
+    },
+    hide: () => hideCardDetail(detailView),
+    setBack: (visible) => { detailView.back.hidden = !visible; detailView.back.textContent = '\u2190 Back'; },
+    restoreFocus: () => { (activeTile?.isConnected ? activeTile : addCardButton).focus(); }
+  });
 
   refreshOwnerFilter(ownerFilter, owners);
   const defaultOwnerId = await loadDefaultOwnerId().catch(() => '');
@@ -233,7 +245,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     const tile = event.target.closest('[data-card-id]');
 
     if (tile) {
-      openCardDetail(detailView, findCard(cards, tile.dataset.cardId), tile, cards, paperPacks);
+      detailNavigation.open('card', tile.dataset.cardId);
       activeTile = tile;
     }
   });
@@ -251,77 +263,37 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
 
     if (tile) {
       event.preventDefault();
-      openCardDetail(detailView, findCard(cards, tile.dataset.cardId), tile, cards, paperPacks);
+      detailNavigation.open('card', tile.dataset.cardId);
       activeTile = tile;
     }
   });
 
-  detailView.close.addEventListener('click', () => closeCardDetail(detailView, activeTile));
+  detailView.close.addEventListener('click', () => closeCardDetail());
   detailView.overlay.addEventListener('click', (event) => {
     if (event.target === detailView.overlay) {
-      closeCardDetail(detailView, activeTile);
+      closeCardDetail();
     }
   });
 
   document.addEventListener('card:detail-request', (event) => {
-    const card = findCard(cards, event.detail?.cardId);
-
-    if (!card) {
-      return;
-    }
-
-    activeTile = event.detail?.sourceElement || null;
-    openCardDetail(detailView, card, activeTile, cards, paperPacks, event.detail?.sourcePaperPackId);
+    detailNavigation.open('card', event.detail?.cardId, { related: true });
   });
-
   detailView.back.addEventListener('click', (event) => {
     event.stopPropagation();
-    const sourcePaperPackId = detailView.overlay.dataset.sourcePaperPackId;
-
-    if (!sourcePaperPackId) {
-      return;
-    }
-
-    closeCardDetail(detailView, activeTile);
-    document.dispatchEvent(
-      new CustomEvent('paper-pack:detail-request', {
-        detail: { paperPackId: sourcePaperPackId }
-      })
-    );
+    detailNavigation.back();
   });
   detailView.body.addEventListener('click', (event) => {
     const stampDieLink = event.target.closest('[data-card-detail-stamp-die-set]');
     if (stampDieLink) {
       event.stopPropagation();
-      requestCardStampDieDetail(detailView, stampDieLink.dataset.cardDetailStampDieSet);
+      detailNavigation.open('stamp', stampDieLink.dataset.cardDetailStampDieSet, { related: true });
       return;
     }
     const paperPackLink = event.target.closest('[data-card-detail-paper-pack]');
 
     if (paperPackLink) {
       event.stopPropagation();
-      const paperPackId = paperPackLink.dataset.cardDetailPaperPack;
-      const sourceCardId = detailView.overlay.dataset.selectedCardId;
-      const sourcePaperPackId = detailView.overlay.dataset.sourcePaperPackId;
-      const needsPaperLibraryScreen = window.location.hash !== '#library';
-
-      if (needsPaperLibraryScreen) {
-        window.addEventListener(
-          'hashchange',
-          () => closeCardDetail(detailView, null),
-          { once: true }
-        );
-      }
-
-      document.dispatchEvent(
-        new CustomEvent('paper-pack:detail-request', {
-          detail: { paperPackId, sourceCardId, sourcePaperPackId }
-        })
-      );
-
-      if (!needsPaperLibraryScreen) {
-        closeCardDetail(detailView, null);
-      }
+      detailNavigation.open('paper', paperPackLink.dataset.cardDetailPaperPack, { related: true });
 
       return;
     }
@@ -347,7 +319,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     const card = findCard(cards, editButton.dataset.editCard);
 
     if (card) {
-      closeCardDetail(detailView, activeTile);
+      closeCardDetail();
       loadAvailablePaperPacks(addCardView, paperPacks);
       openEditCardView(addCardView, card);
     }
@@ -409,7 +381,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     }
 
     if (event.key === 'Escape' && !detailView.overlay.hidden) {
-      closeCardDetail(detailView, activeTile);
+      closeCardDetail();
     }
   });
 
@@ -1333,7 +1305,7 @@ function createCardDetailView() {
   return { overlay, panel, close, back, body };
 }
 
-function openCardDetail(detailView, card, tile, cards, paperPacks, sourcePaperPackId = '') {
+function openCardDetail(detailView, card, cards, paperPacks) {
   if (!card) {
     return;
   }
@@ -1341,25 +1313,18 @@ function openCardDetail(detailView, card, tile, cards, paperPacks, sourcePaperPa
   const cardIndex = cards.indexOf(card);
   detailView.body.replaceChildren(createCardDetailContent(card, cardIndex, paperPacks));
   detailView.overlay.dataset.selectedCardId = card.id;
-  const sourcePaperPack = paperPacks.find((paperPack) => paperPack.id === sourcePaperPackId);
-  applyCardDetailSourceState(detailView.overlay, sourcePaperPack?.id, detailView.back, sourcePaperPack?.name);
   detailView.overlay.hidden = false;
   detailView.close.focus();
 }
 
-function closeCardDetail(detailView, tile) {
-  if (detailView.overlay.hidden) {
-    return;
-  }
+function closeCardDetail() {
+  detailNavigation.close('card');
+}
 
+function hideCardDetail(detailView) {
   detailView.overlay.hidden = true;
   detailView.body.replaceChildren();
   delete detailView.overlay.dataset.selectedCardId;
-  applyCardDetailSourceState(detailView.overlay, '', detailView.back);
-
-  if (tile?.isConnected) {
-    tile.focus();
-  }
 }
 
 function createCardDetailContent(card, index, paperPacks) {
@@ -1423,19 +1388,6 @@ export function resolvePaperPackReferences(paperPackIds = [], paperPacks = []) {
   });
 }
 
-export function applyCardDetailSourceState(overlay, sourcePaperPackId, backControl = null, sourcePaperPackName = '') {
-  if (sourcePaperPackId) {
-    overlay.dataset.sourcePaperPackId = sourcePaperPackId;
-  } else {
-    delete overlay.dataset.sourcePaperPackId;
-  }
-
-  if (backControl) {
-    backControl.hidden = !sourcePaperPackId;
-    backControl.textContent = sourcePaperPackId ? `← Back to ${sourcePaperPackName}` : '';
-  }
-}
-
 function createCardDetailActions(card) {
   const actions = document.createElement('div');
   actions.className = 'card-detail-actions';
@@ -1473,7 +1425,7 @@ function deleteSelectedCard(card, cards, detailView, activeTile, renderCurrent) 
   }
 
   renderCurrent();
-  closeCardDetail(detailView, activeTile);
+  closeCardDetail();
   return true;
 }
 
@@ -1637,13 +1589,4 @@ export async function appendCardStampDieRelationships(metadata, card, loadSets =
   }
   pending.remove();
   appendPaperPackDetailMetadata(metadata, 'Stamps & Dies', references, 'cardDetailStampDieSet');
-}
-
-export function requestCardStampDieDetail(detailView, stampDieSetId) {
-  const { selectedCardId: sourceCardId, sourcePaperPackId } = detailView.overlay.dataset;
-  // Retain the originating Card and its Paper context in the same transient event handoff.
-  document.dispatchEvent(new CustomEvent('stamp-die-set:detail-request', {
-    detail: { stampDieSetId, sourceCardId, sourcePaperPackId }
-  }));
-  closeCardDetail(detailView, null);
 }

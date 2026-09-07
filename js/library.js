@@ -1,3 +1,4 @@
+import { detailNavigation } from './detail-navigation.js';
 import { initializeAddDspWorkflow } from "./add-dsp.js";
 import { initializeCatalogBackup } from "./backup.js";
 import { initializeAddColorWorkflow } from "./color-form.js";
@@ -507,7 +508,14 @@ export function initializeScreenNavigation() {
   }
 
   showCurrentScreen();
-  window.addEventListener("hashchange", showCurrentScreen);
+  document.addEventListener('detail:screen-change', showCurrentScreen);
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('[data-nav-link]')) detailNavigation.mainLibrary();
+  }, true);
+  window.addEventListener("hashchange", () => {
+    detailNavigation.mainLibrary();
+    showCurrentScreen();
+  });
 }
 
 async function loadColors() {
@@ -1436,7 +1444,7 @@ function isRecentlyAddedPaperPack(paperPack) {
   return paperPack.recentlyAdded === true;
 }
 
-function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderCurrentLibrary) {
+export function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderCurrentLibrary) {
   const detailPanel = document.querySelector("[data-detail-panel]");
   const detailTitle = document.querySelector("[data-detail-title]");
   const detailBody = document.querySelector("[data-detail-body]");
@@ -1446,6 +1454,23 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
   if (!detailPanel || !detailTitle || !detailBody) {
     return;
   }
+
+  let displayedPackId;
+  detailNavigation.register('paper', {
+    library: 'library',
+    exists: (id) => paperPacks.some((pack) => pack.id === id),
+    open: (id, context) => {
+      displayedPackId = id;
+      openDetailPanel(detailPanel, detailTitle, detailBody,
+        paperPacks.find((pack) => pack.id === id), paperPacks, colorsById, context?.coordinatingColor);
+    },
+    hide: () => { detailPanel.hidden = true; delete detailPanel.dataset.selectedPackId; },
+    setBack: (visible) => { if (detailBack) { detailBack.hidden = !visible; detailBack.textContent = '\u2190 Back'; } },
+    restoreFocus: () => {
+      const tile = [...paperPackLibrary.querySelectorAll('[data-paper-pack-card]')].find((entry) => entry.dataset.packId === displayedPackId);
+      tile?.focus();
+    }
+  });
 
   paperPackLibrary.addEventListener("click", (event) => {
     const favoriteButton = event.target.closest("[data-toggle-pack-favorite]");
@@ -1536,7 +1561,7 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
     const paperPack = paperPacks.find((pack) => pack.id === card.dataset.packId);
 
     if (paperPack) {
-      openDetailPanel(detailPanel, detailTitle, detailBody, paperPack, paperPacks, colorsById);
+      detailNavigation.open('paper', paperPack.id);
     }
   });
 
@@ -1561,7 +1586,7 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
     const paperPack = paperPacks.find((pack) => pack.id === card.dataset.packId);
 
     if (paperPack) {
-      openDetailPanel(detailPanel, detailTitle, detailBody, paperPack, paperPacks, colorsById);
+      detailNavigation.open('paper', paperPack.id);
     }
   });
 
@@ -1571,15 +1596,7 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
     const relatedCard = event.target.closest("[data-related-card-id]");
 
     if (relatedCard) {
-      document.dispatchEvent(
-        new CustomEvent("card:detail-request", {
-          detail: {
-            cardId: relatedCard.dataset.relatedCardId,
-            sourcePaperPackId: detailPanel.dataset.selectedPackId,
-            sourceElement: relatedCard
-          }
-        })
-      );
+      detailNavigation.open('card', relatedCard.dataset.relatedCardId, { related: true });
       return;
     }
 
@@ -1608,7 +1625,7 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
 
       if (selectedPack) {
         requestPaperPackEdit(selectedPack);
-        closeDetailPanel(detailPanel);
+        closeDetailPanel();
       }
 
       return;
@@ -1647,15 +1664,7 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
       const coordinatingColor = colorsById[coordinatingPack.dataset.coordinateColor];
 
       if (paperPack) {
-        openDetailPanel(
-          detailPanel,
-          detailTitle,
-          detailBody,
-          paperPack,
-          paperPacks,
-          colorsById,
-          coordinatingColor
-        );
+        detailNavigation.open('paper', paperPack.id, { related: true, context: { coordinatingColor } });
       }
 
       return;
@@ -1678,34 +1687,15 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
     renderCoordinatingPacks(resultsContainer, selectedPack, color, paperPacks);
   });
 
-  detailClose?.addEventListener("click", () => closeDetailPanel(detailPanel));
+  detailClose?.addEventListener("click", () => closeDetailPanel());
 
   detailBack?.addEventListener("click", (event) => {
     event.stopPropagation();
-    const cardId = detailPanel.dataset.sourceCardId;
-
-    if (!cardId) {
-      return;
-    }
-
-    const sourcePaperPackId = detailPanel.dataset.sourceCardPaperPackId;
-    document.dispatchEvent(
-      new CustomEvent("card:detail-request", {
-        detail: { cardId, sourcePaperPackId }
-      })
-    );
+    detailNavigation.back();
   });
 
   document.addEventListener("paper-pack:detail-request", (event) => {
-    const paperPack = paperPacks.find((pack) => pack.id === event.detail?.paperPackId);
-
-    if (paperPack) {
-      window.location.hash = "library";
-      openDetailPanel(detailPanel, detailTitle, detailBody, paperPack, paperPacks, colorsById, null, {
-        cardId: event.detail?.sourceCardId,
-        sourcePaperPackId: event.detail?.sourcePaperPackId
-      });
-    }
+    detailNavigation.open('paper', event.detail?.paperPackId, { related: true });
   });
 
   document.addEventListener("click", (event) => {
@@ -1713,7 +1703,7 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
       return;
     }
 
-    closeDetailPanel(detailPanel);
+    closeDetailPanel();
   });
 
   document.addEventListener("keydown", (event) => {
@@ -1725,7 +1715,7 @@ function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, renderC
         return;
       }
 
-      closeDetailPanel(detailPanel);
+      closeDetailPanel();
     }
   });
 }
@@ -1800,17 +1790,10 @@ function openDetailPanel(
   paperPack,
   paperPacks,
   colorsById,
-  coordinatingColor = null,
-  cardReturn = null
+  coordinatingColor = null
 ) {
   detailPanel.hidden = false;
   detailPanel.dataset.selectedPackId = paperPack.id;
-  applyPaperPackDetailCardSourceState(
-    detailPanel,
-    detailPanel.querySelector("[data-detail-back]"),
-    cardReturn?.cardId,
-    cardReturn?.sourcePaperPackId
-  );
   detailTitle.textContent = paperPack.name;
   detailBody.replaceChildren(createDetailContent(paperPack, paperPacks, colorsById));
   detailBody.scrollTop = 0;
@@ -1826,36 +1809,8 @@ function openDetailPanel(
   detailPanel.querySelector("[data-detail-close]")?.focus();
 }
 
-function closeDetailPanel(detailPanel) {
-  detailPanel.hidden = true;
-  delete detailPanel.dataset.selectedPackId;
-  applyPaperPackDetailCardSourceState(
-    detailPanel,
-    detailPanel.querySelector("[data-detail-back]")
-  );
-}
-
-export function applyPaperPackDetailCardSourceState(
-  detailPanel,
-  backControl,
-  sourceCardId = "",
-  sourcePaperPackId = ""
-) {
-  if (sourceCardId) {
-    detailPanel.dataset.sourceCardId = sourceCardId;
-  } else {
-    delete detailPanel.dataset.sourceCardId;
-  }
-
-  if (sourcePaperPackId) {
-    detailPanel.dataset.sourceCardPaperPackId = sourcePaperPackId;
-  } else {
-    delete detailPanel.dataset.sourceCardPaperPackId;
-  }
-
-  if (backControl) {
-    backControl.hidden = !sourceCardId;
-  }
+function closeDetailPanel() {
+  detailNavigation.close('paper');
 }
 
 function createDetailContent(paperPack, paperPacks, colorsById) {
@@ -2198,7 +2153,7 @@ function deleteSelectedPaperPack(selectedPack, paperPacks, renderCurrentLibrary,
   }
 
   renderCurrentLibrary();
-  closeDetailPanel(detailPanel);
+  closeDetailPanel();
 }
 
 function createAvailabilityIndicator(paperPack) {

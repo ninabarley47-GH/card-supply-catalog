@@ -1,3 +1,4 @@
+import { detailNavigation } from './detail-navigation.js';
 import { filterStampDieSets, initializeStampDieFilters } from './stamp-die-filter.js';
 import { initializeOwnerPicker, resolveOwnerPicker, setOwnerPickerValue, refreshOwnerOptions, notifyOwnerRegistryUpdated } from './owner-picker.js';
 import { isActiveOwner } from './owners.js';
@@ -56,7 +57,7 @@ export async function initializeStampDieLibrary(services = {}) {
   let detailSource = null;
   function renderDetail(records, tagCatalog) {
     const record = records.find((entry) => entry.id === selectedSetId);
-    if (!record) { if (detail.dialog.open) detail.dialog.close(); return; }
+    if (!record) { detailNavigation.close('stamp'); return; }
     detail.title.textContent = record.name;
     const metadata = document.createElement('div');
     metadata.className = 'detail-metadata';
@@ -93,15 +94,14 @@ export async function initializeStampDieLibrary(services = {}) {
     content.append(createSetImageGrid(record.imageRefs, true), metadata);
     detail.body.replaceChildren(content);
   }
-  function openDetail(id, source, cardContext = {}) {
-    if (!displayedRecords.some((record) => record.id === id)) return;
-    for (const key of ['sourceCardId', 'sourcePaperPackId']) {
-      if (cardContext[key]) detail.dialog.dataset[key] = cardContext[key];
-      else delete detail.dialog.dataset[key];
-    }
+  function openDetail(id, source) {
+    detailSource = source;
+    detailNavigation.open('stamp', id);
+  }
+  function renderOpenDetail(id) {
+    detailSource = [...gallery.querySelectorAll('[data-set-id]')].find((tile) => tile.dataset.setId === id) || null;
     detail.message.textContent = '';
     selectedSetId = id;
-    detailSource = source;
     renderDetail(displayedRecords, libraryCatalog);
     detail.dialog.showModal();
     detail.close.focus();
@@ -131,26 +131,22 @@ export async function initializeStampDieLibrary(services = {}) {
     displayedRecords = displayedRecords.filter((entry) => entry.id !== id);
     clearStampImageSources(removed);
     if (view.dialog.open) view.dialog.close();
-    detail.dialog.close();
+    detailNavigation.close('stamp');
     renderCurrent();
     window.location.hash = '#stamps-dies';
     await refresh();
     add.focus();
     document.dispatchEvent(new CustomEvent('catalog:stamp-die-set-saved'));
   });
-  detail.dialog.addEventListener('cancel', (event) => { if (deleting) event.preventDefault(); });
-  detail.close.addEventListener('click', () => detail.dialog.close());
-  detail.dialog.addEventListener('click', (event) => { if (!deleting && event.target === detail.dialog) detail.dialog.close(); });
+  detail.dialog.addEventListener('cancel', (event) => { event.preventDefault(); if (!deleting) detailNavigation.close('stamp'); });
+  detail.close.addEventListener('click', () => detailNavigation.close('stamp'));
+  detail.dialog.addEventListener('click', (event) => { if (!deleting && event.target === detail.dialog) detailNavigation.close('stamp'); });
   detail.dialog.addEventListener('close', () => {
-    selectedSetId = null;
-    delete detail.dialog.dataset.sourceCardId;
-    delete detail.dialog.dataset.sourcePaperPackId;
-    detail.title.textContent = '';
-    detail.body.replaceChildren();
-    const currentTile = [...gallery.querySelectorAll('[data-set-id]')].find((tile) => tile.dataset.setId === detailSource?.dataset.setId);
-    detailSource = null;
-    (currentTile || add).focus();
+    // A queued native close may belong to a previous visit to this same dialog.
+    if (detail.dialog.open) return;
+    detailNavigation.close('stamp');
   });
+  detail.back.addEventListener('click', (event) => { event.stopPropagation(); detailNavigation.back(); });
   detail.edit.addEventListener('click', () => openForm(selectedSetId));
   let catalog;
   let picker;
@@ -164,6 +160,22 @@ export async function initializeStampDieLibrary(services = {}) {
   let imageDirectory = null;
   let displayedRecords = [];
   let libraryCatalog;
+  detailNavigation.register('stamp', {
+    library: 'stamps-dies',
+    exists: (id) => displayedRecords.some((record) => record.id === id),
+    open: renderOpenDetail,
+    hide: () => {
+      if (detail.dialog.open) detail.dialog.close();
+      selectedSetId = null;
+      detail.title.textContent = '';
+      detail.body.replaceChildren();
+    },
+    setBack: (visible) => { detail.back.hidden = !visible; },
+    restoreFocus: () => {
+      const tile = [...gallery.querySelectorAll('[data-set-id]')].find((entry) => entry.dataset.setId === detailSource?.dataset.setId);
+      (tile || add).focus();
+    }
+  });
   const filters = initializeStampDieFilters(owners, renderCurrent);
   filters.refreshOwners();
 
@@ -480,10 +492,7 @@ export async function initializeStampDieLibrary(services = {}) {
   });
 
   document.addEventListener('stamp-die-set:detail-request', (event) => {
-    const context = event.detail || {};
-    if (!displayedRecords.some((record) => record.id === context.stampDieSetId)) return;
-    window.location.hash = '#stamps-dies';
-    openDetail(context.stampDieSetId, null, context);
+    detailNavigation.open('stamp', event.detail?.stampDieSetId, { related: true });
   });
   document.addEventListener('catalog:stamp-sets-restored', () => refresh());
   document.addEventListener('catalog:global-tags-updated', (event) => { if (event.detail?.source !== 'stamp-die-save') return refresh(); });
@@ -726,7 +735,12 @@ function createSetDetailView() {
   const titleRow = document.createElement('div');
   titleRow.className = 'card-title-row stamp-set-detail-title-row';
   titleRow.append(title);
-  heading.append(context, titleRow);
+  const back = document.createElement('button');
+  back.type = 'button';
+  back.className = 'card-detail-back';
+  back.textContent = '\u2190 Back';
+  back.hidden = true;
+  heading.append(back, context, titleRow);
   header.append(heading, close);
   const actions = createSetDetailSection('Actions');
   actions.className += ' detail-actions';
@@ -735,7 +749,7 @@ function createSetDetailView() {
   row.append(edit, remove);
   actions.append(row, message);
   dialog.append(header, body);
-  return { dialog, title, titleRow, close, edit, remove, message, body, actions };
+  return { dialog, title, titleRow, close, back, edit, remove, message, body, actions };
 }
 
 function getSetOwnerName(record, owners) {

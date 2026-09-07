@@ -56,6 +56,7 @@ test('existing hash navigation opens Stamps & Dies and returns to Paper and Card
   const oldDocument = globalThis.document;
   let onHashChange;
   globalThis.document = {
+    addEventListener() {},
     querySelectorAll: (selector) => ({ '[data-screen]': screens, '[data-nav-link]': links, '[data-sidebar-controls]': groups })[selector],
     getElementById: (id) => screens.find((screen) => screen.id === id)
   };
