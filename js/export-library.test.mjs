@@ -6,7 +6,7 @@ import { initializeExportLibrarySettings } from './settings.js';
 import { createCatalogBackup, saveJsonBackup, downloadImportDiagnosticReport } from './backup.js';
 import { chooseCoverSheetDestination, saveCoverSheet } from './cover-sheet.js';
 
-const clock = { now: () => new Date('2026-09-07T12:34:56.789Z'), randomUUID: () => 'unique-token' };
+const clock = { loadCatalogSetting: async () => null, now: () => new Date('2026-09-07T12:34:56.789Z') };
 function folder(initial = {}, failure = '') {
   const files = new Map(Object.entries(initial));
   const writes = [];
@@ -118,7 +118,7 @@ test('writable folder receives a complete timestamped backup without changing un
   const directory = folder({ 'unrelated.txt': 'keep me' });
   const result = await saveJsonBackup({ test: true }, 'backup', directory, { ...clock, download: () => assert.fail('should save directly') });
   assert.equal(result.savedToFolder, true); assert.equal(result.folderName, 'Exports');
-  assert.equal(result.fileName, 'card-supply-catalog-backup-2026-09-07T12-34-56-789Z-unique-token.json');
+  assert.equal(result.fileName, 'CSC-backup-2026-09-07T12-34-56Z.json');
   assert.deepEqual(JSON.parse(directory.files.get(result.fileName)), { test: true });
   assert.equal(directory.files.get('unrelated.txt'), 'keep me'); assert.equal(directory.files.size, 2);
 });
@@ -144,16 +144,15 @@ for (const failure of ['lookup', 'open', 'write', 'close']) {
   });
 }
 
-for (const randomUUID of [() => undefined, () => { throw new TypeError('Unavailable'); }]) {
-  test('missing/broken UUID capability does not prevent browser downloads', async () => {
-    const names = [];
-    for (let i = 0; i < 2; i++) {
-      const result = await saveExportFile(new Blob(['backup']), {}, { ...clock, randomUUID, download: (_blob, name) => names.push(name) });
-      assert.equal(result.savedToFolder, false);
-    }
-    assert.notEqual(names[0], names[1]); assert.match(names[0], /2026-09-07T12-34-56-789Z/);
-  });
-}
+test('concurrent exports in the same second get short collision suffixes without overwriting', async () => {
+  const directory = folder();
+  const results = await Promise.all([1, 2].map((number) => saveExportFile(new Blob([String(number)]),
+    { directoryHandle: directory }, { ...clock, download: () => assert.fail('should save') })));
+  assert.equal(results[0].fileName, 'CSC-backup-2026-09-07T12-34-56Z.json');
+  assert.equal(results[1].fileName, 'CSC-backup-2026-09-07T12-34-56Z-2.json');
+  assert.equal(directory.files.get(results[0].fileName), '1');
+  assert.equal(directory.files.get(results[1].fileName), '2');
+});
 
 test('backup contents never load or serialize the Export Library setting', async () => {
   const loaded = [];
@@ -206,4 +205,25 @@ test('Export Library is in the offline shell and outside Check Image Libraries',
   assert.match(html, /Export Library Folder/); assert.match(sw, /"\.\/js\/export-library\.js"/);
   const checks = settings.slice(settings.indexOf('export async function checkAllImageLibraries'), settings.indexOf('function formatHealthStatus'));
   assert.doesNotMatch(checks, /exportLibrary|Export Library|loadWritableExportDirectory/);
+});
+
+test('export prefixes the configured default Owner name, not another catalog Owner', async () => {
+  let downloaded;
+  const result = await saveExportFile(new Blob(['backup']), {}, { ...clock,
+    loadCatalogSetting: async (id) => { assert.equal(id, 'defaultOwnerId'); return 'owner-nina'; },
+    loadOwners: async () => [{ id: 'other', name: 'Amanda' }, { id: 'owner-nina', name: 'Nina Barley' }],
+    download: (_blob, name) => { downloaded = name; }
+  });
+  assert.equal(downloaded, 'Nina-Barley-CSC-backup-2026-09-07T12-34-56Z.json');
+  assert.equal(result.fileName, downloaded);
+});
+
+test('Owner prefix is filename-safe and a missing/stale Default Owner still permits export', async () => {
+  const name = createExportFileName('backup', 'json', { ...clock, ownerName: ' Nina / Amanda: ' });
+  assert.match(name, /^Nina---Amanda-CSC-backup-/);
+  for (const loadCatalogSetting of [async () => null, async () => 'missing', async () => { throw new Error('Unavailable'); }]) {
+    const result = await saveExportFile(new Blob(['backup']), {}, { ...clock, loadCatalogSetting,
+      loadOwners: async () => [], download: () => {} });
+    assert.match(result.fileName, /^CSC-backup-/);
+  }
 });

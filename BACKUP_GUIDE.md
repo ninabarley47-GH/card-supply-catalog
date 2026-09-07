@@ -41,9 +41,12 @@ download when that picker is unavailable; a direct folder-write failure download
 the generated file.
 
 Automatically saved exports use names such as
-`card-supply-catalog-backup-2026-09-07T12-34-56-789Z-<unique-suffix>.json`.
-The UTC timestamp includes milliseconds; a unique suffix and existing-file checks
-prevent automatic replacement. If a name is occupied, CSC adds a numbered suffix.
+`Nina-CSC-backup-2026-09-07T12-34-56Z.json`.
+The prefix uses this device's Default Owner name, with filename-unsafe characters
+and spaces replaced by hyphens. If no Default Owner can be resolved, the name starts
+with `CSC`.
+The UTC timestamp uses hours, minutes, and seconds, with hyphens instead of colons
+for filename compatibility. Existing-file checks prevent automatic replacement. If a name is occupied, CSC adds a numbered suffix.
 CSC never automatically deletes old exports, renames files, creates an Export
 subfolder in an image library, or cleans up the selected folder. A failed write may
 leave a new partial file; CSC preserves it and downloads the complete generated file.
@@ -119,7 +122,7 @@ Back up the Paper, Card, and Stamp & Die image library folders whenever you add,
 
 For a complete real-world backup, keep these together:
 
-- `card-supply-catalog-backup-YYYY-MM-DD.json`
+- `<Default-Owner>-CSC-backup-<timestamp>.json`
 - the Paper image library folder
 - the Card image library folder
 - the Stamp & Die image library folder

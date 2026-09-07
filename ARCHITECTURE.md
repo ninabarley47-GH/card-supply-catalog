@@ -374,8 +374,9 @@ denied, and failed setting access resolve to the browser-download path.
 `export-library.js` handles standard/compact JSON backups, full diagnostic JSON,
 and generated cover-sheet PNGs. It reuses `fileExists` and `writeFile` from the shared
 image-reference utilities without introducing new filesystem storage. Filenames
-combine a UTC timestamp through milliseconds and UUID, with a compatible unique
-suffix when UUID generation is unavailable. Collision checks choose a new numbered
+start with the resolved device Default Owner name and `CSC` (or just `CSC` when
+no Owner can be resolved), followed by a UTC date/time timestamp through seconds, with no random suffix.
+Exports within a page are serialized to prevent same-second write races. Collision checks choose a new numbered
 name, and the writer checks again before creating a file. Lookup/write/close errors
 preserve the generated Blob for download; no folder scan or cleanup is performed.
 Cover sheets retain explicit Save As/cancellation when no export folder is usable.

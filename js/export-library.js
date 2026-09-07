@@ -1,4 +1,4 @@
-import { loadCatalogSetting, saveCatalogSetting } from './storage.js';
+import { loadCatalogSetting, saveCatalogSetting, loadOwners } from './storage.js';
 import { supportsDirectoryPicker } from './browser-capabilities.js';
 import { hasDirectoryPermission, fileExists, writeFile } from './image-references.js';
 
@@ -23,21 +23,35 @@ export async function loadWritableExportDirectory(environment = globalThis, serv
   }
 }
 
-let fallbackSequence = 0;
+let exportWriteQueue = Promise.resolve();
 
 export function createExportFileName(label, extension, services = {}) {
-  const timestamp = (services.now?.() || new Date()).toISOString().replace(/[:.]/g, '-');
-  let token;
-  try { token = (services.randomUUID || (() => globalThis.crypto?.randomUUID?.()))(); } catch { /* Use a compatible filename suffix below. */ }
-  token ||= `${Date.now().toString(36)}-${(++fallbackSequence).toString(36)}-${Math.random().toString(36).slice(2)}`;
+  const timestamp = (services.now?.() || new Date()).toISOString().slice(0, 19).replace(/:/g, '-') + 'Z';
   const safeLabel = String(label).replace(/[^a-zA-Z0-9_-]+/g, '-');
   const safeExtension = String(extension).replace(/[^a-zA-Z0-9]/g, '');
-  return `card-supply-catalog-${safeLabel}-${timestamp}-${token}.${safeExtension}`;
+  const ownerName = String(services.ownerName || '').trim()
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '-').replace(/\s+/g, '-').replace(/^[. -]+|[. -]+$/g, '');
+  return `${ownerName ? `${ownerName}-` : ''}CSC-${safeLabel}-${timestamp}.${safeExtension}`;
 }
 
-export async function saveExportFile(blob, { label = 'backup', extension = 'json', directoryHandle = null } = {}, services = {}) {
+// Serialize exports in this page so same-second writes cannot race each other.
+export function saveExportFile(...args) {
+  const saved = exportWriteQueue.then(() => performExportSave(...args));
+  exportWriteQueue = saved.catch(() => {});
+  return saved;
+}
+
+async function performExportSave(blob, { label = 'backup', extension = 'json', directoryHandle = null } = {}, services = {}) {
   if (!blob?.size) throw new Error('The generated export file is empty.');
-  let fileName = createExportFileName(label, extension, services);
+  let ownerName = '';
+  try {
+    const ownerId = await (services.loadCatalogSetting || loadCatalogSetting)('defaultOwnerId');
+    if (ownerId) {
+      const owners = await (services.loadOwners || loadOwners)();
+      ownerName = owners.find((owner) => owner.id === ownerId)?.name || '';
+    }
+  } catch { /* A missing device setting must not prevent export. */ }
+  let fileName = createExportFileName(label, extension, { ...services, ownerName });
   if (directoryHandle) {
     try {
       const dot = fileName.lastIndexOf('.');
