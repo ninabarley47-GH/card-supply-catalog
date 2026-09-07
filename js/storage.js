@@ -755,6 +755,7 @@ export function normalizeCardForRuntime(card, catalog = null) {
 
   const runtimeCard = {
     ...cardWithoutLegacyStampSet,
+    stampDieSetIds: normalizeStampDieSetIds(cardWithoutLegacyStampSet.stampDieSetIds),
     notes: normalizeCardNotes(cardWithoutLegacyStampSet.notes),
     status: cardWithoutLegacyStampSet.status === "sent" ? "sent" : "available",
     tags,
@@ -771,7 +772,13 @@ export function normalizeCardNotes(notes) {
   return notes.trim();
 }
 
+export function normalizeStampDieSetIds(ids) {
+  if (!Array.isArray(ids)) return [];
+  return [...new Set(ids.filter((id) => typeof id === "string" && id.trim() && id === id.trim()))];
+}
+
 export function isCard(card) {
+  // Optional Stamp & Die references are repaired by normalization, not a reason to discard a Card.
   return (
     card &&
     typeof card.id === "string" &&

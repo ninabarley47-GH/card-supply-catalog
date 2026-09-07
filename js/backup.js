@@ -11,6 +11,7 @@ import {
   loadSavedPaperPack,
   isCard,
   normalizeCardNotes,
+  normalizeStampDieSetIds,
   isColor,
   isCompatiblePaperPack,
   restoreCatalogRecords,
@@ -1760,6 +1761,7 @@ function createSerializableCard(card) {
   return addCatalogSchemaVersion(cloneJsonSafe({
     ...serializableCard,
     notes: normalizeCardNotes(serializableCard.notes),
+    stampDieSetIds: normalizeStampDieSetIds(serializableCard.stampDieSetIds),
     status: serializableCard.status === "sent" ? "sent" : "available"
   }));
 }
