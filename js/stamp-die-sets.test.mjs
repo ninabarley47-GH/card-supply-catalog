@@ -381,3 +381,41 @@ test('Card Notes survives storage reload, editing and clearing without rewriting
     assert.equal(h.stores.get('cards').get(legacy.id).notes, notes.trim());
   }
 });
+
+test('Card Stamp references normalize through real storage APIs without rewriting on load; Set deletion preserves Cards', async (t) => {
+  const h = databaseHarness(); const previous = globalThis.window;
+  t.after(() => { globalThis.window = previous; });
+  globalThis.window = { indexedDB: h.indexedDB, localStorage: { getItem: () => 'true' } };
+  const storage = await import('./storage.js?card-stamp-persistence');
+  await storage.saveStampDieSet(setRecord());
+  const base = { id: 'relationship-card', dateCreated: '2026-09-07', size: { width: 4, height: 6 },
+    tagIds: [], paperPackIds: ['paper-one', 'paper-one'], colorIds: [], favorite: false };
+  const cases = [
+    [undefined, []], [null, []], ['bad', []], [{ bad: true }, []],
+    [[setRecord().id, null, '', 42, {}, setRecord().id, 'missing-set'], [setRecord().id, 'missing-set']]
+  ];
+  for (const [value, expected] of cases) {
+    const raw = { ...base, ...(value === undefined ? {} : { stampDieSetIds: value }) };
+    h.stores.get('cards').set(base.id, structuredClone(raw));
+    const before = structuredClone(h.stores);
+    const loaded = (await storage.loadSavedCards()).find(card => card.id === base.id);
+    assert.ok(loaded, 'malformed optional references cannot exclude the Card');
+    assert.deepEqual(loaded.stampDieSetIds, expected);
+    assert.deepEqual(loaded.paperPackIds, base.paperPackIds);
+    assert.deepEqual(h.stores, before, 'loading does not rewrite stored records');
+    await storage.restoreCatalogRecords({ cards: [raw], tagCatalog: catalog });
+    assert.deepEqual(h.stores.get('cards').get(base.id).stampDieSetIds, expected);
+    assert.equal(h.stores.get('cards').get(base.id).schemaVersion, 8);
+    await storage.saveCard(raw);
+    assert.deepEqual((await storage.loadSavedCards()).find(card => card.id === base.id).stampDieSetIds, expected);
+  }
+  const beforeDelete = structuredClone(h.stores);
+  h.failNextCommit();
+  await assert.rejects(storage.deleteStampDieSet(setRecord().id));
+  assert.deepEqual(h.stores, beforeDelete);
+  await storage.deleteStampDieSet(setRecord().id);
+  const expected = structuredClone(beforeDelete);
+  expected.get('stampDieSets').delete(setRecord().id);
+  assert.deepEqual(h.stores, expected, 'only the selected Set record is removed, including no library-setting changes');
+  assert.deepEqual((await storage.loadSavedCards()).find(card => card.id === base.id).stampDieSetIds, [setRecord().id, 'missing-set']);
+});

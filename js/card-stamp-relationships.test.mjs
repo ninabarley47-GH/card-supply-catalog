@@ -59,3 +59,69 @@ test('canonical tag-ID Cards also tolerate malformed Stamp relationships', () =>
   assert.equal(isCard(card), true);
   assert.deepEqual(normalizeCardForRuntime(card, catalog).stampDieSetIds, []);
 });
+import { createCatalogBackupSnapshot, createCatalogBackup, createIpadCatalogBackup, restoreCatalogBackup, validateBackup } from './backup.js';
+import { CATALOG_SCHEMA_VERSION, BACKUP_SCHEMA_VERSION } from './schema.js';
+
+const tagCatalog = { schemaVersion: 1, tags: [], categories: [] };
+const snapshot = (card) => createCatalogBackupSnapshot({ paperPacks: [], colorsById: {}, cards: [card], tagCatalog });
+
+async function restore(backup) {
+  let written;
+  const result = await restoreCatalogBackup({ backup: JSON.parse(JSON.stringify(backup)), paperPacks: [], colorsById: {}, owners: [], services: {
+    loadGlobalTagCatalog: async () => tagCatalog, loadSavedCards: async () => [], loadSavedStampDieRecordsForRestore: async () => [],
+    restoreCatalogRecords: async (records) => { written = records; },
+    dispatchCardsRestored() {}, dispatchStampSetsRestored() {}, dispatchCatalogRestored() {}
+  } });
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.cardsImported, 1);
+  return written.cards[0];
+}
+
+for (const [label, overrides, expected] of cases) {
+  test(`backup import normalizes Stamp relationships and retains Paper references: ${label}`, async () => {
+    const source = createCard({ ...overrides, tags: undefined, tagIds: [] });
+    const backup = snapshot(source);
+    assert.deepEqual(backup.cards[0].stampDieSetIds, expected, 'export normalizes references');
+    // Inject raw input after export to test actual malformed/legacy import data.
+    if ('stampDieSetIds' in overrides) backup.cards[0].stampDieSetIds = overrides.stampDieSetIds;
+    else {
+      delete backup.cards[0].stampDieSetIds;
+      backup.catalogSchemaVersion = 7;
+      backup.cards[0].schemaVersion = 7;
+    }
+    const before = structuredClone(backup);
+    assert.equal(validateBackup(backup).ok, true);
+    const card = await restore(backup);
+    assert.deepEqual(card.stampDieSetIds, expected);
+    assert.deepEqual(card.paperPackIds, source.paperPackIds);
+    assert.equal(card.schemaVersion, 8);
+    assert.deepEqual(backup, before);
+    const again = await restore(snapshot(card));
+    assert.deepEqual(again, card, 'second export/import preserves stable IDs and Card fields');
+  });
+}
+
+test('schema 8 standard and compact exports retain both relationship fields; future schemas are rejected', async () => {
+  assert.equal(CATALOG_SCHEMA_VERSION, 8);
+  assert.equal(BACKUP_SCHEMA_VERSION, 4);
+  const card = createCard({ tags: undefined, tagIds: [], stampDieSetIds: ['set-one', 'set-two'] });
+  const services = {
+    loadCatalogSetting: async () => null, loadSavedCards: async () => [card],
+    loadSavedStampDieSets: async () => [], loadGlobalTagCatalog: async () => tagCatalog,
+    hydrateCardImageSources: async () => {}
+  };
+  for (const exportBackup of [createCatalogBackup, createIpadCatalogBackup]) {
+    const backup = await exportBackup({ paperPacks: [], colorsById: {}, services });
+    assert.equal(backup.catalogSchemaVersion, 8);
+    assert.equal(backup.schemaVersion, 4);
+    assert.equal(backup.cards[0].schemaVersion, 8);
+    assert.equal(validateBackup(backup).ok, true);
+    assert.deepEqual(backup.cards[0].stampDieSetIds, card.stampDieSetIds);
+    assert.deepEqual(backup.cards[0].paperPackIds, card.paperPackIds);
+    const restored = await restore(backup);
+    assert.deepEqual(restored.stampDieSetIds, card.stampDieSetIds);
+    assert.deepEqual(restored.paperPackIds, card.paperPackIds);
+    backup.catalogSchemaVersion = 9;
+    assert.equal(validateBackup(backup).ok, false);
+  }
+});
