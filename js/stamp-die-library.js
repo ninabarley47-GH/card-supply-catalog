@@ -341,6 +341,7 @@ export async function initializeStampDieLibrary(services = {}) {
     } finally { add.disabled = false; }
   }
   add.addEventListener('click', () => openForm());
+  document.querySelector('[data-add-stamp-set-open]')?.addEventListener('click', () => openForm());
 
   function renderDraftImages() {
     draftImages = orderStampDieImages(draftImages);

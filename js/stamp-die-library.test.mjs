@@ -93,6 +93,8 @@ async function harness(t, otherCatalogServices = {}) {
   const status = new Element('p'); status.dataset.setLibraryStatus = '';
   screen.append(add, gallery, status);
   document.body.append(screen);
+  const headerAdd = new Element('button'); headerAdd.dataset.addStampSetOpen = '';
+  document.body.append(headerAdd);
   const filterForm = new Element('form'); filterForm.dataset.setLibraryFilterForm = '';
   const filterControls = {};
   for (const [key, tag] of Object.entries({ search: 'input', owner: 'select', year: 'select', favorites: 'button', clear: 'button', clearTags: 'button', toggleTags: 'button', tagFilters: 'fieldset' })) {
@@ -147,7 +149,7 @@ async function harness(t, otherCatalogServices = {}) {
     input.checked = true;
     await form.querySelector('.global-tag-picker').emit('change', { target: input });
   }
-  return { saveOptions, filterControls, owners, owner: form.querySelector('select[name="ownerId"]'), newOwner: form.querySelector('input[name="owner"]'), document, add, gallery, status, dialog, form, name, year, favorite, cancel, records, select,
+  return { headerAdd, saveOptions, filterControls, owners, owner: form.querySelector('select[name="ownerId"]'), newOwner: form.querySelector('input[name="owner"]'), document, add, gallery, status, dialog, form, name, year, favorite, cancel, records, select,
     recordReads: () => recordReads, calls: () => calls, setFailure: (value) => { failure = value; }, setGate: (value) => { commitGate = value; },
     renameTag: () => { catalog.tags[0].name = 'Botanical'; } };
 }
@@ -164,6 +166,24 @@ test('Add Set opens with current release year, empty name/tags and Favorite off;
   await h.form.emit('submit');
   assert.equal(h.records.length, 0);
   assert.equal(h.name.validationMessage, 'Enter a Set Name.');
+});
+
+test('header Add Stamp Set opens the existing Add form and saves through its normal workflow', async (t) => {
+  const h = await harness(t);
+  await h.headerAdd.emit('click');
+  assert.equal(h.dialog.open, true);
+  assert.equal(h.document.activeElement, h.name);
+  assert.equal(h.name.value, '');
+  h.name.value = 'Header Set';
+  await h.headerAdd.emit('click');
+  assert.equal(h.name.value, 'Header Set');
+  await h.form.emit('submit');
+  assert.equal(h.records.length, 1);
+  assert.equal(h.records[0].name, 'Header Set');
+  assert.equal(h.dialog.open, false);
+  await h.add.emit('click');
+  assert.equal(h.dialog.open, true);
+  assert.equal(h.name.value, '');
 });
 
 test('shared date helper uses local calendar components, including year boundaries', () => {
@@ -346,6 +366,10 @@ test('Add Set is wired into the application and offline shell with isolated imag
   assert.match(shell, /\.\/js\/stamp-die-library\.js/);
   assert.match(shell, /\.\/js\/ui\.js/);
   assert.match(html, /data-add-set>Add Set/);
+  const header = html.match(/<div class="header-actions"[\s\S]*?<\/div>/)[0];
+  assert.match(header, /class="button button-primary"[^>]*data-add-stamp-set-open[^>]*aria-haspopup="dialog"[^>]*hidden>[\s\S]*?Add Stamp Set/);
+  assert.match(header, /data-add-dsp-open>\s*<span aria-hidden="true">\+<\/span>\s*Add Paper/);
+  assert.doesNotMatch(header, /Add DSP/);
   assert.match(settings, /catalog:stamp-die-set-saved/);
   assert.doesNotMatch(source, /showOpenFilePicker|showDirectoryPicker|FileReader|createObjectURL|createWritable/);
   assert.match(shell, /\.\/js\/image-references\.js/);

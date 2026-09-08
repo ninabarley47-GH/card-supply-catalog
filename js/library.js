@@ -487,6 +487,9 @@ export function initializeScreenNavigation() {
       screen.hidden = screen !== activeScreen;
     }
 
+    const stampAddButton = document.getElementById("add-stamp-set");
+    if (stampAddButton) stampAddButton.hidden = activeScreen.id !== "stamps-dies";
+
     for (const controlGroup of sidebarControlGroups) {
       controlGroup.hidden = controlGroup.dataset.sidebarControls !== activeScreen.id;
     }
