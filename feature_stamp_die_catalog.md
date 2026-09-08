@@ -35,7 +35,7 @@ Sets at submit time, excluding the current stable ID during Edit, and never chec
 the entire draft intact. Ownership describes who owns one Set
 rather than requiring duplicate records for different owners.
 
-Release Year matches DSP: a required whole year from 1990 to 2100, defaulting to
+Release Year matches Paper: a required whole year from 1990 to 2100, defaulting to
 the current year. Older Sets may omit it and show "Release year not recorded".
 `dateCreated` remains automatic creation metadata in local YYYY-MM-DD format,
 using Cards' shared date helper. Existing creation dates are never converted into

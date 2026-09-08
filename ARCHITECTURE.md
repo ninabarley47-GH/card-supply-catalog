@@ -61,8 +61,8 @@ Every module should have one clear job. The current modules are:
 | --- | --- |
 | `app.js` | Application startup and feature initialization |
 | `library.js` | Screen navigation, Library and Color Library rendering, filters, detail interactions, uncataloged-folder discovery, and catalog coordination |
-| `add-dsp.js` | Add/Edit DSP workflow, validation, remembered defaults, and automatic folder-image loading |
-| `color-form.js` | Add Color workflow, including missing-color handoff from Add/Edit DSP |
+| `add-dsp.js` | Add/Edit Paper workflow, validation, remembered defaults, and automatic folder-image loading |
+| `color-form.js` | Add Color workflow, including missing-color handoff from Add/Edit Paper |
 | `images.js` | Embedded images, selected-folder access, relative paths, health checks, migration, and link repair |
 | `import-mode.js` | Shared incremental/overlay import planning for paper packs, colors, and Cards |
 | `settings.js` | Image-library settings, setup status, and bulk owner changes |
@@ -91,7 +91,7 @@ The application has three storage layers:
 Directory handles are permission-scoped browser objects and may require the user to reconnect or grant access again. A cloud-synced local folder such as OneDrive can be selected, but the app does not call a cloud-storage API directly.
 
 # JSON Design
-Each DSP contains:
+Each paper pack contains:
 
 catalog schema version
 unique ID
@@ -128,7 +128,7 @@ imported by folder or by file
 # Colors
 Treat colors as first-class data entities. Every product in the catalog references colors by ID. The colors.json file is the authoritative source for all color metadata.
 
-Each color's JSON entry includes a color ID derived from the name, name, HEX value, RGB value, collection family, visual color family, optional collection years, status, aliases, and supported product metadata (cardstock, ink, DSP, marker, and blend).
+Each color's JSON entry includes a color ID derived from the name, name, HEX value, RGB value, collection family, visual color family, optional collection years, status, aliases, and supported product metadata (cardstock, ink, Paper, marker, and blend).
    
 # Backups
 
@@ -267,7 +267,7 @@ for the agreed record shape and Phase 1 boundaries.
 
 ### Stamp & Die Release Year
 
-Sets now persist an optional numeric `releaseYear`, using DSP's 1990?2100 range.
+Sets now persist an optional numeric `releaseYear`, using Paper's 1990?2100 range.
 Add Set requires this field; older records may omit it. Their original `dateCreated`
 is preserved as creation metadata and is never converted into a release year.
 This persisted-field change raises shared `CATALOG_SCHEMA_VERSION` to 4 under the

@@ -17,7 +17,7 @@ This document defines the visual and interaction principles for Card Supply Cata
 4. Speed before decoration
 5. Consistency before cleverness
 
-# Philosophy: The interface should disappear behind the paper. The UI exists to showcase the DSP—not compete with it.
+# Philosophy: The interface should disappear behind the paper. The UI exists to showcase the Paper—not compete with it.
 
 # Things We Don't Do:
 No skeuomorphic craft graphics.
@@ -38,18 +38,18 @@ Avoid fixed widths whenever possible.
 Card Supply Catalog should feel calm, uncluttered, and inviting. The interface should encourage browsing and rediscovery rather than data management. Users should spend their time looking at paper, not interacting with the application.
 
 # Navigation and Layout
-The desktop experience uses a sticky left sidebar for primary navigation, search, and filters so these controls remain reachable while browsing a long library. The main navigation contains Paper Library, Color Library, and Settings. Add DSP and Add Color remain visible as global header actions. On phone-sized screens, the sidebar returns to the normal page flow.
+The desktop experience uses a sticky left sidebar for primary navigation, search, and filters so these controls remain reachable while browsing a long library. The main navigation contains Paper Library, Color Library, and Settings. Add Paper and Add Color remain visible as global header actions. On phone-sized screens, the sidebar returns to the normal page flow.
 
 # Visual Hierarchy
-Highest priority: DSP images
-Secondary: DSP name and the complete coordinating color palette
+Highest priority: Paper images
+Secondary: paper pack name and the complete coordinating color palette
 Tertiary: availability, owner, and tags
 Lowest priority: buttons, controls, and settings
 
 # Empty States
 Empty Library
 Friendly welcome message.
-Prominent + Add DSP button.
+Prominent + Add Paper button.
 No giant illustration.
 No unnecessary decoration.
 Missing Images - Show tasteful placeholders. 
@@ -58,7 +58,7 @@ Never make the user feel like something is "broken."
 # Feedback
 How the app talks to the user: 
 Save successful
-DSP added
+Paper Pack added
 Images imported
 
 Messages should be: 
@@ -95,7 +95,7 @@ Related fields grouped together.
 Required fields minimized.
 Defaults provided whenever possible.
 
-The Add DSP form remembers the owner, release year, availability, and backup-supply value from the most recently added pack. Entering a DSP name may automatically load images from a matching folder in the selected image library.
+The Add Paper form remembers the owner, release year, availability, and backup-supply value from the most recently added pack. Entering a paper pack name may automatically load images from a matching folder in the selected image library.
 
 # Error Philosophy
 Make mistakes easy to recover from.
@@ -111,7 +111,7 @@ The application should feel instantaneous.
 Target:
 Startup < 1 second
 Search updates immediately
-Library scrolling remains smooth with hundreds of DSP packs
+Library scrolling remains smooth with hundreds of paper packs
 
 # Accessibility
 Good color contrast
@@ -186,7 +186,7 @@ Whenever possible, images should be large enough for users to recognize patterns
 
 # Delight
 The app should have moments to delight the user. 
-For example: when a new DSP is added, it moves to the top of the available library and receives a green Recently Added context bar. That status remains until the user clears it from the card.
+For example: when a new paper pack is added, it moves to the top of the available library and receives a green Recently Added context bar. That status remains until the user clears it from the card.
 
 When in doubt, remove something instead of adding something.
 

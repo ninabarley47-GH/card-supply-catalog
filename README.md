@@ -2,7 +2,7 @@
 
 *A visual library for paper crafters.*
 
-Card Supply Catalog is an offline-first web application designed to help paper crafters organize, browse, and rediscover their Designer Series Paper (DSP) collection.
+Card Supply Catalog is an offline-first web application designed to help paper crafters organize, browse, and rediscover their paper collection.
 
 Unlike traditional inventory software, Card Supply Catalog is built around a simple idea:
 
@@ -36,7 +36,7 @@ It answers the questions crafters actually ask while creating:
 
 ### Visual Library
 
-Browse your collection using four pattern thumbnails for each DSP pack, making recognition fast and intuitive.
+Browse your collection using four pattern thumbnails for each paper pack, making recognition fast and intuitive.
 
 ### Fast Search
 
@@ -49,7 +49,7 @@ Instantly search by:
 
 ### Simple Cataloging
 
-Add new DSP packs in under a minute.
+Add new paper packs in under a minute.
 
 The application automatically:
 
@@ -66,7 +66,7 @@ Images can be:
 * Added individually
 * Replaced at any time
 
-DSP packs can be cataloged immediately, even if images are not yet available.
+paper packs can be cataloged immediately, even if images are not yet available.
 
 ### Offline First
 
@@ -100,7 +100,7 @@ Version 1 focuses exclusively on Designer Series Paper.
 Planned features include:
 
 * Responsive library
-* Four-thumbnail DSP cards
+* Four-thumbnail Paper Pack cards
 * Pattern gallery
 * Search and filtering
 * Recently Added section

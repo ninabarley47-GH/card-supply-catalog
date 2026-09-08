@@ -2786,7 +2786,7 @@ function createColorDetailContent(color) {
     createColorDetailItem("Aliases", (color.aliases || []).join(", ") || "None"),
     createColorDetailItem("Cardstock", formatMetadataValue(color.products?.cardstock)),
     createColorDetailItem("Ink", formatMetadataValue(color.products?.ink)),
-    createColorDetailItem("DSP", formatMetadataValue(color.products?.dsp)),
+    createColorDetailItem("Paper", formatMetadataValue(color.products?.dsp)),
     createColorDetailItem("Marker", formatMetadataValue(color.products?.marker)),
     createColorDetailItem("Blend", formatMetadataValue(color.products?.blend))
   );

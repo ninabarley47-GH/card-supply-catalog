@@ -1,1 +1,1 @@
-// DSP detail screen behavior belongs here.
+// Paper Pack detail screen behavior belongs here.

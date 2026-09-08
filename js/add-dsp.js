@@ -96,7 +96,7 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = [], owners = [
   document.addEventListener("color:saved", (event) => {
     if (event.detail?.source === "add-dsp") {
       panel.hidden = false;
-      renderFormMessage(message, `${event.detail.color.name} was added. You can continue saving this DSP.`, "success");
+      renderFormMessage(message, `${event.detail.color.name} was added. You can continue saving this paper pack.`, "success");
     }
   });
 
@@ -342,7 +342,7 @@ export function shouldShowPatternLibraryPicker(environment = globalThis) {
 
 export function getPatternImageHelpText(environment = globalThis) {
   return supportsDirectoryPicker(environment)
-    ? "If an image library folder is selected in Settings, images load automatically from a folder matching the DSP name. Use these controls only as a fallback."
+    ? "If an image library folder is selected in Settings, images load automatically from a folder matching the paper pack name. Use these controls only as a fallback."
     : "Choose one or more images from this device. They will be stored with this browser's catalog.";
 }
 
@@ -434,7 +434,7 @@ function openEditDspPanel(panel, form, paperPack, colorsById, selectedImages, im
   resetAddDspForm(form, selectedImages, imagePreviewList, imagePreviewCount, controls);
   controls.formState.editingPaperPack = paperPack;
   controls.title.textContent = "Edit Paper";
-  controls.summary.textContent = "Update this Designer Series Paper pack.";
+  controls.summary.textContent = "Update this paper pack.";
   controls.submitButton.textContent = "Save Changes";
 
   fillPaperPackForm(form, paperPack, colorsById, controls.owners);
@@ -461,7 +461,7 @@ function resetAddDspForm(form, selectedImages, imagePreviewList, imagePreviewCou
   controls.formState.autoLoadedPaperPackId = "";
   controls.formState.isLoadingLibraryImages = false;
   controls.title.textContent = "Add Paper";
-  controls.summary.textContent = "Save a new Designer Series Paper pack to this catalog.";
+  controls.summary.textContent = "Save a new paper pack to this catalog.";
   controls.submitButton.textContent = "Save Paper Pack";
 }
 
@@ -545,7 +545,7 @@ function validatePaperPackDuplicate(paperPack, paperPacks, editingPaperPack = nu
     return {
       ok: false,
       requiresConfirmation: false,
-      message: `A paper pack with the ID "${paperPack.id}" already exists. Change the DSP name before saving.`
+      message: `A paper pack with the ID "${paperPack.id}" already exists. Change the paper pack name before saving.`
     };
   }
 
@@ -553,7 +553,7 @@ function validatePaperPackDuplicate(paperPack, paperPacks, editingPaperPack = nu
     return {
       ok: false,
       requiresConfirmation: false,
-      message: `A paper pack named "${paperPack.name}" already exists. Use a unique DSP name before saving.`
+      message: `A paper pack named "${paperPack.name}" already exists. Use a unique paper pack name before saving.`
     };
   }
 

@@ -175,7 +175,7 @@ test('Phase 2A canonical creation survives storage reload with empty imageRefs',
 });
 
 
-test('Release Year validates the DSP year range while legacy creation dates remain metadata', () => {
+test('Release Year validates the Paper year range while legacy creation dates remain metadata', () => {
   for (const releaseYear of [1990, 2024, 2100]) {
     assert.equal(normalizeStampDieSet({ ...setRecord(), releaseYear }, catalog).releaseYear, releaseYear);
   }

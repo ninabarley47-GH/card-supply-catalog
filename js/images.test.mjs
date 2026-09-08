@@ -101,7 +101,7 @@ test("Card thumbnail generation targets only unique Card-folder image paths", ()
   assert.deepEqual([...paths], ["birthday/card one.jpg", "card two.png"]);
 });
 
-test("unsupported browsers skip automatic DSP folder lookup without folder messaging", async () => {
+test("unsupported browsers skip automatic Paper folder lookup without folder messaging", async () => {
   let folderLookupStarted = false;
   const result = await loadPatternImagesForPaperPackName("Test Pack", {}, {
     getReadableImageLibraryDirectoryHandle: async () => {
@@ -119,7 +119,7 @@ test("unsupported browsers skip automatic DSP folder lookup without folder messa
   assert.equal(folderLookupStarted, false);
 });
 
-test("supported browsers preserve automatic DSP folder lookup and reconnect messaging", async () => {
+test("supported browsers preserve automatic Paper folder lookup and reconnect messaging", async () => {
   let folderLookupStarted = false;
   const result = await loadPatternImagesForPaperPackName(
     "Test Pack",

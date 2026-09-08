@@ -1,7 +1,7 @@
 {
   "name": "Card Supply Catalog",
   "short_name": "Card Catalog",
-  "description": "A visual library for Designer Series Paper and coordinating colors.",
+  "description": "A visual library for paper and coordinating colors.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

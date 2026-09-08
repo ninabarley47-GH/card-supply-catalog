@@ -159,7 +159,7 @@ The iPad backup embeds compressed images directly in the backup file. It is larg
 
 ## Current Limitations
 
-- The app is focused on Designer Series Paper.
+- The app is focused on paper.
 - Folder-backed image storage requires a supported desktop browser.
 - iPad is best for browsing, searching, viewing colors, and using imported catalog data.
 - Full image-folder setup and folder-backed image migration should be done from a supported desktop browser.

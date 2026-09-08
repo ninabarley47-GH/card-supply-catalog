@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Provide a searchable gallery of finished cards linked to DSP packs.
+Provide a searchable gallery of finished cards linked to paper packs.
 
 # Goals
 

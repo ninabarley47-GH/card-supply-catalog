@@ -218,7 +218,7 @@ export async function loadPatternImagesForPaperPackName(paperPackName, environme
     };
   }
 
-  // This lookup is started by the user's change/blur action in the DSP form, so
+  // This lookup is started by the user's change/blur action in the Paper form, so
   // it can restore access to a previously selected folder. Saved directory
   // handles commonly return to the "prompt" state after the browser reopens.
   const loadDirectoryHandle = services.getReadableImageLibraryDirectoryHandle || getReadableImageLibraryDirectoryHandle;

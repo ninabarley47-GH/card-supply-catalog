@@ -1662,7 +1662,7 @@ function getFolderSelectionErrorMessage(error) {
 }
 
 function getSelectedImageLibraryMessage(directoryHandle, prefix = "Image folder selected") {
-  return `${prefix}: ${directoryHandle.name}. Full local paths are hidden by the browser, but DSP images can be read from this folder.`;
+  return `${prefix}: ${directoryHandle.name}. Full local paths are hidden by the browser, but paper images can be read from this folder.`;
 }
 
 async function getDirectoryPermissionState(directoryHandle) {
