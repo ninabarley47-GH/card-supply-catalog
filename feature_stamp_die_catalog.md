@@ -448,3 +448,21 @@ the existing atomic catalog transaction, now including the Set store. Malformed
 Sets or transaction failure abort the whole restore. Decision 32 remains in force:
 restoring references never writes or cleans up shared-library image files. Reconnect
 the correct library in Settings to resolve restored folder references.
+
+
+## Cards using a Set
+
+Library tiles show compact related-Card thumbnails when used; Detail always shows
+Related Cards, with a simple empty state. Card links use shared Detail navigation,
+including Back to the Set. Reverse matches come from the complete live Card collection.
+
+Add/Edit provides the Paper-style searchable, removable Card selector. Cards are
+identified by thumbnail, creation date and size; search also matches Card tags.
+Only explicit selection changes update Cards. Set metadata and those Card deltas
+commit in one transaction, using the new Set's stable ID on Add. Unchanged selections
+leave Card records untouched. Failed saves retain the draft and roll back catalog
+writes. Other Set references, including missing Sets, and Paper relationships remain.
+
+`Card.stampDieSetIds` is the only persisted relationship field; Sets do not store
+Card IDs. Existing backup/restore supports these references without a version change.
+Set deletion still preserves referencing Cards and leaves image files untouched.

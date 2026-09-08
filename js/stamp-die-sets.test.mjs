@@ -110,7 +110,7 @@ function databaseHarness() {
         for (const [key, value] of snapshot) stores.set(key, value);
         target.dispatchEvent(new Event('abort'));
       };
-      if (mode === 'readwrite') queueMicrotask(() => {
+      if (mode === 'readwrite') setTimeout(() => {
         if (failCommit) { failCommit = false; target.error = new Error('Simulated failed commit'); target.abort(); }
         else if (!aborted) target.dispatchEvent(new Event('complete'));
       });
@@ -419,4 +419,64 @@ test('Card Stamp references normalize through real storage APIs without rewritin
   expected.get('stampDieSets').delete(setRecord().id);
   assert.deepEqual(h.stores, expected, 'only the selected Set record is removed, including no library-setting changes');
   assert.deepEqual((await storage.loadSavedCards()).find(card => card.id === base.id).stampDieSetIds, [setRecord().id, 'missing-set']);
+});
+
+
+async function relationshipStorageHarness(t, suffix) {
+  const h = databaseHarness(); const previous = globalThis.window;
+  t.after(() => { globalThis.window = previous; });
+  globalThis.window = { indexedDB: h.indexedDB, localStorage: { getItem: () => 'true' } };
+  const storage = await import(`./storage.js?stamp-write-through-${suffix}`);
+  await storage.loadSavedStampDieSets();
+  const card = (id, ids) => ({ id, dateCreated: '2026-09-07', size: { width: 4, height: 6 },
+    tagIds: [], colorIds: [], favorite: false, notes: 'Latest notes', paperPackIds: ['paper-X'],
+    stampDieSetIds: ids, imagePath: 'keep.jpg' });
+  h.stores.get('cards').set('A', card('A', ['missing-set']));
+  h.stores.get('cards').set('B', card('B', ['another-set']));
+  return { h, storage };
+}
+
+test('Add Set and multiple Card relationship writes commit atomically; Edit changes only the targeted references', async t => {
+  const { h, storage } = await relationshipStorageHarness(t, 'success');
+  const before = structuredClone(h.stores);
+  const updated = await storage.saveStampDieSet(setRecord(), { cardRelationshipChanges: { add: ['A', 'B', 'A'], remove: [] } });
+  assert.equal(updated.length, 2);
+  assert.deepEqual(h.stores.get('cards').get('A'), { ...before.get('cards').get('A'), stampDieSetIds: ['missing-set', 'set-one'] });
+  assert.deepEqual(h.stores.get('cards').get('B').stampDieSetIds, ['another-set', 'set-one']);
+  assert.equal('cardIds' in h.stores.get('stampDieSets').get('set-one'), false);
+  h.stores.get('cards').get('B').notes = 'Changed elsewhere after Edit opened';
+  await storage.saveStampDieSet({ ...setRecord(), name: 'Renamed' }, { cardRelationshipChanges: { add: [], remove: ['B'] } });
+  assert.deepEqual(h.stores.get('cards').get('B'), { ...before.get('cards').get('B'), notes: 'Changed elsewhere after Edit opened' });
+  assert.deepEqual(h.stores.get('cards').get('A').stampDieSetIds, ['missing-set', 'set-one']);
+  for (const name of ['paperPacks', 'colors', 'owners', 'settings']) assert.deepEqual(h.stores.get(name), before.get(name));
+});
+
+test('unchanged Stamp selections never rewrite Cards, including concurrent and missing references', async t => {
+  const { h, storage } = await relationshipStorageHarness(t, 'unchanged');
+  const cards = h.stores.get('cards');
+  cards.get('A').stampDieSetIds = ['set-one', 'missing', 'set-one'];
+  const before = structuredClone(cards);
+  await storage.saveStampDieSet(setRecord(), { cardRelationshipChanges: { add: [], remove: [] } });
+  assert.deepEqual(cards, before);
+  assert.deepEqual(await storage.saveStampDieSet(setRecord(), { cardRelationshipChanges: { add: ['A'], remove: ['B'] } }), []);
+  assert.deepEqual(cards, before, 'already satisfied deltas do not normalize or overwrite unrelated data');
+});
+
+for (const failure of ['commit', 'missing-card', 'invalid-set']) test(`Set creation failure (${failure}) leaves no partial Card or Set writes`, async t => {
+  const { h, storage } = await relationshipStorageHarness(t, failure);
+  const before = structuredClone(h.stores);
+  if (failure === 'commit') h.failNextCommit();
+  await assert.rejects(storage.saveStampDieSet(failure === 'invalid-set' ? { ...setRecord(), name: '' } : setRecord(), {
+    cardRelationshipChanges: { add: failure === 'missing-card' ? ['A', 'missing-card'] : ['A', 'B'], remove: [] }
+  }));
+  assert.deepEqual(h.stores, before);
+});
+
+test('failed Stamp Edit rolls back Set metadata and all relationship deltas', async t => {
+  const { h, storage } = await relationshipStorageHarness(t, 'edit-failure');
+  await storage.saveStampDieSet(setRecord(), { cardRelationshipChanges: { add: ['A'], remove: [] } });
+  const before = structuredClone(h.stores);
+  h.failNextCommit();
+  await assert.rejects(storage.saveStampDieSet({ ...setRecord(), name: 'Changed' }, { cardRelationshipChanges: { add: ['B'], remove: ['A'] } }));
+  assert.deepEqual(h.stores, before);
 });

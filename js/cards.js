@@ -124,6 +124,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     sortCards(savedCards);
     cards.splice(0, cards.length, ...savedCards);
     renderCurrent();
+    document.dispatchEvent(new CustomEvent('catalog:cards-updated'));
   };
 
   try {
@@ -731,7 +732,7 @@ function createDimensionInput(name) {
   return input;
 }
 
-function createPaperPackPicker(labels = {
+export function createPaperPackPicker(labels = {
   heading: 'Paper Packs Used', search: 'Search paper packs by name',
   results: 'Paper pack search results', selected: 'Selected paper packs'
 }) {

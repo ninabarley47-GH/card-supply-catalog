@@ -145,7 +145,13 @@ export async function loadSavedStampDieRecordsForRestore() {
   return getAllFromStore(await openCatalogDatabase(), STAMP_DIE_SETS_STORE);
 }
 
-export async function saveStampDieSet(record, { inferredTags = [], owner = null } = {}) {
+export async function saveStampDieSet(record, { inferredTags = [], owner = null, cardRelationshipChanges = { add: [], remove: [] } } = {}) {
+  const { add, remove } = cardRelationshipChanges;
+  if (![add, remove].every((ids) => Array.isArray(ids) && ids.every((id) => typeof id === 'string' && id.trim() && id === id.trim())) ||
+      add.some((id) => remove.includes(id))) throw new TypeError('Invalid Card relationship changes.');
+  const additions = new Set(add);
+  const affectedIds = [...new Set([...add, ...remove])];
+  const updatedCards = [];
   const database = await openCatalogDatabase();
   const catalog = await ensureGlobalTagPersistence(database);
   const reconciled = reconcileStampDieImageTags(record, catalog, inferredTags);
@@ -153,7 +159,26 @@ export async function saveStampDieSet(record, { inferredTags = [], owner = null 
   if (owner && (!isOwner(owner) || owner.id !== normalized.ownerId)) throw new TypeError('Invalid Set owner.');
   const stores = reconciled.catalog === catalog ? [STAMP_DIE_SETS_STORE] : [STAMP_DIE_SETS_STORE, SETTINGS_STORE];
   if (owner) stores.push(OWNERS_STORE);
+  if (affectedIds.length) stores.push(CARDS_STORE);
   await writeTransaction(database, stores, (transaction) => {
+    // Read the latest affected Cards inside the same transaction. Never overwrite a draft snapshot.
+    for (const id of affectedIds) {
+      const store = transaction.objectStore(CARDS_STORE);
+      const request = store.get(id);
+      request.addEventListener('success', () => {
+        try {
+          const card = request.result;
+          if (!card && !additions.has(id)) return;
+          if (!isCard(card)) throw new TypeError('A selected Card is no longer available.');
+          const ids = normalizeStampDieSetIds(card.stampDieSetIds);
+          if (ids.includes(normalized.id) === additions.has(id)) return;
+          const stampDieSetIds = additions.has(id) ? [...ids, normalized.id] : ids.filter((setId) => setId !== normalized.id);
+          const updated = { ...card, stampDieSetIds };
+          store.put(updated);
+          updatedCards.push(updated);
+        } catch { transaction.abort(); }
+      });
+    }
     if (owner) transaction.objectStore(OWNERS_STORE).put(owner);
     transaction.objectStore(STAMP_DIE_SETS_STORE).put(normalized);
     if (reconciled.catalog !== catalog) {
@@ -161,6 +186,7 @@ export async function saveStampDieSet(record, { inferredTags = [], owner = null 
     }
   });
   globalTagMigrationPromise = Promise.resolve(reconciled.catalog);
+  return updatedCards;
 }
 
 export async function deleteStampDieSet(id) {

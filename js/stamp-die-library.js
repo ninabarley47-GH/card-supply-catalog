@@ -1,3 +1,4 @@
+import { createPaperPackPicker } from './cards.js';
 import { getCardLibraryImageSource } from './card-images.js';
 import { detailNavigation } from './detail-navigation.js';
 import { filterStampDieSets, initializeStampDieFilters } from './stamp-die-filter.js';
@@ -162,6 +163,8 @@ export async function initializeStampDieLibrary(services = {}) {
   let draftId;
   let draftSession = 0;
   let editingRecord = null;
+  let initialCardIds = [];
+  let selectedCardIds = [];
   let saving = false;
   let selecting = false;
   let draftImages = [];
@@ -192,7 +195,7 @@ export async function initializeStampDieLibrary(services = {}) {
     if (!libraryCatalog) return;
     filters.refreshCatalog(libraryCatalog, displayedRecords);
     const visible = filterStampDieSets(displayedRecords, filters.read(), libraryCatalog, owners);
-    renderStampDieLibrary(gallery, visible, libraryCatalog, (id) => openForm(id), openDetail, owners, displayedRecords.length, toggleFavorite);
+    renderStampDieLibrary(gallery, visible, libraryCatalog, (id) => openForm(id), openDetail, owners, displayedRecords.length, toggleFavorite, cards);
     setFavoriteButtonsDisabled(savingFavorite || deleting);
     status.dataset.tone = '';
     status.textContent = `Showing ${visible.length} of ${displayedRecords.length} sets`;
@@ -234,6 +237,10 @@ export async function initializeStampDieLibrary(services = {}) {
   }
 
   function reset() {
+    initialCardIds = [];
+    selectedCardIds = [];
+    view.cardPicker.search.value = '';
+    renderCardSelections();
     draftSession++;
     clearDraftStampImages(draftImages);
     draftImages = [];
@@ -321,6 +328,9 @@ export async function initializeStampDieLibrary(services = {}) {
       }
       await refreshImageDirectory();
       draftId = id || createSetId();
+      initialCardIds = findCardsUsingStampDieSet(cards, id).map((card) => card.id);
+      selectedCardIds = [...initialCardIds];
+      renderCardSelections();
       view.title.textContent = id ? 'Edit Stamp & Die Set' : 'Add Stamp & Die Set';
       view.dialog.showModal();
       view.name.focus();
@@ -424,6 +434,57 @@ export async function initializeStampDieLibrary(services = {}) {
     await refresh();
   });
 
+  function renderCardSelections() {
+    const { search, results, selected, status } = view.cardPicker;
+    results.replaceChildren();
+    selected.replaceChildren();
+    const byId = new Map(cards.map((card) => [card.id, card]));
+    for (const id of selectedCardIds) {
+      const card = byId.get(id);
+      const item = document.createElement('li');
+      const name = document.createElement('span');
+      name.textContent = card ? cardRelationshipLabel(card) : 'Card no longer available';
+      if (card) appendCardRelationshipThumbnail(name, card);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.removeRelatedCard = id;
+      button.textContent = String.fromCodePoint(215);
+      button.setAttribute('aria-label', `Remove ${card ? cardRelationshipLabel(card) : 'unavailable Card'}`);
+      item.append(name, button);
+      selected.append(item);
+    }
+    const query = search.value.trim().toLowerCase();
+    if (!query) { status.textContent = cards.length ? 'Type to search Cards.' : 'No Cards available.'; return; }
+    const matches = cards.filter((card) => !selectedCardIds.includes(card.id) &&
+      `${cardRelationshipLabel(card)} ${(card.tags || []).join(' ')}`.toLowerCase().includes(query));
+    status.textContent = matches.length ? '' : 'No matching Cards.';
+    for (const card of matches) {
+      const item = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.addRelatedCard = card.id;
+      button.textContent = cardRelationshipLabel(card);
+      appendCardRelationshipThumbnail(button, card);
+      item.append(button);
+      results.append(item);
+    }
+  }
+  view.cardPicker.search.addEventListener('input', renderCardSelections);
+  view.cardPicker.results.addEventListener('click', (event) => {
+    const id = event.target.closest('[data-add-related-card]')?.dataset.addRelatedCard;
+    if (saving || !id || selectedCardIds.includes(id) || !cards.some((card) => card.id === id)) return;
+    selectedCardIds.push(id);
+    view.cardPicker.search.value = '';
+    renderCardSelections();
+    view.cardPicker.search.focus();
+  });
+  view.cardPicker.selected.addEventListener('click', (event) => {
+    const id = event.target.closest('[data-remove-related-card]')?.dataset.removeRelatedCard;
+    if (saving || !id) return;
+    selectedCardIds = selectedCardIds.filter((cardId) => cardId !== id);
+    renderCardSelections();
+  });
+
   view.cancel.addEventListener('click', () => { if (!saving) view.dialog.close(); });
   view.dialog.addEventListener('cancel', (event) => { if (saving) event.preventDefault(); });
   view.dialog.addEventListener('close', () => { reset(); (detail.dialog.open ? detail.edit : add).focus(); });
@@ -469,7 +530,15 @@ export async function initializeStampDieLibrary(services = {}) {
       const prepared = await storage.prepareStampImagesForSave(draftImages);
       record.imageRefs = prepared.imageRefs;
       usedFallback = prepared.usedFallback;
-      await storage.saveStampDieSet(normalizeStampDieSet(record, reconciled.catalog), { inferredTags, owner });
+      const cardRelationshipChanges = {
+        add: selectedCardIds.filter((id) => !initialCardIds.includes(id)),
+        remove: initialCardIds.filter((id) => !selectedCardIds.includes(id))
+      };
+      const updatedCards = await storage.saveStampDieSet(normalizeStampDieSet(record, reconciled.catalog), { inferredTags, owner, cardRelationshipChanges });
+      for (const updated of updatedCards || []) {
+        const card = cards.find((entry) => entry.id === updated.id);
+        if (card) card.stampDieSetIds = [...updated.stampDieSetIds];
+      }
       if (owner && !owners.some((entry) => entry.id === owner.id && entry.archived === owner.archived)) {
         const index = owners.findIndex((entry) => entry.id === owner.id);
         if (index < 0) owners.push(owner);
@@ -481,7 +550,7 @@ export async function initializeStampDieLibrary(services = {}) {
       saved = true;
     } catch {
       view.message.dataset.tone = 'error';
-      view.message.textContent = 'The set could not be saved. Check the release year and selected tags, or try fewer images. Your draft is still here.';
+      view.message.textContent = 'The set could not be saved. Check the release year, selected tags and Cards, or try fewer images. Your draft is still here.';
     } finally {
       saving = false;
       view.fields.disabled = false;
@@ -500,6 +569,12 @@ export async function initializeStampDieLibrary(services = {}) {
     document.dispatchEvent(new CustomEvent('catalog:global-tags-updated', { detail: { source: 'stamp-die-save' } }));
   });
 
+  for (const name of ['catalog:card-saved', 'catalog:cards-updated']) {
+    document.addEventListener(name, () => {
+      renderCurrent();
+      if (selectedSetId) renderDetail(displayedRecords, libraryCatalog);
+    });
+  }
   document.addEventListener('stamp-die-set:detail-request', (event) => {
     detailNavigation.open('stamp', event.detail?.stampDieSetId, { related: true });
   });
@@ -577,10 +652,12 @@ function createSetFormView() {
   previews.className = 'stamp-set-draft-images';
   imageControls.append(imageHeading, chooseLibrary, chooseImages, imageInput, folderMessage, imageMessage, previews);
   const tags = document.createElement('div');
+  const cardPicker = createPaperPackPicker({ heading: 'Related Cards', search: 'Search Cards by date, size, or tags',
+    results: 'Card search results', selected: 'Selected Cards' });
   const message = document.createElement('p');
   message.className = 'form-message';
   message.setAttribute('role', 'status');
-  fields.append(createField('Set Name', name), createField('Owner', owner, newOwner), createField('Release Year', releaseYear), favoriteLabel, imageControls, tags, message);
+  fields.append(createField('Set Name', name), createField('Owner', owner, newOwner), createField('Release Year', releaseYear), favoriteLabel, imageControls, tags, cardPicker.section, message);
   const actions = document.createElement('div');
   actions.className = 'card-add-actions';
   const cancel = document.createElement('button');
@@ -594,7 +671,7 @@ function createSetFormView() {
   actions.append(cancel, save);
   form.append(fields, actions);
   dialog.append(header, form);
-  return { dialog, title, form, fields, name, owner, newOwner, releaseYear, favorite, tags, message, cancel, save, chooseImages, imageInput, chooseLibrary, folderMessage, imageMessage, previews };
+  return { dialog, title, form, fields, name, owner, newOwner, releaseYear, favorite, tags, cardPicker, message, cancel, save, chooseImages, imageInput, chooseLibrary, folderMessage, imageMessage, previews };
 }
 
 function createField(text, ...inputs) {
@@ -604,7 +681,7 @@ function createField(text, ...inputs) {
   return label;
 }
 
-export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetail, owners = [], totalCount = records.length, onFavorite) {
+export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetail, owners = [], totalCount = records.length, onFavorite, cards = []) {
   const tiles = records.map((record) => {
     const tile = document.createElement('article');
     tile.className = 'stamp-set-tile';
@@ -652,6 +729,18 @@ export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetai
       content.append(tags);
     }
     content.append(release);
+    if (findCardsUsingStampDieSet(cards, record.id).length) {
+      const related = createStampRelatedCardsSection(cards, record.id);
+      related.className += ' stamp-library-related-cards';
+      related.addEventListener('click', (event) => {
+        const link = event.target.closest('[data-related-card-id]');
+        if (!link || !cards.some((card) => card.id === link.dataset.relatedCardId)) return;
+        event.stopPropagation();
+        if (!detailNavigation.open('stamp', record.id)) return;
+        detailNavigation.open('card', link.dataset.relatedCardId, { related: true });
+      });
+      content.append(related);
+    }
     tile.append(titleRow, placeholder, content);
     if (onEdit) {
       const edit = document.createElement('button');
@@ -847,4 +936,20 @@ function createStampRelatedCardsSection(cards, setId) {
   }
   section.append(grid);
   return section;
+}
+
+
+function cardRelationshipLabel(card) {
+  return `Card ${card.dateCreated}, ${card.size.width} by ${card.size.height} inches`;
+}
+
+function appendCardRelationshipThumbnail(container, card) {
+  const source = getCardLibraryImageSource(card);
+  if (!source) return;
+  const image = document.createElement('img');
+  image.className = 'stamp-card-selection-thumbnail';
+  image.src = source;
+  image.alt = '';
+  image.addEventListener('error', () => image.remove(), { once: true });
+  container.append(image);
 }

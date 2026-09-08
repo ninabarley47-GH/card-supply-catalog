@@ -69,3 +69,14 @@ Missing/null Notes normalize to an empty string; saving trims outer whitespace w
 preserving internal line breaks, without a character limit. Non-string values are
 invalid. Existing records need no bulk rewrite. Standard and iPad backups preserve
 Notes through restore, including backups from before Notes existed.
+
+
+## Stamp & Die relationship editing from Sets
+
+Cards reference multiple Sets through stable `stampDieSetIds`. Stamp Library and
+Detail derive Related Cards from this field and use the shared Detail Back history.
+Stamp Add/Edit can also manage these assignments: explicit additions/removals write
+through to the affected Cards in the same transaction as the Set save. Opening and
+saving unchanged selections does not rewrite Cards. Paper references and missing
+Set IDs unrelated to an explicit removal remain intact. Backup/restore and Set
+catalog-only deletion retain the existing relationship and image-file safety rules.

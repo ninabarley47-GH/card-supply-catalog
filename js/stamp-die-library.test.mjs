@@ -110,6 +110,7 @@ async function harness(t, otherCatalogServices = {}) {
   let failure = false;
   let commitGate;
   let calls = 0;
+  const saveOptions = [];
   let recordReads = 0;
   const owners = [{ id: 'owner-nina', name: 'Nina' }, { id: 'owner-amanda', name: 'Amanda' }];
   await initializeStampDieLibrary({
@@ -119,13 +120,19 @@ async function harness(t, otherCatalogServices = {}) {
     saveCatalogSetting: async () => {},
     loadGlobalTagCatalog: async () => structuredClone(catalog),
     loadSavedStampDieSets: async () => { recordReads++; return structuredClone(records); },
-    saveStampDieSet: async (record) => {
+    saveStampDieSet: async (record, options) => {
       calls += 1;
+      saveOptions.push(structuredClone(options));
       if (commitGate) await commitGate;
       if (failure) throw new Error('Storage unavailable');
       const index = records.findIndex((entry) => entry.id === record.id);
       if (index === -1) records.push(structuredClone(record));
       else records[index] = structuredClone(record);
+      const changes = options?.cardRelationshipChanges || { add: [], remove: [] };
+      return (otherCatalogServices.cards || []).filter(card => changes.add.includes(card.id) || changes.remove.includes(card.id))
+        .map(card => ({ ...card, stampDieSetIds: changes.add.includes(card.id)
+          ? [...new Set([...(card.stampDieSetIds || []), record.id])]
+          : (card.stampDieSetIds || []).filter(id => id !== record.id) }));
     },
     ...otherCatalogServices
   });
@@ -140,7 +147,7 @@ async function harness(t, otherCatalogServices = {}) {
     input.checked = true;
     await form.querySelector('.global-tag-picker').emit('change', { target: input });
   }
-  return { filterControls, owners, owner: form.querySelector('select[name="ownerId"]'), newOwner: form.querySelector('input[name="owner"]'), document, add, gallery, status, dialog, form, name, year, favorite, cancel, records, select,
+  return { saveOptions, filterControls, owners, owner: form.querySelector('select[name="ownerId"]'), newOwner: form.querySelector('input[name="owner"]'), document, add, gallery, status, dialog, form, name, year, favorite, cancel, records, select,
     recordReads: () => recordReads, calls: () => calls, setFailure: (value) => { failure = value; }, setGate: (value) => { commitGate = value; },
     renameTag: () => { catalog.tags[0].name = 'Botanical'; } };
 }
@@ -1387,4 +1394,89 @@ test('Stamp Related Card click opens the correct Card and Back restores the Set 
   await detail.querySelector('.card-detail-back').emit('click', { stopPropagation() {} });
   assert.equal(currentCard, 'A');
   assert.deepEqual(cards.map(card => card.stampDieSetIds), [['set-existing'], ['set-existing']]);
+});
+
+
+async function selectRelatedCard(h, id) {
+  const search = h.form.querySelector('input[aria-label="Search Cards by date, size, or tags"]');
+  search.value = '2026';
+  await search.emit('input');
+  const button = h.form.querySelector(`[data-add-related-card="${id}"]`);
+  assert.ok(button, `Card ${id} is offered`);
+  await button.parent.parent.emit('click', { target: button });
+}
+async function removeRelatedCard(h, id) {
+  const button = h.form.querySelector(`[data-remove-related-card="${id}"]`);
+  assert.ok(button);
+  await button.parent.parent.emit('click', { target: button });
+}
+
+test('Stamp Library shows compact related Cards, omits unused Set section, and opens Card with Set return context', async (t) => {
+  const cards = [relationshipCard('A', ['set-existing']), relationshipCard('B', ['set-existing'])];
+  const h = await harness(t, { cards });
+  await seedEdit(h); await h.cancel.emit('click');
+  const section = h.gallery.querySelector('.stamp-library-related-cards');
+  assert.deepEqual(section.querySelectorAll('[data-related-card-id]').map(el => el.dataset.relatedCardId), ['A', 'B']);
+  let selected;
+  detailNavigation.register('card', { library: 'cards', exists: id => cards.some(card => card.id === id), open: id => { selected = id; }, hide() {} });
+  const button = section.querySelector('[data-related-card-id="B"]');
+  await section.emit('click', { target: button, stopPropagation() {} });
+  assert.equal(selected, 'B');
+  assert.deepEqual(detailNavigation.getState().history, [{ type: 'stamp', id: 'set-existing' }]);
+  detailNavigation.back();
+  assert.equal(setDetail(h).open, true);
+  cards.splice(0, cards.length);
+  await h.document.emit('catalog:cards-updated');
+  assert.equal(h.gallery.querySelector('.stamp-library-related-cards'), null);
+});
+
+test('Stamp Edit populates Cards, no-op save sends no Card writes, and explicit changes affect only this Set', async (t) => {
+  const cards = [relationshipCard('A', ['set-existing', 'missing-set']), relationshipCard('B', ['other-set'])];
+  const h = await harness(t, { cards });
+  await seedEdit(h);
+  assert.equal(h.form.querySelectorAll('[data-remove-related-card]').length, 1);
+  const before = structuredClone(cards);
+  await h.form.emit('submit');
+  assert.deepEqual(h.saveOptions.at(-1).cardRelationshipChanges, { add: [], remove: [] });
+  assert.deepEqual(cards, before);
+  await h.gallery.querySelector('button[aria-label="Edit Original"]').emit('click');
+  await selectRelatedCard(h, 'B');
+  await removeRelatedCard(h, 'A');
+  assert.deepEqual(cards, before, 'draft changes cannot write through before Save');
+  await h.form.emit('submit');
+  assert.deepEqual(h.saveOptions.at(-1).cardRelationshipChanges, { add: ['B'], remove: ['A'] });
+  assert.deepEqual(cards.map(card => card.stampDieSetIds), [['missing-set'], ['other-set', 'set-existing']]);
+  assert.deepEqual(cards.map(card => card.paperPackIds), before.map(card => card.paperPackIds));
+  assert.equal('cardIds' in h.records[0], false);
+});
+
+test('Stamp Add selects multiple Cards, prevents duplicate selection, and failed save/cancel cannot change Cards', async (t) => {
+  const cards = [relationshipCard('A', ['missing-set']), relationshipCard('B', [])];
+  const before = structuredClone(cards);
+  const h = await harness(t, { cards });
+  await h.add.emit('click'); h.name.value = 'New Set';
+  await selectRelatedCard(h, 'A'); await selectRelatedCard(h, 'B');
+  assert.equal(h.form.querySelectorAll('[data-remove-related-card]').length, 2);
+  const search = h.form.querySelector('input[aria-label="Search Cards by date, size, or tags"]');
+  search.value = '2026'; await search.emit('input');
+  assert.equal(h.form.querySelectorAll('[data-add-related-card]').length, 0);
+  h.setFailure(true); await h.form.emit('submit');
+  assert.equal(h.records.length, 0); assert.deepEqual(cards, before);
+  assert.equal(h.dialog.open, true);
+  h.setFailure(false); await h.form.emit('submit');
+  const id = h.records[0].id;
+  assert.deepEqual(cards.map(card => card.stampDieSetIds), [['missing-set', id], [id]]);
+  assert.deepEqual(h.saveOptions.at(-1).cardRelationshipChanges, { add: ['A', 'B'], remove: [] });
+  assert.equal('cardIds' in h.records[0], false);
+  await h.add.emit('click'); await selectRelatedCard(h, 'A'); await h.cancel.emit('click');
+  assert.deepEqual(cards.map(card => card.stampDieSetIds), [['missing-set', id], [id]]);
+});
+
+test('removing then reselecting an existing Card leaves its relationship unchanged', async (t) => {
+  const cards = [relationshipCard('A', ['set-existing', 'missing'])];
+  const h = await harness(t, { cards });
+  await seedEdit(h); await removeRelatedCard(h, 'A'); await selectRelatedCard(h, 'A');
+  await h.form.emit('submit');
+  assert.deepEqual(h.saveOptions.at(-1).cardRelationshipChanges, { add: [], remove: [] });
+  assert.deepEqual(cards[0].stampDieSetIds, ['set-existing', 'missing']);
 });
