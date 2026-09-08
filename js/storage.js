@@ -196,6 +196,68 @@ export async function deleteStampDieSet(id) {
   });
 }
 
+// Only case and surrounding whitespace are ignored; no fuzzy matching or Set creation.
+export function migrateCardStampRelationships(card, sets) {
+  const matches = new Map();
+  for (const set of sets) {
+    if (typeof set?.id !== 'string' || !set.id.trim() || typeof set.name !== 'string') continue;
+    const key = set.name.trim().toLowerCase();
+    if (!key) continue;
+    if (!matches.has(key)) matches.set(key, new Set());
+    matches.get(key).add(set.id);
+  }
+  const ids = new Set(normalizeStampDieSetIds(card.stampDieSetIds));
+  let changed = false;
+  const convert = (name) => {
+    const candidates = typeof name === 'string' ? matches.get(name.trim().toLowerCase()) : null;
+    if (candidates?.size !== 1) return false;
+    ids.add([...candidates][0]);
+    changed = true;
+    return true;
+  };
+  const remaining = Array.isArray(card.stampSets) ? card.stampSets.filter((name) => !convert(name)) : null;
+  const convertedSingular = convert(card.stampSet);
+  if (!changed) return card;
+  const migrated = { ...card, stampDieSetIds: [...ids] };
+  if (remaining) {
+    if (remaining.length) migrated.stampSets = remaining;
+    else delete migrated.stampSets;
+  }
+  if (convertedSingular) delete migrated.stampSet;
+  return migrated;
+}
+
+function hasLegacyStampNames(card) {
+  return (Array.isArray(card?.stampSets) && card.stampSets.some((name) => typeof name === 'string' && name.trim())) ||
+    (typeof card?.stampSet === 'string' && Boolean(card.stampSet.trim()));
+}
+
+// Explicit startup migration: ordinary reads and rendering never write Card records.
+export async function migrateLegacyCardStampSets() {
+  const database = await openCatalogDatabase();
+  const cards = await getAllFromStore(database, CARDS_STORE);
+  if (!cards.some((card) => isCard(card) && hasLegacyStampNames(card))) return 0;
+  let count = 0;
+  await writeTransaction(database, [CARDS_STORE, STAMP_DIE_SETS_STORE], (transaction) => {
+    const cardStore = transaction.objectStore(CARDS_STORE);
+    const cardRequest = cardStore.getAll();
+    const setRequest = transaction.objectStore(STAMP_DIE_SETS_STORE).getAll();
+    let pending = 2;
+    const ready = () => {
+      if (--pending) return;
+      try {
+        for (const card of cardRequest.result.filter(isCard)) {
+          const migrated = migrateCardStampRelationships(card, setRequest.result);
+          if (migrated !== card) { cardStore.put(migrated); count++; }
+        }
+      } catch { transaction.abort(); }
+    };
+    cardRequest.addEventListener('success', ready);
+    setRequest.addEventListener('success', ready);
+  });
+  return count;
+}
+
 export async function loadSavedCards() {
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
@@ -343,8 +405,17 @@ export async function restoreCatalogRecords({ paperPacks = [], colors = [], card
         colorStore.put(color);
       }
 
-      for (const card of cards) {
-        cardStore.put(normalizeCardForStorage(card, tagCatalog));
+      const preparedCards = cards.map((card) => normalizeCardForStorage(card, tagCatalog));
+      if (preparedCards.some(hasLegacyStampNames)) {
+        // Read after Set puts: matching uses the actual post-import catalog, including retained local Sets.
+        const request = transaction.objectStore(STAMP_DIE_SETS_STORE).getAll();
+        request.addEventListener('success', () => {
+          try {
+            for (const card of preparedCards) cardStore.put(migrateCardStampRelationships(card, request.result));
+          } catch { transaction.abort(); }
+        });
+      } else {
+        preparedCards.forEach((card) => cardStore.put(card));
       }
 
       if (tagVocabularies) {

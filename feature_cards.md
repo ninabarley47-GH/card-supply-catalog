@@ -80,3 +80,20 @@ through to the affected Cards in the same transaction as the Set save. Opening a
 saving unchanged selections does not rewrite Cards. Paper references and missing
 Set IDs unrelated to an explicit removal remain intact. Backup/restore and Set
 catalog-only deletion retain the existing relationship and image-file safety rules.
+
+
+## Legacy Stamp name migration
+
+At startup, CSC converts legacy `stampSets` (and older singular `stampSet`) names
+only when exactly one existing Set matches after ignoring case and surrounding
+whitespace. Existing stable IDs are retained and duplicate IDs are avoided. Matched
+names are removed atomically with adding their IDs; unmatched or ambiguous names
+remain available as legacy metadata. No Sets are created and no fuzzy matching runs.
+Only changed Cards are written; unrelated metadata and image references are preserved.
+Normal loading and rendering remain read-only. A failed migration retains the original
+records and can be retried on reload. Unresolved names are reconsidered at later startups.
+
+Older backups use the same matching rules inside the existing restore transaction,
+against the final imported/retained Set catalog. Skipped Cards are not rewritten by
+restore. No schema or backup version changes are required: this converts existing
+fields and retains compatibility for unresolved legacy names.

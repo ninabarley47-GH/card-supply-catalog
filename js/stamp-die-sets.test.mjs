@@ -426,6 +426,7 @@ async function relationshipStorageHarness(t, suffix) {
   const h = databaseHarness(); const previous = globalThis.window;
   t.after(() => { globalThis.window = previous; });
   globalThis.window = { indexedDB: h.indexedDB, localStorage: { getItem: () => 'true' } };
+  globalThis.window.location = { search: '' };
   const storage = await import(`./storage.js?stamp-write-through-${suffix}`);
   await storage.loadSavedStampDieSets();
   const card = (id, ids) => ({ id, dateCreated: '2026-09-07', size: { width: 4, height: 6 },
@@ -478,5 +479,115 @@ test('failed Stamp Edit rolls back Set metadata and all relationship deltas', as
   const before = structuredClone(h.stores);
   h.failNextCommit();
   await assert.rejects(storage.saveStampDieSet({ ...setRecord(), name: 'Changed' }, { cardRelationshipChanges: { add: ['B'], remove: ['A'] } }));
+  assert.deepEqual(h.stores, before);
+});
+
+const migrationCard = (id, fields = {}) => ({ id, dateCreated: '2026-09-08', size: { width: 4, height: 6 },
+  tagIds: [], paperPackIds: ['keep-paper'], colorIds: [], favorite: true, notes: 'keep notes',
+  imagePath: 'Shared/keep.jpg', ...fields });
+
+test('explicit startup migration commits only matched Cards, is idempotent, and preserves every other store', async t => {
+  const { h, storage } = await relationshipStorageHarness(t, 'legacy-startup');
+  await storage.saveStampDieSet(setRecord());
+  const matched = migrationCard('legacy', { stampSets: [' garden ', 'Unknown'], stampDieSetIds: ['missing-set'] });
+  const unresolved = migrationCard('unresolved', { stampSets: ['No match'] });
+  h.stores.get('cards').set(matched.id, matched);
+  h.stores.get('cards').set(unresolved.id, unresolved);
+  const before = structuredClone(h.stores);
+  await storage.loadSavedCards();
+  assert.deepEqual(h.stores, before, 'ordinary loading cannot migrate');
+  assert.equal(await storage.migrateLegacyCardStampSets(), 1);
+  const expected = structuredClone(before);
+  expected.get('cards').set('legacy', { ...matched, stampSets: ['Unknown'], stampDieSetIds: ['missing-set', 'set-one'] });
+  assert.deepEqual(h.stores, expected);
+  assert.equal(await storage.migrateLegacyCardStampSets(), 0);
+  assert.deepEqual(h.stores, expected);
+  assert.deepEqual((await storage.loadSavedCards()).find(card => card.id === 'legacy').stampDieSetIds, ['missing-set', 'set-one']);
+});
+
+test('failed startup migration retains original names and relationships for every Card; retry is safe', async t => {
+  const { h, storage } = await relationshipStorageHarness(t, 'legacy-failure');
+  await storage.saveStampDieSet(setRecord());
+  for (const id of ['one', 'two']) h.stores.get('cards').set(id, migrationCard(id, { stampSets: ['Garden'] }));
+  const before = structuredClone(h.stores);
+  h.failNextCommit();
+  await assert.rejects(storage.migrateLegacyCardStampSets());
+  assert.deepEqual(h.stores, before);
+  assert.equal(await storage.migrateLegacyCardStampSets(), 2);
+  for (const id of ['one', 'two']) {
+    assert.deepEqual(h.stores.get('cards').get(id).stampDieSetIds, ['set-one']);
+    assert.equal('stampSets' in h.stores.get('cards').get(id), false);
+  }
+});
+
+test('startup retries unresolved names against current Sets, without selecting an ambiguous match', async t => {
+  const { h, storage } = await relationshipStorageHarness(t, 'legacy-ambiguous');
+  const card = migrationCard('unresolved', { stampSets: ['Garden'] });
+  h.stores.get('cards').set(card.id, card);
+  assert.equal(await storage.migrateLegacyCardStampSets(), 0);
+  await storage.saveStampDieSet(setRecord());
+  await storage.saveStampDieSet({ ...setRecord(), id: 'second', name: ' garden ' });
+  assert.equal(await storage.migrateLegacyCardStampSets(), 0);
+  assert.deepEqual(h.stores.get('cards').get(card.id), card);
+  await storage.saveStampDieSet({ ...setRecord(), id: 'second', name: 'Other name' });
+  assert.equal(await storage.migrateLegacyCardStampSets(), 1);
+});
+
+for (const overwriteExisting of [false, true]) test(`older-backup import migrates using the final catalog (replace=${overwriteExisting})`, async t => {
+  const { h, storage } = await relationshipStorageHarness(t, `legacy-import-${overwriteExisting}`);
+  const { createCatalogBackupSnapshot, restoreCatalogBackup } = await import('./backup.js');
+  await storage.saveStampDieSet({ ...setRecord(), name: 'Local name' });
+  await storage.saveStampDieSet({ ...setRecord(), id: 'local-only', name: 'Local only' });
+  const skipped = migrationCard('skip-card', { stampSets: ['Local only'] });
+  h.stores.get('cards').set(skipped.id, skipped);
+  const backup = createCatalogBackupSnapshot({ paperPacks: [], colorsById: {}, tagCatalog: catalog,
+    stampDieSets: [{ ...setRecord(), name: 'Imported name' }],
+    cards: [migrationCard('imported', { stampSets: ['Local name', 'Imported name', 'Local only', 'Unknown'] })] });
+  const beforeBackup = structuredClone(backup);
+  const result = await restoreCatalogBackup({ backup, paperPacks: [], colorsById: {}, overwriteExisting, services: {
+    loadGlobalTagCatalog: async () => catalog, loadSavedCardRecordsForRestore: storage.loadSavedCardRecordsForRestore,
+    loadSavedStampDieRecordsForRestore: storage.loadSavedStampDieRecordsForRestore, restoreCatalogRecords: storage.restoreCatalogRecords,
+    dispatchCardsRestored() {}, dispatchStampSetsRestored() {}, dispatchCatalogRestored() {}
+  } });
+  assert.deepEqual(result.errors, []);
+  const stored = h.stores.get('cards').get('imported');
+  assert.deepEqual(stored.stampDieSetIds, ['set-one', 'local-only']);
+  assert.deepEqual(stored.stampSets, [overwriteExisting ? 'Local name' : 'Imported name', 'Unknown']);
+  assert.deepEqual(h.stores.get('cards').get('skip-card'), skipped);
+  assert.deepEqual(stored.paperPackIds, ['keep-paper']);
+  assert.deepEqual(backup, beforeBackup);
+});
+
+test('pre-Set backup converts legacy singular names using local Sets and round-trips the resulting IDs', async t => {
+  const { h, storage } = await relationshipStorageHarness(t, 'legacy-old-backup');
+  const { createCatalogBackupSnapshot, restoreCatalogBackup } = await import('./backup.js');
+  await storage.saveStampDieSet(setRecord());
+  const backup = createCatalogBackupSnapshot({ paperPacks: [], colorsById: {}, tagCatalog: catalog,
+    cards: [migrationCard('old', { stampSet: 'Garden' })] });
+  delete backup.stampDieSets;
+  delete backup.cards[0].stampDieSetIds;
+  backup.schemaVersion = 3;
+  backup.catalogSchemaVersion = 7;
+  const services = { loadGlobalTagCatalog: async () => catalog,
+    loadSavedCardRecordsForRestore: storage.loadSavedCardRecordsForRestore,
+    loadSavedStampDieRecordsForRestore: storage.loadSavedStampDieRecordsForRestore,
+    restoreCatalogRecords: storage.restoreCatalogRecords, dispatchCardsRestored() {}, dispatchStampSetsRestored() {}, dispatchCatalogRestored() {} };
+  const result = await restoreCatalogBackup({ backup, paperPacks: [], colorsById: {}, services });
+  assert.deepEqual(result.errors, []);
+  const restored = h.stores.get('cards').get('old');
+  assert.deepEqual(restored.stampDieSetIds, ['set-one']);
+  assert.equal('stampSet' in restored, false);
+  assert.equal('stampSets' in restored, false);
+  const roundTrip = createCatalogBackupSnapshot({ paperPacks: [], colorsById: {}, tagCatalog: catalog, cards: [restored] });
+  assert.deepEqual((await restoreCatalogBackup({ backup: roundTrip, paperPacks: [], colorsById: {}, overwriteExisting: true, services })).errors, []);
+  assert.deepEqual(h.stores.get('cards').get('old').stampDieSetIds, ['set-one']);
+});
+
+test('restore migration failure rolls back names, ID references, and incoming Sets atomically', async t => {
+  const { h, storage } = await relationshipStorageHarness(t, 'legacy-restore-failure');
+  const before = structuredClone(h.stores);
+  h.failNextCommit();
+  await assert.rejects(storage.restoreCatalogRecords({ tagCatalog: catalog,
+    stampDieSets: [setRecord()], cards: [migrationCard('old', { stampSets: ['Garden'] })] }));
   assert.deepEqual(h.stores, before);
 });
