@@ -67,3 +67,15 @@ test('Stamp Library enlarges image boxes responsively without changing fit or im
   assert.match(css, /\.stamp-set-images\s*\{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(css, /\.stamp-set-images > :only-child\s*\{ grid-column: 1 \/ -1; \}/);
 });
+
+
+test('wrapped Stamp images use natural heights while one and two images retain their larger boxes', async () => {
+  const css = await read('../css/cards.css');
+  assert.match(css, /\[data-set-library\] \.stamp-set-images img\s*\{ height: min\(20rem, 80vw\); \}/);
+  const wrapped = css.match(/\[data-set-library\] \.stamp-set-images:has\(> :nth-child\(3\)\) img\s*\{([^}]*)}/)[1];
+  assert.match(wrapped, /height: auto;/);
+  assert.match(wrapped, /max-height: min\(20rem, 80vw\);/);
+  assert.doesNotMatch(wrapped, /object-fit|width|padding/);
+  assert.match(css, /\[data-set-library\] \.stamp-set-images:has\(> :nth-child\(3\)\)\s*\{\s*align-items: start;/);
+  assert.match(css, /\.stamp-set-images\s*\{[^}]*repeat\(2, minmax\(0, 1fr\)\); gap: var\(--space-2\)/);
+});

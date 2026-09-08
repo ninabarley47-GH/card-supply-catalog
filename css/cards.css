@@ -845,6 +845,15 @@
 
 [data-set-library] .stamp-set-images img { height: min(20rem, 80vw); }
 
+[data-set-library] .stamp-set-images:has(> :nth-child(3)) {
+  align-items: start;
+}
+
+[data-set-library] .stamp-set-images:has(> :nth-child(3)) img {
+  height: auto;
+  max-height: min(20rem, 80vw);
+}
+
 /* Set Detail reuses the modal/header conventions, with room for complete sets. */
 .stamp-set-detail {
   position: fixed;
