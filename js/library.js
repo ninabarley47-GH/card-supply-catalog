@@ -1916,23 +1916,27 @@ function createRelatedCardsSection(paperPack, cards) {
     button.className = "related-card-link";
     button.type = "button";
     button.dataset.relatedCardId = card.id;
-    button.setAttribute("aria-label", "Open card details");
+    const description = `Card created ${card.dateCreated}, ${card.size.width} by ${card.size.height} inches`;
+    button.setAttribute("aria-label", `Open ${description}`);
 
-    if (!imageSource) {
-      const placeholder = document.createElement("div");
-      placeholder.className = "related-card-thumbnail related-card-thumbnail-missing";
-      placeholder.textContent = "No image yet";
+    const placeholder = document.createElement("div");
+    placeholder.className = "related-card-thumbnail related-card-thumbnail-missing";
+    placeholder.textContent = "No image yet";
+    const caption = document.createElement("span");
+    caption.textContent = `${card.dateCreated} \u00b7 ${card.size.width} \u00d7 ${card.size.height} inches`;
+
+    if (imageSource) {
+      const image = document.createElement("img");
+      image.className = "related-card-thumbnail";
+      image.src = imageSource;
+      image.alt = description;
+      image.decoding = "async";
+      image.addEventListener("error", () => button.replaceChildren(placeholder, caption), { once: true });
+      button.append(image);
+    } else {
       button.append(placeholder);
-      grid.append(button);
-      continue;
     }
-
-    const image = document.createElement("img");
-    image.className = "related-card-thumbnail";
-    image.src = imageSource;
-    image.alt = "Handmade card using this paper";
-    image.decoding = "async";
-    button.append(image);
+    button.append(caption);
     grid.append(button);
   }
 
