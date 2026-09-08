@@ -357,6 +357,9 @@ test('failed save preserves the draft and retry succeeds; pending save blocks du
   await Promise.resolve();
   await h.form.emit('submit');
   await h.cancel.emit('click');
+  const close = h.dialog.querySelector('.card-add-close');
+  assert.equal(close.disabled, true);
+  await close.emit('click');
   assert.equal((await h.dialog.emit('cancel')).defaultPrevented, true);
   assert.equal(h.dialog.open, true);
   assert.equal(h.calls(), 2);
@@ -1516,4 +1519,23 @@ test('removing then reselecting an existing Card leaves its relationship unchang
   await h.form.emit('submit');
   assert.deepEqual(h.saveOptions.at(-1).cardRelationshipChanges, { add: [], remove: [] });
   assert.deepEqual(cards[0].stampDieSetIds, ['set-existing', 'missing']);
+});
+
+
+test('Stamp form header Close discards the draft like Cancel and allows a fresh Add', async (t) => {
+  const h = await harness(t);
+  await h.headerAdd.emit('click');
+  const close = h.dialog.querySelector('header').querySelector('.card-add-close');
+  assert.equal(close.type, 'button');
+  assert.equal(close.textContent, String.fromCodePoint(215));
+  assert.equal(close.getAttribute('aria-label'), 'Close Stamp & Die Set form');
+  h.name.value = 'Unsaved draft';
+  await close.emit('click');
+  assert.equal(h.dialog.open, false);
+  assert.equal(h.records.length, 0);
+  assert.equal(h.calls(), 0);
+  assert.equal(h.document.activeElement, h.add);
+  await h.headerAdd.emit('click');
+  assert.equal(h.dialog.open, true);
+  assert.equal(h.name.value, '');
 });

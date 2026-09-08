@@ -486,7 +486,9 @@ export async function initializeStampDieLibrary(services = {}) {
     renderCardSelections();
   });
 
-  view.cancel.addEventListener('click', () => { if (!saving) view.dialog.close(); });
+  for (const control of [view.cancel, view.close]) {
+    control.addEventListener('click', () => { if (!saving) view.dialog.close(); });
+  }
   view.dialog.addEventListener('cancel', (event) => { if (saving) event.preventDefault(); });
   view.dialog.addEventListener('close', () => { reset(); (detail.dialog.open ? detail.edit : add).focus(); });
   view.name.addEventListener('input', () => view.name.setCustomValidity(''));
@@ -503,6 +505,7 @@ export async function initializeStampDieLibrary(services = {}) {
     view.fields.disabled = true;
     view.save.disabled = true;
     view.cancel.disabled = true;
+    view.close.disabled = true;
     view.message.textContent = 'Saving set…';
     view.message.dataset.tone = '';
     let saved = false;
@@ -557,6 +560,7 @@ export async function initializeStampDieLibrary(services = {}) {
       view.fields.disabled = false;
       view.save.disabled = false;
       view.cancel.disabled = false;
+      view.close.disabled = false;
     }
     if (!saved) return;
     view.dialog.close();
@@ -598,7 +602,12 @@ function createSetFormView() {
   const title = document.createElement('h3');
   title.id = 'stamp-set-add-title';
   title.textContent = 'Add Stamp & Die Set';
-  header.append(title);
+  const close = document.createElement('button');
+  close.className = 'card-add-close';
+  close.type = 'button';
+  close.setAttribute('aria-label', 'Close Stamp & Die Set form');
+  close.textContent = String.fromCodePoint(215);
+  header.append(title, close);
   const form = document.createElement('form');
   form.className = 'card-add-form';
   const fields = document.createElement('fieldset');
@@ -672,7 +681,7 @@ function createSetFormView() {
   actions.append(cancel, save);
   form.append(fields, actions);
   dialog.append(header, form);
-  return { dialog, title, form, fields, name, owner, newOwner, releaseYear, favorite, tags, cardPicker, message, cancel, save, chooseImages, imageInput, chooseLibrary, folderMessage, imageMessage, previews };
+  return { dialog, title, close, form, fields, name, owner, newOwner, releaseYear, favorite, tags, cardPicker, message, cancel, save, chooseImages, imageInput, chooseLibrary, folderMessage, imageMessage, previews };
 }
 
 function createField(text, ...inputs) {
