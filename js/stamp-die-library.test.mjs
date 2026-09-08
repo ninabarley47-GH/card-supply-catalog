@@ -1083,7 +1083,7 @@ test('Set Detail reuses context/title/close header and places destructive action
   assert.equal(metadata.querySelector('.card-detail-chips').textContent, 'Floral');
   const actions = metadata.querySelector('.detail-actions');
   assert.deepEqual(actions.querySelectorAll('button').map((button) => button.textContent), ['Edit Set', 'Delete Set']);
-  assert.ok(actions.querySelectorAll('button')[0].className.includes('button-primary'));
+  assert.equal(actions.querySelectorAll('button')[0].className, 'button');
   assert.ok(actions.querySelectorAll('button')[1].className.includes('button-danger'));
   assert.ok(actions.querySelector('.detail-action-row'));
   assert.equal(h.calls(), 0);

@@ -840,7 +840,25 @@
 .stamp-set-images [hidden] { display: none; }
 
 /* Set Detail reuses the modal/header conventions, with room for complete sets. */
-.stamp-set-detail { width: min(76rem, calc(100% - 2rem)); }
+.stamp-set-detail {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(76rem, calc(100vw - 2rem));
+  max-width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  overflow: hidden;
+  border: 0;
+  border-left: 1px solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-page);
+  box-shadow: -18px 0 45px rgba(47, 44, 40, 0.18);
+}
+@media (max-width: 44rem) {
+  .stamp-set-detail { width: 100vw; }
+}
 .stamp-set-detail .card-detail-header > div { min-width: 0; overflow-wrap: anywhere; }
 .stamp-set-detail-content { grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem); }
 .stamp-set-detail-content .detail-metadata { overflow-wrap: anywhere; }
@@ -860,7 +878,8 @@
 .stamp-set-detail .form-message:empty { display: none; }
 
 .stamp-set-tile > .card-title-row { padding-bottom: var(--space-4); }
-.stamp-set-detail-title-row { padding: 0; align-items: center; }
+.stamp-set-detail-title-row,
+.detail-title-row { padding: 0; align-items: center; }
 
 .card-detail-notes {
   min-width: 0;

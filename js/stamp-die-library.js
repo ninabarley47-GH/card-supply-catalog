@@ -824,7 +824,7 @@ function createSetDetailView() {
   close.textContent = '\u00d7';
   const edit = document.createElement('button');
   edit.type = 'button';
-  edit.className = 'button button-primary';
+  edit.className = 'button';
   edit.textContent = 'Edit Set';
   const body = document.createElement('div');
   body.className = 'card-detail-body stamp-set-detail-body';

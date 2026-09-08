@@ -43,10 +43,11 @@ test('pending Card Favorite prevents duplicate writes; failed save retains state
   assert.equal(button.disabled, false); assert.equal(renders, 0);
 });
 test('Card Detail uses the same heart and save handler without moving other metadata', () => {
-  assert.match(source, /appendFact\(facts, 'Favorite', ''\);\s*facts.lastElementChild.querySelector\('dd'\).append\(createCardFavoriteButton\(card\)\)/);
-  const handler = source.slice(source.indexOf("detailView.body.addEventListener('click'"), source.indexOf("const stampDieLink ="));
+  assert.match(source, /detailView.titleRow.replaceChildren\(detailView.title, createCardFavoriteButton\(card\)\)/);
+  assert.doesNotMatch(source, /appendFact\(facts, 'Favorite'/);
+  const handler = source.slice(source.indexOf("detailView.panel.addEventListener('click'"), source.indexOf("const stampDieLink ="));
   assert.match(handler, /await toggleCardFavorite/);
   assert.match(handler, /renderCurrent\(\)/);
   assert.match(handler, /favoriteButton.replaceWith\(createCardFavoriteButton/);
-  assert.match(handler, /detailView.body/);
+  assert.match(handler, /detailView.panel/);
 });

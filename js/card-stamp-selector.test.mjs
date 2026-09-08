@@ -230,7 +230,7 @@ test('Card Library displays ID-based and legacy Stamp names without duplicate la
   ]) {
     const record = { ...card(), ...overrides }; const before = structuredClone(record);
     const metadata = createCardLibraryMetadata(record, paperNames, names);
-    const stampRow = metadata.children.find(row => row.querySelector('dt').textContent === 'Stamp Sets');
+    const stampRow = metadata.children.find(row => row.querySelector('dt').textContent === 'Stamps & Dies');
     assert.equal(stampRow.querySelector('dd').textContent, expected);
     assert.equal(metadata.children[0].querySelector('dd').textContent, 'Paper A');
     assert.deepEqual(record, before);
@@ -249,7 +249,7 @@ test('Card Library distinguishes missing Sets from failed lookup and omits empty
   assert.doesNotMatch(unavailable.textContent, /Missing Stamp/);
   for (const ids of [undefined, []]) {
     const empty = createCardLibraryMetadata({ ...record, stampDieSetIds: ids }, new Map(), new Map());
-    assert.doesNotMatch(empty.textContent, /Stamp Sets/);
+    assert.doesNotMatch(empty.textContent, /Stamps & Dies/);
   }
 });
 

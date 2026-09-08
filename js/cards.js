@@ -286,7 +286,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     event.stopPropagation();
     detailNavigation.back();
   });
-  detailView.body.addEventListener('click', async (event) => {
+  detailView.panel.addEventListener('click', async (event) => {
     const favoriteButton = event.target.closest('[data-toggle-card-favorite]');
     if (favoriteButton) {
       event.stopPropagation();
@@ -294,7 +294,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
       await toggleCardFavorite(card, cards, favoriteButton, () => {
         renderCurrent();
         favoriteButton.replaceWith(createCardFavoriteButton(findCard(cards, card.id)));
-      }, detailView.body);
+      }, detailView.panel);
       return;
     }
 
@@ -1263,7 +1263,7 @@ export function createCardLibraryMetadata(card, paperPackNamesById, stampDieSetN
 
   metadata.className = 'card-library-metadata';
   appendCardLibraryMetadata(metadata, 'Paper Packs', paperPackNames);
-  appendCardLibraryMetadata(metadata, 'Stamp Sets', resolveCardLibraryStampNames(card, stampDieSetNamesById));
+  appendCardLibraryMetadata(metadata, 'Stamps & Dies', resolveCardLibraryStampNames(card, stampDieSetNamesById));
   appendCardLibraryCreatedDate(metadata, dateCreated);
   return metadata;
 }
@@ -1396,7 +1396,10 @@ function createCardDetailView() {
   const title = document.createElement('h3');
   title.id = 'card-detail-title';
   title.textContent = 'Card Details';
-  heading.append(back, eyebrow, title);
+  const titleRow = document.createElement('div');
+  titleRow.className = 'card-title-row detail-title-row';
+  titleRow.append(title);
+  heading.append(back, eyebrow, titleRow);
 
   const close = document.createElement('button');
   close.className = 'card-detail-close';
@@ -1410,7 +1413,7 @@ function createCardDetailView() {
   panel.append(header, body);
   overlay.append(panel);
 
-  return { overlay, panel, close, back, body };
+  return { overlay, panel, close, back, body, title, titleRow };
 }
 
 function openCardDetail(detailView, card, cards, paperPacks) {
@@ -1418,6 +1421,7 @@ function openCardDetail(detailView, card, cards, paperPacks) {
     return;
   }
 
+  detailView.titleRow.replaceChildren(detailView.title, createCardFavoriteButton(card));
   const cardIndex = cards.indexOf(card);
   detailView.body.replaceChildren(createCardDetailContent(card, cardIndex, paperPacks));
   detailView.overlay.dataset.selectedCardId = card.id;
@@ -1500,7 +1504,7 @@ function createCardDetailActions(card) {
   const actions = document.createElement('div');
   actions.className = 'card-detail-actions';
   const edit = document.createElement('button');
-  edit.className = 'button button-primary';
+  edit.className = 'button';
   edit.type = 'button';
   edit.dataset.editCard = card.id;
   edit.textContent = 'Edit Card';
@@ -1511,7 +1515,13 @@ function createCardDetailActions(card) {
   deleteButton.dataset.deleteCard = card.id;
   deleteButton.textContent = 'Delete Card';
 
-  actions.append(edit, deleteButton);
+  const heading = document.createElement('h4');
+  heading.textContent = 'Actions';
+  const row = document.createElement('div');
+  row.className = 'detail-action-row';
+  row.append(edit, deleteButton);
+  actions.className = 'card-detail-section detail-actions';
+  actions.append(heading, row);
   return actions;
 }
 
@@ -1591,8 +1601,6 @@ function createCardFacts(card) {
   appendFact(facts, 'Date created', card.dateCreated);
   appendFact(facts, 'Card size', `${card.size.width} × ${card.size.height} inches`);
   appendFact(facts, 'Status', card.status === 'sent' ? 'Sent' : 'Available');
-  appendFact(facts, 'Favorite', '');
-  facts.lastElementChild.querySelector('dd').append(createCardFavoriteButton(card));
   return facts;
 }
 

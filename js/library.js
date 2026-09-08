@@ -1455,6 +1455,18 @@ export function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, 
     return;
   }
 
+  const titleRow = detailPanel.querySelector('[data-detail-title-row]');
+  titleRow?.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-toggle-pack-favorite]');
+    if (!button) return;
+    event.stopPropagation();
+    await togglePaperPackFavorite(button.dataset.togglePackFavorite, paperPacks, button, () => {
+      renderCurrentLibrary();
+      const pack = paperPacks.find((entry) => entry.id === button.dataset.togglePackFavorite);
+      button.replaceWith(createPaperPackFavoriteButton(pack));
+    }, titleRow);
+  });
+
   let displayedPackId;
   detailNavigation.register('paper', {
     library: 'library',
@@ -1720,10 +1732,10 @@ export function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, 
   });
 }
 
-async function togglePaperPackFavorite(paperPackId, paperPacks, button, renderCurrentLibrary) {
+async function togglePaperPackFavorite(paperPackId, paperPacks, button, renderCurrentLibrary, focusRoot = document) {
   const paperPack = paperPacks.find((pack) => pack.id === paperPackId);
 
-  if (!paperPack) {
+  if (!paperPack || button.disabled) {
     return;
   }
 
@@ -1738,7 +1750,7 @@ async function togglePaperPackFavorite(paperPackId, paperPacks, button, renderCu
     await savePaperPack(updatedPaperPack);
     replacePaperPack(paperPacks, updatedPaperPack);
     renderCurrentLibrary();
-    document.querySelector(`[data-toggle-pack-favorite="${CSS.escape(paperPackId)}"]`)?.focus();
+    focusRoot.querySelector(`[data-toggle-pack-favorite="${CSS.escape(paperPackId)}"]`)?.focus();
   } catch (error) {
     button.disabled = false;
     window.alert("The paper pack favorite status could not be saved.");
@@ -1795,6 +1807,7 @@ function openDetailPanel(
   detailPanel.hidden = false;
   detailPanel.dataset.selectedPackId = paperPack.id;
   detailTitle.textContent = paperPack.name;
+  detailPanel.querySelector("[data-detail-title-row]")?.replaceChildren(detailTitle, createPaperPackFavoriteButton(paperPack));
   detailBody.replaceChildren(createDetailContent(paperPack, paperPacks, colorsById));
   detailBody.scrollTop = 0;
 

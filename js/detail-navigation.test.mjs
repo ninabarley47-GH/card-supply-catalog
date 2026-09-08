@@ -141,7 +141,7 @@ test('actual Paper coordinating and Related Card click handlers use shared trans
   browserHarness(t);
   const nodes = {};
   for (const selector of ['[data-detail-panel]', '[data-detail-title]', '[data-detail-body]', '[data-detail-close]', '[data-detail-back]']) {
-    nodes[selector] = { listeners: {}, addEventListener(type, fn) { this.listeners[type] = fn; } };
+    nodes[selector] = { querySelector() { return null; }, listeners: {}, addEventListener(type, fn) { this.listeners[type] = fn; } };
   }
   document.querySelector = selector => nodes[selector];
   const library = { addEventListener() {} };
