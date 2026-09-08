@@ -286,7 +286,18 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     event.stopPropagation();
     detailNavigation.back();
   });
-  detailView.body.addEventListener('click', (event) => {
+  detailView.body.addEventListener('click', async (event) => {
+    const favoriteButton = event.target.closest('[data-toggle-card-favorite]');
+    if (favoriteButton) {
+      event.stopPropagation();
+      const card = findCard(cards, favoriteButton.dataset.toggleCardFavorite);
+      await toggleCardFavorite(card, cards, favoriteButton, () => {
+        renderCurrent();
+        favoriteButton.replaceWith(createCardFavoriteButton(findCard(cards, card.id)));
+      }, detailView.body);
+      return;
+    }
+
     const stampDieLink = event.target.closest('[data-card-detail-stamp-die-set]');
     if (stampDieLink) {
       event.stopPropagation();
@@ -1206,15 +1217,7 @@ function createCardTile(card, index, paperPackNamesById, stampDieSetNamesById) {
     image.append(createMissingCardImageMessage());
   }
 
-  const favorite = document.createElement('button');
-  favorite.className = 'card-library-favorite';
-  favorite.type = 'button';
-  favorite.dataset.toggleCardFavorite = card.id;
-  favorite.dataset.favorite = String(Boolean(card.favorite));
-  favorite.setAttribute('aria-label', card.favorite ? 'Remove card from favorites' : 'Add card to favorites');
-  favorite.setAttribute('aria-pressed', String(Boolean(card.favorite)));
-  favorite.title = card.favorite ? 'Remove from favorites' : 'Add to favorites';
-  favorite.textContent = '♥';
+  const favorite = createCardFavoriteButton(card);
 
 
   const metadata = createCardLibraryMetadata(card, paperPackNamesById, stampDieSetNamesById);
@@ -1322,8 +1325,21 @@ function appendCardLibraryMetadata(metadata, label, values) {
   metadata.append(group);
 }
 
-async function toggleCardFavorite(card, cards, button, renderCurrent) {
-  if (!card) {
+function createCardFavoriteButton(card) {
+  const favorite = document.createElement('button');
+  favorite.className = 'card-library-favorite';
+  favorite.type = 'button';
+  favorite.dataset.toggleCardFavorite = card.id;
+  favorite.dataset.favorite = String(Boolean(card.favorite));
+  favorite.setAttribute('aria-label', card.favorite ? 'Remove card from favorites' : 'Add card to favorites');
+  favorite.setAttribute('aria-pressed', String(Boolean(card.favorite)));
+  favorite.title = card.favorite ? 'Remove from favorites' : 'Add to favorites';
+  favorite.textContent = '♥';
+  return favorite;
+}
+
+async function toggleCardFavorite(card, cards, button, renderCurrent, focusRoot = document) {
+  if (button.disabled || !card) {
     return;
   }
 
@@ -1344,7 +1360,7 @@ async function toggleCardFavorite(card, cards, button, renderCurrent) {
     }
 
     renderCurrent();
-    document.querySelector(`[data-toggle-card-favorite="${CSS.escape(card.id)}"]`)?.focus();
+    focusRoot.querySelector(`[data-toggle-card-favorite="${CSS.escape(card.id)}"]`)?.focus();
   } catch (error) {
     button.disabled = false;
     window.alert('The favorite status could not be saved.');
@@ -1575,7 +1591,8 @@ function createCardFacts(card) {
   appendFact(facts, 'Date created', card.dateCreated);
   appendFact(facts, 'Card size', `${card.size.width} × ${card.size.height} inches`);
   appendFact(facts, 'Status', card.status === 'sent' ? 'Sent' : 'Available');
-  appendFact(facts, 'Favorite', card.favorite ? 'Yes' : 'No');
+  appendFact(facts, 'Favorite', '');
+  facts.lastElementChild.querySelector('dd').append(createCardFavoriteButton(card));
   return facts;
 }
 
