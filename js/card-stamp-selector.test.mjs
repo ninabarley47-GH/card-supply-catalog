@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appendCardStampDieRelationships, createAddCardView, openAddCardView, openEditCardView, createCardRecord } from './cards.js';
+import { createCardLibraryMetadata, createCardStampNameLookup, appendCardStampDieRelationships, createAddCardView, openAddCardView, openEditCardView, createCardRecord } from './cards.js';
 
 // Minimal DOM harness follows the existing Stamp form tests.
 class Element {
@@ -216,4 +216,74 @@ test('Card Detail omits empty Stamp relationships and distinguishes failed reads
   assert.doesNotMatch(metadata.textContent, /Missing Stamp/);
   assert.equal(metadata.querySelectorAll('button').length, 0);
   assert.deepEqual(existing, card());
+});
+
+
+test('Card Library displays ID-based and legacy Stamp names without duplicate labels or relationship changes', t => {
+  harness(t);
+  const paperNames = new Map([['paper-a', 'Paper A']]);
+  const names = new Map([['set-a', 'Garden Flowers'], ['set-b', 'Garden Leaves']]);
+  for (const [overrides, expected] of [
+    [{ stampDieSetIds: ['set-a', 'set-b'], stampSets: [] }, 'Garden Flowers, Garden Leaves'],
+    [{ stampDieSetIds: [], stampSets: ['Peaceful View'] }, 'Peaceful View'],
+    [{ stampDieSetIds: ['set-a', 'set-a'], stampSets: [' garden flowers ', 'Legacy Name'] }, 'Garden Flowers, Legacy Name']
+  ]) {
+    const record = { ...card(), ...overrides }; const before = structuredClone(record);
+    const metadata = createCardLibraryMetadata(record, paperNames, names);
+    const stampRow = metadata.children.find(row => row.querySelector('dt').textContent === 'Stamp Sets');
+    assert.equal(stampRow.querySelector('dd').textContent, expected);
+    assert.equal(metadata.children[0].querySelector('dd').textContent, 'Paper A');
+    assert.deepEqual(record, before);
+    assert.doesNotMatch(metadata.textContent, /set-a|set-b/);
+  }
+});
+
+test('Card Library distinguishes missing Sets from failed lookup and omits empty Stamp metadata', t => {
+  harness(t);
+  const record = { ...card(), stampSets: [] };
+  const missing = createCardLibraryMetadata(record, new Map(), new Map([['set-a', 'Flowers']]));
+  assert.match(missing.textContent, /Flowers, Missing Stamp & Die Set/);
+  assert.doesNotMatch(missing.textContent, /missing-set/);
+  const unavailable = createCardLibraryMetadata(record, new Map(), null);
+  assert.match(unavailable.textContent, /names unavailable/);
+  assert.doesNotMatch(unavailable.textContent, /Missing Stamp/);
+  for (const ids of [undefined, []]) {
+    const empty = createCardLibraryMetadata({ ...record, stampDieSetIds: ids }, new Map(), new Map());
+    assert.doesNotMatch(empty.textContent, /Stamp Sets/);
+  }
+});
+
+test('Library name lookup refreshes on Set changes and restore; failed or late reads do not show incorrect names', async () => {
+  let records = [{ id: 'set-a', name: 'Original' }];
+  let reads = 0, renders = 0;
+  const listeners = {};
+  let loader = async () => records;
+  const lookup = createCardStampNameLookup(() => renders++, () => { reads++; return loader(); }, {
+    addEventListener: (name, listener) => { listeners[name] = listener; }
+  });
+  await lookup.refresh(false);
+  assert.equal(renders, 0);
+  assert.equal(lookup.getNames().get('set-a'), 'Original');
+  records = [{ id: 'set-a', name: 'Renamed' }, { id: 'set-b', name: 'Added' }];
+  await listeners['catalog:stamp-die-set-saved']();
+  assert.equal(lookup.getNames().get('set-a'), 'Renamed');
+  assert.equal(lookup.getNames().get('set-b'), 'Added');
+  records = [];
+  await listeners['catalog:stamp-die-set-saved']();
+  assert.equal(lookup.getNames().has('set-a'), false);
+  records = [{ id: 'set-a', name: 'Restored' }];
+  await listeners['catalog:stamp-sets-restored']();
+  assert.equal(lookup.getNames().get('set-a'), 'Restored');
+  loader = async () => { throw new Error('Unavailable'); };
+  await lookup.refresh();
+  assert.equal(lookup.getNames(), null);
+  let resolve;
+  loader = () => new Promise(done => { resolve = done; });
+  const pending = lookup.refresh();
+  loader = async () => [{ id: 'set-a', name: 'Newest' }];
+  await lookup.refresh();
+  resolve([{ id: 'set-a', name: 'Old result' }]); await pending;
+  assert.equal(lookup.getNames().get('set-a'), 'Newest');
+  assert.equal(reads, 7);
+  assert.equal(renders, 5);
 });

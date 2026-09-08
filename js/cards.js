@@ -101,7 +101,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
       tagCatalog
     });
 
-    renderCardLibrary(gallery, visibleCards, cards.length, paperPackNamesById);
+    renderCardLibrary(gallery, visibleCards, cards.length, paperPackNamesById, stampNames.getNames());
     updateCardLibraryResultCount(resultCount, visibleCards.length, cards.length);
     updateCardQuickFilterStates({ favoritesButton, ownerFilter, holidayFilter, statusFilter });
 
@@ -113,6 +113,8 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
       clearTagsButton.hidden = !hasGlobalTagFilterSelection(selectedTags);
     }
   };
+
+  const stampNames = createCardStampNameLookup(renderCurrent);
 
   // Keep the shell loading message until the initial records and images resolve.
   document.body.append(detailView.overlay, addCardView.overlay);
@@ -128,6 +130,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   };
 
   try {
+    await stampNames.refresh(false);
     await reloadCards();
   } catch (error) {
     renderCardLibraryError(gallery);
@@ -1063,7 +1066,7 @@ function sortCards(cards, sortOrder = 'date-desc') {
   });
 }
 
-function renderCardLibrary(gallery, cards, totalCount = cards.length, paperPackNamesById = new Map()) {
+function renderCardLibrary(gallery, cards, totalCount = cards.length, paperPackNamesById = new Map(), stampDieSetNamesById = null) {
   if (cards.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'card-library-empty';
@@ -1074,7 +1077,7 @@ function renderCardLibrary(gallery, cards, totalCount = cards.length, paperPackN
     return;
   }
 
-  gallery.replaceChildren(...cards.map((card, index) => createCardTile(card, index, paperPackNamesById)));
+  gallery.replaceChildren(...cards.map((card, index) => createCardTile(card, index, paperPackNamesById, stampDieSetNamesById)));
 }
 
 function updateCardLibraryResultCount(resultCount, visibleCount, totalCount) {
@@ -1093,7 +1096,7 @@ function renderCardLibraryError(gallery) {
   gallery.replaceChildren(error);
 }
 
-function createCardTile(card, index, paperPackNamesById) {
+function createCardTile(card, index, paperPackNamesById, stampDieSetNamesById) {
   const tile = document.createElement('article');
   tile.className = 'card-library-tile';
   tile.dataset.cardId = card.id;
@@ -1126,7 +1129,7 @@ function createCardTile(card, index, paperPackNamesById) {
   favorite.textContent = '♥';
 
 
-  const metadata = createCardLibraryMetadata(card, paperPackNamesById);
+  const metadata = createCardLibraryMetadata(card, paperPackNamesById, stampDieSetNamesById);
   const actions = createCardLibraryActions(card);
 
   const tagList = document.createElement('ul');
@@ -1160,7 +1163,7 @@ function createCardLibraryActions(card) {
   return actions;
 }
 
-function createCardLibraryMetadata(card, paperPackNamesById) {
+export function createCardLibraryMetadata(card, paperPackNamesById, stampDieSetNamesById = null) {
   const metadata = document.createElement('dl');
   const dateCreated = formatCardLibraryDate(card.dateCreated);
   const paperPackNames = (card.paperPackIds || [])
@@ -1169,7 +1172,7 @@ function createCardLibraryMetadata(card, paperPackNamesById) {
 
   metadata.className = 'card-library-metadata';
   appendCardLibraryMetadata(metadata, 'Paper Packs', paperPackNames);
-  appendCardLibraryMetadata(metadata, 'Stamp Sets', card.stampSets || []);
+  appendCardLibraryMetadata(metadata, 'Stamp Sets', resolveCardLibraryStampNames(card, stampDieSetNamesById));
   appendCardLibraryCreatedDate(metadata, dateCreated);
   return metadata;
 }
@@ -1590,4 +1593,43 @@ export async function appendCardStampDieRelationships(metadata, card, loadSets =
   }
   pending.remove();
   appendPaperPackDetailMetadata(metadata, 'Stamps & Dies', references, 'cardDetailStampDieSet');
+}
+
+
+// One lookup per Library, refreshed by catalog events rather than one read per Card tile.
+export function createCardStampNameLookup(onChange, loadSets = loadSavedStampDieSets, eventTarget = document) {
+  let names = null;
+  let revision = 0;
+  async function refresh(render = true) {
+    const request = ++revision;
+    let next = null;
+    try {
+      const sets = await loadSets();
+      next = new Map(sets.map((set) => [set.id, set.name]));
+    } catch { /* Unknown catalog availability is not evidence that a Set was deleted. */ }
+    if (request !== revision) return;
+    names = next;
+    if (render) onChange();
+  }
+  for (const event of ['catalog:stamp-die-set-saved', 'catalog:stamp-sets-restored']) {
+    eventTarget.addEventListener(event, () => refresh());
+  }
+  return { getNames: () => names, refresh };
+}
+
+function resolveCardLibraryStampNames(card, namesById) {
+  const labels = [];
+  const seen = new Set();
+  const addName = (name) => {
+    if (typeof name !== 'string' || !name.trim()) return;
+    const key = name.trim().toLocaleLowerCase();
+    if (!seen.has(key)) { labels.push(name.trim()); seen.add(key); }
+  };
+  for (const id of normalizeStampDieSetIds(card.stampDieSetIds)) {
+    const name = namesById?.get(id);
+    if (name) addName(name);
+    else labels.push(namesById ? 'Missing Stamp & Die Set' : 'Stamp & Die Set names unavailable');
+  }
+  for (const name of Array.isArray(card.stampSets) ? card.stampSets : []) addName(name);
+  return labels;
 }
