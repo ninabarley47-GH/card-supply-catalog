@@ -170,7 +170,9 @@ test('Add Set opens with current release year, empty name/tags and Favorite off;
 
 test('header Add Stamp Set opens the existing Add form and saves through its normal workflow', async (t) => {
   const h = await harness(t);
+  globalThis.window.location.hash = '#library';
   await h.headerAdd.emit('click');
+  assert.equal(h.dialog.className, 'stamp-set-dialog stamp-set-form-panel');
   assert.equal(h.dialog.open, true);
   assert.equal(h.document.activeElement, h.name);
   assert.equal(h.name.value, '');
@@ -184,6 +186,17 @@ test('header Add Stamp Set opens the existing Add form and saves through its nor
   await h.add.emit('click');
   assert.equal(h.dialog.open, true);
   assert.equal(h.name.value, '');
+});
+
+test('Stamp form uses a full-height right-edge panel without moving Stamp Detail', async () => {
+  const css = await readFile(new URL('../css/cards.css', import.meta.url), 'utf8');
+  const panel = css.match(/\.stamp-set-form-panel\s*\{([^}]+)\}/)[1];
+  assert.match(panel, /position: fixed/);
+  assert.match(panel, /inset: 0 0 0 auto/);
+  assert.match(panel, /margin: 0/);
+  assert.match(panel, /width: min\(34rem, 100vw\)/);
+  assert.match(panel, /height: 100dvh/);
+  assert.match(panel, /border-radius: 0/);
 });
 
 test('shared date helper uses local calendar components, including year boundaries', () => {
@@ -367,7 +380,7 @@ test('Add Set is wired into the application and offline shell with isolated imag
   assert.match(shell, /\.\/js\/ui\.js/);
   assert.match(html, /data-add-set>Add Set/);
   const header = html.match(/<div class="header-actions"[\s\S]*?<\/div>/)[0];
-  assert.match(header, /class="button button-primary"[^>]*data-add-stamp-set-open[^>]*aria-haspopup="dialog"[^>]*hidden>[\s\S]*?Add Stamp Set/);
+  assert.match(header, /class="button button-primary"[^>]*data-add-stamp-set-open[^>]*aria-haspopup="dialog">[\s\S]*?Add Stamp Set/);
   assert.match(header, /data-add-dsp-open>\s*<span aria-hidden="true">\+<\/span>\s*Add Paper/);
   assert.doesNotMatch(header, /Add DSP/);
   assert.match(settings, /catalog:stamp-die-set-saved/);

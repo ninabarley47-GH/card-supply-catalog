@@ -143,3 +143,14 @@ test("DSP image help matches directory capability", () => {
     "Choose one or more images from this device. They will be stored with this browser's catalog."
   );
 });
+
+
+test("Paper form titles use Add Paper and Edit Paper", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const source = await readFile(new URL("./add-dsp.js", import.meta.url), "utf8");
+  assert.match(html, /data-add-dsp-title>Add Paper<\/h3>/);
+  assert.match(html, /aria-label="Close Add Paper"/);
+  assert.match(source, /controls\.title\.textContent = "Edit Paper"/);
+  assert.match(source, /controls\.title\.textContent = "Add Paper"/);
+  assert.doesNotMatch(source, /"(?:Add|Edit) DSP"/);
+});

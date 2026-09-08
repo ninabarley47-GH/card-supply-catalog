@@ -591,7 +591,7 @@ export async function initializeStampDieLibrary(services = {}) {
 
 function createSetFormView() {
   const dialog = document.createElement('dialog');
-  dialog.className = 'stamp-set-dialog';
+  dialog.className = 'stamp-set-dialog stamp-set-form-panel';
   dialog.setAttribute('aria-labelledby', 'stamp-set-add-title');
   const header = document.createElement('header');
   header.className = 'card-add-header';

@@ -433,7 +433,7 @@ export function applyDefaultOwner(form, defaultOwnerId, owners = []) {
 function openEditDspPanel(panel, form, paperPack, colorsById, selectedImages, imagePreviewList, imagePreviewCount, controls) {
   resetAddDspForm(form, selectedImages, imagePreviewList, imagePreviewCount, controls);
   controls.formState.editingPaperPack = paperPack;
-  controls.title.textContent = "Edit DSP";
+  controls.title.textContent = "Edit Paper";
   controls.summary.textContent = "Update this Designer Series Paper pack.";
   controls.submitButton.textContent = "Save Changes";
 
@@ -460,7 +460,7 @@ function resetAddDspForm(form, selectedImages, imagePreviewList, imagePreviewCou
   controls.formState.editingPaperPack = null;
   controls.formState.autoLoadedPaperPackId = "";
   controls.formState.isLoadingLibraryImages = false;
-  controls.title.textContent = "Add DSP";
+  controls.title.textContent = "Add Paper";
   controls.summary.textContent = "Save a new Designer Series Paper pack to this catalog.";
   controls.submitButton.textContent = "Save Paper Pack";
 }

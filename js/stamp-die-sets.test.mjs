@@ -52,7 +52,7 @@ test('existing hash navigation opens Stamps & Dies and returns to Paper and Card
     removeAttribute(key) { delete this.attributes[key]; }
   }));
   const groups = ['library', 'cards', 'stamps-dies'].map((id) => ({ dataset: { sidebarControls: id } }));
-  const stampAddButton = { hidden: true };
+  const stampAddButton = { hidden: false };
   const oldWindow = globalThis.window;
   const oldDocument = globalThis.document;
   let onHashChange;
@@ -68,7 +68,7 @@ test('existing hash navigation opens Stamps & Dies and returns to Paper and Card
     for (const id of ['stamps-dies', 'library', 'cards', 'color-library', 'settings', 'stamps-dies']) {
       window.location.hash = `#${id}`;
       onHashChange();
-      assert.equal(stampAddButton.hidden, id !== "stamps-dies");
+      assert.equal(stampAddButton.hidden, false);
       assert.deepEqual(screens.filter((screen) => !screen.hidden).map((screen) => screen.id), [id]);
       assert.deepEqual(links.filter((link) => link.attributes['aria-current'] === 'page').map((link) => link.hash), [`#${id}`]);
       assert.ok(groups.every((group) => group.hidden === (group.dataset.sidebarControls !== id)));

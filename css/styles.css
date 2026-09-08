@@ -75,10 +75,6 @@ a {
   gap: var(--space-3);
 }
 
-.header-actions [hidden] {
-  display: none;
-}
-
 .brand {
   display: flex;
   align-items: center;
