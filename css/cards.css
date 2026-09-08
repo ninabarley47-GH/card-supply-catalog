@@ -843,6 +843,8 @@
 .stamp-set-images img { display: block; width: 100%; height: 12rem; object-fit: contain; }
 .stamp-set-images [hidden] { display: none; }
 
+[data-set-library] .stamp-set-images img { height: min(20rem, 80vw); }
+
 /* Set Detail reuses the modal/header conventions, with room for complete sets. */
 .stamp-set-detail {
   position: fixed;

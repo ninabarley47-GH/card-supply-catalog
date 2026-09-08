@@ -57,3 +57,13 @@ test('Stamp Library alone uses Paper column sizing while Cards retain 20rem', as
   assert.match(card, /grid-template-columns: repeat\(auto-fill, minmax\(min\(100%, 20rem\), 1fr\)\)/);
   assert.match(card, /align-items: stretch/);
 });
+
+
+test('Stamp Library enlarges image boxes responsively without changing fit or image columns', async () => {
+  const css = await read('../css/cards.css');
+  const override = css.match(/\[data-set-library\] \.stamp-set-images img\s*\{([^}]*)}/)[1].trim();
+  assert.equal(override, 'height: min(20rem, 80vw);');
+  assert.match(css, /\.stamp-set-images img\s*\{[^}]*width: 100%;[^}]*object-fit: contain;/);
+  assert.match(css, /\.stamp-set-images\s*\{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.stamp-set-images > :only-child\s*\{ grid-column: 1 \/ -1; \}/);
+});
