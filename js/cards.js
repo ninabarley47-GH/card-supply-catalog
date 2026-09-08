@@ -483,6 +483,9 @@ export function createAddCardView({ owners = [], tagCatalog, loadStampDieSets = 
     heading: 'Stamps & Dies Used', search: 'Search stamp & die sets by name',
     results: 'Stamp & die set search results', selected: 'Selected stamp & die sets'
   });
+  const legacyStampReview = document.createElement('div');
+  legacyStampReview.className = 'card-legacy-stamp-review';
+  stampDiePicker.section.append(legacyStampReview);
   controls.append(stampDiePicker.section);
   const notes = document.createElement('textarea');
   notes.name = 'notes';
@@ -524,7 +527,7 @@ export function createAddCardView({ owners = [], tagCatalog, loadStampDieSets = 
     width,
     height,
     favorite,
-    // Retain legacy text metadata on save without offering a second input.
+    // Unresolved legacy names are reviewed through the existing Set lookup.
     stampSets: [],
     tagCatalog,
     tagPicker,
@@ -540,6 +543,8 @@ export function createAddCardView({ owners = [], tagCatalog, loadStampDieSets = 
     paperPackSelected: paperPackPicker.selected,
     paperPackStatus: paperPackPicker.status,
     stampDiePicker,
+    legacyStampReview,
+    resolvingLegacyStampName: null,
     loadStampDieSets,
     availableStampDieSets: [],
     stampDieSetIds: [],
@@ -551,12 +556,43 @@ export function createAddCardView({ owners = [], tagCatalog, loadStampDieSets = 
   stampDiePicker.results.addEventListener('click', (event) => {
     const button = event.target.closest('[data-add-stamp-die-set]');
     const id = button?.dataset.addStampDieSet;
-    if (!id || addCardView.stampDieSetIds.includes(id) ||
+    if (addCardView.save.disabled || !id ||
         !addCardView.availableStampDieSets.some((set) => set.id === id)) return;
-    addCardView.stampDieSetIds.push(id);
+    const legacyName = addCardView.resolvingLegacyStampName;
+    if ((button.dataset.resolvesLegacyStampName || null) !== legacyName) return;
+    if (!legacyName && addCardView.stampDieSetIds.includes(id)) return;
+    if (!addCardView.stampDieSetIds.includes(id)) addCardView.stampDieSetIds.push(id);
+    if (legacyName) {
+      addCardView.stampSets = addCardView.stampSets.filter((name) => name !== legacyName);
+      addCardView.resolvingLegacyStampName = null;
+    }
     stampDiePicker.search.value = '';
     renderStampDiePicker(addCardView);
     stampDiePicker.search.focus();
+  });
+  legacyStampReview.addEventListener('click', (event) => {
+    if (addCardView.save.disabled) return;
+    const find = event.target.closest('[data-resolve-legacy-stamp]');
+    const discard = event.target.closest('[data-discard-legacy-stamp]');
+    const cancel = event.target.closest('[data-cancel-legacy-stamp]');
+    if (find && !addCardView.stampDieLoading && !addCardView.stampDieLoadError) {
+      const name = find.dataset.resolveLegacyStamp;
+      if (!addCardView.stampSets.includes(name)) return;
+      addCardView.resolvingLegacyStampName = name;
+      stampDiePicker.search.value = name;
+    } else if (discard) {
+      const name = discard.dataset.discardLegacyStamp;
+      addCardView.stampSets = addCardView.stampSets.filter((candidate) => candidate !== name);
+      if (addCardView.resolvingLegacyStampName === name) {
+        addCardView.resolvingLegacyStampName = null;
+        stampDiePicker.search.value = '';
+      }
+    } else if (cancel) {
+      addCardView.resolvingLegacyStampName = null;
+      stampDiePicker.search.value = '';
+    } else return;
+    renderStampDiePicker(addCardView);
+    if (find || cancel) stampDiePicker.search.focus();
   });
   stampDiePicker.selected.addEventListener('click', (event) => {
     const button = event.target.closest('[data-remove-stamp-die-set]');
@@ -856,6 +892,7 @@ function renderStampDiePicker(view) {
   const { search, status, results, selected } = view.stampDiePicker;
   results.replaceChildren();
   selected.replaceChildren();
+  renderLegacyStampReview(view);
   const setsById = new Map(view.availableStampDieSets.map((set) => [set.id, set]));
   for (const id of view.stampDieSetIds) {
     const set = setsById.get(id);
@@ -880,24 +917,75 @@ function renderStampDiePicker(view) {
   }
   const query = search.value.trim().toLowerCase();
   if (!query) {
-    status.textContent = 'Type to search stamp & die sets.';
+    status.textContent = view.resolvingLegacyStampName
+      ? `Search for the Set to link to "${view.resolvingLegacyStampName}".`
+      : 'Type to search stamp & die sets.';
     return;
   }
   const matches = view.availableStampDieSets.filter((set) =>
-    set.name.toLowerCase().includes(query) && !view.stampDieSetIds.includes(set.id));
-  status.textContent = matches.length ? '' : 'No matching stamp & die sets.';
+    set.name.toLowerCase().includes(query) && (view.resolvingLegacyStampName || !view.stampDieSetIds.includes(set.id)));
+  status.textContent = view.resolvingLegacyStampName
+    ? `Choose a Set to replace "${view.resolvingLegacyStampName}".${matches.length ? '' : ' No matches; try a different search or leave this name for later.'}`
+    : matches.length ? '' : 'No matching stamp & die sets.';
   for (const set of matches) {
     const item = document.createElement('li');
     const button = document.createElement('button');
     button.type = 'button';
     button.dataset.addStampDieSet = set.id;
     button.textContent = set.name;
+    if (view.resolvingLegacyStampName) {
+      button.dataset.resolvesLegacyStampName = view.resolvingLegacyStampName;
+      const owner = view.owners.find((entry) => entry.id === set.ownerId)?.name || 'Owner not recorded';
+      button.textContent = `${set.name} (${set.releaseYear || 'Year unknown'}; ${owner})`;
+      button.setAttribute('aria-label', `Link ${view.resolvingLegacyStampName} to ${button.textContent}`);
+    }
     item.append(button);
     results.append(item);
   }
 }
 
+function renderLegacyStampReview(view) {
+  const container = view.legacyStampReview;
+  container.replaceChildren();
+  if (!view.stampSets.length) return;
+  const heading = document.createElement('h5');
+  heading.textContent = 'Unresolved Stamp Set names';
+  const help = document.createElement('p');
+  help.className = 'card-add-paper-pack-status';
+  help.textContent = 'These saved names could not be matched automatically. Link each to a Set, discard the old name, or leave it for later. Changes apply when you save.';
+  const list = document.createElement('ul');
+  list.className = 'card-add-selected-packs';
+  for (const name of view.stampSets) {
+    const item = document.createElement('li');
+    const label = document.createElement('span');
+    label.textContent = name;
+    const resolve = document.createElement('button');
+    resolve.type = 'button';
+    resolve.dataset.resolveLegacyStamp = name;
+    resolve.textContent = 'Find Set';
+    resolve.setAttribute('aria-label', `Find a Set for ${name}`);
+    resolve.disabled = view.stampDieLoading || view.stampDieLoadError;
+    const discard = document.createElement('button');
+    discard.type = 'button';
+    discard.dataset.discardLegacyStamp = name;
+    discard.textContent = 'Discard name';
+    discard.setAttribute('aria-label', `Discard legacy name ${name}`);
+    item.append(label, resolve, discard);
+    if (view.resolvingLegacyStampName === name) {
+      const cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.dataset.cancelLegacyStamp = '';
+      cancel.textContent = 'Cancel linking';
+      item.append(cancel);
+    }
+    list.append(item);
+  }
+  container.append(heading, help, list);
+}
+
 function resetAddCardForm(addCardView) {
+  addCardView.resolvingLegacyStampName = null;
+  addCardView.stampSets = [];
   addCardView.stampDieLoadSession += 1;
   addCardView.stampDieSetIds = [];
   addCardView.availableStampDieSets = [];

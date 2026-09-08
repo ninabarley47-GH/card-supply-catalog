@@ -97,3 +97,16 @@ Older backups use the same matching rules inside the existing restore transactio
 against the final imported/retained Set catalog. Skipped Cards are not rewritten by
 restore. No schema or backup version changes are required: this converts existing
 fields and retains compatibility for unresolved legacy names.
+
+### Reviewing unresolved names
+
+Card Edit shows unresolved legacy Stamp Set names beneath the existing Set lookup.
+Find Set searches that same control; selecting a result replaces just that legacy
+name with the chosen stable ID in the draft. Already-selected Sets can be chosen
+without duplicating IDs. Result metadata helps distinguish same-name Sets. Cancel
+linking leaves the name intact. Discard name explicitly removes only the old text,
+never existing Set or Paper IDs. Users may leave unresolved names for later.
+
+All changes use the normal Card Save path; canceling the form preserves the saved
+Card. No second free-text Stamp field, automatic Set creation, or additional schema
+migration is introduced. Cards without unresolved names show no review area.

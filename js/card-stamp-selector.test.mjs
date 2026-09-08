@@ -287,3 +287,106 @@ test('Library name lookup refreshes on Set changes and restore; failed or late r
   assert.equal(reads, 7);
   assert.equal(renders, 5);
 });
+
+async function reviewAction(view, selector) {
+  const button = view.legacyStampReview.querySelector(selector);
+  assert.ok(button);
+  await view.legacyStampReview.emit('click', { target: button });
+}
+
+test('legacy review appears only for unresolved names and adds no second Stamp lookup', async t => {
+  const view = harness(t);
+  await openAddCardView(view);
+  assert.equal(view.legacyStampReview.childElementCount, 0);
+  await openEditCardView(view, { ...card(), stampSets: [] });
+  assert.equal(view.legacyStampReview.childElementCount, 0);
+  await openEditCardView(view, card());
+  assert.match(view.legacyStampReview.textContent, /Unresolved Stamp Set names.*Legacy text.*Find Set.*Discard name/);
+  assert.equal(view.form.querySelectorAll('input').filter(el => el.getAttribute('aria-label') === 'Search stamp & die sets by name').length, 1);
+  assert.deepEqual(createCardRecord(view).stampSets, ['Legacy text']);
+});
+
+test('manual linking uses the existing lookup, preserves other legacy names and IDs, and allows already-selected Sets', async t => {
+  const view = harness(t);
+  const existing = { ...card(), stampSets: ['Old garden name', 'Leave for later'] };
+  const before = structuredClone(existing);
+  await openEditCardView(view, existing);
+  await reviewAction(view, '[data-resolve-legacy-stamp="Old garden name"]');
+  assert.equal(view.stampDiePicker.search.value, 'Old garden name');
+  assert.match(view.stampDiePicker.status.textContent, /No matches/);
+  await search(view, 'Garden');
+  const result = view.stampDiePicker.results.querySelector('[data-add-stamp-die-set="set-a"]');
+  assert.ok(result, 'already-selected Sets must be available for resolving legacy names');
+  await view.stampDiePicker.results.emit('click', { target: result });
+  const saved = createCardRecord(view);
+  assert.deepEqual(saved.stampSets, ['Leave for later']);
+  assert.deepEqual(saved.stampDieSetIds, ['set-a', 'missing-set']);
+  assert.deepEqual(saved.paperPackIds, before.paperPackIds);
+  assert.equal(view.resolvingLegacyStampName, null);
+  assert.deepEqual(existing, before, 'only the draft changes before Save');
+});
+
+test('ambiguous names require an explicit choice with Set metadata and save the chosen stable ID', async t => {
+  const ambiguous = [{ id: 'first', name: 'Garden', releaseYear: 2024 }, { id: 'second', name: 'Garden', releaseYear: 2026 }];
+  const view = harness(t, async () => ambiguous);
+  const existing = { ...card(), stampSets: ['Garden'], stampDieSetIds: ['missing-set'] };
+  await openEditCardView(view, existing);
+  await reviewAction(view, '[data-resolve-legacy-stamp="Garden"]');
+  const results = view.stampDiePicker.results.querySelectorAll('button');
+  assert.equal(results.length, 2);
+  assert.match(results[0].textContent, /Garden.*2024/);
+  assert.match(results[1].textContent, /Garden.*2026/);
+  assert.deepEqual(createCardRecord(view).stampSets, ['Garden'], 'displaying candidates cannot convert a name');
+  await view.stampDiePicker.results.emit('click', { target: results[1] });
+  assert.deepEqual(createCardRecord(view).stampDieSetIds, ['missing-set', 'second']);
+  assert.deepEqual(createCardRecord(view).stampSets, []);
+  assert.equal(view.legacyStampReview.childElementCount, 0);
+});
+
+test('cancel linking, saving an unfinished lookup, and reopening leave unresolved names intact', async t => {
+  const view = harness(t);
+  const existing = card();
+  await openEditCardView(view, existing);
+  await reviewAction(view, '[data-resolve-legacy-stamp="Legacy text"]');
+  assert.deepEqual(createCardRecord(view).stampSets, existing.stampSets);
+  await reviewAction(view, '[data-cancel-legacy-stamp]');
+  assert.equal(view.resolvingLegacyStampName, null);
+  assert.deepEqual(createCardRecord(view).stampDieSetIds, existing.stampDieSetIds);
+  await reviewAction(view, '[data-resolve-legacy-stamp="Legacy text"]');
+  await select(view, 'set-b');
+  assert.deepEqual(createCardRecord(view).stampSets, []);
+  await openEditCardView(view, existing); // Reopening after abandoning an unsaved draft.
+  assert.deepEqual(createCardRecord(view).stampSets, existing.stampSets);
+  assert.deepEqual(createCardRecord(view).stampDieSetIds, existing.stampDieSetIds);
+  assert.equal(view.resolvingLegacyStampName, null);
+});
+
+test('discarding a legacy name is draft-only and never removes any ID-based relationship', async t => {
+  const view = harness(t);
+  const existing = { ...card(), stampSets: ['Legacy text', 'Keep this'] };
+  const before = structuredClone(existing);
+  await openEditCardView(view, existing);
+  await reviewAction(view, '[data-discard-legacy-stamp="Legacy text"]');
+  const saved = createCardRecord(view);
+  assert.deepEqual(saved.stampSets, ['Keep this']);
+  assert.deepEqual(saved.stampDieSetIds, before.stampDieSetIds);
+  assert.deepEqual(saved.paperPackIds, before.paperPackIds);
+  assert.deepEqual(existing, before);
+});
+
+test('failed Set loading cannot resolve legacy names; stale lookup results cannot resolve another name', async t => {
+  const view = harness(t, async () => { throw new Error('Unavailable'); });
+  await openEditCardView(view, card());
+  assert.equal(view.legacyStampReview.querySelector('[data-resolve-legacy-stamp]').disabled, true);
+  assert.deepEqual(createCardRecord(view).stampSets, ['Legacy text']);
+  view.loadStampDieSets = async () => sets;
+  await openEditCardView(view, { ...card(), stampSets: ['First', 'Second'] });
+  await reviewAction(view, '[data-resolve-legacy-stamp="First"]');
+  const firstResult = (await search(view, 'Garden'))[0];
+  await reviewAction(view, '[data-resolve-legacy-stamp="Second"]');
+  await view.stampDiePicker.results.emit('click', { target: firstResult });
+  assert.deepEqual(createCardRecord(view).stampSets, ['First', 'Second']);
+  view.save.disabled = true;
+  await reviewAction(view, '[data-discard-legacy-stamp="Second"]');
+  assert.deepEqual(createCardRecord(view).stampSets, ['First', 'Second']);
+});
