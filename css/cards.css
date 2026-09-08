@@ -910,5 +910,3 @@
 }
 
 .stamp-card-selection-thumbnail { display: block; width: 3rem; height: 3rem; object-fit: contain; }
-.stamp-library-related-cards .related-card-thumbnail { height: 3rem; }
-.stamp-library-related-cards { font-size: 0.8rem; }

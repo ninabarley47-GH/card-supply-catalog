@@ -739,18 +739,6 @@ export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetai
       content.append(tags);
     }
     content.append(release);
-    if (findCardsUsingStampDieSet(cards, record.id).length) {
-      const related = createStampRelatedCardsSection(cards, record.id);
-      related.className += ' stamp-library-related-cards';
-      related.addEventListener('click', (event) => {
-        const link = event.target.closest('[data-related-card-id]');
-        if (!link || !cards.some((card) => card.id === link.dataset.relatedCardId)) return;
-        event.stopPropagation();
-        if (!detailNavigation.open('stamp', record.id)) return;
-        detailNavigation.open('card', link.dataset.relatedCardId, { related: true });
-      });
-      content.append(related);
-    }
     tile.append(titleRow, placeholder, content);
     if (onEdit) {
       const edit = document.createElement('button');

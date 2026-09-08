@@ -1379,12 +1379,15 @@ test('Stamp Detail displays multiple Related Cards with existing thumbnail conve
   assert.equal(section.querySelector('h4').textContent, 'Related Cards');
   assert.deepEqual(section.querySelectorAll('[data-related-card-id]').map(button => button.dataset.relatedCardId), ['card-A', 'card-B']);
   assert.equal(section.querySelector('img').src, cards[0].thumbnailImageSrc);
+  assert.equal(section.querySelector('img').className, 'related-card-thumbnail');
+  assert.match(section.querySelector('img').alt, /2026-09-07.*4.25 by 5.5/);
   assert.match(section.textContent, /2026-09-07.*2026-09-06/);
   assert.match(section.textContent, /No image yet/);
   assert.doesNotMatch(section.textContent, /card-A|card-B|unrelated/);
   assert.match(section.querySelector('button').getAttribute('aria-label'), /2026-09-07.*4.25 by 5.5/);
   await section.querySelector('img').emit('error');
   assert.equal(section.querySelector('img'), null);
+  assert.match(section.querySelector('button').textContent, /No image yet.*2026-09-07.*4.25/);
   assert.deepEqual(cards, before);
   assert.equal(h.calls(), 0, 'viewing never saves a Set');
 });
@@ -1451,23 +1454,18 @@ async function removeRelatedCard(h, id) {
   await button.parent.parent.emit('click', { target: button });
 }
 
-test('Stamp Library shows compact related Cards, omits unused Set section, and opens Card with Set return context', async (t) => {
+test('Stamp Library omits Related Cards while Detail retains all relationships', async (t) => {
   const cards = [relationshipCard('A', ['set-existing']), relationshipCard('B', ['set-existing'])];
+  const before = structuredClone(cards);
   const h = await harness(t, { cards });
   await seedEdit(h); await h.cancel.emit('click');
-  const section = h.gallery.querySelector('.stamp-library-related-cards');
-  assert.deepEqual(section.querySelectorAll('[data-related-card-id]').map(el => el.dataset.relatedCardId), ['A', 'B']);
-  let selected;
-  detailNavigation.register('card', { library: 'cards', exists: id => cards.some(card => card.id === id), open: id => { selected = id; }, hide() {} });
-  const button = section.querySelector('[data-related-card-id="B"]');
-  await section.emit('click', { target: button, stopPropagation() {} });
-  assert.equal(selected, 'B');
-  assert.deepEqual(detailNavigation.getState().history, [{ type: 'stamp', id: 'set-existing' }]);
-  detailNavigation.back();
-  assert.equal(setDetail(h).open, true);
-  cards.splice(0, cards.length);
-  await h.document.emit('catalog:cards-updated');
-  assert.equal(h.gallery.querySelector('.stamp-library-related-cards'), null);
+  assert.equal(h.gallery.querySelector('.related-cards-section'), null);
+  assert.equal(h.gallery.querySelector('[data-related-card-id]'), null);
+  assert.doesNotMatch(h.gallery.textContent, /Related Cards/);
+  await h.gallery.querySelector('article').emit('click');
+  assert.deepEqual(setDetail(h).querySelectorAll('[data-related-card-id]').map(el => el.dataset.relatedCardId), ['A', 'B']);
+  assert.deepEqual(cards, before);
+  assert.equal(h.calls(), 0);
 });
 
 test('Stamp Edit populates Cards, no-op save sends no Card writes, and explicit changes affect only this Set', async (t) => {
