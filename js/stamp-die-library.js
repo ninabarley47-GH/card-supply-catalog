@@ -1,4 +1,4 @@
-import { createCardContextBar, sortPaperPacks } from './library.js';
+import { createPatternViewer, openPatternPreview, closePatternPreview, createCardContextBar, sortPaperPacks } from './library.js';
 import { createPaperPackPicker } from './cards.js';
 import { getCardLibraryImageSource } from './card-images.js';
 import { detailNavigation } from './detail-navigation.js';
@@ -98,7 +98,7 @@ export async function initializeStampDieLibrary(services = {}) {
     const content = document.createElement('div');
     content.className = 'card-detail-content stamp-set-detail-content';
     content.append(createSetImageGrid(record.imageRefs, true), metadata);
-    detail.body.replaceChildren(content);
+    detail.body.replaceChildren(content, createPatternViewer('stamp-image-viewer-title', 'Close image preview'));
   }
   function openDetail(id, source) {
     detailSource = source;
@@ -144,7 +144,38 @@ export async function initializeStampDieLibrary(services = {}) {
     add.focus();
     document.dispatchEvent(new CustomEvent('catalog:stamp-die-set-saved'));
   });
-  detail.dialog.addEventListener('cancel', (event) => { event.preventDefault(); if (!deleting) detailNavigation.close('stamp'); });
+  let previewSource;
+  function closeImagePreview() {
+    closePatternPreview(detail.body);
+    previewSource?.focus();
+  }
+  detail.body.addEventListener('click', (event) => {
+    if (event.target.closest('[data-pattern-viewer-close]')) {
+      event.stopPropagation();
+      closeImagePreview();
+      return;
+    }
+    const button = event.target.closest('[data-set-image-preview]');
+    if (!button) return;
+    event.stopPropagation();
+    const record = displayedRecords.find((entry) => entry.id === selectedSetId);
+    if (!record) return;
+    const references = orderStampDieImages(record.imageRefs);
+    const index = Number(button.dataset.setImagePreview);
+    const reference = references[index];
+    if (!reference) return;
+    previewSource = button;
+    openPatternPreview(detail.body, { name: record.name, patterns: references.map((entry, imageIndex) => ({
+      imageSrc: entry.imageSrc || getStampDetailImageSource(entry),
+      imageName: entry.imageName || `Set image ${imageIndex + 1}`
+    })) }, index);
+  });
+  detail.dialog.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    const viewer = detail.body.querySelector('[data-pattern-viewer]');
+    if (viewer && !viewer.hidden) { closeImagePreview(); return; }
+    if (!deleting) detailNavigation.close('stamp');
+  });
   detail.close.addEventListener('click', () => detailNavigation.close('stamp'));
   detail.dialog.addEventListener('click', (event) => { if (!deleting && event.target === detail.dialog) detailNavigation.close('stamp'); });
   detail.dialog.addEventListener('close', () => {
@@ -798,7 +829,13 @@ function createSetImageGrid(references = [], fullQuality = false) {
     grid.append(empty);
   }
   for (const [index, reference] of orderStampDieImages(references).entries()) {
-    const frame = document.createElement('div');
+    const frame = document.createElement(fullQuality ? 'button' : 'div');
+    if (fullQuality) {
+      frame.type = 'button';
+      frame.className = 'stamp-detail-image-preview';
+      frame.dataset.setImagePreview = String(index);
+      frame.setAttribute('aria-label', `Enlarge ${reference.imageName || `Set image ${index + 1}`}`);
+    }
     const missing = document.createElement('div');
     missing.className = 'stamp-set-placeholder';
     missing.textContent = 'Image unavailable';

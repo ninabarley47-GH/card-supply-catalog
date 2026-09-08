@@ -884,6 +884,18 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
   gap: var(--space-4);
 }
+.stamp-detail-image-preview {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+.stamp-detail-image-preview:focus-visible,
+.stamp-detail-image-preview:hover {
+  outline: 3px solid rgba(82, 120, 109, 0.42);
+  outline-offset: 3px;
+}
 .stamp-set-detail-images img { height: auto; max-height: 65dvh; min-height: 12rem; object-fit: contain; }
 .stamp-set-tile[tabindex] { cursor: pointer; }
 .stamp-set-tile[tabindex]:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }

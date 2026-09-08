@@ -1574,3 +1574,46 @@ test('Stamp Recently Added uses Paper ordering and explicit eligibility, with fa
   assert.deepEqual(h.gallery.querySelectorAll('article').map(tile => tile.dataset.setId), ['recent-z', 'old', 'recent-b']);
   assert.equal(h.records.find(record => record.id === 'recent-b').recentlyAdded, true);
 });
+
+test('Stamp Detail enlarges each ordered original image with Paper viewer and closes without changing history', async (t) => {
+  const refs = [
+    { imageName: 'Mask.jpg', imageSrc: 'data:image/jpeg;base64,Yw==' },
+    { imageName: 'Stamp.jpg', imageSrc: 'data:image/jpeg;base64,YQ==' },
+    { imageName: 'Die.jpg', imageSrc: 'data:image/jpeg;base64,Yg==' }
+  ].map(ref => ({ ...ref, thumbnailImageSrc: 'data:image/jpeg;base64,ZA==' }));
+  const h = await harness(t, { hydrateStampImages: async records => {
+    for (const record of records) for (const ref of record.imageRefs) ref.imagePreviewSrc = 'data:image/jpeg;base64,ZQ==';
+  } });
+  await seedEdit(h, { imageRefs: refs }); await h.cancel.emit('click');
+  const before = structuredClone(h.records);
+  assert.equal(h.gallery.querySelector('[data-set-image-preview]'), null);
+  let currentCard;
+  detailNavigation.register('card', { library: 'cards', exists: id => id === 'origin', open: id => { currentCard = id; }, hide() {} });
+  detailNavigation.open('card', 'origin');
+  detailNavigation.open('stamp', 'set-existing', { related: true });
+  const state = detailNavigation.getState();
+  const detail = setDetail(h), body = detail.querySelector('.stamp-set-detail-body');
+  const buttons = body.querySelectorAll('[data-set-image-preview]');
+  assert.deepEqual(buttons.map(button => button.getAttribute('aria-label')), ['Enlarge Stamp.jpg', 'Enlarge Die.jpg', 'Enlarge Mask.jpg']);
+  for (const [index, name] of ['Stamp.jpg', 'Die.jpg', 'Mask.jpg'].entries()) {
+    await body.emit('click', { target: buttons[index].querySelector('img'), stopPropagation() {} });
+    const viewer = body.querySelector('[data-pattern-viewer]');
+    assert.equal(viewer.className, 'pattern-viewer'); assert.equal(viewer.hidden, false);
+    assert.equal(viewer.querySelector('[data-pattern-viewer-title]').textContent, name);
+    assert.equal(viewer.querySelector('img').src, refs.find(ref => ref.imageName === name).imageSrc);
+    assert.equal(viewer.querySelector('img').alt, name);
+    assert.deepEqual(detailNavigation.getState(), state);
+    if (index === 2) {
+      const cancel = await detail.emit('cancel'); assert.equal(cancel.defaultPrevented, true);
+    } else {
+      // Exercise both the backdrop and the header Close button.
+      const close = viewer.querySelectorAll('[data-pattern-viewer-close]')[index];
+      await body.emit('click', { target: close, stopPropagation() {} });
+    }
+    assert.equal(viewer.hidden, true); assert.equal(viewer.querySelector('img'), null);
+    assert.equal(detail.open, true); assert.equal(h.document.activeElement, buttons[index]);
+    assert.deepEqual(detailNavigation.getState(), state);
+  }
+  assert.deepEqual(h.records, before); assert.equal(h.calls(), 0);
+  detailNavigation.back(); assert.equal(currentCard, 'origin'); assert.equal(detail.open, false);
+});

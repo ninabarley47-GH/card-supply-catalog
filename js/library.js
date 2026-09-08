@@ -1944,7 +1944,7 @@ function createRelatedCardsSection(paperPack, cards) {
   return section;
 }
 
-function createPatternViewer() {
+export function createPatternViewer(titleId = "pattern-viewer-title", closeLabel = "Close pattern preview") {
   const viewer = document.createElement("div");
   const backdrop = document.createElement("button");
   const dialog = document.createElement("div");
@@ -1959,18 +1959,18 @@ function createPatternViewer() {
   backdrop.className = "pattern-viewer-backdrop";
   backdrop.type = "button";
   backdrop.dataset.patternViewerClose = "";
-  backdrop.setAttribute("aria-label", "Close pattern preview");
+  backdrop.setAttribute("aria-label", closeLabel);
   dialog.className = "pattern-viewer-dialog";
   dialog.setAttribute("role", "dialog");
   dialog.setAttribute("aria-modal", "true");
-  dialog.setAttribute("aria-labelledby", "pattern-viewer-title");
+  dialog.setAttribute("aria-labelledby", titleId);
   header.className = "pattern-viewer-header";
-  title.id = "pattern-viewer-title";
+  title.id = titleId;
   title.dataset.patternViewerTitle = "";
   closeButton.className = "detail-close";
   closeButton.type = "button";
   closeButton.dataset.patternViewerClose = "";
-  closeButton.setAttribute("aria-label", "Close pattern preview");
+  closeButton.setAttribute("aria-label", closeLabel);
   closeButton.textContent = "\u00d7";
   imageFrame.className = "pattern-viewer-image";
   imageFrame.dataset.patternViewerImage = "";
@@ -1982,7 +1982,7 @@ function createPatternViewer() {
   return viewer;
 }
 
-function openPatternPreview(detailBody, paperPack, patternIndex) {
+export function openPatternPreview(detailBody, paperPack, patternIndex) {
   const viewer = detailBody.querySelector("[data-pattern-viewer]");
   const title = viewer?.querySelector("[data-pattern-viewer-title]");
   const imageFrame = viewer?.querySelector("[data-pattern-viewer-image]");
@@ -1998,7 +1998,7 @@ function openPatternPreview(detailBody, paperPack, patternIndex) {
   viewer.querySelector("[data-pattern-viewer-close]")?.focus();
 }
 
-function closePatternPreview(detailBody) {
+export function closePatternPreview(detailBody) {
   const viewer = detailBody.querySelector("[data-pattern-viewer]");
 
   if (!viewer) {
