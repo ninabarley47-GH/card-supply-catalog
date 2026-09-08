@@ -45,3 +45,15 @@ test('Set deletion has a catalog-only transaction with no image helper or recurs
   assert.match(body, /objectStore\(STAMP_DIE_SETS_STORE\).delete\(id\)/);
   assert.doesNotMatch(body, /removeEntry|createWritable|image|SETTINGS_STORE|recursive/);
 });
+
+
+test('Stamp Library alone uses Paper column sizing while Cards retain 20rem', async () => {
+  const [css, shared] = await Promise.all([read('../css/cards.css'), read('../css/styles.css')]);
+  const stamp = css.match(/\[data-set-library\]\s*\{([^}]*)}/)[1].trim();
+  const paper = shared.match(/\.library-pack-grid\s*\{([^}]*)}/)[1];
+  const card = css.match(/\.card-library-grid\s*\{([^}]*)}/)[1];
+  assert.equal(stamp, 'grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr));');
+  assert.ok(paper.includes(stamp));
+  assert.match(card, /grid-template-columns: repeat\(auto-fill, minmax\(min\(100%, 20rem\), 1fr\)\)/);
+  assert.match(card, /align-items: stretch/);
+});

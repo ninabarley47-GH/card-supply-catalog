@@ -5,6 +5,10 @@
   gap: var(--space-5);
 }
 
+[data-set-library] {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr));
+}
+
 .card-library-empty {
   grid-column: 1 / -1;
   margin: 0;
