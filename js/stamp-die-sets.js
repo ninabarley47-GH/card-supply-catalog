@@ -26,6 +26,7 @@ export function normalizeStampDieSet(record, catalog) {
     imageRefs: record.imageRefs.map(normalizeImageReference),
     tagIds: [...record.tagIds],
     favorite: record.favorite,
+    ...(record.recentlyAdded === undefined ? {} : { recentlyAdded: record.recentlyAdded === true }),
     dateCreated: record.dateCreated,
     ...(record.releaseYear === undefined ? {} : { releaseYear: record.releaseYear })
   });

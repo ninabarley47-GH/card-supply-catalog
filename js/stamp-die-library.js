@@ -1,3 +1,4 @@
+import { createCardContextBar, sortPaperPacks } from './library.js';
 import { createPaperPackPicker } from './cards.js';
 import { getCardLibraryImageSource } from './card-images.js';
 import { detailNavigation } from './detail-navigation.js';
@@ -28,6 +29,7 @@ export function createStampDieSetRecord(values, catalog) {
     releaseYear: values.releaseYear,
     ownerId: values.ownerId,
     favorite: values.favorite,
+    recentlyAdded: values.recentlyAdded,
     tagIds: values.tagIds,
     imageRefs: values.imageRefs || []
   }, catalog);
@@ -200,6 +202,27 @@ export async function initializeStampDieLibrary(services = {}) {
     status.dataset.tone = '';
     status.textContent = `Showing ${visible.length} of ${displayedRecords.length} sets`;
   }
+
+  gallery.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-clear-recently-added]');
+    if (!button) return;
+    event.stopPropagation();
+    if (savingFavorite || deleting || saving || view.dialog.open) return;
+    const record = displayedRecords.find((entry) => entry.id === button.dataset.clearRecentlyAdded);
+    if (!record || record.recentlyAdded !== true) return;
+    const updated = { ...record, recentlyAdded: false };
+    displayedRecords.splice(displayedRecords.indexOf(record), 1, updated);
+    savingFavorite = true;
+    renderCurrent();
+    try {
+      await storage.saveStampDieSet(updated);
+    } catch {
+      window.alert('The Recently Added status was cleared for this session, but the change could not be saved permanently.');
+    } finally {
+      savingFavorite = false;
+      setFavoriteButtonsDisabled(false);
+    }
+  });
 
   function setFavoriteButtonsDisabled(disabled) {
     for (const container of [gallery, detail.dialog]) {
@@ -529,6 +552,7 @@ export async function initializeStampDieLibrary(services = {}) {
         releaseYear: editingRecord && editingRecord.releaseYear === undefined && !view.releaseYear.value
           ? undefined : Number(view.releaseYear.value),
         favorite: view.favorite.checked,
+        recentlyAdded: editingRecord ? editingRecord.recentlyAdded : true,
         tagIds: reconciled.record.tagIds
       }, reconciled.catalog);
       const prepared = await storage.prepareStampImagesForSave(draftImages);
@@ -692,7 +716,7 @@ function createField(text, ...inputs) {
 }
 
 export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetail, owners = [], totalCount = records.length, onFavorite, cards = []) {
-  const tiles = records.map((record) => {
+  const tiles = sortPaperPacks(records).map((record) => {
     const tile = document.createElement('article');
     tile.className = 'stamp-set-tile';
     tile.dataset.setId = record.id;
@@ -710,6 +734,8 @@ export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetai
         }
       });
     }
+    const contextBar = createCardContextBar(record);
+    if (contextBar) tile.append(contextBar);
     const placeholder = createSetImageGrid(record.imageRefs);
     const content = document.createElement('div');
     content.className = 'card-body stamp-set-tile-content';

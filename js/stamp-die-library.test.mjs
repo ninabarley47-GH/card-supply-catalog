@@ -221,7 +221,7 @@ test('save persists Favorite and universal stable tag IDs, then renders a no-ima
   await h.form.emit('submit');
   const record = h.records[0];
   assert.match(record.id, /^set-/);
-  assert.deepEqual(record, { schemaVersion: CATALOG_SCHEMA_VERSION, id: record.id, ownerId: 'owner-nina', name: 'Garden', dateCreated: getLocalDateValue(), releaseYear: 2024, favorite: true, tagIds: ['stable-paper', 'stable-card'], imageRefs: [] });
+  assert.deepEqual(record, { schemaVersion: CATALOG_SCHEMA_VERSION, id: record.id, ownerId: 'owner-nina', name: 'Garden', dateCreated: getLocalDateValue(), releaseYear: 2024, favorite: true, recentlyAdded: true, tagIds: ['stable-paper', 'stable-card'], imageRefs: [] });
   assert.equal(h.dialog.open, false);
   assert.equal(saves, 1);
   assert.match(h.gallery.textContent, /Garden.*No image.*Floral.*Birthday.*2024/);
@@ -1536,4 +1536,41 @@ test('Stamp form header Close discards the draft like Cancel and allows a fresh 
   await h.headerAdd.emit('click');
   assert.equal(h.dialog.open, true);
   assert.equal(h.name.value, '');
+});
+
+test('Stamp Recently Added is set on Add, survives Edit, and dismisses without changing other data', async (t) => {
+  const h = await harness(t);
+  await h.add.emit('click'); h.name.value = 'New Set'; await h.form.emit('submit');
+  assert.equal(h.records[0].recentlyAdded, true);
+  let tile = h.gallery.querySelector('article');
+  assert.equal(tile.children[0].className, 'card-context-bar');
+  assert.match(tile.children[0].textContent, /Recently Added/);
+  let button = tile.querySelector('[data-clear-recently-added]');
+  assert.match(button.getAttribute('aria-label'), /Clear Recently Added status for New Set/);
+  await tile.querySelector('.card-edit-button').emit('click'); await h.form.emit('submit');
+  assert.equal(h.records[0].recentlyAdded, true);
+  const before = structuredClone(h.records[0]);
+  button = h.gallery.querySelector('[data-clear-recently-added]');
+  await h.gallery.emit('click', { target: button, stopPropagation() {} });
+  assert.deepEqual(h.records[0], { ...before, recentlyAdded: false });
+  assert.equal(h.gallery.querySelector('.card-context-bar'), null);
+  assert.ok(!setDetail(h).open);
+  await h.gallery.querySelector('.card-edit-button').emit('click'); await h.form.emit('submit');
+  assert.equal(h.records[0].recentlyAdded, false);
+});
+
+test('Stamp Recently Added uses Paper ordering and explicit eligibility, with failed dismissal retained for session', async (t) => {
+  const h = await harness(t);
+  for (const [id, name, flag] of [['old', 'Alpha', undefined], ['recent-z', 'Zulu', true], ['recent-b', 'Bravo', true]]) {
+    h.records.push(createStampDieSetRecord({ id, name, dateCreated: '2026-09-01', favorite: false, tagIds: [], recentlyAdded: flag }, initialCatalog()));
+  }
+  await h.document.emit('catalog:global-tags-updated');
+  assert.deepEqual(h.gallery.querySelectorAll('article').map(tile => tile.dataset.setId), ['recent-b', 'recent-z', 'old']);
+  h.setFailure(true); let notice;
+  window.alert = value => { notice = value; };
+  const button = h.gallery.querySelector('[data-clear-recently-added]');
+  await h.gallery.emit('click', { target: button, stopPropagation() {} });
+  assert.match(notice, /cleared for this session/);
+  assert.deepEqual(h.gallery.querySelectorAll('article').map(tile => tile.dataset.setId), ['recent-z', 'old', 'recent-b']);
+  assert.equal(h.records.find(record => record.id === 'recent-b').recentlyAdded, true);
 });

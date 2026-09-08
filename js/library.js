@@ -1404,7 +1404,7 @@ function createPaperPackFavoriteButton(paperPack) {
   return favorite;
 }
 
-function createCardContextBar(paperPack) {
+export function createCardContextBar(paperPack) {
   const context = getCardContext(paperPack);
 
   if (!context) {

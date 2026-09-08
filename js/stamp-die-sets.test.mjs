@@ -594,3 +594,20 @@ test('restore migration failure rolls back names, ID references, and incoming Se
     stampDieSets: [setRecord()], cards: [migrationCard('old', { stampSets: ['Garden'] })] }));
   assert.deepEqual(h.stores, before);
 });
+
+test('main Library navigation keeps its labels and targets in Paper, Stamp, Card, Color, Settings order', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const links = [...html.matchAll(/<a[^>]*href="(#[^"]+)"[^>]*data-nav-link>([^<]+)<\/a>/g)];
+  assert.deepEqual(links.map(match => match[1]), ['#library', '#stamps-dies', '#cards', '#color-library', '#settings']);
+  assert.deepEqual(links.map(match => match[2]), ['Paper Library', 'Stamps &amp; Dies', 'Card Library', 'Color Library', 'Settings']);
+});
+
+test('Recently Added survives Set normalization while legacy Sets remain unmarked', () => {
+  const original = setRecord();
+  assert.equal(normalizeStampDieSet(original, catalog).recentlyAdded, undefined);
+  for (const recentlyAdded of [true, false]) {
+    const saved = normalizeStampDieSet({ ...original, recentlyAdded }, catalog);
+    assert.equal(normalizeStampDieSet(JSON.parse(JSON.stringify(saved)), catalog).recentlyAdded, recentlyAdded);
+  }
+  assert.equal('recentlyAdded' in original, false);
+});
