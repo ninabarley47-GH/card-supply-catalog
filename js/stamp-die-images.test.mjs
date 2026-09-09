@@ -309,3 +309,34 @@ test('Detail reuses full-image resolution after folder hydration and falls back 
     assert.equal(getStampDetailImageSource({ imagePath: 'unresolved.jpg' }), '');
   } finally { clearImageReferenceObjectUrls(ref); }
 });
+
+test('automatic Set folder lookup reuses Paper matching, excludes thumbnails, and preserves original handles', async () => {
+  const names = ['Garden MaSk.jpg', 'Garden DIES.jpg', 'Garden.jpg', 'Garden.thumb.jpg', 'notes.txt'];
+  const handles = names.map(name => ({ kind: 'file', name, relativePath: ['Garden Set', name], getFile: async () => file(name) }));
+  const child = { kind: 'directory', async *entries() { for (const handle of handles) yield [handle.name, handle]; } };
+  const root = { async getDirectoryHandle() { throw new DOMException('Missing', 'NotFoundError'); },
+    async *entries() { yield ['Unrelated', { kind: 'directory' }]; yield ['Garden Set', child]; } };
+  const { loadStampImagesForSetName } = await import('./stamp-die-images.js');
+  const images = await loadStampImagesForSetName('garden-set', { ...environment(), showDirectoryPicker() {} }, {
+    loadDirectory: async (mode, request) => { assert.equal(mode, 'read'); assert.equal(request, true); return root; }
+  });
+  assert.equal(images.length, 3);
+  const ordered = orderStampDieImages(images);
+  assert.deepEqual(ordered.map(image => image.name), ['Garden.jpg', 'Garden DIES.jpg', 'Garden MaSk.jpg']);
+  for (const image of images) {
+    assert.equal(image.fileHandle, handles.find(handle => handle.name === image.name));
+    assert.ok(image.file instanceof File);
+    assert.ok(image.previewSrc);
+  }
+  const inferred = inferStampDieImageTags({ schemaVersion: 1, tags: [], categories: [] }, [], images.map(image => image.name));
+  assert.deepEqual(inferred.catalog.tags.map(tag => tag.name).sort(), ['Die', 'Mask', 'Stamp']);
+  assert.deepEqual(await loadStampImagesForSetName('Missing', { ...environment(), showDirectoryPicker() {} }, { loadDirectory: async () => root }), []);
+});
+
+test('automatic Set lookup skips unsupported browsers before accessing a saved folder', async () => {
+  const { loadStampImagesForSetName } = await import('./stamp-die-images.js');
+  assert.deepEqual(await loadStampImagesForSetName('Garden', environment(), {
+    loadDirectory: async () => { assert.fail('Unsupported browser must not access a folder'); }
+  }), []);
+  assert.deepEqual(await loadStampImagesForSetName('Garden', { showDirectoryPicker() {} }, { loadDirectory: async () => null }), []);
+});

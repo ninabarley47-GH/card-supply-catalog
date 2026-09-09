@@ -1,6 +1,7 @@
 import { loadCatalogSetting, saveCatalogSetting } from './storage.js';
 import { supportsOpenFilePicker, supportsDirectoryPicker } from './browser-capabilities.js';
 import { createCardImageFromFile, clearSelectedCardImage, getCardLibraryImageSource, getCardDetailImageSource } from './card-images.js';
+import { findPaperPackImageDirectory, isSupportedImageFileName } from './images.js';
 import {
   prepareFolderBackedImage, prepareEmbeddedImage, hasDirectoryPermission,
   hydrateImageReference, clearImageReferenceObjectUrls, getFileFromRelativePath
@@ -73,6 +74,23 @@ export async function chooseStampImages(environment = globalThis, directory = nu
     types: [{ description: 'Set images', accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.gif'] } }]
   });
   const images = await selectStampImageFiles(await Promise.all(handles.map((handle) => handle.getFile())), environment);
+  return images.map((image, index) => ({ ...image, fileHandle: handles[index] }));
+}
+
+export async function loadStampImagesForSetName(name, environment = globalThis, services = {}) {
+  if (!name.trim() || !supportsDirectoryPicker(environment)) return [];
+  // Like Paper's name lookup, this user-triggered read may restore folder permission.
+  const directory = await (services.loadDirectory || loadStampImageDirectory)('read', true);
+  if (!directory) return [];
+  const match = await findPaperPackImageDirectory(directory, name.trim());
+  if (!match?.handle.entries) return [];
+  const handles = [];
+  for await (const [filename, handle] of match.handle.entries()) {
+    if (handle.kind === 'file' && isSupportedImageFileName(filename)) handles.push(handle);
+  }
+  handles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+  const images = await selectStampImageFiles(await Promise.all(handles.map(handle => handle.getFile())), environment);
+  // Keep file handles so the existing save path references originals in this library.
   return images.map((image, index) => ({ ...image, fileHandle: handles[index] }));
 }
 

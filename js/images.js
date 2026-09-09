@@ -1046,7 +1046,7 @@ async function hasDirectoryPermission(directoryHandle, mode, options = {}) {
   }
 }
 
-async function findPaperPackImageDirectory(directoryHandle, paperPackId) {
+export async function findPaperPackImageDirectory(directoryHandle, paperPackId) {
   try {
     return {
       handle: await directoryHandle.getDirectoryHandle(paperPackId),
@@ -1129,7 +1129,7 @@ function formatPaperPackNameFromFolder(folderName) {
     .join(" ");
 }
 
-function isSupportedImageFileName(fileName) {
+export function isSupportedImageFileName(fileName) {
   const normalizedFileName = String(fileName || "");
 
   return !isThumbnailImageFileName(normalizedFileName) && /\.(jpe?g|png|webp|gif)$/i.test(normalizedFileName);

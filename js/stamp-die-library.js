@@ -7,7 +7,7 @@ import { initializeOwnerPicker, resolveOwnerPicker, setOwnerPickerValue, refresh
 import { isActiveOwner } from './owners.js';
 import { loadDefaultOwnerId } from './settings.js';
 import {
-  chooseStampImages, selectStampImageFiles, loadStampImageDirectory,
+  chooseStampImages, selectStampImageFiles, loadStampImageDirectory, loadStampImagesForSetName,
   prepareStampImagesForSave, hydrateStampImages, clearStampImageSources,
   clearDraftStampImages, removeDraftStampImage, getStampLibraryImageSource, getStampDetailImageSource
 } from './stamp-die-images.js';
@@ -44,7 +44,7 @@ function createSetId() {
 
 export async function initializeStampDieLibrary(services = {}) {
   const storage = { loadGlobalTagCatalog, loadSavedStampDieSets, saveStampDieSet, deleteStampDieSet,
-    chooseStampImages, selectStampImageFiles, loadStampImageDirectory,
+    chooseStampImages, selectStampImageFiles, loadStampImageDirectory, loadStampImagesForSetName,
     prepareStampImagesForSave, hydrateStampImages, loadDefaultOwnerId, loadCatalogSetting, saveCatalogSetting, ...services };
   const owners = services.owners || [];
   // Share the live Card collection, as Paper Detail does; reverse links are never persisted.
@@ -195,6 +195,7 @@ export async function initializeStampDieLibrary(services = {}) {
   let picker;
   let draftId;
   let draftSession = 0;
+  let autoLoadedName = '';
   let editingRecord = null;
   let initialCardIds = [];
   let selectedCardIds = [];
@@ -296,6 +297,7 @@ export async function initializeStampDieLibrary(services = {}) {
     view.cardPicker.search.value = '';
     renderCardSelections();
     draftSession++;
+    autoLoadedName = '';
     clearDraftStampImages(draftImages);
     draftImages = [];
     inferredTags = [];
@@ -474,6 +476,24 @@ export async function initializeStampDieLibrary(services = {}) {
       ? `Image folder: ${imageDirectory.name}. Manage this library in Settings.`
       : 'Choose or reconnect a Stamp & Die image folder in Settings. Without an accessible folder, images are saved in this browser.';
   }
+  async function autoLoadImagesForCurrentSetName() {
+    const name = view.name.value.trim();
+    const nameKey = getTagKey(name);
+    if (!name || !supportsDirectoryPicker(globalThis) || !view.dialog.open || editingRecord ||
+        saving || selecting || draftImages.length || autoLoadedName === nameKey) return;
+    const session = draftSession;
+    await receiveImages((async () => {
+      const images = await storage.loadStampImagesForSetName(name);
+      if (session !== draftSession || getTagKey(view.name.value) !== nameKey) {
+        clearDraftStampImages(images);
+        return [];
+      }
+      autoLoadedName = nameKey;
+      return images;
+    })());
+  }
+  view.name.addEventListener('change', autoLoadImagesForCurrentSetName);
+  view.name.addEventListener('blur', autoLoadImagesForCurrentSetName);
   view.chooseImages.addEventListener('click', () => {
     if (saving || selecting) return;
     view.imageInput.click();

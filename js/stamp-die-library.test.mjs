@@ -1617,3 +1617,104 @@ test('Stamp Detail enlarges each ordered original image with Paper viewer and cl
   assert.deepEqual(h.records, before); assert.equal(h.calls(), 0);
   detailNavigation.back(); assert.equal(currentCard, 'origin'); assert.equal(detail.open, false);
 });
+
+function setImageLookupCapabilities(t, supported = true) {
+  const previous = { showDirectoryPicker: globalThis.showDirectoryPicker, showOpenFilePicker: globalThis.showOpenFilePicker };
+  Object.assign(globalThis, { showDirectoryPicker: supported ? () => {} : undefined, showOpenFilePicker: supported ? () => {} : undefined });
+  t.after(() => Object.assign(globalThis, previous));
+}
+const draftImage = name => ({ name, previewSrc: 'data:image/jpeg;base64,YQ==' });
+
+test('Add name change automatically populates ordered Stamp/Die/Mask images and keeps manual selection available', async (t) => {
+  setImageLookupCapabilities(t);
+  let lookups = 0;
+  let prepared;
+  const h = await harness(t, {
+    loadStampImageDirectory: async () => ({ name: 'Sets' }),
+    loadStampImagesForSetName: async name => { lookups++; assert.equal(name, 'Garden'); return ['Garden MaSk.jpg', 'Garden DIES.jpg', 'Garden.jpg'].map(draftImage); },
+    selectStampImageFiles: async files => files.map(file => draftImage(file.name)),
+    chooseStampImages: async () => [draftImage('Extra Die.jpg')],
+    prepareStampImagesForSave: async images => { prepared = images.map(image => image.name); return { imageRefs: [], usedFallback: false }; }
+  });
+  await h.add.emit('click'); h.name.value = 'Garden';
+  await h.name.emit('change'); await h.name.emit('blur');
+  const previews = h.form.querySelector('.stamp-set-draft-images');
+  assert.deepEqual(previews.querySelectorAll('img').map(image => image.alt), ['Garden.jpg', 'Garden DIES.jpg', 'Garden MaSk.jpg']);
+  assert.equal(lookups, 1);
+  const picker = h.form.querySelector('.global-tag-picker');
+  assert.equal(picker.querySelectorAll('[data-tag-id]').filter(input => input.checked).length, 3);
+  assert.match(picker.textContent, /Stamp/); assert.match(picker.textContent, /Die/); assert.match(picker.textContent, /Mask/);
+  const library = h.form.querySelectorAll('button').find(button => button.textContent === 'Add from Stamp & Die Library');
+  assert.equal(library.hidden, false); assert.equal(library.disabled, false);
+  await library.emit('click');
+  await previews.querySelector('button').emit('click');
+  const input = h.form.querySelector('input[type="file"]');
+  assert.equal(input.multiple, true); input.files = [{ name: 'Replacement.jpg' }]; await input.emit('change');
+  await h.form.emit('submit');
+  assert.deepEqual(prepared, ['Replacement.jpg', 'Garden DIES.jpg', 'Extra Die.jpg', 'Garden MaSk.jpg']);
+});
+
+test('unsupported Add skips automatic lookup silently and still accepts manual images', async (t) => {
+  setImageLookupCapabilities(t, false);
+  const h = await harness(t, {
+    loadStampImageDirectory: async () => null,
+    loadStampImagesForSetName: async () => assert.fail('Must not start automatic lookup'),
+    selectStampImageFiles: async files => files.map(file => draftImage(file.name))
+  });
+  await h.add.emit('click'); h.name.value = 'Garden';
+  await h.name.emit('change'); await h.name.emit('blur');
+  assert.doesNotMatch(h.form.textContent, /not found|could not be selected|Loading images/);
+  const input = h.form.querySelector('input[type="file"]'); input.files = [{ name: 'Manual.jpg' }]; await input.emit('change');
+  assert.deepEqual(h.form.querySelectorAll('img').map(image => image.alt), ['Manual.jpg']);
+});
+
+test('automatic lookup does not replace manual Add images or run in Edit', async (t) => {
+  setImageLookupCapabilities(t);
+  const h = await harness(t, {
+    loadStampImageDirectory: async () => ({ name: 'Sets' }),
+    loadStampImagesForSetName: async () => assert.fail('Existing selection and Edit must skip lookup'),
+    selectStampImageFiles: async files => files.map(file => draftImage(file.name))
+  });
+  await h.add.emit('click');
+  const input = h.form.querySelector('input[type="file"]'); input.files = [{ name: 'Manual.jpg' }]; await input.emit('change');
+  h.name.value = 'Garden'; await h.name.emit('change'); await h.name.emit('blur');
+  await h.cancel.emit('click'); await seedEdit(h);
+  h.name.value = 'Renamed'; await h.name.emit('change'); await h.name.emit('blur');
+});
+
+test('automatic lookup ignores duplicate triggers and discards results after cancellation or renaming', async (t) => {
+  setImageLookupCapabilities(t);
+  let release; let calls = 0;
+  const h = await harness(t, {
+    loadStampImageDirectory: async () => ({ name: 'Sets' }),
+    loadStampImagesForSetName: () => { calls++; return new Promise(resolve => { release = resolve; }); }
+  });
+  await h.add.emit('click'); h.name.value = 'Garden';
+  const pending = h.name.emit('change'); await h.name.emit('blur'); assert.equal(calls, 1);
+  await h.cancel.emit('click'); await h.add.emit('click');
+  release([draftImage('Old.jpg')]); await pending;
+  assert.equal(h.form.querySelectorAll('img').length, 0);
+  h.name.value = 'Garden'; const renamed = h.name.emit('blur'); h.name.value = 'Other';
+  release([draftImage('Garden.jpg')]); await renamed;
+  assert.equal(h.form.querySelectorAll('img').length, 0);
+  const fresh = h.name.emit('blur'); release([draftImage('Other.jpg')]); await fresh;
+  assert.deepEqual(h.form.querySelectorAll('img').map(image => image.alt), ['Other.jpg']);
+});
+
+test('empty automatic lookup is deduplicated and lookup failure leaves manual controls usable with retry', async (t) => {
+  setImageLookupCapabilities(t);
+  let calls = 0;
+  const h = await harness(t, {
+    loadStampImageDirectory: async () => ({ name: 'Sets' }),
+    loadStampImagesForSetName: async () => { calls++; if (calls === 2) throw new Error('Read failed'); return []; }
+  });
+  await h.add.emit('click'); h.name.value = 'Missing';
+  await h.name.emit('change'); await h.name.emit('blur'); assert.equal(calls, 1);
+  assert.doesNotMatch(h.form.textContent, /could not be selected|Loading images/);
+  h.name.value = 'Other'; await h.name.emit('change');
+  assert.match(h.form.textContent, /Images could not be selected/);
+  const library = h.form.querySelectorAll('button').find(button => button.textContent === 'Add from Stamp & Die Library');
+  assert.equal(library.disabled, false);
+  await h.name.emit('blur'); assert.equal(calls, 3);
+  assert.doesNotMatch(h.form.textContent, /could not be selected|Loading images/);
+});

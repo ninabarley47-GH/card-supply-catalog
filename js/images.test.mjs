@@ -137,3 +137,22 @@ test("supported browsers preserve automatic Paper folder lookup and reconnect me
   assert.deepEqual(result.images, []);
   assert.match(result.message, /Reconnect the image folder in Settings/);
 });
+
+test('Paper automatic lookup still loads originals from a normalized matching folder', async () => {
+  const pack = { kind: 'directory', async *entries() {
+    yield ['Pattern.jpg', { kind: 'file', getFile: async () => new File(['original'], 'Pattern.jpg', { type: 'image/jpeg' }) }];
+    yield ['Pattern.thumb.jpg', { kind: 'file', getFile: async () => assert.fail('Do not select thumbnails') }];
+  } };
+  const result = await loadPatternImagesForPaperPackName('Test Pack', { showDirectoryPicker() {} }, {
+    getReadableImageLibraryDirectoryHandle: async () => ({
+      async getDirectoryHandle() { throw new DOMException('Missing', 'NotFoundError'); },
+      async *entries() { yield ['Test Pack', pack]; }
+    })
+  });
+  try {
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.images.map(image => image.imagePath), ['Test Pack/Pattern.jpg']);
+    assert.equal(result.images[0].storageStrategy, 'local-folder');
+    assert.match(result.images[0].src, /^blob:/);
+  } finally { result.images.forEach(image => URL.revokeObjectURL(image.src)); }
+});
