@@ -209,10 +209,10 @@ h6 {
   align-self: start;
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
   max-height: 100vh;
   overflow-y: auto;
-  padding: var(--space-6) var(--space-4);
+  padding: var(--space-4);
   border-right: 1px solid var(--color-border);
 }
 
@@ -291,12 +291,15 @@ h6 {
 .nav-links {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 .nav-link {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
   border-radius: var(--radius-small);
-  padding: 0.72rem 0.85rem;
+  padding: 0.5rem 0.85rem;
   color: var(--color-muted);
   font-weight: 700;
   text-decoration: none;
@@ -2862,6 +2865,7 @@ button.pattern {
 
   .nav-links {
     flex-direction: row;
+    gap: var(--space-2);
     overflow-x: auto;
   }
 
