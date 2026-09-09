@@ -1,3 +1,4 @@
+import { createCardContextBar } from './library.js';
 import { detailNavigation } from './detail-navigation.js';
 import { getLocalDateValue } from './ui.js';
 import { loadSavedStampDieSets, normalizeStampDieSetIds, normalizeCardNotes, deleteCard, loadCatalogSetting, loadGlobalTagCatalog, loadSavedCards, saveCard, saveCatalogSetting, saveOwner } from './storage.js';
@@ -219,6 +220,13 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   });
 
   gallery.addEventListener('click', async (event) => {
+    const clearRecent = event.target.closest('[data-clear-recently-added]');
+    if (clearRecent) {
+      event.preventDefault();
+      event.stopPropagation();
+      await clearCardRecentlyAddedStatus(clearRecent.dataset.clearRecentlyAdded, cards, renderCurrent);
+      return;
+    }
     const editButton = event.target.closest('[data-edit-card]');
 
     if (editButton) {
@@ -255,7 +263,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   });
 
   gallery.addEventListener('keydown', (event) => {
-    if (event.target.closest('[data-toggle-card-favorite], [data-edit-card]')) {
+    if (event.target.closest('[data-toggle-card-favorite], [data-edit-card], [data-clear-recently-added]')) {
       return;
     }
 
@@ -1042,7 +1050,7 @@ export function createCardRecord(addCardView) {
   const selectedTags = addCardView.tagPicker.getSelectedTags();
 
   return {
-    ...(existingCard || {}),
+    ...(existingCard || { recentlyAdded: true }),
     id: existingCard?.id || createCardId(timestamp),
     status: addCardView.status.value === 'sent' ? 'sent' : 'available',
     dateCreated: addCardView.dateCreated.value,
@@ -1148,10 +1156,15 @@ function hasGlobalTagFilterSelection(selection = {}) {
   return (selection.individualTagIds || []).length > 0 || (selection.categories || []).length > 0;
 }
 
-function sortCards(cards, sortOrder = 'date-desc') {
+function sortCards(cards, sortOrder = 'recently-added') {
   const direction = sortOrder === 'date-asc' ? 1 : -1;
 
   return cards.sort((first, second) => {
+    if (sortOrder === 'recently-added') {
+      const recentComparison = Number(second.recentlyAdded === true) - Number(first.recentlyAdded === true);
+      if (recentComparison) return recentComparison;
+    }
+
     if (sortOrder === 'favorite-desc') {
       const favoriteComparison = Number(Boolean(second.favorite)) - Number(Boolean(first.favorite));
 
@@ -1236,6 +1249,8 @@ function createCardTile(card, index, paperPackNamesById, stampDieSetNamesById) {
   const titleRow = document.createElement('div');
   titleRow.className = 'card-title-row card-library-title-row';
   titleRow.append(tagList, favorite);
+  const contextBar = createCardContextBar({ ...card, name: `card created ${card.dateCreated}` });
+  if (contextBar) tile.append(contextBar);
   tile.append(image, titleRow, metadata, actions);
   return tile;
 }
@@ -1323,6 +1338,19 @@ function appendCardLibraryMetadata(metadata, label, values) {
   description.textContent = values.join(', ');
   group.append(term, description);
   metadata.append(group);
+}
+
+async function clearCardRecentlyAddedStatus(cardId, cards, renderCurrent) {
+  const index = cards.findIndex(card => card.id === cardId);
+  if (index < 0 || cards[index].recentlyAdded !== true) return;
+  const updated = { ...cards[index], recentlyAdded: false };
+  cards.splice(index, 1, updated);
+  renderCurrent();
+  try {
+    await saveCard(updated);
+  } catch {
+    window.alert('The Recently Added status was cleared for this session, but the change could not be saved permanently.');
+  }
 }
 
 function createCardFavoriteButton(card) {

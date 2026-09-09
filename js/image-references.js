@@ -76,7 +76,9 @@ export async function hydrateImageReference(record, rootDirectory) {
   }
 
   try {
-    const thumbnailFile = await getFileFromRelativePath(rootDirectory, record.thumbnailImagePath);
+    // Older records may predate the path field; maintenance creates this same sibling name.
+    const thumbnailPath = record.thumbnailImagePath || createThumbnailImageFileName(record.imagePath);
+    const thumbnailFile = await getFileFromRelativePath(rootDirectory, thumbnailPath);
     record.imageThumbnailSrc = URL.createObjectURL(thumbnailFile);
   } catch (error) {
     // The full-resolution image remains the display fallback.
