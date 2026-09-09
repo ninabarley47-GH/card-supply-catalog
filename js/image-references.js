@@ -65,34 +65,108 @@ export function removeStoredImageFields(record) {
   return recordWithoutImage;
 }
 
-export async function hydrateImageReference(record, rootDirectory) {
+// Runtime-only state: never persisted with catalog records.
+const imageLoads = new WeakMap();
+
+export async function hydrateImageReference(record, rootDirectory, options = {}) {
   clearImageReferenceObjectUrls(record);
-
+  const state = {
+    loadOriginal: options.loadOriginal || (() => getFileFromRelativePath(rootDirectory, record.imagePath)),
+    pending: null, active: true, urls: new Set(), originalSrc: ''
+  };
+  imageLoads.set(record, state);
+  if (!options.preferThumbnail) await ensureImageReferenceOriginal(record);
   try {
-    const imageFile = await getFileFromRelativePath(rootDirectory, record.imagePath);
-    record.imagePreviewSrc = URL.createObjectURL(imageFile);
-  } catch (error) {
-    // The no-image placeholder remains visible when the original cannot be read.
-  }
-
-  try {
-    // Older records may predate the path field; maintenance creates this same sibling name.
     const thumbnailPath = record.thumbnailImagePath || createThumbnailImageFileName(record.imagePath);
-    const thumbnailFile = await getFileFromRelativePath(rootDirectory, thumbnailPath);
-    record.imageThumbnailSrc = URL.createObjectURL(thumbnailFile);
-  } catch (error) {
-    // The full-resolution image remains the display fallback.
+    const file = await (options.loadThumbnail
+      ? options.loadThumbnail() : getFileFromRelativePath(rootDirectory, thumbnailPath));
+    if (!state.active || imageLoads.get(record) !== state) return;
+    if (file.size > 0) setImageUrl(record, 'imageThumbnailSrc', file, options.enumerableThumbnail !== false);
+  } catch { /* Missing thumbnails retain the original fallback. */ }
+  if (imageLoads.get(record) === state && options.preferThumbnail &&
+      !record.imageThumbnailSrc && !record.thumbnailImageSrc) await ensureImageReferenceOriginal(record);
+}
+
+function setImageUrl(record, property, file, enumerable = true) {
+  Object.defineProperty(record, property, {
+    configurable: true, writable: true, enumerable, value: URL.createObjectURL(file)
+  });
+  imageLoads.get(record)?.urls.add(record[property]);
+}
+
+export function inheritImageReferenceState(source, target) {
+  const state = imageLoads.get(source);
+  if (state) imageLoads.set(target, state);
+}
+
+export async function ensureImageReferenceOriginal(record) {
+  if (!record || typeof record !== 'object') return '';
+  const state = imageLoads.get(record);
+  if (state && !state.active) return '';
+  if (record.imagePreviewSrc || record.imageSrc) return record.imagePreviewSrc || record.imageSrc;
+  if (state?.originalSrc) return record.imagePreviewSrc = state.originalSrc;
+  if (!state) return '';
+  if (!state.pending) {
+    state.pending = (async () => {
+      try {
+        const file = await state.loadOriginal();
+        // A refreshed/released record must not acquire a late URL.
+        if (!state.active || imageLoads.get(record) !== state) return '';
+        setImageUrl(record, 'imagePreviewSrc', file);
+        state.originalSrc = record.imagePreviewSrc;
+        return state.originalSrc;
+      } catch { return ''; }
+      finally { state.pending = null; }
+    })();
+  }
+  const source = await state.pending;
+  if (!state.active || imageLoads.get(record) !== state) return '';
+  if (source) record.imagePreviewSrc = source;
+  return source;
+}
+
+// Detail upgrades in place; a broken thumbnail can request its original on demand.
+export function bindImageReference(image, record, { fullQuality = false, onUnavailable = () => {} } = {}) {
+  const failed = new Set();
+  const attempted = new Set();
+  const state = imageLoads.get(record);
+  const use = source => {
+    if (state && (!state.active || imageLoads.get(record) !== state)) return false;
+    if (source && !failed.has(source) && !attempted.has(source)) {
+      attempted.add(source); image.src = source; return true;
+    }
+    return false;
+  };
+  image.addEventListener('error', () => {
+    failed.add(image.src);
+    const original = record.imagePreviewSrc || record.imageSrc;
+    const thumbnail = record.imageThumbnailSrc || record.thumbnailImageSrc;
+    if (original) {
+      if (!use(original) && !use(thumbnail)) onUnavailable();
+    } else {
+      ensureImageReferenceOriginal(record).then(source => {
+        if (!use(source) && !use(thumbnail)) onUnavailable();
+      });
+    }
+  });
+  if (fullQuality && !record.imagePreviewSrc && !record.imageSrc) {
+    ensureImageReferenceOriginal(record).then(source => { if (source) use(source); });
   }
 }
 
 export function clearImageReferenceObjectUrls(record) {
+  const state = imageLoads.get(record);
+  if (state) state.active = false;
+  const urls = new Set(state?.urls);
+  imageLoads.delete(record);
   for (const property of ['imagePreviewSrc', 'imageThumbnailSrc']) {
     if (record[property]?.startsWith('blob:')) {
-      URL.revokeObjectURL(record[property]);
+      urls.add(record[property]);
     }
 
     delete record[property];
   }
+  urls.forEach(url => URL.revokeObjectURL(url));
 }
 
 export async function hasDirectoryPermission(directoryHandle, mode, requestPermission = true) {

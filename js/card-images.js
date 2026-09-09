@@ -261,7 +261,7 @@ export async function prepareCardImageForSave(card, selectedImage, services = {}
   }
 }
 
-export async function hydrateCardImageSources(cards) {
+export async function hydrateCardImageSources(cards, options = {}, services = {}) {
   const folderBackedCards = cards.filter((card) => card.imagePath);
 
   if (folderBackedCards.length === 0) {
@@ -269,8 +269,8 @@ export async function hydrateCardImageSources(cards) {
   }
 
   const [cardDirectoryHandle, legacyPaperDirectoryHandle] = await Promise.all([
-    getDirectoryHandle(CARD_IMAGE_LIBRARY_SETTING_ID, 'read'),
-    getDirectoryHandle(IMAGE_LIBRARY_SETTING_ID, 'read')
+    (services.getDirectoryHandle || getDirectoryHandle)(CARD_IMAGE_LIBRARY_SETTING_ID, 'read'),
+    (services.getDirectoryHandle || getDirectoryHandle)(IMAGE_LIBRARY_SETTING_ID, 'read')
   ]);
 
   await Promise.all(folderBackedCards.map((card) => {
@@ -278,7 +278,7 @@ export async function hydrateCardImageSources(cards) {
       ? cardDirectoryHandle
       : legacyPaperDirectoryHandle;
 
-    return directoryHandle ? hydrateCardImageSource(card, directoryHandle) : null;
+    return directoryHandle ? hydrateCardImageSource(card, directoryHandle, options) : null;
   }));
 }
 

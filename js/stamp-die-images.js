@@ -157,7 +157,7 @@ export async function prepareStampImagesForSave(images, services = {}) {
   return { imageRefs, usedFallback };
 }
 
-export async function hydrateStampImages(records, services = {}) {
+export async function hydrateStampImages(records, services = {}, options = {}) {
   const loadDirectory = services.loadDirectory || loadStampImageDirectory;
   const hydrate = services.hydrate || hydrateImageReference;
   const references = records.flatMap((record) => record.imageRefs || []);
@@ -181,7 +181,7 @@ export async function hydrateStampImages(records, services = {}) {
       } catch { /* Missing library leaves embedded data or a placeholder available. */ }
       directories.set(settingId, handle);
     }
-    if (directories.get(settingId)) await hydrate(ref, directories.get(settingId));
+    if (directories.get(settingId)) await hydrate(ref, directories.get(settingId), options);
   }
 }
 

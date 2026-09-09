@@ -1,3 +1,4 @@
+import { bindImageReference } from './image-references.js';
 import { detailNavigation } from './detail-navigation.js';
 import { initializeAddDspWorkflow } from "./add-dsp.js";
 import { initializeCatalogBackup } from "./backup.js";
@@ -8,6 +9,7 @@ import {
   getPaperLibraryImageSource,
   getPatternImageSource,
   hydratePaperPackImageSources,
+  clearPaperPackImageObjectUrls,
   preparePaperPackImagesForSave,
   scanImageLibraryPaperPackFolders
 } from "./images.js";
@@ -156,12 +158,12 @@ export async function initializeLibraryShell() {
         paperPacks,
         owners,
         onImageLibrarySelected: async () => {
-          await hydratePaperPackImageSources(paperPacks);
+          await hydratePaperPackImageSources(paperPacks, { preferThumbnail: true });
           librarySearch.renderCurrent();
           await refreshUncatalogedPackFinder?.();
         },
         onImagesMigrated: () => {
-          hydratePaperPackImageSources(paperPacks).then(librarySearch.renderCurrent);
+          hydratePaperPackImageSources(paperPacks, { preferThumbnail: true }).then(librarySearch.renderCurrent);
         },
         onPaperPacksUpdated: () => {
           librarySearch.renderCurrent();
@@ -172,7 +174,7 @@ export async function initializeLibraryShell() {
         owners,
         colorsById,
         onRestore: async () => {
-          await hydratePaperPackImageSources(paperPacks);
+          await hydratePaperPackImageSources(paperPacks, { preferThumbnail: true });
           librarySearch.renderCurrent();
 
           if (colorLibrary) {
@@ -546,7 +548,7 @@ async function loadPaperPacks() {
   const paperPacks = await mergePaperPacks(ownership.basePaperPacks, ownership.savedPaperPacks);
 
   try {
-    await hydratePaperPackImageSources(paperPacks);
+    await hydratePaperPackImageSources(paperPacks, { preferThumbnail: true });
   } catch (error) {
     console.warn("Paper metadata loaded, but Paper images could not be hydrated.", error);
   }
@@ -1265,7 +1267,7 @@ function initializePaperPackSaves(paperPackLibrary, paperPacks, colorsById, rend
         const preparedPack = saveResult.paperPack;
 
         await savePaperPack(preparedPack);
-        await hydratePaperPackImageSources([preparedPack]);
+        await hydratePaperPackImageSources([preparedPack], { preferThumbnail: true });
         replacePaperPack(paperPacks, preparedPack);
         renderCurrentLibrary();
         document.dispatchEvent(new CustomEvent("catalog:paper-pack-saved"));
@@ -2011,13 +2013,14 @@ export function closePatternPreview(detailBody) {
 
 function createEnlargedPatternPreview(patternEntry, index) {
   const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
-  const imageSrc = getPatternImageSource(patternEntry);
+  const imageSrc = getPatternImageSource(patternEntry) || getPaperLibraryImageSource(patternEntry);
 
   if (imageSrc) {
     const image = document.createElement("img");
 
     image.src = imageSrc;
     image.alt = patternObject?.imageName || `Pattern ${index + 1}`;
+    bindImageReference(image, patternObject, { fullQuality: true });
 
     return image;
   }
@@ -2166,6 +2169,7 @@ function deleteSelectedPaperPack(selectedPack, paperPacks, renderCurrentLibrary,
   const selectedPackIndex = paperPacks.findIndex((paperPack) => paperPack.id === selectedPack.id);
 
   if (selectedPackIndex !== -1) {
+    clearPaperPackImageObjectUrls(paperPacks[selectedPackIndex]);
     paperPacks.splice(selectedPackIndex, 1);
   }
 
@@ -2301,7 +2305,7 @@ function createPatternPreview(patternEntry, index, options = {}) {
   const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
   const imageSrc = options.preferThumbnail
     ? getPaperLibraryImageSource(patternEntry)
-    : getPatternImageSource(patternEntry);
+    : getPatternImageSource(patternEntry) || getPaperLibraryImageSource(patternEntry);
   const imageName = patternObject?.imageName || "";
 
   if (options.interactive) {
@@ -2317,6 +2321,7 @@ function createPatternPreview(patternEntry, index, options = {}) {
     const image = document.createElement("img");
     image.src = imageSrc;
     image.alt = imageName || `Pattern ${index + 1}`;
+    bindImageReference(image, patternObject, { fullQuality: !options.preferThumbnail });
 
     pattern.className = getPatternPreviewClassName(patternEntry, "pattern-image", options.interactive);
     pattern.append(image);

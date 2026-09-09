@@ -1,3 +1,4 @@
+import { ensureImageReferenceOriginal } from './image-references.js';
 import {
   addPatternImageFiles,
   choosePatternImagesFromLibrary,
@@ -198,6 +199,7 @@ export function initializeAddDspWorkflow(colorsById, paperPacks = [], owners = [
 
     try {
       await paperTagsReady;
+      await Promise.all((paperPack.patterns || []).map(ensureImageReferenceOriginal));
       openEditDspPanel(panel, form, paperPack, colorsById, selectedImages, imagePreviewList, imagePreviewCount, {
         title, summary, submitButton, formState
       });

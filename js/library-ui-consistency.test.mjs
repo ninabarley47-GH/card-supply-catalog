@@ -11,8 +11,8 @@ test('all three libraries retain matching loading-message markup until records r
   }
   const initial = cards.slice(cards.indexOf('const renderCurrent'), cards.indexOf('const reloadCards'));
   assert.doesNotMatch(initial, /\n  renderCurrent\(\);/);
-  assert.ok(cards.indexOf('await hydrateCardImageSources(savedCards)') < cards.indexOf('    renderCurrent();', cards.indexOf('const reloadCards')));
-  assert.ok(sets.indexOf('await storage.hydrateStampImages(records)') < sets.indexOf('renderStampDieLibrary(gallery, records'));
+  assert.ok(cards.indexOf('await hydrateCardImageSources(savedCards, { preferThumbnail: true })') < cards.indexOf('    renderCurrent();', cards.indexOf('const reloadCards')));
+  assert.ok(sets.indexOf('await storage.hydrateStampImages(records, {}, { preferThumbnail: true })') < sets.indexOf('renderStampDieLibrary(gallery, records'));
 });
 
 test('module grids stretch per row without fixed/global row heights; Paper retains native grid defaults', async () => {

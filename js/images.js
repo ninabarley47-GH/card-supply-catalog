@@ -1,3 +1,4 @@
+import { hydrateImageReference, clearImageReferenceObjectUrls } from './image-references.js';
 import { loadCatalogSetting } from "./storage.js";
 import { generateImageThumbnail } from "./thumbnails.js";
 import { supportsDirectoryIteration, supportsDirectoryPicker, supportsOpenFilePicker } from "./browser-capabilities.js";
@@ -351,8 +352,8 @@ export async function getUncatalogedPackDiscoveryAvailability(environment = glob
     : { available: false, reason: "disconnected" };
 }
 
-export async function hydratePaperPackImageSources(paperPacks) {
-  const directoryHandle = await getReadableImageLibraryDirectoryHandle();
+export async function hydratePaperPackImageSources(paperPacks, options = {}, services = {}) {
+  const directoryHandle = await (services.getReadableImageLibraryDirectoryHandle || getReadableImageLibraryDirectoryHandle)();
 
   if (!directoryHandle) {
     return paperPacks;
@@ -360,7 +361,7 @@ export async function hydratePaperPackImageSources(paperPacks) {
 
   await Promise.all(
     paperPacks.flatMap((paperPack) =>
-      (paperPack.patterns || []).map((patternEntry) => hydratePatternImageSource(patternEntry, directoryHandle))
+      (paperPack.patterns || []).map((patternEntry) => hydratePatternImageSource(patternEntry, directoryHandle, options))
     )
   );
 
@@ -1139,40 +1140,19 @@ function isThumbnailImageFileName(fileName) {
   return /\.thumb\.jpe?g$/i.test(String(fileName || ""));
 }
 
-async function hydratePatternImageSource(patternEntry, directoryHandle) {
-  const patternObject = patternEntry && typeof patternEntry === "object" ? patternEntry : null;
-
-  if (!patternObject?.imagePath) {
-    return;
-  }
-
-  clearStalePatternObjectUrls(patternObject);
-  await hydratePatternThumbnailSource(patternObject, directoryHandle);
-
-  try {
-    const file = await findFileFromImagePath(directoryHandle, patternObject.imagePath);
-    patternObject.imagePreviewSrc = URL.createObjectURL(file);
-  } catch (error) {
-    // The placeholder remains visible if the local image cannot be read.
-  }
-}
-
-async function hydratePatternThumbnailSource(patternObject, directoryHandle) {
-  const thumbnailPath = createThumbnailImagePath(patternObject.imagePath);
-
-  try {
-    const thumbnailFile = await getFileFromImagePath(directoryHandle, thumbnailPath);
-    Object.defineProperty(patternObject, "imageThumbnailSrc", {
-      configurable: true,
-      writable: true,
-      value: URL.createObjectURL(thumbnailFile)
-    });
-  } catch (error) {
-    // Existing packs without thumbnails continue using their full-resolution image.
-  }
+async function hydratePatternImageSource(patternEntry, directoryHandle, options) {
+  if (!patternEntry || typeof patternEntry !== 'object' || !patternEntry.imagePath) return;
+  clearStalePatternObjectUrls(patternEntry);
+  await hydrateImageReference(patternEntry, directoryHandle, {
+    ...options,
+    enumerableThumbnail: false,
+    loadOriginal: () => findFileFromImagePath(directoryHandle, patternEntry.imagePath),
+    loadThumbnail: () => getFileFromImagePath(directoryHandle, createThumbnailImagePath(patternEntry.imagePath))
+  });
 }
 
 function clearStalePatternObjectUrls(patternObject) {
+  clearImageReferenceObjectUrls(patternObject);
   for (const fieldName of ["imageThumbnailSrc", "imagePreviewSrc", "imageSrc"]) {
     const imageSource = patternObject[fieldName];
 

@@ -1,3 +1,4 @@
+import { bindImageReference, ensureImageReferenceOriginal, clearImageReferenceObjectUrls, inheritImageReferenceState } from './image-references.js';
 import { createCardContextBar } from './library.js';
 import { detailNavigation } from './detail-navigation.js';
 import { getLocalDateValue } from './ui.js';
@@ -51,6 +52,9 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   let tagCatalog = await loadGlobalTagCatalog();
   const addCardView = createAddCardView({ owners, tagCatalog });
   const cards = [];
+  addCardView.releaseRetiredImage = card => {
+    if (card && !cards.includes(card)) clearImageReferenceObjectUrls(card);
+  };
   const filterForm = document.querySelector('[data-card-library-filter-form]');
   const searchInput = document.querySelector('[data-card-library-search]');
   const favoritesButton = document.querySelector('[data-card-library-favorites]');
@@ -123,10 +127,16 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
 
   const reloadCards = async () => {
     const savedCards = await loadSavedCards();
-    await hydrateCardImageSources(savedCards);
+    await hydrateCardImageSources(savedCards, { preferThumbnail: true });
     sortCards(savedCards);
+    const previousCards = [...cards];
     cards.splice(0, cards.length, ...savedCards);
     renderCurrent();
+    if (!detailView.overlay.hidden) {
+      const selected = findCard(cards, detailView.overlay.dataset.selectedCardId);
+      if (selected) detailView.body.replaceChildren(createCardDetailContent(selected, cards.indexOf(selected), paperPacks));
+    }
+    previousCards.filter(card => card !== addCardView.existingCard).forEach(clearImageReferenceObjectUrls);
     document.dispatchEvent(new CustomEvent('catalog:cards-updated'));
   };
 
@@ -138,7 +148,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   }
 
   document.addEventListener('catalog:card-image-library-selected', async () => {
-    await hydrateCardImageSources(cards);
+    await hydrateCardImageSources(cards, { preferThumbnail: true });
     renderCurrent();
   });
 
@@ -368,10 +378,11 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
       const usedStandardImageInput = addCardView.selectedImage?.imageSelectionStrategy === 'standard-file-input';
       const imageResult = await prepareCardImageForSave(card, addCardView.selectedImage);
       await saveCard(imageResult.card);
-      await hydrateCardImageSources([imageResult.card]);
+      await hydrateCardImageSources([imageResult.card], { preferThumbnail: true });
       const existingCardIndex = cards.findIndex((candidate) => candidate.id === imageResult.card.id);
 
       if (existingCardIndex >= 0) {
+        clearImageReferenceObjectUrls(cards[existingCardIndex]);
         cards.splice(existingCardIndex, 1, imageResult.card);
       } else {
         cards.push(imageResult.card);
@@ -698,6 +709,12 @@ export function openEditCardView(addCardView, card) {
   addCardView.paperPackIds = [...(card.paperPackIds || [])];
   addCardView.stampDieSetIds = normalizeStampDieSetIds(card.stampDieSetIds);
   addCardView.existingImageSource = getCardDetailImageSource(card);
+  ensureImageReferenceOriginal(card).then(source => {
+    if (source && addCardView.existingCard === card && !addCardView.overlay.hidden) {
+      addCardView.existingImageSource = source;
+      renderSelectedCardImage(addCardView);
+    }
+  });
   addCardView.imageMessage.textContent = card.imageName || '';
   renderSelectedPaperPacks(addCardView);
   renderPaperPackSearchResults(addCardView);
@@ -1022,6 +1039,7 @@ function resetAddCardForm(addCardView) {
   addCardView.tagPicker.reset();
   addCardView.stampSets = [];
   addCardView.selectedImage = null;
+  addCardView.releaseRetiredImage?.(addCardView.existingCard);
   addCardView.existingCard = null;
   addCardView.existingImageSource = '';
   addCardView.title.textContent = 'Add Card';
@@ -1344,6 +1362,7 @@ async function clearCardRecentlyAddedStatus(cardId, cards, renderCurrent) {
   const index = cards.findIndex(card => card.id === cardId);
   if (index < 0 || cards[index].recentlyAdded !== true) return;
   const updated = { ...cards[index], recentlyAdded: false };
+  inheritImageReferenceState(cards[index], updated);
   cards.splice(index, 1, updated);
   renderCurrent();
   try {
@@ -1384,6 +1403,7 @@ async function toggleCardFavorite(card, cards, button, renderCurrent, focusRoot 
     const cardIndex = cards.indexOf(card);
 
     if (cardIndex >= 0) {
+      inheritImageReferenceState(card, updatedCard);
       cards.splice(cardIndex, 1, updatedCard);
     }
 
@@ -1567,6 +1587,7 @@ function deleteSelectedCard(card, cards, detailView, activeTile, renderCurrent) 
   const cardIndex = cards.findIndex((candidate) => candidate.id === card.id);
 
   if (cardIndex !== -1) {
+    clearImageReferenceObjectUrls(cards[cardIndex]);
     cards.splice(cardIndex, 1);
   }
 
@@ -1603,11 +1624,7 @@ function createCardImage(card, className, imagePath, fallbackPath = null) {
   image.alt = `Handmade card, ${card.size.width} by ${card.size.height} inches`;
   image.decoding = 'async';
 
-  if (fallbackPath) {
-    image.addEventListener('error', () => {
-      image.src = fallbackPath;
-    }, { once: true });
-  }
+  bindImageReference(image, card, { fullQuality: className === 'card-detail-image' });
 
   return image;
 }

@@ -1,3 +1,4 @@
+import { inheritImageReferenceState } from './image-references.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -39,7 +40,7 @@ function node(tag) { return { tag, dataset: {}, children: [], attributes: {},
 test('Card tile places the shared banner first and uses an identifying dismissal label', t => {
   const previous = globalThis.document; t.after(() => { globalThis.document = previous; });
   const document = { createElement: node }; globalThis.document = document;
-  const context = vm.createContext({ document, createCardContextBar,
+  const context = vm.createContext({ inheritImageReferenceState, document, createCardContextBar,
     applyCardMockupSize() {}, getCardPlaceholderNumber: () => 1, getCardLibraryImageSource: () => '', createCardImage: () => null,
     createMissingCardImageMessage: () => node('missing'), createCardFavoriteButton: () => node('favorite'),
     createCardLibraryMetadata: () => node('metadata'), createCardLibraryActions: () => node('actions') });
@@ -60,7 +61,7 @@ for (const fail of [false, true]) test(`Card dismissal clears only the flag, doe
   const card = { id: 'one', recentlyAdded: true, imagePath: 'card.jpg', notes: 'Keep', favorite: true, paperPackIds: ['paper'] };
   const cards = [card]; let saved, calls = 0, renders = 0, alert = '', opens = 0;
   const listeners = {};
-  const context = vm.createContext({ cards, gallery: { addEventListener: (name, listener) => { listeners[name] = listener; } },
+  const context = vm.createContext({ inheritImageReferenceState, cards, gallery: { addEventListener: (name, listener) => { listeners[name] = listener; } },
     renderCurrent: () => renders++, saveCard: async value => { calls++; saved = value; if (fail) throw new Error('Failed'); },
     window: { alert: message => { alert = message; } }, detailNavigation: { open() { opens++; } } });
   vm.runInContext(source.slice(source.indexOf('async function clearCardRecentlyAddedStatus('), source.indexOf('function createCardFavoriteButton(')), context);
@@ -78,7 +79,7 @@ for (const fail of [false, true]) test(`Card dismissal clears only the flag, doe
 
 test('Card dismissal keyboard activation does not open the enclosing Detail tile', () => {
   const handlers = {}; let opens = 0;
-  const context = vm.createContext({ gallery: { addEventListener: (name, handler) => { handlers[name] = handler; } },
+  const context = vm.createContext({ inheritImageReferenceState, gallery: { addEventListener: (name, handler) => { handlers[name] = handler; } },
     detailNavigation: { open() { opens++; } } });
   vm.runInContext(source.slice(source.indexOf("  gallery.addEventListener('keydown'"), source.indexOf("  detailView.close.addEventListener")), context);
   for (const key of ['Enter', ' ']) handlers.keydown({ key, target: { closest: selector => selector.includes('[data-clear-recently-added]') ? {} : { dataset: { cardId: 'one' } } }, preventDefault() {} });

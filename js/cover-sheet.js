@@ -1,3 +1,4 @@
+import { ensureImageReferenceOriginal } from './image-references.js';
 import { loadWritableExportDirectory, saveExportFile, downloadExportFile } from './export-library.js';
 import { getAvailablePatternImages } from "./images.js";
 
@@ -12,6 +13,7 @@ const SUBTITLE_FONT = "bold italic 42px Georgia, serif";
 const COLOR_FONT = "bold italic 40px Georgia, serif";
 
 export async function createCoverSheetForPack(paperPack, colorsById) {
+  await Promise.all((paperPack.patterns || []).map(ensureImageReferenceOriginal));
   const imageEntries = getAvailablePatternImages(paperPack);
 
   if (imageEntries.length === 0) {

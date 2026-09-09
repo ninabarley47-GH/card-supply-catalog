@@ -1,10 +1,11 @@
+import { inheritImageReferenceState } from './image-references.js';
 ﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 const source = await readFile(new URL('./cards.js', import.meta.url), 'utf8');
 function setup(saveCard = async () => {}) {
-  const context = vm.createContext({ saveCard, CSS: { escape: value => value }, window: { alert() {} },
+  const context = vm.createContext({ inheritImageReferenceState, saveCard, CSS: { escape: value => value }, window: { alert() {} },
     document: { createElement: () => ({ dataset: {}, setAttribute(key, value) { this[key] = value; } }), querySelector: () => null } });
   vm.runInContext(source.slice(source.indexOf('function createCardFavoriteButton('), source.indexOf('function findCard(')), context);
   return context;

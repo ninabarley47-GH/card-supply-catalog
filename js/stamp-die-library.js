@@ -1,3 +1,4 @@
+import { bindImageReference, inheritImageReferenceState } from './image-references.js';
 import { createPatternViewer, openPatternPreview, closePatternPreview, createCardContextBar, sortPaperPacks } from './library.js';
 import { createPaperPackPicker } from './cards.js';
 import { getCardLibraryImageSource } from './card-images.js';
@@ -165,10 +166,15 @@ export async function initializeStampDieLibrary(services = {}) {
     const reference = references[index];
     if (!reference) return;
     previewSource = button;
-    openPatternPreview(detail.body, { name: record.name, patterns: references.map((entry, imageIndex) => ({
-      imageSrc: entry.imageSrc || getStampDetailImageSource(entry),
-      imageName: entry.imageName || `Set image ${imageIndex + 1}`
-    })) }, index);
+    openPatternPreview(detail.body, { name: record.name, patterns: references.map((entry, imageIndex) => {
+      const preview = {
+        imageSrc: entry.imageSrc || entry.imagePreviewSrc || '',
+        imageThumbnailSrc: getStampLibraryImageSource(entry),
+        imageName: entry.imageName || `Set image ${imageIndex + 1}`
+      };
+      inheritImageReferenceState(entry, preview);
+      return preview;
+    }) }, index);
   });
   detail.dialog.addEventListener('cancel', (event) => {
     event.preventDefault();
@@ -325,7 +331,7 @@ export async function initializeStampDieLibrary(services = {}) {
       const [records, nextCatalog] = await Promise.all([
         storage.loadSavedStampDieSets(), storage.loadGlobalTagCatalog()
       ]);
-      await storage.hydrateStampImages(records);
+      await storage.hydrateStampImages(records, {}, { preferThumbnail: true });
       clearStampImageSources(displayedRecords);
       displayedRecords = records;
       if (!view.dialog.open) catalog = nextCatalog;
@@ -866,11 +872,9 @@ function createSetImageGrid(references = [], fullQuality = false) {
       image.alt = reference.imageName || `Set image ${index + 1}`;
       image.loading = 'lazy';
       missing.hidden = true;
-      let triedFull = false;
-      image.addEventListener('error', () => {
-        const full = fullQuality ? getStampLibraryImageSource(reference) : reference.imagePreviewSrc || reference.imageSrc;
-        if (!triedFull && full && full !== source) { triedFull = true; image.src = full; }
-        else { image.hidden = true; missing.hidden = false; }
+      bindImageReference(image, reference, {
+        fullQuality,
+        onUnavailable: () => { image.hidden = true; missing.hidden = false; }
       });
       frame.append(image);
     }
