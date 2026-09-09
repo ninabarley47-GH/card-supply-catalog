@@ -2,6 +2,7 @@ import { loadCatalogSetting, saveCatalogSetting } from './storage.js';
 import { supportsOpenFilePicker, supportsDirectoryPicker } from './browser-capabilities.js';
 import { createCardImageFromFile, clearSelectedCardImage, getCardLibraryImageSource, getCardDetailImageSource } from './card-images.js';
 import { findPaperPackImageDirectory, isSupportedImageFileName } from './images.js';
+import { getTagKey } from './tag-utils.js';
 import {
   prepareFolderBackedImage, prepareEmbeddedImage, hasDirectoryPermission,
   hydrateImageReference, clearImageReferenceObjectUrls, getFileFromRelativePath
@@ -83,10 +84,17 @@ export async function loadStampImagesForSetName(name, environment = globalThis, 
   const directory = await (services.loadDirectory || loadStampImageDirectory)('read', true);
   if (!directory) return [];
   const match = await findPaperPackImageDirectory(directory, name.trim());
-  if (!match?.handle.entries) return [];
+  const source = match?.handle || directory;
+  if (typeof source.entries !== 'function') return [];
+  const nameKey = getTagKey(name);
   const handles = [];
-  for await (const [filename, handle] of match.handle.entries()) {
-    if (handle.kind === 'file' && isSupportedImageFileName(filename)) handles.push(handle);
+  for await (const [filename, handle] of source.entries()) {
+    if (handle.kind !== 'file' || !isSupportedImageFileName(filename)) continue;
+    // Sets can use a flat library, as the existing manual save path does.
+    // Match the complete Set name, optionally followed by an image type.
+    const stem = getTagKey(filename.replace(/\.[^.]+$/, ''));
+    const setStem = stem.replace(/[\s_-]+(?:stamps?|dies?|masks?)$/, '');
+    if (match || stem === nameKey || setStem === nameKey) handles.push(handle);
   }
   handles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
   const images = await selectStampImageFiles(await Promise.all(handles.map(handle => handle.getFile())), environment);

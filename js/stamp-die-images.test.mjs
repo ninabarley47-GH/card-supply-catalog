@@ -340,3 +340,17 @@ test('automatic Set lookup skips unsupported browsers before accessing a saved f
   }), []);
   assert.deepEqual(await loadStampImagesForSetName('Garden', { showDirectoryPicker() {} }, { loadDirectory: async () => null }), []);
 });
+
+test('automatic lookup finds Set-named originals stored directly in the connected library', async () => {
+  const names = ['Frosted Pines.jpg', 'Frosted Pines DIES.JPG', 'Frosted Pines MaSk.png',
+    'Frosted Pines.thumb.jpg', 'Frosted Pines DIES.thumb.jpg', 'Frosted Pines Extra.jpg', 'Other Pines.jpg'];
+  const handles = names.map(name => ({ kind: 'file', name, relativePath: [name], getFile: async () => file(name) }));
+  const directory = {
+    async getDirectoryHandle() { throw new DOMException('Missing', 'NotFoundError'); },
+    async *entries() { for (const handle of handles) yield [handle.name, handle]; }
+  };
+  const { loadStampImagesForSetName } = await import('./stamp-die-images.js');
+  const images = await loadStampImagesForSetName('Frosted Pines', { ...environment(), showDirectoryPicker() {} }, { loadDirectory: async () => directory });
+  assert.deepEqual(orderStampDieImages(images).map(image => image.name), ['Frosted Pines.jpg', 'Frosted Pines DIES.JPG', 'Frosted Pines MaSk.png']);
+  assert.ok(images.every(image => image.fileHandle === handles.find(handle => handle.name === image.name)));
+});

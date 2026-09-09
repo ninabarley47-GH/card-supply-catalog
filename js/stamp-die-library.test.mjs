@@ -1718,3 +1718,36 @@ test('empty automatic lookup is deduplicated and lookup failure leaves manual co
   await h.name.emit('blur'); assert.equal(calls, 3);
   assert.doesNotMatch(h.form.textContent, /could not be selected|Loading images/);
 });
+
+test('Add populates previews through the real flat-library lookup and saves references to the originals', async (t) => {
+  setImageLookupCapabilities(t);
+  const { loadStampImagesForSetName, prepareStampImagesForSave } = await import('./stamp-die-images.js');
+  const names = ['Frosted Pines Masks.jpg', 'Frosted Pines Dies.jpg', 'Frosted Pines.jpg'];
+  const handles = names.map(name => ({ kind: 'file', name, getFile: async () => new File(['original'], name, { type: 'image/jpeg' }) }));
+  const directory = {
+    name: 'Sets',
+    async getDirectoryHandle() { throw new DOMException('Missing', 'NotFoundError'); },
+    async *entries() { for (const handle of handles) yield [handle.name, handle]; },
+    resolve: async handle => handles.includes(handle) ? [handle.name] : null,
+    async getFileHandle(name, options) {
+      assert.ok(!options?.create, 'Existing originals and thumbnails must not be rewritten');
+      return { getFile: async () => new File(['existing'], name, { type: 'image/jpeg' }) };
+    }
+  };
+  const environment = { showDirectoryPicker() {}, FileReader: class {
+    listeners = {};
+    addEventListener(type, handler) { this.listeners[type] = handler; }
+    readAsDataURL() { this.result = 'data:image/jpeg;base64,YQ=='; this.listeners.load(); }
+  } };
+  const h = await harness(t, {
+    loadStampImageDirectory: async () => directory,
+    loadStampImagesForSetName: name => loadStampImagesForSetName(name, environment, { loadDirectory: async () => directory }),
+    prepareStampImagesForSave: images => prepareStampImagesForSave(images, { loadDirectory: async () => directory })
+  });
+  await h.add.emit('click'); h.name.value = 'Frosted Pines'; await h.name.emit('blur');
+  const expected = ['Frosted Pines.jpg', 'Frosted Pines Dies.jpg', 'Frosted Pines Masks.jpg'];
+  assert.deepEqual(h.form.querySelectorAll('img').map(image => image.alt), expected);
+  await h.form.emit('submit');
+  assert.deepEqual(h.records[0].imageRefs.map(ref => ref.imagePath), expected);
+  assert.ok(h.records[0].imageRefs.every(ref => ref.imageLibrary === 'stamp-die-images' && ref.imageStorageStrategy === 'local-folder'));
+});
