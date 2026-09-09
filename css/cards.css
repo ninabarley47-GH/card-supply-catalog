@@ -897,6 +897,36 @@
   outline-offset: 3px;
 }
 .stamp-set-detail-images img { height: auto; max-height: 65dvh; min-height: 12rem; object-fit: contain; }
+
+/* Fit the original image, reserving viewport space for margins, borders and Close. */
+.stamp-set-detail-body .pattern-viewer { padding: 1rem; }
+.stamp-set-detail-body .pattern-viewer-dialog {
+  width: max-content;
+  min-width: 6rem;
+  max-width: calc(100dvw - 2rem);
+}
+.stamp-set-detail-body .pattern-viewer-header {
+  contain: inline-size;
+  min-width: 0;
+  height: 2.35rem;
+}
+.stamp-set-detail-body .pattern-viewer-header h4 {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.stamp-set-detail-body .pattern-viewer-image {
+  aspect-ratio: auto;
+  justify-self: center;
+  overflow: visible;
+}
+.stamp-set-detail-body .pattern-viewer-image img {
+  width: auto;
+  height: auto;
+  max-width: calc(100dvw - 4rem - 4px);
+  max-height: calc(100dvh - 7.35rem - 4px);
+  object-fit: contain;
+}
 .stamp-set-tile[tabindex] { cursor: pointer; }
 .stamp-set-tile[tabindex]:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
 
