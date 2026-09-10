@@ -639,8 +639,8 @@ export async function initializeExportLibrarySettings(services = {}) {
         error?.name === "AbortError" ? "" : "error");
     }
   };
-  choose.addEventListener("click", () => select("selected"));
-  reconnect?.addEventListener("click", () => select("reconnected"));
+  choose.addEventListener("click", () => select("ready"));
+  reconnect?.addEventListener("click", () => select("ready"));
   try {
     const setting = await (services.loadCatalogSetting || loadCatalogSetting)(EXPORT_LIBRARY_SETTING_ID);
     const directory = setting?.directoryHandle;
@@ -684,8 +684,8 @@ export async function initializeStampImageLibrarySettings({ paperPacks = [] } = 
         error?.name === "AbortError" ? "" : "error");
     }
   };
-  choose.addEventListener("click", () => select("Stamp & Die image folder selected"));
-  reconnect?.addEventListener("click", () => select("Stamp & Die image folder reconnected"));
+  choose.addEventListener("click", () => select("Stamp & Die image folder ready"));
+  reconnect?.addEventListener("click", () => select("Stamp & Die image folder ready"));
   try {
     const setting = await loadSetting(STAMP_IMAGE_LIBRARY_SETTING_ID);
     const directory = setting?.directoryHandle;
@@ -730,11 +730,11 @@ async function initializeCardImageLibrarySettings({ paperPacks = [] } = {}) {
   await renderSavedCardImageLibraryStatus(status);
 
   chooseButton.addEventListener("click", async () => {
-    await selectCardImageLibraryFolder(status, "Card image folder selected", paperPacks);
+    await selectCardImageLibraryFolder(status, "Card image folder ready", paperPacks);
   });
 
   reconnectButton?.addEventListener("click", async () => {
-    await selectCardImageLibraryFolder(status, "Card image folder reconnected", paperPacks);
+    await selectCardImageLibraryFolder(status, "Card image folder ready", paperPacks);
   });
 
   generateThumbnailsButton?.addEventListener("click", async () => {
@@ -946,7 +946,7 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
       status,
       health,
       onImageLibrarySelected,
-      successPrefix: "Image folder selected"
+      successPrefix: "Paper image folder ready"
     });
   });
 
@@ -956,7 +956,7 @@ async function initializeImageLibrarySettings({ paperPacks = [], onImageLibraryS
       status,
       health,
       onImageLibrarySelected,
-      successPrefix: "Image folder reconnected"
+      successPrefix: "Paper image folder ready"
     });
 
     if (selected) {
@@ -1676,8 +1676,8 @@ function getFolderSelectionErrorMessage(error) {
   return `The image folder could not be selected${error?.name ? ` (${error.name})` : ""}.`;
 }
 
-function getSelectedImageLibraryMessage(directoryHandle, prefix = "Image folder selected") {
-  return `${prefix}: ${directoryHandle.name}. Full local paths are hidden by the browser, but paper images can be read from this folder.`;
+function getSelectedImageLibraryMessage(directoryHandle, prefix = "Paper image folder ready") {
+  return `${prefix}: ${directoryHandle.name}.`;
 }
 
 async function getDirectoryPermissionState(directoryHandle) {
