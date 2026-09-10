@@ -401,15 +401,17 @@
               </div>
               <p class="settings-message" data-default-owner-message aria-live="polite"></p>
               <div class="owner-settings-list" data-owner-settings-list></div>
-              <p>Update the owner on every paper pack.</p>
-              <form class="bulk-owner-form" data-bulk-owner-form>
-                <div class="form-field">
-                  <label for="bulk-paper-pack-owner">New owner</label>
-                  <input id="bulk-paper-pack-owner" type="text" autocomplete="off" placeholder="e.g., Nina" data-bulk-owner-input required>
-                </div>
-                <button class="button button-primary" type="submit" data-bulk-owner-submit>Change Paper Pack Owner</button>
-              </form>
-              <p class="settings-message" data-bulk-owner-message aria-live="polite"></p>
+              <div class="bulk-owner-settings" role="group" aria-labelledby="bulk-owner-heading">
+                <p id="bulk-owner-heading">Change the owner on all Paper Packs</p>
+                <form class="bulk-owner-form" data-bulk-owner-form>
+                  <div class="form-field">
+                    <label for="bulk-paper-pack-owner">Paper Pack owner</label>
+                    <input id="bulk-paper-pack-owner" type="text" autocomplete="off" placeholder="e.g., Nina" data-bulk-owner-input required>
+                  </div>
+                  <button class="button button-primary" type="submit" data-bulk-owner-submit>Change Paper Pack Owner</button>
+                </form>
+                <p class="settings-message" data-bulk-owner-message aria-live="polite"></p>
+              </div>
               </div>
             </details>
 
