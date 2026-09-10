@@ -42,6 +42,7 @@ function sortTagsAlphabetically(tags = []) {
 }
 
 export function initializeSettings(options = {}) {
+  initializeSettingsQuickLinks();
   initializeOwnerSettings(options);
   initializeSetupStatus(options);
   initializeImageLibrarySettings(options);
@@ -50,6 +51,20 @@ export function initializeSettings(options = {}) {
   initializeExportLibrarySettings();
   initializeBulkOwnerSettings(options);
   initializeTagSettings(options);
+}
+
+export function initializeSettingsQuickLinks(root = document) {
+  root.querySelectorAll('.settings-quick-links a').forEach((link) => {
+    link.addEventListener('click', (event) => {
+      if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      const section = root.querySelector(link.getAttribute('href'));
+      if (!section) return;
+      event.preventDefault();
+      section.open = true;
+      section.querySelector('summary').focus({ preventScroll: true });
+      section.scrollIntoView({ block: 'start' });
+    });
+  });
 }
 
 async function initializeOwnerSettings({ owners = [], paperPacks = [], onPaperPacksUpdated } = {}) {

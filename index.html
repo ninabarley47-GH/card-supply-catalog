@@ -384,32 +384,41 @@
               <span>Quick links</span>
               <a href="#owner-settings">Owners</a>
               <a href="#global-tags-settings">Tags</a>
-              <a href="#image-storage-settings">Image Storage</a>
+              <a href="#library-folders-settings">Library Folders</a>
               <a href="#catalog-maintenance-settings">Catalog Maintenance</a>
-              <a href="#export-library-settings">Export Library Folder</a>
               <a href="#catalog-backup-settings">Catalog Backup and Restore</a>
               <a href="#setup-status-settings">Setup Status</a>
             </nav>
 
-            <section class="settings-subsection" id="owner-settings" aria-labelledby="owner-settings-title">
-              <div class="section-heading">
-                <div><p class="eyebrow">Ownership</p><h4 id="owner-settings-title">Owners</h4></div>
-                <p>Owner names are shared with the catalog. The Default Owner selection applies only to this browser.</p>
-              </div>
+            <details class="settings-subsection" id="owner-settings" open>
+              <summary class="settings-summary">
+                <span class="settings-summary-text"><strong id="owner-settings-title">Owners</strong><span>Owner names are shared with the catalog. The Default Owner selection applies only to this browser.</span></span>
+              </summary>
+              <div class="settings-body" role="region" aria-labelledby="owner-settings-title">
               <div class="form-field device-default-field">
                 <label for="default-owner">Default owner</label>
                 <select id="default-owner" data-default-owner><option value="">Not selected</option></select>
               </div>
               <p class="settings-message" data-default-owner-message aria-live="polite"></p>
               <div class="owner-settings-list" data-owner-settings-list></div>
-            </section>
+              <p>Update the owner on every paper pack.</p>
+              <form class="bulk-owner-form" data-bulk-owner-form>
+                <div class="form-field">
+                  <label for="bulk-paper-pack-owner">New owner</label>
+                  <input id="bulk-paper-pack-owner" type="text" autocomplete="off" placeholder="e.g., Nina" data-bulk-owner-input required>
+                </div>
+                <button class="button button-primary" type="submit" data-bulk-owner-submit>Change Paper Pack Owner</button>
+              </form>
+              <p class="settings-message" data-bulk-owner-message aria-live="polite"></p>
+              </div>
+            </details>
 
             <details class="settings-subsection tag-settings" id="global-tags-settings" data-global-tag-settings>
-              <summary class="tag-settings-summary">
-                <span class="tag-settings-summary-text"><strong id="global-tags-settings-title">Tags &amp; Categories</strong><span>Manage the shared tag system for Paper, Cards, and Stamp Sets.</span></span>
+              <summary class="settings-summary">
+                <span class="settings-summary-text"><strong id="global-tags-settings-title">Tags &amp; Categories</strong><span>Manage the shared tag system for Paper, Cards, and Stamp Sets.</span></span>
                 <span class="tag-settings-total" data-tag-total>0 tags</span>
               </summary>
-              <div class="tag-settings-body" role="region" aria-labelledby="global-tags-settings-title">
+              <div class="settings-body" role="region" aria-labelledby="global-tags-settings-title">
                 <section class="category-settings" aria-labelledby="category-settings-title">
                   <div class="category-settings-heading"><div><h5 id="category-settings-title">Categories</h5><p>Organize tags without changing their item assignments.</p></div><span data-category-total>0 categories</span></div>
                   <button class="text-action settings-reveal-action" type="button" data-category-add-open aria-expanded="false">+ Add Category</button>
@@ -434,17 +443,15 @@
               </div>
             </details>
 
-            <section class="settings-subsection" id="image-storage-settings" aria-labelledby="image-library-title">
-              <div class="section-heading">
-                <div>
-                  <p class="eyebrow">Image Storage</p>
-                  <h4 id="image-library-title">Image Library Folder</h4>
-                </div>
-                <p>Choose separate local or cloud-synced folders for Paper, Card, and Stamp &amp; Die images.</p>
-              </div>
+            <details class="settings-subsection" id="library-folders-settings">
+              <summary class="settings-summary">
+                <span class="settings-summary-text"><strong id="image-library-title">Library Folders</strong><span>Choose separate local or cloud-synced folders for Paper, Card, and Stamp &amp; Die images.</span></span>
+              </summary>
+              <div class="settings-body" role="region" aria-labelledby="image-library-title">
 
               <div class="image-library-groups">
                 <div class="image-library-group" role="group" aria-label="Paper image library">
+                  <h5>Paper Image Library</h5>
                   <div class="settings-actions image-library-buttons">
                     <button class="button" type="button" data-choose-image-library>Choose Image Folder for Paper</button>
                     <button class="button" type="button" data-reconnect-image-library>Reconnect for Paper</button>
@@ -453,6 +460,7 @@
                   <div class="image-library-health" data-image-library-health aria-live="polite"></div>
                 </div>
                 <div class="image-library-group" role="group" aria-label="Stamps &amp; Dies image library">
+                  <h5>Stamps &amp; Dies Image Library</h5>
                   <div class="settings-actions image-library-buttons">
                     <button class="button" type="button" data-choose-stamp-image-library>Choose Image Folder for Stamps &amp; Dies</button>
                     <button class="button" type="button" data-reconnect-stamp-image-library>Reconnect for Stamps &amp; Dies</button>
@@ -461,6 +469,7 @@
                   <div class="image-library-health" data-stamp-image-library-health aria-live="polite"></div>
                 </div>
                 <div class="image-library-group" role="group" aria-label="Cards image library">
+                  <h5>Card Image Library</h5>
                   <div class="settings-actions image-library-buttons">
                     <button class="button" type="button" data-choose-card-image-library>Choose Image Folder for Cards</button>
                     <button class="button" type="button" data-reconnect-card-image-library>Reconnect for Cards</button>
@@ -471,17 +480,24 @@
                 <div class="settings-actions">
                   <button class="button" type="button" data-check-image-libraries>Check Image Libraries</button>
                 </div>
+                <div class="image-library-group" role="group" aria-labelledby="export-library-title">
+                  <h5 id="export-library-title">Export Library</h5>
+                  <p>Choose an optional folder for backups and other exports, independently of your three image libraries.</p>
+              <div class="settings-actions image-library-buttons">
+                <button class="button" type="button" data-choose-export-library>Choose Export Library Folder</button>
+                <button class="button" type="button" data-reconnect-export-library>Reconnect Export Library</button>
               </div>
-            </section>
-
-            <section class="settings-subsection" id="catalog-maintenance-settings" aria-labelledby="bulk-owner-title">
-              <div class="section-heading">
-                <div>
-                  <p class="eyebrow">Catalog Maintenance</p>
-                  <h4 id="bulk-owner-title">Catalog Maintenance</h4>
+              <p class="settings-message" data-export-library-status aria-live="polite">Checking export folder support...</p>
                 </div>
-                <p>Maintain stored images and update the owner on every paper pack.</p>
               </div>
+              </div>
+            </details>
+
+            <details class="settings-subsection" id="catalog-maintenance-settings">
+              <summary class="settings-summary">
+                <span class="settings-summary-text"><strong id="bulk-owner-title">Catalog Maintenance</strong><span>Maintain stored images.</span></span>
+              </summary>
+              <div class="settings-body" role="region" aria-labelledby="bulk-owner-title">
 
               <div class="settings-actions" aria-label="Catalog maintenance actions">
                 <button class="button" type="button" data-repair-image-library>Repair Image Links</button>
@@ -491,14 +507,7 @@
               </div>
               <p class="settings-message" data-image-maintenance-status aria-live="polite"></p>
 
-              <form class="bulk-owner-form" data-bulk-owner-form>
-                <div class="form-field">
-                  <label for="bulk-paper-pack-owner">New owner</label>
-                  <input id="bulk-paper-pack-owner" type="text" autocomplete="off" placeholder="e.g., Nina" data-bulk-owner-input required>
-                </div>
-                <button class="button button-primary" type="submit" data-bulk-owner-submit>Change Paper Pack Owner</button>
-              </form>
-              <p class="settings-message" data-bulk-owner-message aria-live="polite"></p>
+
               <details class="settings-help">
                 <summary>What does Move Images to Folder do?</summary>
                 <p>Moves images currently stored inside this browser into your selected image folder. Use this after choosing an image folder, especially before sharing the catalog with someone else.</p>
@@ -511,31 +520,14 @@
                 <summary>What do Generate Missing Thumbnails actions do?</summary>
                 <p>Scans catalog-referenced images in the selected Paper or Card folder, leaves every usable <code>.thumb.jpg</code> unchanged, repairs empty thumbnails, and creates thumbnails only where they are missing.</p>
               </details>
-            </section>
+              </div>
+            </details>
 
-            <section class="settings-subsection" id="export-library-settings" aria-labelledby="export-library-title">
-              <div class="section-heading">
-                <div>
-                  <p class="eyebrow">Export Storage</p>
-                  <h4 id="export-library-title">Export Library Folder</h4>
-                </div>
-                <p>Choose an optional folder for backups and other exports, independently of your image libraries.</p>
-              </div>
-              <div class="settings-actions image-library-buttons">
-                <button class="button" type="button" data-choose-export-library>Choose Export Library Folder</button>
-                <button class="button" type="button" data-reconnect-export-library>Reconnect Export Library</button>
-              </div>
-              <p class="settings-message" data-export-library-status aria-live="polite">Checking export folder support...</p>
-            </section>
-
-            <section class="settings-subsection" id="catalog-backup-settings" aria-labelledby="backup-restore-title">
-              <div class="section-heading">
-                <div>
-                  <p class="eyebrow">Backup & Restore</p>
-                  <h4 id="backup-restore-title">Catalog Backup and Restore</h4>
-                </div>
-                <p>Export or restore catalog data for sharing, safekeeping, or moving browsers. Exports are saved in your optional Export Library when available, or downloaded by the browser.</p>
-              </div>
+            <details class="settings-subsection" id="catalog-backup-settings">
+              <summary class="settings-summary">
+                <span class="settings-summary-text"><strong id="backup-restore-title">Catalog Backup &amp; Restore</strong><span>Export or restore catalog data for sharing, safekeeping, or moving browsers. Exports are saved in your optional Export Library when available, or downloaded by the browser.</span></span>
+              </summary>
+              <div class="settings-body" role="region" aria-labelledby="backup-restore-title">
 
               <div class="settings-actions" aria-label="Backup and restore actions">
                 <button class="button" type="button" data-export-catalog>Export Backup</button>
@@ -575,19 +567,18 @@
                 </ol>
               </details>
               <p class="settings-message" data-backup-message aria-live="polite"></p>
-            </section>
-
-            <section class="settings-subsection" id="setup-status-settings" aria-labelledby="setup-status-title">
-              <div class="section-heading">
-                <div>
-                  <p class="eyebrow">Readiness</p>
-                  <h4 id="setup-status-title">Setup Status</h4>
-                </div>
-                <p>Confirm this browser is ready to use the shared catalog.</p>
               </div>
+            </details>
+
+            <details class="settings-subsection" id="setup-status-settings">
+              <summary class="settings-summary">
+                <span class="settings-summary-text"><strong id="setup-status-title">Setup Status</strong><span>Confirm this browser is ready to use the shared catalog.</span></span>
+              </summary>
+              <div class="settings-body" role="region" aria-labelledby="setup-status-title">
 
               <div class="setup-status-list" data-setup-status aria-live="polite"></div>
-            </section>
+              </div>
+            </details>
           </section>
         </main>
 
