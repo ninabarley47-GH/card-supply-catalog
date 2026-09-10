@@ -163,7 +163,7 @@ test("Paper terminology covers visible labels, messages and app description whil
   for (const text of ['Visual Paper Library', '>Paper Packs<', '>Paper Pack Name<', '>Paper</h2>', 'Save a new paper pack to this catalog.']) assert.ok(html.includes(text), text);
   assert.match(html, /Paper\s*<select name="productDsp">/);
   assert.match(library, /createColorDetailItem\("Paper", formatMetadataValue\(color.products\?\.dsp\)\)/);
-  assert.match(settings, /but paper images can be read from this folder/);
+  assert.match(settings, /Paper image folder ready/);
   assert.equal(JSON.parse(manifestText).description, 'A visual library for paper and coordinating colors.');
   for (const text of ['saving this paper pack.', 'Change the paper pack name', 'unique paper pack name', 'Update this paper pack.', 'Save a new paper pack to this catalog.']) assert.ok(source.includes(text), text);
   assert.match(getPatternImageHelpText({ showDirectoryPicker() {} }), /matching the paper pack name/);

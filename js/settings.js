@@ -1,5 +1,5 @@
 import { EXPORT_LIBRARY_SETTING_ID, chooseExportDirectory } from './export-library.js';
-import { STAMP_IMAGE_LIBRARY_SETTING_ID, chooseStampImageDirectory, checkStampImageLibraryHealth } from './stamp-die-images.js';
+import { STAMP_IMAGE_LIBRARY_MARKER, STAMP_IMAGE_LIBRARY_SETTING_ID, chooseStampImageDirectory, checkStampImageLibraryHealth } from './stamp-die-images.js';
 import {
   checkImageLibraryHealth,
   generateMissingImageThumbnails,
@@ -889,6 +889,11 @@ function initializeSetupStatus({ paperPacks = [] } = {}) {
 
   renderSetupStatus(container, paperPacks);
 
+  const section = container.closest("details");
+  section?.addEventListener("toggle", () => {
+    if (section.open) renderSetupStatus(container, paperPacks);
+  });
+
   document.addEventListener("catalog:backup-exported", () => renderSetupStatus(container, paperPacks));
   document.addEventListener("catalog:backup-imported", () => renderSetupStatus(container, paperPacks));
 }
@@ -1114,18 +1119,20 @@ async function selectImageLibraryFolder({ paperPacks = [], status, health, onIma
   }
 }
 
-async function renderSetupStatus(container, paperPacks = []) {
+export async function renderSetupStatus(container, paperPacks = [], services = {}) {
   if (!container) {
     return;
   }
 
-  const [imageLibrary, cardImageLibrary, cards, lastBackupExportedAt, lastBackupImportedAt, stampImageLibrary] = await Promise.all([
-    loadCatalogSetting(IMAGE_LIBRARY_SETTING_ID),
-    loadCatalogSetting(CARD_IMAGE_LIBRARY_SETTING_ID),
-    loadSavedCards(),
-    loadCatalogSetting(LAST_BACKUP_EXPORT_SETTING_ID),
-    loadCatalogSetting(LAST_BACKUP_IMPORT_SETTING_ID),
-    loadCatalogSetting(STAMP_IMAGE_LIBRARY_SETTING_ID).catch(() => null)
+  const loadSetting = services.loadCatalogSetting || loadCatalogSetting;
+  const [imageLibrary, cardImageLibrary, cards, lastBackupExportedAt, lastBackupImportedAt, stampImageLibrary, stampSets] = await Promise.all([
+    loadSetting(IMAGE_LIBRARY_SETTING_ID),
+    loadSetting(CARD_IMAGE_LIBRARY_SETTING_ID),
+    (services.loadSavedCards || loadSavedCards)(),
+    loadSetting(LAST_BACKUP_EXPORT_SETTING_ID),
+    loadSetting(LAST_BACKUP_IMPORT_SETTING_ID),
+    loadSetting(STAMP_IMAGE_LIBRARY_SETTING_ID).catch(() => null),
+    (services.loadSavedStampDieSets || loadSavedStampDieSets)()
   ]);
   const directoryHandle = imageLibrary?.directoryHandle;
   const cardDirectoryHandle = cardImageLibrary?.directoryHandle;
@@ -1134,19 +1141,40 @@ async function renderSetupStatus(container, paperPacks = []) {
   const folderPermission = directoryHandle ? await getDirectoryPermissionState(directoryHandle) : "";
   const cardFolderPermission = cardDirectoryHandle ? await getDirectoryPermissionState(cardDirectoryHandle) : "";
   const imageHealth =
-    directoryHandle && folderPermission === "granted" ? await checkImageLibraryHealth(paperPacks).catch(() => null) : null;
+    directoryHandle && folderPermission === "granted" ? await (services.checkImageLibraryHealth || checkImageLibraryHealth)(paperPacks).catch(() => null) : null;
   const folderImages = imageHealth?.summary.folderImages ?? countFolderImageReferences(paperPacks);
   const missingImages = imageHealth?.summary.imagesMissing ?? 0;
   const missingImageFolders = getMissingImageFolders(imageHealth?.summary.missingImages);
   const imageReferencesChecked = Boolean(imageHealth);
   const cardFolderImages = countCardFolderImageReferences(cards);
 
+  // Stamp Sets can have multiple images; use the same marker/path predicate as their health check.
+  const stampFolderImages = stampSets.reduce((count, set) => count + (set.imageRefs || [])
+    .filter((ref) => ref.imageLibrary === STAMP_IMAGE_LIBRARY_MARKER && ref.imagePath).length, 0);
+  const folders = [
+    ["Paper", directoryHandle, folderPermission, "Paper Pack image"],
+    ["Stamps & Dies", stampDirectoryHandle, stampFolderPermission, "Stamp & Die image"],
+    ["Cards", cardDirectoryHandle, cardFolderPermission, "Card image"]
+  ];
+  const folderBadges = folders.map(([, handle, permission]) => getImageFolderStatusBadge(handle, permission));
+  const references = [
+    { label: "Paper", detail: getImageReferenceStatusDetail(folderImages, missingImages,
+      imageReferencesChecked, Boolean(directoryHandle), missingImageFolders),
+      badge: getImageReferenceStatusBadge(folderImages, missingImages, imageReferencesChecked) },
+    { label: "Stamps & Dies", detail: getCardImageReferenceStatusDetail(stampFolderImages,
+      stampDirectoryHandle, stampFolderPermission, "Stamp & Die"),
+      badge: getCardImageReferenceStatusBadge(stampFolderImages, stampDirectoryHandle, stampFolderPermission) },
+    { label: "Cards", detail: getCardImageReferenceStatusDetail(cardFolderImages, cardDirectoryHandle, cardFolderPermission),
+      badge: getCardImageReferenceStatusBadge(cardFolderImages, cardDirectoryHandle, cardFolderPermission) }
+  ];
+  const hasCatalogData = paperPacks.length + stampSets.length + cards.length > 0;
+
   container.replaceChildren(
     createSetupStatusItem({
       title: "Catalog data",
-      detail: paperPacks.length > 0 ? `${paperPacks.length} paper pack${paperPacks.length === 1 ? "" : "s"} loaded.` : "No paper packs are loaded yet.",
-      badge: paperPacks.length > 0 ? "Ready" : "Needs data",
-      status: paperPacks.length > 0 ? "ready" : "attention"
+      lines: [`Paper Packs: ${paperPacks.length}`, `Stamp & Die Sets: ${stampSets.length}`, `Cards: ${cards.length}`],
+      badge: hasCatalogData ? "Ready" : "Needs data",
+      status: hasCatalogData ? "ready" : "attention"
     }),
     createSetupStatusItem({
       title: "Catalog backup",
@@ -1155,58 +1183,45 @@ async function renderSetupStatus(container, paperPacks = []) {
       status: lastBackupExportedAt ? "ready" : "neutral"
     }),
     createSetupStatusItem({
-      title: "Paper Pack image folder",
-      detail: getImageFolderStatusDetail(directoryHandle, folderPermission, "Paper Pack image"),
-      badge: getImageFolderStatusBadge(directoryHandle, folderPermission),
-      status: getImageFolderStatusTone(directoryHandle, folderPermission)
+      title: "Image folders",
+      lines: folders.map(([label, handle, permission, imageType]) =>
+        `${label}: ${getImageFolderStatusDetail(handle, permission, imageType)}`),
+      ...aggregateSetupStatus(folderBadges, "Ready")
     }),
     createSetupStatusItem({
-      title: "Card image folder",
-      detail: getImageFolderStatusDetail(cardDirectoryHandle, cardFolderPermission, "Card image"),
-      badge: getImageFolderStatusBadge(cardDirectoryHandle, cardFolderPermission),
-      status: getImageFolderStatusTone(cardDirectoryHandle, cardFolderPermission)
-    }),
-    createSetupStatusItem({
-      title: "Stamp & Die image folder",
-      detail: getImageFolderStatusDetail(stampDirectoryHandle, stampFolderPermission, "Stamp & Die image"),
-      badge: getImageFolderStatusBadge(stampDirectoryHandle, stampFolderPermission),
-      status: getImageFolderStatusTone(stampDirectoryHandle, stampFolderPermission)
-    }),
-    createSetupStatusItem({
-      title: "Paper Pack image references",
-      detail: getImageReferenceStatusDetail(
-        folderImages,
-        missingImages,
-        imageReferencesChecked,
-        Boolean(directoryHandle),
-        missingImageFolders
-      ),
-      badge: getImageReferenceStatusBadge(folderImages, missingImages, imageReferencesChecked),
-      status: getImageReferenceStatusTone(missingImages, imageReferencesChecked)
-    }),
-    createSetupStatusItem({
-      title: "Card image references",
-      detail: getCardImageReferenceStatusDetail(cardFolderImages, cardDirectoryHandle, cardFolderPermission),
-      badge: getCardImageReferenceStatusBadge(cardFolderImages, cardDirectoryHandle, cardFolderPermission),
-      status: getImageFolderStatusTone(cardDirectoryHandle, cardFolderPermission)
+      title: "Image references",
+      lines: references.map(({ label, detail }) => `${label}: ${detail}`),
+      ...aggregateSetupStatus(references.map(({ badge }) => badge), "OK")
     })
   );
 }
 
-function createSetupStatusItem({ title, detail, badge, status }) {
+function aggregateSetupStatus(badges, readyBadge) {
+  for (const badge of ["Unsupported", "Check needed", "Reconnect", "Verify", "Optional"]) {
+    if (badges.includes(badge)) {
+      return { badge, status: ["Verify", "Optional"].includes(badge) ? "neutral" : "attention" };
+    }
+  }
+  return { badge: readyBadge, status: "ready" };
+}
+
+function createSetupStatusItem({ title, detail, lines, badge, status }) {
   const item = document.createElement("div");
   const text = document.createElement("div");
   const titleElement = document.createElement("strong");
-  const detailElement = document.createElement("span");
   const badgeElement = document.createElement("span");
 
   item.className = "setup-status-item";
   item.dataset.status = status;
   titleElement.textContent = title;
-  detailElement.textContent = detail;
   badgeElement.className = "setup-status-badge";
   badgeElement.textContent = badge;
-  text.append(titleElement, detailElement);
+  text.append(titleElement);
+  for (const line of lines || [detail]) {
+    const detailElement = document.createElement("span");
+    detailElement.textContent = line;
+    text.append(detailElement);
+  }
   item.append(text, badgeElement);
 
   return item;
@@ -1320,20 +1335,20 @@ function countCardFolderImageReferences(cards) {
   return cards.filter((card) => card && typeof card === "object" && card.imagePath).length;
 }
 
-function getCardImageReferenceStatusDetail(folderImages, directoryHandle, permissionState) {
+function getCardImageReferenceStatusDetail(folderImages, directoryHandle, permissionState, imageType = "Card") {
   if (folderImages === 0) {
-    return "No folder-backed Card image references found yet.";
+    return `No folder-backed ${imageType} image references found yet.`;
   }
 
   if (!directoryHandle) {
-    return `${folderImages} Card image reference${folderImages === 1 ? "" : "s"} need a Card image folder connection.`;
+    return `${folderImages} ${imageType} image reference${folderImages === 1 ? "" : "s"} need a ${imageType} image folder connection.`;
   }
 
   if (permissionState !== "granted") {
-    return `Reconnect the Card image folder to access ${folderImages} Card image reference${folderImages === 1 ? "" : "s"}.`;
+    return `Reconnect the ${imageType} image folder to access ${folderImages} ${imageType} image reference${folderImages === 1 ? "" : "s"}.`;
   }
 
-  return `${folderImages} folder-backed Card image reference${folderImages === 1 ? "" : "s"} connected.`;
+  return `${folderImages} folder-backed ${imageType} image reference${folderImages === 1 ? "" : "s"} connected.`;
 }
 
 function getCardImageReferenceStatusBadge(folderImages, directoryHandle, permissionState) {
