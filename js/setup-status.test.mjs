@@ -110,3 +110,36 @@ test('unchecked Paper references keep the overall verification state', async t =
   assert.match(rows[3].lines[0], /need an image folder connection/);
   assert.equal(rows[1].badge, 'Reminder');
 });
+
+for (const state of ['changed', 'disconnected', 'denied']) {
+  test(`backup destination remains historical when current Export Library is ${state}`, async t => {
+    const previous = { exportedAt: '2026-09-10T19:37:00Z', destination: { type: 'folder', folderName: 'Original Backup Folder' } };
+    const settings = { lastBackupExportedAt: previous, exportLibrary: folder('Original Backup Folder') };
+    const h = harness(t, { settings });
+    const before = (await h.render())[1];
+    settings.exportLibrary = state === 'disconnected' ? null : folder('New Folder', state === 'denied' ? 'denied' : 'granted');
+    const after = (await h.render())[1];
+    assert.deepEqual(after, before);
+    assert.equal(after.lines[1], 'Saved to: Original Backup Folder');
+    assert.equal(after.badge, 'Exported');
+  });
+}
+
+test('backup browser-download destination renders independently of a configured folder', async t => {
+  const rows = await harness(t, { settings: {
+    lastBackupExportedAt: { exportedAt: '2026-09-10T19:37:00Z', destination: { type: 'browser-download' } },
+    exportLibrary: folder('Unused Folder')
+  } }).render();
+  assert.match(rows[1].lines[0], /^Last export: /);
+  assert.equal(rows[1].lines[1], 'Saved via browser download');
+});
+
+for (const value of ['2026-09-01T12:00:00Z', { exportedAt: '2026-09-01T12:00:00Z' }]) {
+  test(`older backup status without destination safely displays only its timestamp (${typeof value})`, async t => {
+    const rows = await harness(t, { settings: { lastBackupExportedAt: value, exportLibrary: folder('Do not guess') } }).render();
+    assert.equal(rows[1].lines.length, 1);
+    assert.match(rows[1].lines[0], /^Last export: /);
+    assert.doesNotMatch(rows[1].lines[0], /unknown|Do not guess/);
+    assert.equal(rows[1].badge, 'Exported');
+  });
+}

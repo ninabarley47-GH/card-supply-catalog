@@ -1125,7 +1125,7 @@ export async function renderSetupStatus(container, paperPacks = [], services = {
   }
 
   const loadSetting = services.loadCatalogSetting || loadCatalogSetting;
-  const [imageLibrary, cardImageLibrary, cards, lastBackupExportedAt, lastBackupImportedAt, stampImageLibrary, stampSets] = await Promise.all([
+  const [imageLibrary, cardImageLibrary, cards, lastBackupExport, lastBackupImportedAt, stampImageLibrary, stampSets] = await Promise.all([
     loadSetting(IMAGE_LIBRARY_SETTING_ID),
     loadSetting(CARD_IMAGE_LIBRARY_SETTING_ID),
     (services.loadSavedCards || loadSavedCards)(),
@@ -1134,6 +1134,17 @@ export async function renderSetupStatus(container, paperPacks = [], services = {
     loadSetting(STAMP_IMAGE_LIBRARY_SETTING_ID).catch(() => null),
     (services.loadSavedStampDieSets || loadSavedStampDieSets)()
   ]);
+  // Older installations stored only an ISO timestamp in this setting.
+  const lastBackupExportedAt = typeof lastBackupExport === "string" ? lastBackupExport : lastBackupExport?.exportedAt;
+  const backupLines = [getBackupStatusDetail(lastBackupExportedAt, lastBackupImportedAt)];
+  if (lastBackupExportedAt) {
+    const destination = lastBackupExport?.destination;
+    if (destination?.type === "folder" && typeof destination.folderName === "string" && destination.folderName) {
+      backupLines.push(`Saved to: ${destination.folderName}`);
+    } else if (destination?.type === "browser-download") {
+      backupLines.push("Saved via browser download");
+    }
+  }
   const directoryHandle = imageLibrary?.directoryHandle;
   const cardDirectoryHandle = cardImageLibrary?.directoryHandle;
   const stampDirectoryHandle = stampImageLibrary?.directoryHandle;
@@ -1178,7 +1189,7 @@ export async function renderSetupStatus(container, paperPacks = [], services = {
     }),
     createSetupStatusItem({
       title: "Catalog backup",
-      detail: getBackupStatusDetail(lastBackupExportedAt, lastBackupImportedAt),
+      lines: backupLines,
       badge: lastBackupExportedAt ? "Exported" : "Reminder",
       status: lastBackupExportedAt ? "ready" : "neutral"
     }),

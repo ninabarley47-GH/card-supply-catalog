@@ -554,8 +554,11 @@
                 <input type="checkbox" data-import-overwrite-existing>
                 <span>Replace existing catalog entries during import</span>
               </label>
-              <p class="settings-help">By default, incremental import adds paper packs, colors, and Cards whose IDs are missing and leaves matching IDs unchanged. Select this option for an overlay import that replaces matching IDs while retaining unrelated catalog entries. Cards that look alike but have different IDs remain separate.</p>
-              <p class="settings-help">If an imported backup is missing images, choose <strong>Low-Memory Diagnostic</strong> and select the same backup. It scans the file in small pieces without importing or changing the catalog. When it finishes, use <strong>Copy Debug Report</strong> and send the copied text to the app developer.</p>
+              <p class="settings-help">When selected, imported items with matching IDs replace existing catalog entries. Items without a matching imported entry are left unchanged.</p>
+              <details class="settings-help">
+                <summary>When should I use Low-Memory Diagnostic?</summary>
+                <p>If an imported backup is missing images, choose <strong>Low-Memory Diagnostic</strong> and select the same backup. It scans the file in small pieces without importing or changing the catalog. When it finishes, use <strong>Copy Debug Report</strong> and send the copied text to the app developer.</p>
+              </details>
               <details class="settings-help">
                 <summary>How do I share this catalog with an iPad or another computer?</summary>
                 <ol>

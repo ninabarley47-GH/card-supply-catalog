@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { chooseExportDirectory, loadWritableExportDirectory, saveExportFile, createExportFileName } from './export-library.js';
 import { initializeExportLibrarySettings } from './settings.js';
-import { createCatalogBackup, saveJsonBackup, downloadImportDiagnosticReport } from './backup.js';
+import { createCatalogBackup, saveCatalogBackupExport, saveJsonBackup, downloadImportDiagnosticReport } from './backup.js';
 import { chooseCoverSheetDestination, saveCoverSheet } from './cover-sheet.js';
 
 const clock = { loadCatalogSetting: async () => null, now: () => new Date('2026-09-07T12:34:56.789Z') };
@@ -237,4 +237,55 @@ test('export timestamps use Pacific time in summer, winter, and across date boun
   ]) {
     assert.equal(createExportFileName('backup', 'json', { now: () => new Date(instant) }), `CSC-backup-${expected}.json`);
   }
+});
+
+for (const label of ['backup', 'ipad-backup']) {
+  test(`${label} records the completed Export Library destination alongside its timestamp`, async () => {
+    const handle = folder(); handle.name = 'All App Backup Files';
+    const backup = { exportedAt: '2026-09-10T19:37:00.000Z', catalog: 'unchanged' };
+    const settings = new Map();
+    const result = await saveCatalogBackupExport(backup, label, handle, { ...clock,
+      download: () => assert.fail('must use folder'),
+      saveCatalogSetting: async (id, value) => {
+        assert.equal(handle.files.get(handle.writes.at(-1)), JSON.stringify(backup, null, 2), 'write finished before metadata');
+        settings.set(id, value);
+      }
+    });
+    assert.equal(result.savedToFolder, true);
+    assert.deepEqual(settings.get('lastBackupExportedAt'), {
+      exportedAt: backup.exportedAt, destination: { type: 'folder', folderName: 'All App Backup Files' }
+    });
+    assert.equal(settings.size, 1, 'timestamp and destination are one settings write');
+    assert.equal(handle.files.get(result.fileName), JSON.stringify(backup, null, 2), 'metadata is not added to backup contents');
+  });
+}
+
+for (const failure of ['', 'write', 'close']) {
+  test(`browser delivery records download destination${failure ? ` after folder ${failure} failure` : ''}`, async () => {
+    const backup = { exportedAt: '2026-09-10T19:37:00.000Z' };
+    let delivered = false, metadata;
+    await saveCatalogBackupExport(backup, 'backup', failure ? folder({}, failure) : null, { ...clock,
+      download: async () => { delivered = true; },
+      saveCatalogSetting: async (_id, value) => { assert.equal(delivered, true); metadata = value; }
+    });
+    assert.deepEqual(metadata, { exportedAt: backup.exportedAt, destination: { type: 'browser-download' } });
+  });
+}
+
+for (const name of ['Error', 'AbortError']) {
+  test(`${name} during export delivery preserves the previous successful metadata`, async () => {
+    const previous = { exportedAt: '2026-09-01T12:00:00Z', destination: { type: 'folder', folderName: 'Original' } };
+    const settings = new Map([['lastBackupExportedAt', previous]]);
+    await assert.rejects(saveCatalogBackupExport({ exportedAt: '2026-09-10T19:37:00Z' }, 'backup', folder({}, 'write'), {
+      ...clock, download: async () => { throw new DOMException('Delivery failed or cancelled', name); },
+      saveCatalogSetting: async (id, value) => settings.set(id, value)
+    }), { name });
+    assert.equal(settings.get('lastBackupExportedAt'), previous);
+  });
+}
+
+test('diagnostic exports never update catalog export history', async () => {
+  await downloadImportDiagnosticReport({ summary: 'diagnostic' }, { ...clock, loadWritableExportDirectory: async () => null,
+    download: async () => {}, saveCatalogSetting: () => assert.fail('diagnostics must not replace backup history')
+  });
 });

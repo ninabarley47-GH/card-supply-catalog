@@ -101,8 +101,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, owners = [], o
           owners
         });
 
-        const saveResult = await saveJsonBackup(backup, "backup", backupDirectory);
-        await saveCatalogSetting(LAST_BACKUP_EXPORT_SETTING_ID, backup.exportedAt);
+        const saveResult = await saveCatalogBackupExport(backup, "backup", backupDirectory);
         document.dispatchEvent(new CustomEvent("catalog:backup-exported"));
         renderBackupMessage(message, formatExportSummary(backup, saveResult), "success");
       } catch (error) {
@@ -124,8 +123,7 @@ export function initializeCatalogBackup({ paperPacks, colorsById, owners = [], o
           owners
         });
 
-        const saveResult = await saveJsonBackup(backup, "ipad-backup", backupDirectory);
-        await saveCatalogSetting(LAST_BACKUP_EXPORT_SETTING_ID, backup.exportedAt);
+        const saveResult = await saveCatalogBackupExport(backup, "ipad-backup", backupDirectory);
         document.dispatchEvent(new CustomEvent("catalog:backup-exported"));
         renderBackupMessage(message, formatIpadExportSummary(backup, saveResult), backup.imageStorage.missingImages > 0 ? "error" : "success");
       } catch (error) {
@@ -921,6 +919,19 @@ function createSerializableImageLibrarySetting(imageLibrary) {
     folderName: imageLibrary.directoryHandle?.name || "",
     selectedAt: imageLibrary.selectedAt || ""
   };
+}
+
+// Keep the timestamp and actual destination together in one settings write.
+// Diagnostics use saveJsonBackup directly and must not replace catalog export history.
+export async function saveCatalogBackupExport(backup, label = "backup", directoryHandle = null, services = {}) {
+  const result = await saveJsonBackup(backup, label, directoryHandle, services);
+  await (services.saveCatalogSetting || saveCatalogSetting)(LAST_BACKUP_EXPORT_SETTING_ID, {
+    exportedAt: backup.exportedAt,
+    destination: result.savedToFolder
+      ? { type: "folder", folderName: result.folderName }
+      : { type: "browser-download" }
+  });
+  return result;
 }
 
 export async function saveJsonBackup(backup, label = "backup", directoryHandle = null, services = {}) {
