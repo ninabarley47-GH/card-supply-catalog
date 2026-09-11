@@ -906,7 +906,9 @@ function preparePatternForEmbeddedStorage(patternEntry) {
     return patternEntry;
   }
 
-  if (patternObject.imagePath && !patternObject.imageSrc && !patternObject.imagePreviewSrc) {
+  // A hydrated preview is runtime-only; unavailable writes must not replace
+  // an existing persistent folder reference with its temporary object URL.
+  if (patternObject.imagePath) {
     return removeTransientImageFields(patternObject);
   }
 
