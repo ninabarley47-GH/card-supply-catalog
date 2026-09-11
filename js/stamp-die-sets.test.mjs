@@ -104,6 +104,22 @@ function databaseHarness() {
       target.objectStore = (name) => ({
         get: (id) => request(stores.get(name).get(id)),
         getAll: () => request([...stores.get(name).values()]),
+        openCursor: () => {
+          const target = new EventTarget();
+          const ids = [...stores.get(name).keys()];
+          let index = 0;
+          const next = () => queueMicrotask(() => {
+            const id = ids[index++];
+            target.result = id === undefined ? null : {
+              value: structuredClone(stores.get(name).get(id)),
+              update: record => stores.get(name).set(id, structuredClone(record)),
+              continue: next
+            };
+            target.dispatchEvent(new Event('success'));
+          });
+          next();
+          return target;
+        },
         put: (record) => stores.get(name).set(record.id, structuredClone(record)),
         delete: (id) => stores.get(name).delete(id)
       });
@@ -611,3 +627,84 @@ test('Recently Added survives Set normalization while legacy Sets remain unmarke
   }
   assert.equal('recentlyAdded' in original, false);
 });
+
+for (const profile of ['standard', 'compact']) for (const failCommit of [false, true]) {
+  test(`${profile} replacement restores taxonomy and product updates atomically, including retained-item tag deletions (failure=${failCommit})`, async t => {
+    const { createCatalogBackupSnapshot, createIpadCatalogBackup, restoreCatalogBackup } = await import('./backup.js');
+    const h = databaseHarness();
+    const previous = globalThis.window;
+    t.after(() => { globalThis.window = previous; });
+    globalThis.window = { indexedDB: h.indexedDB, location: { search: '' }, localStorage: { getItem: () => 'true' } };
+    const storage = await import(`./storage.js?taxonomy-${profile}-${failCommit}`);
+    await storage.loadSavedStampDieRecordsForRestore();
+    const localCatalog = { ...catalog, tags: [...catalog.tags,
+      { id: 'deleted', name: 'Deleted', categoryIds: [] }, { id: 'alias', name: 'Shared', categoryIds: [] }] };
+    await storage.saveGlobalTagCatalog(localCatalog);
+    const assignments = ['stable-one', 'deleted', 'alias'];
+    const localPaper = { id: 'local-paper', name: 'Local Paper', ownerId: 'owner', releaseYear: 2024,
+      patternCount: 1, colors: [], tagIds: assignments, favorite: true, recentlyAdded: true,
+      patterns: [{ imageSrc: 'data:image/jpeg;base64,YQ==', imagePath: 'original.jpg' }] };
+    const localCard = { id: 'local-card', dateCreated: '2025-01-01', size: { width: 4, height: 6 },
+      tagIds: assignments, paperPackIds: ['local-paper'], colorIds: [], stampDieSetIds: ['set-one'],
+      favorite: true, recentlyAdded: true, imageSrc: 'data:image/jpeg;base64,Yg==' };
+    const localSet = { ...setRecord(), tagIds: assignments, favorite: true, recentlyAdded: true };
+    h.stores.get('paperPacks').set(localPaper.id, structuredClone(localPaper));
+    h.stores.get('cards').set(localCard.id, structuredClone(localCard));
+    h.stores.get('stampDieSets').set(localSet.id, structuredClone(localSet));
+    const matchingCard = { ...localCard, id: 'matching-card', tagIds: ['stable-one'], imageSrc: undefined };
+    h.stores.get('cards').set(matchingCard.id, structuredClone(matchingCard));
+    const nextCatalog = { schemaVersion: 1,
+      tags: [{ id: 'stable-one', name: 'Renamed', categoryIds: [] }, { id: 'remote', name: 'Shared', categoryIds: ['new-category'] }],
+      categories: [{ id: 'new-category', name: 'New Category' }] };
+    const importedCard = { ...matchingCard, dateCreated: '2026-09-11', favorite: false, stampDieSetIds: [] };
+    const exportInput = { paperPacks: [], colorsById: {}, cards: [importedCard], tagCatalog: nextCatalog };
+    const backup = profile === 'standard' ? createCatalogBackupSnapshot(exportInput) : await createIpadCatalogBackup({
+      ...exportInput, services: { loadSavedCards: async () => [importedCard], loadSavedStampDieSets: async () => [],
+        loadGlobalTagCatalog: async () => nextCatalog, hydrateCardImageSources() {}, hydrateStampImages() {} }
+    });
+    const before = structuredClone(h.stores);
+    const seedPaper = { ...localPaper, id: 'seed-only-paper' };
+    const runtime = [structuredClone(localPaper), structuredClone(seedPaper)];
+    let refreshes = 0;
+    if (failCommit) h.failNextCommit();
+    const result = await restoreCatalogBackup({ backup, paperPacks: runtime, colorsById: {}, overwriteExisting: true,
+      services: { loadGlobalTagCatalog: storage.loadGlobalTagCatalog,
+        loadSavedCardRecordsForRestore: storage.loadSavedCardRecordsForRestore,
+        restoreCatalogRecords: storage.restoreCatalogRecords,
+        dispatchCardsRestored() { refreshes++; }, dispatchCatalogRestored() { refreshes++; } }
+    });
+    if (failCommit) {
+      assert.equal(result.errors.length, 1);
+      assert.deepEqual(h.stores, before);
+      assert.deepEqual(runtime, [localPaper, seedPaper]);
+      assert.deepEqual(await storage.loadGlobalTagCatalog(), localCatalog);
+      assert.equal(refreshes, 0);
+      assert.equal(result.notes.some(note => note.includes('Tags and categories replaced')), false);
+      return;
+    }
+    assert.deepEqual(result.errors, []);
+    const expectedTags = ['stable-one', 'remote'];
+    for (const [store, record] of [['paperPacks', localPaper], ['cards', localCard], ['stampDieSets', localSet]]) {
+      assert.deepEqual(h.stores.get(store).get(record.id), { ...record, tagIds: expectedTags }, 'only retained tag assignments may change');
+    }
+    assert.deepEqual(h.stores.get('paperPacks').get('seed-only-paper').tagIds, expectedTags);
+    assert.deepEqual(runtime[1].tagIds, expectedTags);
+    assert.deepEqual(runtime[0].tagIds, expectedTags);
+    assert.deepEqual(runtime[0].keywords, ['Renamed', 'Shared']);
+    assert.deepEqual(runtime[0].patterns, localPaper.patterns);
+    assert.equal(h.stores.get('cards').get('matching-card').dateCreated, '2026-09-11');
+    assert.equal(h.stores.get('cards').get('matching-card').favorite, false);
+    assert.deepEqual(h.stores.get('cards').get('matching-card').tagIds, ['stable-one']);
+    assert.deepEqual(await storage.loadGlobalTagCatalog(), backup.tagCatalog);
+    const reloaded = await import(`./storage.js?taxonomy-reload-${profile}`);
+    assert.deepEqual(await reloaded.loadGlobalTagCatalog(), backup.tagCatalog);
+    assert.deepEqual((await reloaded.loadSavedPaperPack('seed-only-paper')).tagIds, expectedTags);
+    assert.deepEqual((await reloaded.loadSavedStampDieRecordsForRestore())[0].tagIds, expectedTags);
+    assert.ok(result.notes.some(note => note.includes('Removed 1 local tags and 1 local categories')));
+    assert.equal(result.cardsImported, 1);
+    assert.equal(result.packsImported, 0);
+    assert.equal(result.setsImported, 0);
+    assert.equal(refreshes, 2);
+    for (const store of ['owners', 'colors', 'deletedPaperPackIds']) assert.deepEqual(h.stores.get(store), before.get(store));
+  });
+}

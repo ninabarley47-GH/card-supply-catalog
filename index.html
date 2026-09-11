@@ -569,7 +569,7 @@
                 <input type="checkbox" data-import-overwrite-existing>
                 <span>Replace existing catalog entries during import</span>
               </label>
-              <p class="settings-help">When selected, imported items with matching IDs replace existing catalog entries. Items without a matching imported entry are left unchanged.</p>
+              <p class="settings-help">When selected, imported items with matching IDs replace existing catalog entries. The backup also replaces tag/category names and memberships, removing tags and categories absent from the backup. Other local items are kept, but deleted tag assignments are cleared and equivalent tags are remapped. Older backups without a complete tag/category catalog merge tags instead.</p>
               <details class="settings-help">
                 <summary>When should I use Low-Memory Diagnostic?</summary>
                 <p>If an imported backup is missing images, choose <strong>Low-Memory Diagnostic</strong> and select the same backup. It scans the file in small pieces without importing or changing the catalog. When it finishes, use <strong>Copy Debug Report</strong> and send the copied text to the app developer.</p>

@@ -293,3 +293,31 @@ test('restore broadcasts the shared owner and taxonomy events used by existing v
   } });
   assert.deepEqual(events, [['catalog:owners-updated', null], ['catalog:global-tags-updated', { source: 'restore' }]]);
 });
+
+test('taxonomy-only replacement always requires confirmation explaining deletions on retained products', async () => {
+  const { summarizeBackupOverwrites } = await import('./backup.js');
+  const backup = createCatalogBackupSnapshot({ paperPacks: [], colorsById: {},
+    tagCatalog: { schemaVersion: 1, tags: [], categories: [] } });
+  const result = await summarizeBackupOverwrites(backup, [], {}, { loadSavedCards: async () => [] });
+  assert.equal(result.requiresConfirmation, true);
+  assert.match(result.message, /replace the complete tag and category catalog/);
+  assert.match(result.message, /absent from the backup will be removed/);
+  assert.match(result.message, /assignments to deleted tags will be cleared/);
+  assert.match(result.message, /retained local products/);
+});
+
+test('replacement of a legacy backup does not infer tag/category deletions', async () => {
+  const local = { schemaVersion: 1, tags: [{ id: 'keep', name: 'Keep', categoryIds: ['cat'] }], categories: [{ id: 'cat', name: 'Category' }] };
+  const backup = createCatalogBackupSnapshot({ paperPacks: [], colorsById: {} });
+  delete backup.tagCatalog;
+  backup.schemaVersion = 2;
+  let saved;
+  const result = await restoreCatalogBackup({ backup, paperPacks: [], colorsById: {}, overwriteExisting: true,
+    services: { loadSavedCards: async () => [], loadGlobalTagCatalog: async () => local,
+      restoreCatalogRecords: async records => { saved = records; } }
+  });
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(saved.tagCatalog, local);
+  assert.equal(saved.retainedTagIdMap, undefined);
+  assert.ok(result.notes.some(note => note.includes('deletions were not applied')));
+});

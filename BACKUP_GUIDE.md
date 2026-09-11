@@ -154,7 +154,23 @@ Validation and tag/category reconciliation precede the one IndexedDB restore
 transaction containing Paper, Card, Set, color, Owner, and taxonomy updates. Invalid
 Set data or a failed transaction cannot partially restore the catalog. Referenced
 Owner IDs must exist in the backup; older Sets with no Owner remain valid. Shared
-tag IDs are reconciled with the local catalog using the existing rules.
+tag IDs are reconciled according to the selected import mode.
+
+With **Replace existing catalog entries during import** selected, modern Standard
+and Compact iPad backups replace the complete tag/category catalog. Backup names
+and category memberships take effect, including renames and removed memberships.
+Local tags and categories absent from the backup are removed. Local products
+absent from the backup remain, but assignments to deleted tags are cleared.
+Equivalent tags are matched by stable ID first, then exact normalized name when
+IDs differ. This assignment cleanup commits in the same transaction as the import;
+images and other fields on retained products are preserved. The confirmation
+explains these effects even when no product IDs match, and the restore summary
+reports the taxonomy replacement.
+
+With replacement unchecked, import retains local names and merges tags,
+categories, and memberships. Legacy backups without a complete `tagCatalog`
+always use this merge behavior, even when replacing matching products; missing
+legacy vocabulary entries are not treated as deletions.
 
 Decision 32 applies: import/export never deletes, moves, renames, overwrites, or
 cleans up source images or folders. Standard export creates a backup JSON file;

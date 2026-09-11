@@ -7,11 +7,45 @@ import {
   validateItemTagAssignments
 } from "./global-tag-catalog.js";
 
-export function reconcileBackupTagData({ localCatalog = createEmptyGlobalTagCatalog(), backup }) {
+export function reconcileBackupTagData({ localCatalog = createEmptyGlobalTagCatalog(), backup, overwriteExisting = false }) {
   assertCatalog(localCatalog, "local");
+  if (backup?.tagCatalog && overwriteExisting) return replaceModern(localCatalog, backup);
   return backup?.tagCatalog
     ? reconcileModern(localCatalog, backup)
     : reconcileLegacy(localCatalog, backup);
+}
+
+function replaceModern(localCatalog, backup) {
+  assertCatalog(backup.tagCatalog, "imported");
+  assertRecordShape(backup.paperPacks || [], "keywords");
+  assertRecordShape(backup.cards || [], "tags");
+  assertRecordShape(backup.stampDieSets || [], "tags");
+  const catalog = cloneCatalog(backup.tagCatalog);
+  const byId = new Map(catalog.tags.map(tag => [tag.id, tag]));
+  const byName = new Map(catalog.tags.map(tag => [getGlobalTagNameKey(tag.name), tag]));
+  // Retained local products keep stable identities first, then exact-name matches.
+  // A missing target explicitly removes that assignment; source records are untouched.
+  const retainedTagIdMap = new Map(localCatalog.tags.map(tag => [
+    tag.id, (byId.get(tag.id) || byName.get(getGlobalTagNameKey(tag.name)))?.id || null
+  ]));
+  const report = { ...createReport(), replaced: true,
+    tagsRemoved: [...retainedTagIdMap.values()].filter(id => id === null).length,
+    categoriesRemoved: localCatalog.categories.filter(category => !catalog.categories.some(
+      target => target.id === category.id || getGlobalTagNameKey(target.name) === getGlobalTagNameKey(category.name)
+    )).length
+  };
+  const result = finish(catalog, backup, new Map(catalog.tags.map(tag => [tag.id, tag.id])), report);
+  return { ...result, retainedTagIdMap };
+}
+
+export function remapRetainedRecordTags(record, tagIdMap) {
+  if (!Array.isArray(record.tagIds)) return record;
+  const tagIds = [...new Set(record.tagIds.map(id => tagIdMap.get(id)).filter(Boolean))];
+  if (tagIds.length === record.tagIds.length && tagIds.every((id, index) => id === record.tagIds[index])) return record;
+  const next = { ...record, tagIds };
+  delete next.keywords;
+  delete next.tags;
+  return next;
 }
 
 function reconcileModern(localCatalog, backup) {

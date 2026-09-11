@@ -125,3 +125,36 @@ test("reconciliation does not mutate local/imported catalogs or image fields", (
   assert.equal(JSON.stringify({ local, imported }), before);
   assert.deepEqual(result.paperPacks[0].patterns, imported.paperPacks[0].patterns);
 });
+
+test('replacement uses the complete backup taxonomy and maps retained local identities without mutation', () => {
+  const local = catalog([
+    tag('same', 'Old name', ['paper'], ['old-cat']), tag('alias', 'Shared'), tag('deleted', 'Deleted')
+  ], [category('old-cat', 'Old category'), category('removed-cat', 'Removed category')]);
+  const incoming = catalog([tag('same', 'Renamed', ['paper'], []), tag('remote', 'Shared')], [category('old-cat', 'Renamed category')]);
+  const backup = modern(incoming, [paper('p', ['same'])], [card('c', ['remote'])]);
+  const before = structuredClone({ local, backup });
+  const result = reconcileBackupTagData({ localCatalog: local, backup, overwriteExisting: true });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.catalog, incoming);
+  assert.deepEqual([...result.retainedTagIdMap], [['same', 'same'], ['alias', 'remote'], ['deleted', null]]);
+  assert.equal(result.report.tagsRemoved, 1);
+  assert.equal(result.report.categoriesRemoved, 1);
+  assert.deepEqual(result.paperPacks[0].tagIds, ['same']);
+  assert.deepEqual(result.cards[0].tagIds, ['remote']);
+  assert.deepEqual({ local, backup }, before);
+});
+
+test('empty modern replacement removes the taxonomy; legacy replacement remains a merge', () => {
+  const local = catalog([tag('local', 'Floral')], [category('cat', 'Nature')]);
+  const modernResult = reconcileBackupTagData({ localCatalog: local, backup: modern(catalog()), overwriteExisting: true });
+  assert.deepEqual(modernResult.catalog, catalog());
+  assert.equal(modernResult.retainedTagIdMap.get('local'), null);
+  const legacy = reconcileBackupTagData({ localCatalog: local, backup: { paperPacks: [], cards: [] }, overwriteExisting: true });
+  assert.deepEqual(legacy.catalog, local);
+  assert.equal(legacy.retainedTagIdMap, undefined);
+});
+
+test('replacement rejects invalid assignments and categories before producing a writable result', () => {
+  assert.throws(() => reconcileBackupTagData({ backup: modern(catalog(), [paper('p', ['missing'])]), overwriteExisting: true }), /unknown tag/);
+  assert.throws(() => reconcileBackupTagData({ backup: modern(catalog([tag('t', 'Tag', ['paper'], ['missing'])])), overwriteExisting: true }), /catalog is invalid/);
+});

@@ -20,7 +20,7 @@ import {
 import { buildOwnerRegistry, isOwner, normalizeOwnerName, migratePaperPackOwners, serializePaperPackOwner } from "./owners.js";
 import { createEmptyGlobalTagCatalog, migrateLegacyTagData, validateGlobalTagCatalog, validateItemTagAssignments } from "./global-tag-catalog.js";
 import { dehydrateCardTagNames, dehydratePaperTagNames, hydratePaperTagNames } from "./global-tag-persistence.js";
-import { reconcileBackupTagData } from "./tag-backup-reconciliation.js";
+import { reconcileBackupTagData, remapRetainedRecordTags } from "./tag-backup-reconciliation.js";
 import { getCardDetailImageSource, hydrateCardImageSources } from "./card-images.js";
 import { createImportPlan } from "./import-mode.js";
 import {
@@ -643,7 +643,7 @@ export async function summarizeBackupOverwrites(backup, paperPacks, colorsById, 
 
   if (setPlan.matchingCount > 0) overwriteParts.push(`${setPlan.matchingCount} Stamp & Die Set${setPlan.matchingCount === 1 ? "" : "s"}`);
 
-  if (overwriteParts.length === 0) {
+  if (overwriteParts.length === 0 && !backup.tagCatalog) {
     return {
       requiresConfirmation: false,
       message: ""
@@ -655,10 +655,14 @@ export async function summarizeBackupOverwrites(backup, paperPacks, colorsById, 
     message: [
       "Replace matching catalog entries?",
       "",
-      `This will replace ${overwriteParts.join(" and ")} already in the catalog. Only image data and references belonging to matching paper packs, Cards, and Sets can change; all other catalog images will remain untouched. Files in your selected image folders will not be deleted.`,
+      `${overwriteParts.length ? `This will replace ${overwriteParts.join(" and ")} already in the catalog.` : "No existing product entries match this backup."} Only image data and references belonging to matching paper packs, Cards, and Sets can change; all other catalog images will remain untouched. Files in your selected image folders will not be deleted.`,
       "",
       `The import will also add ${newPackCount} new paper pack${newPackCount === 1 ? "" : "s"}, ${newColorCount} new color${newColorCount === 1 ? "" : "s"}, ${newCardCount} new Card${newCardCount === 1 ? "" : "s"}, and ${setPlan.newCount} new Stamp & Die Set${setPlan.newCount === 1 ? "" : "s"}.`,
       "",
+      ...(backup.tagCatalog ? [
+        "The backup will replace the complete tag and category catalog, including names and memberships. Local tags and categories absent from the backup will be removed. Products absent from the backup will be kept, but assignments to deleted tags will be cleared; equivalent tags with different IDs will be remapped. This also affects retained local products.",
+        ""
+      ] : ["This older backup has no complete tag/category catalog. Tags will be merged; tag/category deletions will not be applied.", ""]),
       "Continue with replacement import?"
     ].join("\n")
   };
@@ -989,7 +993,7 @@ export async function restoreCatalogBackup({
     const localCatalog = services.loadGlobalTagCatalog
       ? await services.loadGlobalTagCatalog()
       : typeof window === "undefined" ? createEmptyGlobalTagCatalog() : await loadGlobalTagCatalog();
-    reconciliation = reconcileBackupTagData({ localCatalog, backup });
+    reconciliation = reconcileBackupTagData({ localCatalog, backup, overwriteExisting });
   } catch (error) {
     summary.errors.push(`Nothing was imported because tag reconciliation failed: ${error.message}`);
     return summary;
@@ -1071,6 +1075,16 @@ export async function restoreCatalogBackup({
     }
   }
 
+  const retainedPaperPacks = [];
+  if (reconciliation.retainedTagIdMap) {
+    const importedIds = new Set(preparedPaperPacks.map(record => record.id));
+    for (const record of paperPacks) {
+      if (importedIds.has(record.id)) continue;
+      const updated = remapRetainedRecordTags(record, reconciliation.retainedTagIdMap);
+      if (updated !== record) retainedPaperPacks.push(updated);
+    }
+  }
+
   try {
     checkpointImportDiagnostic(importDiagnostic, "saving-to-indexeddb");
     await (services.restoreCatalogRecords || restoreCatalogRecords)({
@@ -1079,7 +1093,11 @@ export async function restoreCatalogBackup({
       cards: preparedCards,
       stampDieSets: setPlan.recordsToImport.map((record) => normalizeStampDieSet(record, reconciliation.catalog)),
       owners: importedOwners,
-      tagCatalog: reconciliation.catalog
+      tagCatalog: reconciliation.catalog,
+      ...(reconciliation.retainedTagIdMap ? {
+        retainedTagIdMap: reconciliation.retainedTagIdMap,
+        retainedPaperPacks
+      } : {})
     });
   } catch (error) {
     logImportError("Atomic catalog restore failed", error, {
@@ -1090,6 +1108,20 @@ export async function restoreCatalogBackup({
     summary.errors.push("Nothing was imported because the catalog could not be saved as one complete transaction.");
     summary.diagnosticReport = await reportImportDiagnostic(importDiagnostic);
     return summary;
+  }
+
+  if (reconciliation.retainedTagIdMap) {
+    const importedIds = new Set(preparedPaperPacks.map(record => record.id));
+    for (let index = 0; index < paperPacks.length; index++) {
+      if (!importedIds.has(paperPacks[index].id)) {
+        paperPacks[index] = hydratePaperTagNames(
+          remapRetainedRecordTags(paperPacks[index], reconciliation.retainedTagIdMap), reconciliation.catalog
+        );
+      }
+    }
+    summary.notes.push(`Tags and categories replaced from the backup, including names and category memberships. Removed ${reconciliation.report.tagsRemoved} local tags and ${reconciliation.report.categoriesRemoved} local categories without a matching backup ID or name. Deleted tag assignments were cleared from retained local items; equivalent tags were remapped.`);
+  } else if (overwriteExisting && !backup.tagCatalog) {
+    summary.notes.push("This older backup has no complete tag/category catalog. Tags were merged; tag/category deletions were not applied.");
   }
 
   for (const color of colorPlan.recordsToImport) {

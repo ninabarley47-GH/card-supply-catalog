@@ -1,3 +1,4 @@
+import { remapRetainedRecordTags } from './tag-backup-reconciliation.js';
 import { reconcileStampDieImageTags } from './stamp-die-image-tags.js';
 import { addCatalogSchemaVersion } from "./schema.js";
 import { normalizeStampDieSet } from "./stamp-die-sets.js";
@@ -372,7 +373,7 @@ export async function saveCard(card) {
   });
 }
 
-export async function restoreCatalogRecords({ paperPacks = [], colors = [], cards = [], stampDieSets = [], owners = [], tagCatalog = null, tagVocabularies = null }) {
+export async function restoreCatalogRecords({ paperPacks = [], colors = [], cards = [], stampDieSets = [], owners = [], tagCatalog = null, tagVocabularies = null, retainedTagIdMap = null, retainedPaperPacks = [] }) {
   if (tagCatalog && !validateGlobalTagCatalog(tagCatalog).ok) throw new TypeError("Cannot restore an invalid global tag catalog.");
   const normalizedSets = stampDieSets.map((record) => normalizeStampDieSet(record, tagCatalog));
   const ownerIds = new Set(owners.map((owner) => owner.id));
@@ -392,6 +393,35 @@ export async function restoreCatalogRecords({ paperPacks = [], colors = [], card
       const cardStore = transaction.objectStore(CARDS_STORE);
       const settingsStore = transaction.objectStore(SETTINGS_STORE);
       const ownerStore = transaction.objectStore(OWNERS_STORE);
+
+      if (retainedTagIdMap) {
+        for (const [storeName, imported] of [[PAPER_PACKS_STORE, paperPacks], [CARDS_STORE, cards], [STAMP_DIE_SETS_STORE, stampDieSets]]) {
+          const store = transaction.objectStore(storeName);
+          const importedIds = new Set(imported.map(record => record.id));
+          const unstoredPaper = new Map((storeName === PAPER_PACKS_STORE ? retainedPaperPacks : [])
+            .filter(record => !importedIds.has(record.id)).map(record => [record.id, record]));
+          // Visit one record at a time: compact iPad catalogs contain large embedded images.
+          const request = store.openCursor();
+          request.addEventListener("success", () => {
+            try {
+              const cursor = request.result;
+              if (!cursor) {
+                // Seed Paper Packs can exist only in the live library. Save changed
+                // assignments as overrides so deleted tags cannot return on reload.
+                for (const record of unstoredPaper.values()) store.put(normalizePaperPackForStorage(record, tagCatalog));
+                return;
+              }
+              const record = cursor.value;
+              unstoredPaper.delete(record.id);
+              if (!importedIds.has(record.id)) {
+                const updated = remapRetainedRecordTags(record, retainedTagIdMap);
+                if (updated !== record) cursor.update(updated);
+              }
+              cursor.continue();
+            } catch { transaction.abort(); }
+          });
+        }
+      }
 
       owners.forEach((owner) => ownerStore.put(owner));
       normalizedSets.forEach((record) => transaction.objectStore(STAMP_DIE_SETS_STORE).put(record));
