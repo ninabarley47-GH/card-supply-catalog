@@ -90,8 +90,9 @@ async function harness(t, otherCatalogServices = {}) {
   const screen = Object.assign(new Element('section'), { id: 'stamps-dies' });
   const add = new Element('button'); add.dataset.addSet = '';
   const gallery = new Element('div'); gallery.dataset.setLibrary = '';
+  const sort = new Element('select'); sort.dataset.setLibrarySort = ''; sort.value = 'recently-added';
   const status = new Element('p'); status.dataset.setLibraryStatus = '';
-  screen.append(add, gallery, status);
+  screen.append(add, sort, gallery, status);
   document.body.append(screen);
   const headerAdd = new Element('button'); headerAdd.dataset.addStampSetOpen = '';
   document.body.append(headerAdd);
@@ -149,7 +150,7 @@ async function harness(t, otherCatalogServices = {}) {
     input.checked = true;
     await form.querySelector('.global-tag-picker').emit('change', { target: input });
   }
-  return { headerAdd, saveOptions, filterControls, owners, owner: form.querySelector('select[name="ownerId"]'), newOwner: form.querySelector('input[name="owner"]'), document, add, gallery, status, dialog, form, name, year, favorite, cancel, records, select,
+  return { sort, headerAdd, saveOptions, filterControls, owners, owner: form.querySelector('select[name="ownerId"]'), newOwner: form.querySelector('input[name="owner"]'), document, add, gallery, status, dialog, form, name, year, favorite, cancel, records, select,
     recordReads: () => recordReads, calls: () => calls, setFailure: (value) => { failure = value; }, setGate: (value) => { commitGate = value; },
     renameTag: () => { catalog.tags[0].name = 'Botanical'; } };
 }
@@ -1750,4 +1751,73 @@ test('Add populates previews through the real flat-library lookup and saves refe
   await h.form.emit('submit');
   assert.deepEqual(h.records[0].imageRefs.map(ref => ref.imagePath), expected);
   assert.ok(h.records[0].imageRefs.every(ref => ref.imageLibrary === 'stamp-die-images' && ref.imageStorageStrategy === 'local-folder'));
+});
+
+test('Stamp gallery Sort matches Paper/Card toolbar labels and defaults', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const section = html.slice(html.indexOf('<section class="library-section" aria-label="Stamp and die sets">'), html.indexOf('<section class="app-screen settings-section"'));
+  assert.match(section, /class="gallery-toolbar"/);
+  assert.match(section, /class="gallery-toolbar-control" for="set-library-sort-order"/);
+  assert.match(section, /<span>Sort<\/span>/);
+  const select = section.match(/<select id="set-library-sort-order" data-set-library-sort>([\s\S]*?)<\/select>/)[1];
+  assert.match(select, /value="recently-added" selected>Recently Added/);
+  const options = [...select.matchAll(/<option value="([^"]+)"[^>]*>([^<]+)<\/option>/g)];
+  assert.deepEqual(options.map(match => match[1]), ['recently-added', 'name-asc', 'name-desc', 'release-asc', 'release-desc', 'favorite-desc']);
+  for (const [, value, label] of options) {
+    assert.ok(html.slice(0, html.indexOf('id="stamps-dies"')).includes(`value="${value}">${label}</option>`) || value === 'recently-added');
+  }
+  assert.ok(section.indexOf('data-set-library-sort') < section.indexOf('data-set-library aria-live'));
+});
+
+test('Stamp sort changes preserve records and use Paper name, recent, favorite and release ordering', async (t) => {
+  const h = await harness(t);
+  for (const [id, name, recentlyAdded, favorite, releaseYear] of [
+    ['z', 'Zulu', true, true, 2023], ['a', 'Alpha', false, false, 2025],
+    ['b', 'Bravo', true, false, 2023], ['c', 'Charlie', false, true, undefined]
+  ]) h.records.push(createStampDieSetRecord({ id, name, recentlyAdded, favorite, releaseYear, tagIds: [], dateCreated: '2026-09-01' }, initialCatalog()));
+  await h.document.emit('catalog:global-tags-updated');
+  const ids = () => h.gallery.querySelectorAll('article').map(tile => tile.dataset.setId);
+  const before = structuredClone(h.records);
+  const reads = h.recordReads();
+  assert.deepEqual(ids(), ['b', 'z', 'a', 'c']);
+  for (const [mode, expected] of [
+    ['name-asc', ['a', 'b', 'c', 'z']], ['name-desc', ['z', 'c', 'b', 'a']],
+    ['favorite-desc', ['c', 'z', 'a', 'b']], ['release-asc', ['b', 'z', 'a', 'c']],
+    ['release-desc', ['a', 'b', 'z', 'c']], ['recently-added', ['b', 'z', 'a', 'c']]
+  ]) {
+    h.sort.value = mode; await h.sort.emit('change');
+    assert.deepEqual(ids(), expected, mode);
+    assert.equal(h.sort.value, mode);
+    assert.deepEqual(h.records, before);
+  }
+  assert.equal(h.calls(), 0);
+  assert.equal(h.recordReads(), reads);
+});
+
+test('Stamp sort composes with search and filters and survives clearing filters and refresh', async (t) => {
+  const h = await harness(t);
+  for (const [id, name, ownerId, favorite] of [
+    ['z', 'Garden Zulu', 'owner-nina', true], ['a', 'Garden Alpha', 'owner-nina', true],
+    ['b', 'Garden Bravo', 'owner-amanda', false], ['c', 'Other', 'owner-nina', true]
+  ]) h.records.push(createStampDieSetRecord({ id, name, ownerId, favorite, dateCreated: '2026-09-01', tagIds: ['stable-paper'], releaseYear: 2024 }, initialCatalog()));
+  await h.document.emit('catalog:global-tags-updated');
+  const before = structuredClone(h.records);
+  const ids = () => h.gallery.querySelectorAll('article').map(tile => tile.dataset.setId);
+  h.filterControls.search.value = 'Garden'; await h.filterControls.search.emit('input');
+  h.filterControls.owner.value = 'owner-nina'; await h.filterControls.owner.emit('change');
+  h.filterControls.year.value = '2024'; await h.filterControls.year.emit('change');
+  await h.filterControls.favorites.emit('click');
+  h.sort.value = 'name-desc'; await h.sort.emit('change');
+  assert.deepEqual(ids(), ['z', 'a']);
+  assert.equal(h.status.textContent, 'Showing 2 of 4 sets');
+  h.filterControls.search.value = 'Floral'; await h.filterControls.search.emit('input');
+  assert.deepEqual(ids(), ['c', 'z', 'a']);
+  await h.document.emit('catalog:global-tags-updated');
+  assert.deepEqual(ids(), ['c', 'z', 'a']);
+  assert.equal(h.sort.value, 'name-desc');
+  await h.filterControls.clear.emit('click');
+  assert.deepEqual(ids(), ['c', 'z', 'b', 'a']);
+  assert.equal(h.sort.value, 'name-desc');
+  assert.deepEqual(h.records, before);
+  assert.equal(h.calls(), 0);
 });

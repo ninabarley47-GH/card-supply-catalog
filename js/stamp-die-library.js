@@ -54,6 +54,7 @@ export async function initializeStampDieLibrary(services = {}) {
   if (!screen) return;
   const add = screen.querySelector('[data-add-set]');
   const gallery = screen.querySelector('[data-set-library]');
+  const sortControl = screen.querySelector('[data-set-library-sort]');
   const status = screen.querySelector('[data-set-library-status]');
   status.className += ' form-message';
   const view = createSetFormView();
@@ -230,12 +231,13 @@ export async function initializeStampDieLibrary(services = {}) {
   });
   const filters = initializeStampDieFilters(owners, renderCurrent);
   filters.refreshOwners();
+  sortControl?.addEventListener('change', renderCurrent);
 
   function renderCurrent() {
     if (!libraryCatalog) return;
     filters.refreshCatalog(libraryCatalog, displayedRecords);
     const visible = filterStampDieSets(displayedRecords, filters.read(), libraryCatalog, owners);
-    renderStampDieLibrary(gallery, visible, libraryCatalog, (id) => openForm(id), openDetail, owners, displayedRecords.length, toggleFavorite, cards);
+    renderStampDieLibrary(gallery, visible, libraryCatalog, (id) => openForm(id), openDetail, owners, displayedRecords.length, toggleFavorite, cards, sortControl?.value || 'recently-added');
     setFavoriteButtonsDisabled(savingFavorite || deleting);
     status.dataset.tone = '';
     status.textContent = `Showing ${visible.length} of ${displayedRecords.length} sets`;
@@ -772,8 +774,8 @@ function createField(text, ...inputs) {
   return label;
 }
 
-export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetail, owners = [], totalCount = records.length, onFavorite, cards = []) {
-  const tiles = sortPaperPacks(records).map((record) => {
+export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetail, owners = [], totalCount = records.length, onFavorite, cards = [], sortOrder = 'recently-added') {
+  const tiles = sortPaperPacks(records, sortOrder).map((record) => {
     const tile = document.createElement('article');
     tile.className = 'stamp-set-tile';
     tile.dataset.setId = record.id;

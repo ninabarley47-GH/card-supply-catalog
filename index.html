@@ -368,6 +368,19 @@
               <button class="button button-primary" type="button" data-add-set>Add Set</button>
             </section>
             <section class="library-section" aria-label="Stamp and die sets">
+              <div class="gallery-toolbar" aria-label="Stamp and die gallery controls">
+                <label class="gallery-toolbar-control" for="set-library-sort-order">
+                  <span>Sort</span>
+                  <select id="set-library-sort-order" data-set-library-sort>
+                    <option value="recently-added" selected>Recently Added</option>
+                    <option value="name-asc">Name: A–Z</option>
+                    <option value="name-desc">Name: Z–A</option>
+                    <option value="release-asc">Release date: Oldest first</option>
+                    <option value="release-desc">Release date: Newest first</option>
+                    <option value="favorite-desc">Favorites first</option>
+                  </select>
+                </label>
+              </div>
               <div class="card-library-grid" data-set-library aria-live="polite"><p class="loading-message">Loading stamps &amp; dies...</p></div>
             </section>
           </section>
