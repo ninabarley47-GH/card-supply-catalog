@@ -243,7 +243,7 @@ export async function prepareCardImageForSave(card, selectedImage, services = {}
 
   if (!directoryHandle) {
     return {
-      card: await prepareEmbeddedImage(card, selectedImage.file),
+      card: await prepareEmbeddedImage(card, selectedImage.file, { allowMissingThumbnail: true }),
       usedFallback: true
     };
   }
@@ -255,7 +255,7 @@ export async function prepareCardImageForSave(card, selectedImage, services = {}
     };
   } catch (error) {
     return {
-      card: await prepareEmbeddedImage(card, selectedImage.file),
+      card: await prepareEmbeddedImage(card, selectedImage.file, { allowMissingThumbnail: true }),
       usedFallback: true
     };
   }

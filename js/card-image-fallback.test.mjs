@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   createCardImageFromFile,
   getCardImageSelectionMode,
+  getCardLibraryImageSource,
+  getCardDetailImageSource,
   prepareCardImageForSave
 } from './card-images.js';
 import { normalizeCardForRuntime } from './storage.js';
@@ -139,3 +141,67 @@ test('folder-capable save keeps the existing folder preparation path', async () 
   assert.equal(result.card.imageStorageStrategy, 'local-folder');
   assert.equal(embeddedCalled, false);
 });
+
+for (const mode of ['thumbnail-success', 'add-thumbnail-failure', 'edit-thumbnail-failure', 'folder-thumbnail-failure']) {
+  test(`real Card image preparation retains the original across reload: ${mode}`, async t => {
+    const globals = { createImageBitmap: globalThis.createImageBitmap, document: globalThis.document, FileReader: globalThis.FileReader };
+    t.after(() => Object.assign(globalThis, globals));
+    const succeeds = mode === 'thumbnail-success';
+    let thumbnailAttempts = 0;
+    globalThis.createImageBitmap = async () => {
+      thumbnailAttempts++;
+      if (!succeeds) throw new Error('Thumbnail decoder unavailable');
+      return { width: 800, height: 600, close() {} };
+    };
+    globalThis.document = { createElement: () => ({
+      getContext: () => ({ drawImage() {} }),
+      toBlob(callback, type, quality) {
+        assert.equal(this.width, 400);
+        assert.equal(this.height, 300);
+        assert.equal(type, 'image/jpeg');
+        assert.equal(quality, 0.82);
+        callback(new Blob(['thumbnail bytes'], { type }));
+      }
+    }) };
+    globalThis.FileReader = class {
+      listeners = {};
+      addEventListener(type, handler) { this.listeners[type] = handler; }
+      readAsDataURL(blob) {
+        blob.arrayBuffer().then(bytes => {
+          this.result = `data:${blob.type};base64,${Buffer.from(bytes).toString('base64')}`;
+          this.listeners.load();
+        }, error => { this.error = error; this.listeners.error(); });
+      }
+    };
+    const file = new File(['usable original bytes'], 'original.png', { type: 'image/png' });
+    const directory = mode === 'folder-thumbnail-failure' ? {
+      getFileHandle: async (name, options) => {
+        assert.ok(!options?.create, 'fallback must not create or rewrite files');
+        throw new DOMException('No thumbnail', 'NotFoundError');
+      }
+    } : null;
+    const input = mode === 'edit-thumbnail-failure' ? {
+      ...baseCard, imageSrc: 'data:image/png;base64,b2xk', thumbnailImageSrc: 'data:image/jpeg;base64,b2xk'
+    } : baseCard;
+    // Use the real folder/embedded preparers and thumbnail generator; only
+    // browser APIs and folder availability are controlled by the harness.
+    const result = await prepareCardImageForSave(input, { file, ...(directory ? { imagePath: 'original.png' } : {}) },
+      { getDirectoryHandle: async () => directory });
+    const reloaded = normalizeCardForRuntime(structuredClone(result.card));
+    const originalSource = `data:image/png;base64,${Buffer.from(await file.arrayBuffer()).toString('base64')}`;
+    assert.equal(reloaded.imageSrc, originalSource);
+    assert.equal(reloaded.imagePath, undefined);
+    assert.equal(reloaded.imageStorageStrategy, 'embedded-indexed-db');
+    assert.equal(getCardDetailImageSource(reloaded), originalSource);
+    assert.ok(!JSON.stringify(reloaded).includes('blob:'));
+    assert.equal(result.usedFallback, true);
+    assert.ok(thumbnailAttempts > 0, 'thumbnail generation must still be attempted');
+    if (succeeds) {
+      assert.match(reloaded.thumbnailImageSrc, /^data:image\/jpeg;base64,/);
+      assert.equal(getCardLibraryImageSource(reloaded), reloaded.thumbnailImageSrc);
+    } else {
+      assert.equal(reloaded.thumbnailImageSrc, undefined);
+      assert.equal(getCardLibraryImageSource(reloaded), originalSource);
+    }
+  });
+}

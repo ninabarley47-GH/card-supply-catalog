@@ -14,6 +14,7 @@ import {
 } from "./global-tag-management.js";
 import { createLegacyOwnerId, getOwnerNameKey, isActiveOwner, normalizeOwnerName } from "./owners.js";
 import { supportsDirectoryPicker } from "./browser-capabilities.js";
+import { refreshOwnerOptions, notifyOwnerRegistryUpdated } from './owner-picker.js';
 
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
 const CARD_IMAGE_LIBRARY_SETTING_ID = "cardImageLibrary";
@@ -839,12 +840,8 @@ function initializeBulkOwnerSettings({ paperPacks = [], owners = [], onPaperPack
       return;
     }
 
-    let owner = owners.find((candidate) => getOwnerNameKey(candidate.name) === getOwnerNameKey(newOwner));
-    if (!owner) {
-      owner = { id: createLegacyOwnerId(newOwner), name: newOwner };
-      await saveOwner(owner);
-      owners.push(owner);
-    }
+    const existingOwner = owners.find((candidate) => getOwnerNameKey(candidate.name) === getOwnerNameKey(newOwner));
+    const owner = existingOwner || { id: createLegacyOwnerId(newOwner), name: newOwner };
     const affectedPacks = paperPacks.filter((paperPack) => paperPack.ownerId !== owner.id);
 
     if (affectedPacks.length === 0) {
@@ -862,6 +859,12 @@ function initializeBulkOwnerSettings({ paperPacks = [], owners = [], onPaperPack
     renderBulkOwnerMessage(message, "Updating paper pack owners...", "");
 
     try {
+      if (!existingOwner) {
+        await saveOwner(owner);
+        owners.push(owner);
+        refreshOwnerOptions(owners);
+        notifyOwnerRegistryUpdated();
+      }
       await savePaperPacks(updatedPaperPacks);
       paperPacks.splice(0, paperPacks.length, ...updatedPaperPacks);
       onPaperPacksUpdated?.();
@@ -1151,8 +1154,11 @@ export async function renderSetupStatus(container, paperPacks = [], services = {
   const stampFolderPermission = await getDirectoryPermissionState(stampDirectoryHandle);
   const folderPermission = directoryHandle ? await getDirectoryPermissionState(directoryHandle) : "";
   const cardFolderPermission = cardDirectoryHandle ? await getDirectoryPermissionState(cardDirectoryHandle) : "";
+  // Collapsed Settings can show counts and permissions without opening originals.
+  // Opening Setup Status renders again and checks the current Paper references.
+  const checkPaperImages = container.closest?.("details")?.open ?? true;
   const imageHealth =
-    directoryHandle && folderPermission === "granted" ? await (services.checkImageLibraryHealth || checkImageLibraryHealth)(paperPacks).catch(() => null) : null;
+    checkPaperImages && directoryHandle && folderPermission === "granted" ? await (services.checkImageLibraryHealth || checkImageLibraryHealth)(paperPacks).catch(() => null) : null;
   const folderImages = imageHealth?.summary.folderImages ?? countFolderImageReferences(paperPacks);
   const missingImages = imageHealth?.summary.imagesMissing ?? 0;
   const missingImageFolders = getMissingImageFolders(imageHealth?.summary.missingImages);

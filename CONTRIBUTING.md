@@ -22,6 +22,20 @@ Last Updated: 2026-07-01
 
 6. Document major decisions.
 
+## Automated tests
+
+From the repository root, run the intended automated suite with:
+
+```sh
+node --test "js/*.test.mjs"
+```
+
+Use this explicit file pattern instead of unqualified `node --test`, which also
+discovers `js/thumbnail-test.js`. That file powers the browser-only
+`thumbnail-test.html` demo and requires browser APIs such as `document`.
+
+Run `git diff --check` before finishing a change.
+
 # Change Safety / Implementation Discipline
 For requests that affect data models, persistence, import/export, storage, shared components, navigation architecture, or multiple features/modules, do not immediately implement the request. First provide an impact assessment and proposed implementation plan. Wait for approval before modifying files.
 

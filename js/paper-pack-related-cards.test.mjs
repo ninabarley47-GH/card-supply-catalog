@@ -88,7 +88,7 @@ function relatedRenderer() {
       setAttribute(key, value) { this.attributes[key] = value; },
       addEventListener(type, callback, options) { this.listeners[type] = { callback, options }; }
     }; } } });
-  vm.runInContext(source.slice(source.indexOf('function createRelatedCardsSection('), source.indexOf('function createPatternViewer(')), context);
+  vm.runInContext(source.slice(source.indexOf('function createRelatedCardsSection('), source.indexOf('export function createPatternViewer(')), context);
   return context.createRelatedCardsSection;
 }
 test('Paper related Cards show identifying captions and accessible labels with Stamp thumbnail classes', () => {
