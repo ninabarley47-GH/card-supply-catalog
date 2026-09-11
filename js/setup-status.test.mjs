@@ -143,3 +143,38 @@ for (const value of ['2026-09-01T12:00:00Z', { exportedAt: '2026-09-01T12:00:00Z
     assert.equal(rows[1].badge, 'Exported');
   });
 }
+
+for (const product of ['Paper', 'Stamps & Dies', 'Cards']) {
+  test(`unsupported browser reports actual embedded storage for ${product} without changing records`, async t => {
+    const embedded = { imageSrc: 'data:image/jpeg;base64,a', imageStorageStrategy: 'embedded-indexed-db' };
+    const data = {
+      supported: false,
+      packs: [{ patterns: product === 'Paper' ? [embedded] : [] }],
+      sets: [{ imageRefs: product === 'Stamps & Dies' ? [embedded] : [] }],
+      cards: product === 'Cards' ? [embedded] : [{}]
+    };
+    const before = structuredClone(data);
+    const rows = await harness(t, data).render();
+    assert.equal(rows[3].lines.find(line => line.startsWith(product + ':')), `${product}: 1 embedded image stored in this browser (IndexedDB).`);
+    assert.equal(rows[3].badge, 'OK');
+    assert.doesNotMatch(rows[3].lines.join(' '), /folder|reconnect/i);
+    assert.deepEqual(data, before);
+  });
+}
+
+test('unsupported browser distinguishes empty libraries from references without embedded originals', async t => {
+  const empty = await harness(t, { supported: false }).render();
+  assert.ok(empty[3].lines.every(line => line.endsWith('No embedded images stored in this browser yet.')));
+  assert.equal(empty[3].badge, 'OK');
+  const rows = await harness(t, { supported: false,
+    packs: [{ patterns: [{ imagePath: 'paper.jpg', thumbnailImageSrc: 'data:image/jpeg;base64,a' }] }],
+    sets: [{ imageRefs: [stampRef('one.jpg'), { ...stampRef('two.jpg'), imageSrc: 'data:image/jpeg;base64,a' }] }],
+    cards: [{ imageSrc: 'data:image/jpeg;base64,a' }, { imageSrc: 'data:image/png;base64,b' }]
+  }).render();
+  assert.equal(rows[3].lines[0], 'Paper: No embedded images stored in this browser yet. 1 image reference has no embedded image data on this device.');
+  assert.equal(rows[3].lines[1], 'Stamps & Dies: 1 embedded image stored in this browser (IndexedDB). 1 image reference has no embedded image data on this device.');
+  assert.equal(rows[3].lines[2], 'Cards: 2 embedded images stored in this browser (IndexedDB).');
+  assert.equal(rows[3].badge, 'Check needed');
+  assert.equal(rows[3].tone, 'attention');
+  assert.doesNotMatch(rows[3].lines.join(' '), /folder|reconnect/i);
+});

@@ -1174,7 +1174,11 @@ export async function renderSetupStatus(container, paperPacks = [], services = {
     ["Cards", cardDirectoryHandle, cardFolderPermission, "Card image"]
   ];
   const folderBadges = folders.map(([, handle, permission]) => getImageFolderStatusBadge(handle, permission));
-  const references = [
+  const references = !supportsDirectoryPicker(window) ? [
+    { label: "Paper", ...getBrowserImageReferenceStatus(paperPacks.flatMap(pack => pack.patterns || [])) },
+    { label: "Stamps & Dies", ...getBrowserImageReferenceStatus(stampSets.flatMap(set => set.imageRefs || [])) },
+    { label: "Cards", ...getBrowserImageReferenceStatus(cards) }
+  ] : [
     { label: "Paper", detail: getImageReferenceStatusDetail(folderImages, missingImages,
       imageReferencesChecked, Boolean(directoryHandle), missingImageFolders),
       badge: getImageReferenceStatusBadge(folderImages, missingImages, imageReferencesChecked) },
@@ -1294,6 +1298,28 @@ function getImageFolderStatusTone(directoryHandle, permissionState) {
   }
 
   return permissionState === "granted" ? "ready" : "attention";
+}
+
+function getBrowserImageReferenceStatus(records) {
+  let embedded = 0;
+  let unavailable = 0;
+  for (const record of records) {
+    if (!record || typeof record !== "object") continue;
+    if (typeof record.imageSrc === "string" && record.imageSrc.startsWith("data:image/")) {
+      embedded++;
+    } else if (record.imagePath || record.imageSrc || record.imageStorageStrategy === "embedded-indexed-db") {
+      unavailable++;
+    }
+  }
+  const detail = embedded
+    ? `${embedded} embedded image${embedded === 1 ? "" : "s"} stored in this browser (IndexedDB).`
+    : "No embedded images stored in this browser yet.";
+  return {
+    detail: unavailable
+      ? `${detail} ${unavailable} image reference${unavailable === 1 ? " has" : "s have"} no embedded image data on this device.`
+      : detail,
+    badge: unavailable ? "Check needed" : "OK"
+  };
 }
 
 function getImageReferenceStatusDetail(folderImages, missingImages, wasChecked, hasDirectoryHandle, missingImageFolders = []) {
