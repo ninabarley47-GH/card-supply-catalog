@@ -173,3 +173,59 @@ test("Paper terminology covers visible labels, messages and app description whil
   assert.match(html, /id="dsp-name"/);
   assert.doesNotMatch(html.replace(/<[^>]*>/g, ''), /\bDSP\b|Designer Series Paper/);
 });
+import vm from 'node:vm';
+
+const addDspSource = await readFile(new URL('./add-dsp.js', import.meta.url), 'utf8');
+function autoCountHarness(loadImages, editingPaperPack = null) {
+  const form = { elements: { name: { value: 'Test Pack' }, patternCount: { value: '12' } } };
+  const selectedImages = [];
+  const state = { editingPaperPack, autoLoadedPaperPackId: '', isLoadingLibraryImages: false };
+  const context = vm.createContext({
+    window: {}, supportsDirectoryPicker: () => true,
+    cleanText: value => value.trim(), createId: value => value.toLowerCase(),
+    loadPatternImagesForPaperPackName: loadImages,
+    renderFormMessage() {}, renderImagePreviews() {}
+  });
+  const start = addDspSource.indexOf('async function autoLoadImagesForCurrentPaperPackName(');
+  const end = addDspSource.indexOf('async function addImagesFromInput(', start);
+  vm.runInContext(addDspSource.slice(start, end), context);
+  return { form, selectedImages, state,
+    load: () => context.autoLoadImagesForCurrentPaperPackName(form, selectedImages, null, null, null, state) };
+}
+
+for (const imageCount of [0, 6, 12, 24]) {
+  test('Add Paper defaults pattern count from folder with ' + imageCount + ' images and preserves later edits', async () => {
+    let lookups = 0;
+    const h = autoCountHarness(async () => {
+      lookups++;
+      return { ok: true, images: Array.from({ length: imageCount }, () => ({})), message: '' };
+    });
+    // An old value must not prevent the new folder-based default.
+    h.form.elements.patternCount.value = '30';
+    await h.load();
+    assert.equal(h.form.elements.patternCount.value, String(imageCount || 12));
+    assert.equal(h.selectedImages.length, imageCount);
+    h.form.elements.patternCount.value = '36';
+    await h.load(); // Repeated blur and submit must preserve a user's choice.
+    assert.equal(h.form.elements.patternCount.value, '36');
+    assert.equal(lookups, 1);
+  });
+}
+
+test('Add Paper preserves a user-entered count while folder images are loading', async () => {
+  let finish;
+  const h = autoCountHarness(() => new Promise(resolve => { finish = resolve; }));
+  const pending = h.load();
+  h.form.elements.patternCount.value = '20';
+  finish({ ok: true, images: Array.from({ length: 6 }, () => ({})), message: '' });
+  await pending;
+  assert.equal(h.form.elements.patternCount.value, '20');
+  assert.equal(h.selectedImages.length, 6);
+});
+
+test('Edit Paper does not replace its saved pattern count through automatic folder loading', async () => {
+  const h = autoCountHarness(() => assert.fail('editing must not perform automatic lookup'), { id: 'existing' });
+  h.form.elements.patternCount.value = '18';
+  await h.load();
+  assert.equal(h.form.elements.patternCount.value, '18');
+});

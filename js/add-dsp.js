@@ -615,6 +615,7 @@ async function autoLoadImagesForCurrentPaperPackName(
     return;
   }
 
+  const patternCountAtStart = form.elements.patternCount?.value;
   formState.isLoadingLibraryImages = true;
   renderFormMessage(message, `Looking for images in the image library for ${paperPackName}...`, "");
 
@@ -627,6 +628,10 @@ async function autoLoadImagesForCurrentPaperPackName(
     }
 
     formState.autoLoadedPaperPackId = paperPackId;
+    // Do not replace a count the user typed while the folder lookup was pending.
+    if (form.elements.patternCount?.value === patternCountAtStart) {
+      updatePatternCountForAutoLoadedImages(form, result.images.length);
+    }
 
     if (result.images.length === 0) {
       renderFormMessage(message, result.message, "");
@@ -634,7 +639,6 @@ async function autoLoadImagesForCurrentPaperPackName(
     }
 
     selectedImages.push(...result.images);
-    updatePatternCountForAutoLoadedImages(form, selectedImages.length);
     renderImagePreviews(selectedImages, imagePreviewList, imagePreviewCount);
     renderFormMessage(message, result.message, "success");
   } catch (error) {
@@ -651,11 +655,7 @@ function updatePatternCountForAutoLoadedImages(form, imageCount) {
     return;
   }
 
-  const currentPatternCount = Number.parseInt(patternCountControl?.value, 10);
-
-  if (Number.isNaN(currentPatternCount) || currentPatternCount < imageCount) {
-    patternCountControl.value = `${imageCount}`;
-  }
+  patternCountControl.value = `${imageCount > 0 ? imageCount : 12}`;
 }
 
 async function addImagesFromInput(files, selectedImages, message) {
