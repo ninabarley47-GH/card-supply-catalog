@@ -1,5 +1,6 @@
 import { ensureImageReferenceOriginal } from './image-references.js';
-import { loadWritableExportDirectory, saveExportFile, downloadExportFile } from './export-library.js';
+import { downloadExportFile } from './export-library.js';
+import { loadWritableCoverSheetDirectory } from './cover-sheet-folder.js';
 import { getAvailablePatternImages } from "./images.js";
 
 const COVER_SHEET_SIZE = 1800;
@@ -17,8 +18,7 @@ export async function createCoverSheetForPack(paperPack, colorsById) {
   const imageEntries = getAvailablePatternImages(paperPack);
 
   if (imageEntries.length === 0) {
-    window.alert("This paper pack does not have any pattern images available for a cover sheet yet.");
-    return;
+    throw new Error("This paper pack does not have any pattern images available for a cover sheet yet.");
   }
 
   const destination = await chooseCoverSheetDestination(paperPack);
@@ -27,8 +27,7 @@ export async function createCoverSheetForPack(paperPack, colorsById) {
   const images = await loadPatternImages(imageEntries);
 
   if (images.length === 0) {
-    window.alert("The available pattern images could not be loaded for this cover sheet.");
-    return;
+    throw new Error("The available pattern images could not be loaded. Check that your Image Library folder is connected in Settings.");
   }
 
   const canvas = document.createElement("canvas");
@@ -43,12 +42,11 @@ export async function createCoverSheetForPack(paperPack, colorsById) {
   const canvasBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 
   if (!canvasBlob) {
-    window.alert("The cover sheet could not be created.");
-    return;
+    throw new Error("The cover sheet could not be created.");
   }
 
   const blob = await addPngPrintResolution(canvasBlob, COVER_SHEET_PRINT_DPI);
-  await saveCoverSheet(blob, paperPack, destination);
+  return await saveCoverSheet(blob, paperPack, destination);
 }
 
 async function addPngPrintResolution(blob, dpi) {
@@ -315,14 +313,14 @@ function parseHexColor(hex) {
 }
 
 export async function chooseCoverSheetDestination(paperPack, environment = globalThis, services = {}) {
-  const directoryHandle = await (services.loadWritableExportDirectory || loadWritableExportDirectory)(environment);
+  const directoryHandle = await (services.loadWritableCoverSheetDirectory || loadWritableCoverSheetDirectory)(environment, services);
   if (directoryHandle) return { directoryHandle };
   const fileHandle = await chooseCoverSheetFile(paperPack, environment);
   return fileHandle === false ? false : { fileHandle };
 }
 
 async function chooseCoverSheetFile(paperPack, environment) {
-  const fileName = `${slugifyFileName(paperPack.name)}-cover-sheet.png`;
+  const fileName = createCoverSheetFileName(paperPack.name);
 
   if (typeof environment.showSaveFilePicker === "function") {
     try {
@@ -348,31 +346,36 @@ async function chooseCoverSheetFile(paperPack, environment) {
 }
 
 export async function saveCoverSheet(blob, paperPack, { directoryHandle, fileHandle }, services = {}) {
-  if (directoryHandle) {
-    return saveExportFile(blob, { label: `${slugifyFileName(paperPack.name)}-cover-sheet`, extension: "png", directoryHandle }, services);
-  }
-  const fileName = `${slugifyFileName(paperPack.name)}-cover-sheet.png`;
-
-  if (fileHandle) {
+  const fileName = createCoverSheetFileName(paperPack.name);
+  if (directoryHandle || fileHandle) {
     try {
-      const writable = await fileHandle.createWritable();
+      const target = directoryHandle
+        ? await directoryHandle.getFileHandle(fileName, { create: true })
+        : fileHandle;
+      const writable = await target.createWritable();
       await writable.write(blob);
       await writable.close();
-      return;
+      return {
+        savedToFolder: Boolean(directoryHandle),
+        savedWithPicker: !directoryHandle,
+        ...(directoryHandle ? { folderName: directoryHandle.name } : {}),
+        fileName: target.name || fileName
+      };
     } catch (error) {
-      if (error.name === "AbortError") {
-        return;
-      }
+      if (!directoryHandle && error.name === "AbortError") return;
+      // Keep the generated image available if the destination cannot be written.
     }
   }
-
   await (services.download || downloadExportFile)(blob, fileName);
+  return { savedToFolder: false, savedWithPicker: false, fileName };
 }
 
-function slugifyFileName(value) {
-  return value
+export function createCoverSheetFileName(value) {
+  const name = String(value || "")
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, "-")
     .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/[. ]+$/g, "") || "Untitled Paper Pack";
+  // Windows reserves these device names even with an extension.
+  const safeName = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name) ? `_${name}` : name;
+  return `${safeName}.png`;
 }

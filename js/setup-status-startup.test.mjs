@@ -40,7 +40,7 @@ test('Settings startup defers Paper health scans until Setup Status opens; expli
   const source = await readFile(new URL('./settings.js', import.meta.url), 'utf8');
   // Run the actual Settings entry point, isolating unrelated Settings controls.
   for (const name of ['initializeSettingsQuickLinks', 'initializeOwnerSettings', 'initializeImageLibrarySettings',
-    'initializeCardImageLibrarySettings', 'initializeStampImageLibrarySettings', 'initializeExportLibrarySettings',
+    'initializeCardImageLibrarySettings', 'initializeStampImageLibrarySettings', 'initializeExportLibrarySettings', 'initializeCoverSheetFolderSettings',
     'initializeBulkOwnerSettings', 'initializeTagSettings']) context[name] = () => {};
   vm.runInContext(source.slice(source.indexOf('export function initializeSettings('),
     source.indexOf('export function initializeSettingsQuickLinks(')).replace('export ', '') +

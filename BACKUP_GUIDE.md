@@ -30,13 +30,13 @@ files. It is independent of the Paper, Card, and Stamp & Die image libraries:
 
 - The three image libraries hold the source images referenced by catalog records.
 - The Export Library receives standard backups, compact iPad backups, diagnostic
-  JSON reports, and generated cover-sheet PNGs.
+  JSON reports. Cover sheets use their own Cover Sheet Folder setting.
 
 The Export Library is optional. Supported browsers remember the selected folder on
 this device. If it is missing, inaccessible, or permission is denied, backups and
 reports use the normal browser download. Unsupported browsers, including Safari
 on iPad, show disabled folder controls with download-fallback messaging. Cover sheets
-retain their existing Save As picker when no Export Library is usable, with browser
+retain their existing Save As picker when no Cover Sheet Folder is usable, with browser
 download when that picker is unavailable; a direct folder-write failure downloads
 the generated file.
 

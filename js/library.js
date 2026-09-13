@@ -1663,9 +1663,7 @@ export function initializeDetailPanel(paperPackLibrary, paperPacks, colorsById, 
       const selectedPack = paperPacks.find((pack) => pack.id === detailPanel.dataset.selectedPackId);
 
       if (selectedPack) {
-        createCoverSheetForPack(selectedPack, colorsById).catch(() => {
-          window.alert("The cover sheet could not be created.");
-        });
+        runCoverSheetAction(coverSheetButton, detailBody.querySelector("[data-cover-sheet-status]"), selectedPack, colorsById);
       }
 
       return;
@@ -2119,6 +2117,30 @@ function createDetailMetaItem(label, value) {
   return wrapper;
 }
 
+export async function runCoverSheetAction(button, status, paperPack, colorsById, create = createCoverSheetForPack) {
+  if (button.disabled) return;
+  button.disabled = true;
+  button.textContent = "Creating Cover Sheet...";
+  status.hidden = false;
+  status.textContent = "Creating cover sheet...";
+  try {
+    const result = await create(paperPack, colorsById);
+    status.textContent = !result
+      ? "Cover sheet creation cancelled."
+      : result.savedToFolder
+        ? `Cover sheet saved to ${result.folderName}: ${result.fileName}`
+        : result.savedWithPicker
+          ? `Cover sheet saved: ${result.fileName}`
+          : `Cover sheet sent to browser downloads: ${result.fileName}`;
+  } catch (error) {
+    console.error("Cover sheet creation failed.", error);
+    status.textContent = `Cover sheet could not be created. ${error?.message || "Please try again."}`;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Create Cover Sheet";
+  }
+}
+
 function createDetailActions(paperPack) {
   const actions = document.createElement("section");
   actions.className = "detail-section detail-actions";
@@ -2150,7 +2172,11 @@ function createDetailActions(paperPack) {
   coverSheetButton.textContent = "Create Cover Sheet";
 
   buttonRow.append(coverSheetButton, editButton, deleteButton);
-  actions.append(heading, buttonRow);
+  const status = document.createElement("p");
+  status.dataset.coverSheetStatus = "";
+  status.setAttribute("role", "status");
+  status.hidden = true;
+  actions.append(heading, buttonRow, status);
 
   return actions;
 }

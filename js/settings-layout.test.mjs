@@ -42,17 +42,17 @@ for (const id of ids) {
   });
 }
 
-test('Library Folders keeps all four independent control/status groups and image-only health action', () => {
+test('Library Folders keeps all five independent control/status groups and image-only health action', () => {
   const folders = sections.find(section => section[1] === 'library-folders-settings')[3];
-  for (const key of ['image-library', 'stamp-image-library', 'card-image-library', 'export-library']) {
+  for (const key of ['image-library', 'stamp-image-library', 'card-image-library', 'export-library', 'cover-sheet-folder']) {
     assert.match(folders, new RegExp(`data-choose-${key}`));
     assert.match(folders, new RegExp(`data-reconnect-${key}`));
     assert.match(folders, new RegExp(`data-${key}-status aria-live="polite"`));
   }
-  assert.equal((folders.match(/class="image-library-group"/g) || []).length, 4);
+  assert.equal((folders.match(/class="image-library-group"/g) || []).length, 5);
   assert.match(folders, /data-check-image-libraries/);
   assert.doesNotMatch(folders, /data-export-library-health/);
-  assert.match(folders, /independently of your three image libraries/);
+  assert.match(folders, /independently of your image libraries and cover sheets/);
 });
 
 test('bulk owner form and feedback live in Owners, maintenance keeps image operations', () => {

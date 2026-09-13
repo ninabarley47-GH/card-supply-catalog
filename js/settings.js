@@ -1,4 +1,5 @@
 import { EXPORT_LIBRARY_SETTING_ID, chooseExportDirectory } from './export-library.js';
+import { COVER_SHEET_FOLDER_SETTING_ID, chooseCoverSheetDirectory } from './cover-sheet-folder.js';
 import { STAMP_IMAGE_LIBRARY_MARKER, STAMP_IMAGE_LIBRARY_SETTING_ID, chooseStampImageDirectory, checkStampImageLibraryHealth } from './stamp-die-images.js';
 import {
   checkImageLibraryHealth,
@@ -50,6 +51,7 @@ export function initializeSettings(options = {}) {
   initializeCardImageLibrarySettings(options);
   initializeStampImageLibrarySettings(options);
   initializeExportLibrarySettings();
+  initializeCoverSheetFolderSettings();
   initializeBulkOwnerSettings(options);
   initializeTagSettings(options);
 }
@@ -653,6 +655,45 @@ export async function initializeExportLibrarySettings(services = {}) {
       directory && permission === "granted" ? "success" : "");
   } catch {
     renderImageLibraryStatus(status, "The saved Export Library could not be loaded. Exports will use the normal browser download.", "error");
+  }
+}
+
+export async function initializeCoverSheetFolderSettings(services = {}) {
+  const environment = services.environment || window;
+  const choose = document.querySelector("[data-choose-cover-sheet-folder]");
+  const reconnect = document.querySelector("[data-reconnect-cover-sheet-folder]");
+  const status = document.querySelector("[data-cover-sheet-folder-status]");
+  if (!choose || !status) return;
+  if (!supportsDirectoryPicker(environment)) {
+    choose.disabled = true;
+    if (reconnect) reconnect.disabled = true;
+    renderImageLibraryStatus(status, "Cover sheet folder selection is not supported in this browser. Cover sheets will use Save As or the normal browser download.", "");
+    return;
+  }
+  const select = async (action) => {
+    try {
+      const directory = await chooseCoverSheetDirectory(environment, services);
+      if (directory) renderImageLibraryStatus(status, `Cover sheet folder ${action}: ${directory.name}.`, "success");
+    } catch (error) {
+      renderImageLibraryStatus(status, error?.name === "AbortError"
+        ? "Cover sheet folder selection was cancelled."
+        : "The Cover Sheet Folder could not be saved. Cover sheets will use Save As or the normal browser download when the saved folder is unavailable.",
+        error?.name === "AbortError" ? "" : "error");
+    }
+  };
+  choose.addEventListener("click", () => select("ready"));
+  reconnect?.addEventListener("click", () => select("ready"));
+  try {
+    const setting = await (services.loadCatalogSetting || loadCatalogSetting)(COVER_SHEET_FOLDER_SETTING_ID);
+    const directory = setting?.directoryHandle;
+    const permission = await getDirectoryPermissionState(directory);
+    renderImageLibraryStatus(status, !directory
+      ? "No Cover Sheet Folder selected. Cover sheets will use Save As or the normal browser download."
+      : permission === "granted" ? `Cover sheet folder ready: ${directory.name}.`
+      : `Saved Cover sheet folder: ${directory.name}. Reconnect to save cover sheets here; otherwise use Save As or browser download.`,
+      directory && permission === "granted" ? "success" : "");
+  } catch {
+    renderImageLibraryStatus(status, "The saved Cover Sheet Folder could not be loaded. Cover sheets will use Save As or the normal browser download.", "error");
   }
 }
 

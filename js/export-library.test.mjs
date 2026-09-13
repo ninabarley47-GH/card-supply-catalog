@@ -173,20 +173,20 @@ test('diagnostic export retains full report contents rather than the summarized 
   assert.deepEqual(saved, report);
 });
 
-test('cover sheets use Export Library directly without opening Save As', async () => {
+test('cover sheets use their own folder directly without opening Save As', async () => {
   const root = folder();
   const destination = await chooseCoverSheetDestination({ name: 'Paper' }, { showSaveFilePicker: () => assert.fail('no picker') }, {
-    loadWritableExportDirectory: async () => root
+    loadWritableCoverSheetDirectory: async () => root
   });
   const result = await saveCoverSheet(new Blob(['png']), { name: 'Paper' }, destination, clock);
-  assert.equal(result.savedToFolder, true); assert.match(result.fileName, /paper-cover-sheet-.*\.png$/);
+  assert.equal(result.savedToFolder, true); assert.equal(result.fileName, 'Paper.png');
 });
 
 test('cover sheet Save As, cancellation and file-input-free download fallback remain available', async () => {
-  const noFolder = { loadWritableExportDirectory: async () => null };
+  const noFolder = { loadWritableCoverSheetDirectory: async () => null };
   const handle = {};
   const destination = await chooseCoverSheetDestination({ name: 'Paper' }, {
-    showSaveFilePicker: async (options) => { assert.equal(options.suggestedName, 'paper-cover-sheet.png'); return handle; }
+    showSaveFilePicker: async (options) => { assert.equal(options.suggestedName, 'Paper.png'); return handle; }
   }, noFolder);
   assert.equal(destination.fileHandle, handle);
   assert.equal(await chooseCoverSheetDestination({ name: 'Paper' }, {

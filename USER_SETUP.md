@@ -165,3 +165,15 @@ The iPad backup embeds compressed images directly in the backup file. It is larg
 - Full image-folder setup and folder-backed image migration should be done from a supported desktop browser.
 - Folder-backed images are not embedded in the JSON backup.
 - Each user must have access to the same image folder if sharing catalog data.
+
+## Cover Sheet Folder
+
+In **Settings > Library Folders > Cover Sheet Folder**, choose your preferred
+destination, such as **All Cover Sheets**. This is separate from the Export Library
+used for backups. Supported browsers remember the choice on this device; use
+Reconnect if access needs to be renewed.
+
+Create Cover Sheet saves a PNG named after the paper pack's display name, for
+example **Glow of Harvest.png**. Saving again replaces that file in the selected
+folder. The action shows progress and the filename and destination after saving.
+Without an available folder, use Save As or the browser download fallback.

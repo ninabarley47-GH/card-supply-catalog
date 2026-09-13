@@ -371,15 +371,15 @@ shared directory capability detection and permission-status presentation. Export
 access uses the existing read/write permission helper; unsupported, missing,
 denied, and failed setting access resolve to the browser-download path.
 
-`export-library.js` handles standard/compact JSON backups, full diagnostic JSON,
-and generated cover-sheet PNGs. It reuses `fileExists` and `writeFile` from the shared
+`export-library.js` handles standard/compact JSON backups and full diagnostic JSON.
+Cover sheets reuse its browser download helper but have a separate folder writer. It reuses `fileExists` and `writeFile` from the shared
 image-reference utilities without introducing new filesystem storage. Filenames
 start with the resolved device Default Owner name and `CSC` (or just `CSC` when
 no Owner can be resolved), followed by a Pacific date/time timestamp through seconds (`America/Los_Angeles`, automatic PST/PDT, `-PT` suffix), with no random suffix.
 Exports within a page are serialized to prevent same-second write races. Collision checks choose a new numbered
 name, and the writer checks again before creating a file. Lookup/write/close errors
 preserve the generated Blob for download; no folder scan or cleanup is performed.
-Cover sheets retain explicit Save As/cancellation when no export folder is usable.
+Cover sheets use their separate device-local destination described below.
 
 This setting controls destination only: no Export Library handle or configuration
 is serialized in backups or modified by restore. The three image-library settings
@@ -396,3 +396,21 @@ does not rewrite old records. Catalog schema advances from 6 to 7 for this persi
 field under the record-only versioning policy. The backup envelope remains 4 and
 IndexedDB remains 6: no store or payload-wrapper changes are required. Older backups
 remain valid and restore missing Notes as empty text.
+
+### Cover Sheet Folder
+
+The optional device-local `coverSheetFolder` setting stores a directory handle
+independently of `exportLibrary`. Settings offers Choose/Reconnect controls.
+`cover-sheet-folder.js` loads only that setting and reuses directory permission
+checks. Cover-sheet destination selection falls back to Save As and then browser
+download when its folder is unavailable; it never uses the backup folder.
+
+Cover sheets use the paper pack display name plus `.png`, preserving case and
+spaces and replacing filesystem-invalid characters. Saving to the selected folder
+replaces the matching file. This intentionally differs from timestamped,
+non-overwriting backup exports. A failed folder write falls back to downloading
+the generated PNG with the same display-name filename. The action reports progress,
+cancellation, errors, and the completed destination.
+
+The folder setting is excluded from backups and untouched by restore. No catalog
+schema change is required. The module is included in the offline app shell.

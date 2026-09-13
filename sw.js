@@ -19,6 +19,7 @@ const APP_SHELL = [
   "./js/detail-navigation.js",
   "./js/color-form.js",
   "./js/cover-sheet.js",
+  "./js/cover-sheet-folder.js",
   "./js/global-tag-filter.js",
   "./js/global-tag-catalog.js",
   "./js/global-tag-management.js",
