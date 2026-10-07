@@ -174,10 +174,11 @@ const catalog = () => ({ schemaVersion: 1, tags: [
   { id: 'manual', name: 'Floral', categoryIds: [] },
   { id: 'stamp-id', name: 'Stamp', categoryIds: ['supplies'], appliesTo: ['paper'] },
   { id: 'die-id', name: 'Die', categoryIds: ['supplies'], appliesTo: ['card'] },
+  { id: 'punch-id', name: 'Punch', categoryIds: ['supplies'], appliesTo: ['stamp'] },
   { id: 'mask-id', name: 'Mask', categoryIds: ['supplies'], appliesTo: ['paper'] }
 ], categories: [{ id: 'supplies', name: 'Supplies' }] });
 
-for (const [filename, expected] of [['die.jpg', 'die-id'], ['DIES.JPG', 'die-id'], ['Stamp.jpg', 'stamp-id']]) {
+for (const [filename, expected] of [['die.jpg', 'die-id'], ['DIES.JPG', 'die-id'], ['Punch.jpg', 'punch-id'], ['PUNCH.JPG', 'punch-id'], ['Stamp.jpg', 'stamp-id']]) {
   test(`filename ${filename} adds the ordinary ${expected} global tag`, () => {
     assert.deepEqual(inferStampDieImageTags(catalog(), ['manual'], [filename]).tagIds, ['manual', expected]);
   });
@@ -233,22 +234,24 @@ test('retry recognizes a cloned directory handle loaded from IndexedDB', async (
 for (const [filename, expected] of [
   ['Frosted Pines.jpg', 'stamp-id'],
   ['Frosted Pines Dies.jpg', 'die-id'],
+  ['Frosted Pines Punch.jpg', 'punch-id'],
+  ['Frosted Pines PUNCHES.jpg', 'punch-id'],
   ['Frosted Pines Masks.jpg', 'mask-id'],
   ['Frosted Pines MASK.JPG', 'mask-id'],
   ['Frosted Pines mAsKs.jpg', 'mask-id'],
   ['Frosted Pines Dies Masks.jpg', 'die-id'],
   ['Frosted Pines MASKS dIeS.jpg', 'die-id']
 ]) {
-  test(`Die-first inference: ${filename} selects only ${expected}`, () => {
+  test(`filename inference: ${filename} selects only ${expected}`, () => {
     const result = inferStampDieImageTags(catalog(), ['manual'], [filename]);
     assert.deepEqual(result.tagIds, ['manual', expected]);
     assert.equal(result.tagIds.includes('supplies'), false);
   });
 }
 
-test('mixed Stamp/Die/Mask inference preserves all existing and manual tags', () => {
-  const mixed = inferStampDieImageTags(catalog(), ['manual'], ['Frosted Pines.jpg', 'Frosted Pines Dies.jpg', 'Frosted Pines Masks.jpg']);
-  assert.deepEqual(mixed.tagIds, ['manual', 'stamp-id', 'die-id', 'mask-id']);
+test('mixed Stamp/Die/Punch/Mask inference preserves all existing and manual tags', () => {
+  const mixed = inferStampDieImageTags(catalog(), ['manual'], ['Frosted Pines.jpg', 'Frosted Pines Dies.jpg', 'Frosted Pines Punch.jpg', 'Frosted Pines Masks.jpg']);
+  assert.deepEqual(mixed.tagIds, ['manual', 'stamp-id', 'die-id', 'punch-id', 'mask-id']);
   assert.deepEqual(inferStampDieImageTags(mixed.catalog, mixed.tagIds, ['another stamp.jpg']).tagIds, mixed.tagIds);
   assert.deepEqual(inferStampDieImageTags(mixed.catalog, mixed.tagIds, []).tagIds, mixed.tagIds);
 });
@@ -270,10 +273,10 @@ test('missing Mask is an ordinary draft global tag; reconciliation respects manu
   assert.equal(reconciled.catalog.tags.length, 1);
 });
 
-test('presentation sorting is stable within Stamp, Die and Mask and never mutates stored input', () => {
-  const names = ['Mask 1.jpg', 'DIE MASK 1.jpg', 'Stamp 1.jpg', 'Mask 2.jpg', 'Die 2.jpg', 'Stamp 2.jpg'];
+test('presentation sorting is stable within Stamp, Die, Punch and Mask and never mutates stored input', () => {
+  const names = ['Mask 1.jpg', 'DIE MASK 1.jpg', 'Punch 1.jpg', 'Stamp 1.jpg', 'Mask 2.jpg', 'Die 2.jpg', 'PUNCH 2.jpg', 'Stamp 2.jpg'];
   const refs = names.map((imageName) => ({ imageName }));
-  assert.deepEqual(orderStampDieImages(refs).map((image) => image.imageName), ['Stamp 1.jpg', 'Stamp 2.jpg', 'DIE MASK 1.jpg', 'Die 2.jpg', 'Mask 1.jpg', 'Mask 2.jpg']);
+  assert.deepEqual(orderStampDieImages(refs).map((image) => image.imageName), ['Stamp 1.jpg', 'Stamp 2.jpg', 'DIE MASK 1.jpg', 'Die 2.jpg', 'Punch 1.jpg', 'PUNCH 2.jpg', 'Mask 1.jpg', 'Mask 2.jpg']);
   assert.deepEqual(refs.map((image) => image.imageName), names);
 });
 

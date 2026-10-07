@@ -3,12 +3,12 @@ import { addGlobalTag } from './global-tag-management.js';
 import { getTagKey } from './tag-utils.js';
 
 export function getStampDieImageType(filename) {
-  return /die/i.test(filename) ? 'Die' : /mask/i.test(filename) ? 'Mask' : 'Stamp';
+  return /die/i.test(filename) ? 'Die' : /punch/i.test(filename) ? 'Punch' : /mask/i.test(filename) ? 'Mask' : 'Stamp';
 }
 
 // Stable presentation ordering; classification is derived, never persisted.
 export function orderStampDieImages(images) {
-  const rank = { Stamp: 0, Die: 1, Mask: 2 };
+  const rank = { Stamp: 0, Die: 1, Punch: 2, Mask: 3 };
   return [...images].sort((a, b) => rank[getStampDieImageType(a.name || a.imageName || a.imagePath?.split('/').pop() || '')]
     - rank[getStampDieImageType(b.name || b.imageName || b.imagePath?.split('/').pop() || '')]);
 }
@@ -40,7 +40,7 @@ export function reconcileStampDieImageTags(record, catalog, inferredTags = []) {
   const remaps = new Map();
   for (const tag of inferredTags) {
     if (!record.tagIds.includes(tag.id) || nextCatalog.tags.some((entry) => entry.id === tag.id)) continue;
-    if (!['stamp', 'die', 'mask'].includes(getTagKey(tag.name))) throw new TypeError('Invalid image inference tag.');
+    if (!['stamp', 'die', 'punch', 'mask'].includes(getTagKey(tag.name))) throw new TypeError('Invalid image inference tag.');
     let current = nextCatalog.tags.find((entry) => getTagKey(entry.name) === getTagKey(tag.name));
     if (!current) {
       const added = addGlobalTag(nextCatalog, { name: tag.name, allowFuzzy: true, idFactory: () => tag.id });
