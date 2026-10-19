@@ -2,6 +2,7 @@ import { remapRetainedRecordTags } from './tag-backup-reconciliation.js';
 import { reconcileStampDieImageTags } from './stamp-die-image-tags.js';
 import { addCatalogSchemaVersion } from "./schema.js";
 import { normalizeStampDieSet } from "./stamp-die-sets.js";
+import { isOptionalProductMetadata, normalizeProductMetadata } from './product-metadata.js';
 import { PAPER_TAG_SEED } from "./tag-utils.js";
 import { buildOwnerRegistry, isOwner, migratePaperPackOwners, serializePaperPackOwner } from "./owners.js";
 import { getGlobalTagNameKey, validateGlobalTagCatalog, validateItemTagAssignments } from "./global-tag-catalog.js";
@@ -713,7 +714,7 @@ export function normalizePaperPackForRuntime(paperPack, catalog = null) {
   const compatiblePaperPack = Array.isArray(paperPack?.tagIds)
     ? hydratePaperTagNames(paperPack, requireValidGlobalTagCatalog(catalog))
     : paperPack;
-  const normalizedPaperPack = normalizePaperPackKeywords(compatiblePaperPack);
+  const normalizedPaperPack = normalizeProductMetadata(normalizePaperPackKeywords(compatiblePaperPack));
 
   const runtimePaperPack = {
     ...normalizedPaperPack,
@@ -811,6 +812,8 @@ export function isPaperPack(paperPack) {
     typeof paperPack.id === "string" &&
     typeof paperPack.name === "string" &&
     typeof paperPack.ownerId === "string" &&
+    isOptionalProductMetadata(paperPack.brand) &&
+    isOptionalProductMetadata(paperPack.purchasedFrom) &&
     Number.isInteger(paperPack.releaseYear) &&
     Number.isInteger(paperPack.patternCount) &&
     Array.isArray(paperPack.colors) &&
@@ -838,6 +841,7 @@ export function isColor(color) {
 export function isCompatiblePaperPack(paperPack) {
   return isPaperPack(paperPack) || (
     paperPack && typeof paperPack.id === "string" && typeof paperPack.name === "string" &&
+    isOptionalProductMetadata(paperPack.brand) && isOptionalProductMetadata(paperPack.purchasedFrom) &&
     typeof paperPack.owner === "string" && Number.isInteger(paperPack.releaseYear) &&
     Number.isInteger(paperPack.patternCount) && Array.isArray(paperPack.colors) &&
     (Array.isArray(paperPack.keywords) || Array.isArray(paperPack.tagIds)) && Array.isArray(paperPack.patterns)
@@ -880,14 +884,14 @@ export function normalizeCardForRuntime(card, catalog = null) {
     }
   }
 
-  const runtimeCard = {
+  const runtimeCard = normalizeProductMetadata({
     ...cardWithoutLegacyStampSet,
     stampDieSetIds: normalizeStampDieSetIds(cardWithoutLegacyStampSet.stampDieSetIds),
     notes: normalizeCardNotes(cardWithoutLegacyStampSet.notes),
     status: cardWithoutLegacyStampSet.status === "sent" ? "sent" : "available",
     tags,
     stampSets
-  };
+  });
   return Array.isArray(card?.tagIds)
     ? hydrateCardTagNames({ ...runtimeCard, tagIds: card.tagIds }, catalog)
     : runtimeCard;
@@ -909,6 +913,8 @@ export function isCard(card) {
   return (
     card &&
     typeof card.id === "string" &&
+    isOptionalProductMetadata(card.brand) &&
+    isOptionalProductMetadata(card.purchasedFrom) &&
     (card.notes == null || typeof card.notes === "string") &&
     (card.ownerId === undefined || typeof card.ownerId === "string") &&
     (card.status === undefined || card.status === "available" || card.status === "sent") &&

@@ -190,6 +190,34 @@ test('Phase 2A canonical creation survives storage reload with empty imageRefs',
   } finally { globalThis.window = previousWindow; }
 });
 
+test('Brand and Purchased From persist across Paper, Card, and Set storage reloads', async () => {
+  const harness = databaseHarness();
+  const previousWindow = globalThis.window;
+  globalThis.window = { indexedDB: harness.indexedDB, localStorage: { getItem: () => 'true' } };
+  const metadata = { brand: 'Stampin\' Up!', purchasedFrom: 'Scrapbooking.com' };
+  const paper = { id: 'paper-metadata', name: 'Paper', ownerId: 'owner-nina', releaseYear: 2026,
+    patternCount: 1, colors: ['red'], tagIds: [], patterns: [], ...metadata };
+  const card = { id: 'card-metadata', dateCreated: '2026-10-19', size: { width: 4, height: 6 },
+    tagIds: [], tags: [], stampSets: [], paperPackIds: [], colorIds: [], favorite: false, ...metadata };
+  const stampSet = { ...setRecord(), id: 'set-metadata', tagIds: [], ...metadata };
+  try {
+    const firstSession = await import('./storage.js?product-metadata-save');
+    await firstSession.savePaperPack(paper);
+    await firstSession.saveCard(card);
+    await firstSession.saveStampDieSet(stampSet);
+    await firstSession.savePaperPack({ ...paper, name: 'Updated Paper' });
+    await firstSession.saveCard({ ...card, dateCreated: '2026-10-20' });
+    await firstSession.saveStampDieSet({ ...stampSet, name: 'Updated Set' });
+    const nextSession = await import('./storage.js?product-metadata-reload');
+    const [savedPaper] = await nextSession.loadSavedPaperPacks();
+    const [savedCard] = await nextSession.loadSavedCards();
+    const [savedSet] = await nextSession.loadSavedStampDieSets();
+    for (const record of [savedPaper, savedCard, savedSet]) assert.deepEqual(
+      { brand: record.brand, purchasedFrom: record.purchasedFrom }, metadata
+    );
+  } finally { globalThis.window = previousWindow; }
+});
+
 
 test('Release Year validates the Paper year range while legacy creation dates remain metadata', () => {
   for (const releaseYear of [1990, 2024, 2100]) {

@@ -6,6 +6,7 @@ import { loadSavedStampDieSets, normalizeStampDieSetIds, normalizeCardNotes, del
 import { loadDefaultOwnerId } from './settings.js';
 import { refreshOwnerFilter, initializeOwnerPicker, notifyOwnerRegistryUpdated, refreshOwnerOptions, resolveOwnerPicker, setOwnerPickerValue } from './owner-picker.js';
 import { isActiveOwner } from './owners.js';
+import { normalizeOptionalProductMetadata } from './product-metadata.js';
 import {
   clearGlobalTagFilter,
   getGlobalTagSearchNames,
@@ -1066,6 +1067,8 @@ export function createCardRecord(addCardView) {
   const timestamp = new Date().toISOString();
   const existingCard = addCardView.existingCard;
   const selectedTags = addCardView.tagPicker.getSelectedTags();
+  const brand = normalizeOptionalProductMetadata(addCardView.brand?.value ?? existingCard?.brand, 'Brand');
+  const purchasedFrom = normalizeOptionalProductMetadata(addCardView.purchasedFrom?.value ?? existingCard?.purchasedFrom, 'Purchased From');
 
   return {
     ...(existingCard || { recentlyAdded: true }),
@@ -1073,6 +1076,8 @@ export function createCardRecord(addCardView) {
     status: addCardView.status.value === 'sent' ? 'sent' : 'available',
     dateCreated: addCardView.dateCreated.value,
     notes: normalizeCardNotes(addCardView.notes.value),
+    ...(brand === undefined ? {} : { brand }),
+    ...(purchasedFrom === undefined ? {} : { purchasedFrom }),
     size: {
       preset: addCardView.sizePreset.value,
       width: Number(addCardView.width.value),

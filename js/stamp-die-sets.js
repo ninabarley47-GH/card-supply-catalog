@@ -1,8 +1,11 @@
 import { addCatalogSchemaVersion } from './schema.js';
 import { validateItemTagAssignments } from './global-tag-catalog.js';
+import { normalizeOptionalProductMetadata } from './product-metadata.js';
 
 // References are metadata only. This module never reads or writes image files.
 export function normalizeStampDieSet(record, catalog) {
+  const brand = normalizeOptionalProductMetadata(record?.brand, 'Brand');
+  const purchasedFrom = normalizeOptionalProductMetadata(record?.purchasedFrom, 'Purchased From');
   if (!record || typeof record.id !== 'string' || !record.id.trim() ||
       typeof record.name !== 'string' || !record.name.trim() ||
       typeof record.favorite !== 'boolean' ||
@@ -28,7 +31,9 @@ export function normalizeStampDieSet(record, catalog) {
     favorite: record.favorite,
     ...(record.recentlyAdded === undefined ? {} : { recentlyAdded: record.recentlyAdded === true }),
     dateCreated: record.dateCreated,
-    ...(record.releaseYear === undefined ? {} : { releaseYear: record.releaseYear })
+    ...(record.releaseYear === undefined ? {} : { releaseYear: record.releaseYear }),
+    ...(brand === undefined ? {} : { brand }),
+    ...(purchasedFrom === undefined ? {} : { purchasedFrom })
   });
 }
 

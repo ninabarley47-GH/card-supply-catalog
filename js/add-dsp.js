@@ -13,6 +13,7 @@ import { loadDefaultOwnerId } from "./settings.js";
 import { initializeOwnerPicker, notifyOwnerRegistryUpdated, refreshOwnerOptions, setOwnerPickerValue } from "./owner-picker.js";
 import { supportsDirectoryPicker, supportsOpenFilePicker } from "./browser-capabilities.js";
 import { createTagPicker, projectTagNames, resolveItemTagIds } from "./tag-picker.js";
+import { normalizeOptionalProductMetadata } from './product-metadata.js';
 
 const ADD_DSP_DEFAULTS_SETTING_ID = "addDspDefaults";
 
@@ -480,6 +481,8 @@ export function buildPaperPackFromForm(formData, colorsById, selectedImages = []
   const colorResult = resolveColorIds(parseList(formData.get("colors")), colorsById);
   const tagIds = [...new Set(selectedTagIds)];
   const keywords = tagCatalog ? projectTagNames(tagCatalog, tagIds, "paper") : [];
+  const brand = normalizeOptionalProductMetadata(formData.has('brand') ? formData.get('brand') : editingPaperPack?.brand, 'Brand');
+  const purchasedFrom = normalizeOptionalProductMetadata(formData.has('purchasedFrom') ? formData.get('purchasedFrom') : editingPaperPack?.purchasedFrom, 'Purchased From');
 
   if (!name || !owner || Number.isNaN(releaseYear) || !Number.isInteger(patternCount) || patternCount < 1) {
     return {
@@ -526,6 +529,8 @@ export function buildPaperPackFromForm(formData, colorsById, selectedImages = []
       refillAvailable: parseOptionalBoolean(formData.get("refillAvailable")),
       recentlyAdded: editingPaperPack?.recentlyAdded === true,
       favorite: editingPaperPack?.favorite === true,
+      ...(brand === undefined ? {} : { brand }),
+      ...(purchasedFrom === undefined ? {} : { purchasedFrom }),
       tagIds,
       keywords,
       colors: colorResult.colorIds,

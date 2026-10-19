@@ -31,6 +31,8 @@ export function createStampDieSetRecord(values, catalog) {
     ownerId: values.ownerId,
     favorite: values.favorite,
     recentlyAdded: values.recentlyAdded,
+    brand: values.brand,
+    purchasedFrom: values.purchasedFrom,
     tagIds: values.tagIds,
     imageRefs: values.imageRefs || []
   }, catalog);
@@ -612,6 +614,8 @@ export async function initializeStampDieLibrary(services = {}) {
           ? undefined : Number(view.releaseYear.value),
         favorite: view.favorite.checked,
         recentlyAdded: editingRecord ? editingRecord.recentlyAdded : true,
+        brand: editingRecord?.brand,
+        purchasedFrom: editingRecord?.purchasedFrom,
         tagIds: reconciled.record.tagIds
       }, reconciled.catalog);
       const prepared = await storage.prepareStampImagesForSave(draftImages);
