@@ -87,6 +87,40 @@ test('mixed catalog round-trips through one restore call with stable IDs and com
   assert.match(summary.warnings.join(' '), /Stamp & Die image folders/);
 });
 
+test('standard backup preserves Paper and Set purchase metadata without changing Cards', async () => {
+  const purchaseMetadata = { brand: "Stampin' Up!", purchasedFrom: 'Scrapbooking.com' };
+  const records = [{ ...sets()[1], ...purchaseMetadata }];
+  const backup = snapshot({ paperPacks: [{ ...paper, ...purchaseMetadata }], stampDieSets: records });
+  let restored;
+
+  const summary = await restoreCatalogBackup({ backup, paperPacks: [], colorsById: {}, owners: [], services: restoreServices({
+    restoreCatalogRecords: async (catalog) => { restored = catalog; }
+  }) });
+
+  assert.deepEqual(summary.errors, []);
+  assert.deepEqual(restored.paperPacks[0].brand, purchaseMetadata.brand);
+  assert.deepEqual(restored.paperPacks[0].purchasedFrom, purchaseMetadata.purchasedFrom);
+  assert.deepEqual(restored.stampDieSets[0].brand, purchaseMetadata.brand);
+  assert.deepEqual(restored.stampDieSets[0].purchasedFrom, purchaseMetadata.purchasedFrom);
+  assert.deepEqual(restored.stampDieSets[0].imageRefs, backup.stampDieSets[0].imageRefs);
+  assert.deepEqual(restored.cards, backup.cards);
+});
+
+test('standard backups without purchase metadata restore Paper and Sets unchanged', async () => {
+  const backup = snapshot({ stampDieSets: [sets()[0]] });
+  let restored;
+
+  const summary = await restoreCatalogBackup({ backup, paperPacks: [], colorsById: {}, owners: [], services: restoreServices({
+    restoreCatalogRecords: async (catalog) => { restored = catalog; }
+  }) });
+
+  assert.deepEqual(summary.errors, []);
+  for (const record of [restored.paperPacks[0], restored.stampDieSets[0]]) {
+    assert.equal(Object.hasOwn(record, 'brand'), false);
+    assert.equal(Object.hasOwn(record, 'purchasedFrom'), false);
+  }
+});
+
 for (const [label, change] of [
   ['section', (b) => { b.stampDieSets = {}; }],
   ['null record', (b) => { b.stampDieSets[0] = null; }],
@@ -217,6 +251,46 @@ test('compact export preserves inaccessible paths and existing embedded original
   } });
   assert.deepEqual(backup.stampDieSets, sets().map((r) => normalizeStampDieSet(r, tagCatalog)));
   assert.equal(backup.imageStorage.missingImages, 3); assert.equal(validateBackup(backup).ok, true);
+});
+
+test('compact backup preserves Paper and Set purchase metadata without changing Cards', async () => {
+  const purchaseMetadata = { brand: 'Echo Park', purchasedFrom: 'Amazon' };
+  const backup = await createIpadCatalogBackup({ paperPacks: [{ ...paper, ...purchaseMetadata }], colorsById: {}, owners, services: {
+    loadSavedCards: async () => [card], loadSavedStampDieSets: async () => [{ ...sets()[1], ...purchaseMetadata }],
+    loadGlobalTagCatalog: async () => tagCatalog, hydrateCardImageSources: async () => {}, hydrateStampImages: async () => {},
+    compressImageSource: async () => thumbnail
+  } });
+  let restored;
+
+  const summary = await restoreCatalogBackup({ backup, paperPacks: [], colorsById: {}, owners: [], services: restoreServices({
+    restoreCatalogRecords: async (catalog) => { restored = catalog; }
+  }) });
+
+  assert.deepEqual(summary.errors, []);
+  assert.deepEqual(restored.paperPacks[0].brand, purchaseMetadata.brand);
+  assert.deepEqual(restored.paperPacks[0].purchasedFrom, purchaseMetadata.purchasedFrom);
+  assert.deepEqual(restored.stampDieSets[0].brand, purchaseMetadata.brand);
+  assert.deepEqual(restored.stampDieSets[0].purchasedFrom, purchaseMetadata.purchasedFrom);
+  assert.deepEqual(restored.stampDieSets[0].imageRefs, backup.stampDieSets[0].imageRefs);
+  assert.deepEqual(restored.cards, backup.cards);
+});
+
+test('compact backups without purchase metadata restore Paper and Sets unchanged', async () => {
+  const backup = await createIpadCatalogBackup({ paperPacks: [paper], colorsById: {}, owners, services: {
+    loadSavedCards: async () => [card], loadSavedStampDieSets: async () => [sets()[0]],
+    loadGlobalTagCatalog: async () => tagCatalog, hydrateCardImageSources: async () => {}, hydrateStampImages: async () => {}
+  } });
+  let restored;
+
+  const summary = await restoreCatalogBackup({ backup, paperPacks: [], colorsById: {}, owners: [], services: restoreServices({
+    restoreCatalogRecords: async (catalog) => { restored = catalog; }
+  }) });
+
+  assert.deepEqual(summary.errors, []);
+  for (const record of [restored.paperPacks[0], restored.stampDieSets[0]]) {
+    assert.equal(Object.hasOwn(record, 'brand'), false);
+    assert.equal(Object.hasOwn(record, 'purchasedFrom'), false);
+  }
 });
 
 test('future versions fail safely and export refuses unknown Set owners', () => {
