@@ -581,6 +581,8 @@ function validatePaperPackDuplicate(paperPack, paperPacks, editingPaperPack = nu
 function fillPaperPackForm(form, paperPack, colorsById, owners = []) {
   form.elements.name.value = paperPack.name || "";
   setOwnerPickerValue(form.elements.ownerId, form.elements.owner, paperPack.ownerId, paperPack.owner, owners);
+  form.elements.brand.value = paperPack.brand || "";
+  form.elements.purchasedFrom.value = paperPack.purchasedFrom || "";
   form.elements.releaseYear.value = paperPack.releaseYear || "";
   form.elements.patternCount.value = paperPack.patternCount || 1;
   form.elements.availability.value = paperPack.availability || "available";

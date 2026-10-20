@@ -80,6 +80,8 @@ export async function initializeStampDieLibrary(services = {}) {
       createSetDetailFact('Owner', getSetOwnerName(record, owners)),
       createSetDetailFact('Release Year', record.releaseYear === undefined ? 'Not recorded' : String(record.releaseYear))
     );
+    if (record.brand?.trim()) facts.append(createSetDetailFact('Brand', record.brand));
+    if (record.purchasedFrom?.trim()) facts.append(createSetDetailFact('Purchased From', record.purchasedFrom));
     detail.titleRow.replaceChildren(detail.title, favorite);
     info.append(facts);
     const tagSection = createSetDetailSection('Tags');
@@ -374,6 +376,8 @@ export async function initializeStampDieLibrary(services = {}) {
           view.owner.value = record.ownerId;
         }
         view.releaseYear.value = record.releaseYear === undefined ? '' : String(record.releaseYear);
+        view.brand.value = record.brand || '';
+        view.purchasedFrom.value = record.purchasedFrom || '';
         view.releaseYear.required = record.releaseYear !== undefined;
         view.favorite.checked = record.favorite;
         picker.setSelectedTagIds(record.tagIds);
@@ -614,8 +618,8 @@ export async function initializeStampDieLibrary(services = {}) {
           ? undefined : Number(view.releaseYear.value),
         favorite: view.favorite.checked,
         recentlyAdded: editingRecord ? editingRecord.recentlyAdded : true,
-        brand: editingRecord?.brand,
-        purchasedFrom: editingRecord?.purchasedFrom,
+        brand: view.brand.value || (editingRecord?.brand === undefined && editingRecord ? undefined : ''),
+        purchasedFrom: view.purchasedFrom.value || (editingRecord?.purchasedFrom === undefined && editingRecord ? undefined : ''),
         tagIds: reconciled.record.tagIds
       }, reconciled.catalog);
       const prepared = await storage.prepareStampImagesForSave(draftImages);
@@ -718,6 +722,16 @@ function createSetFormView() {
   releaseYear.max = '2100';
   releaseYear.step = '1';
   releaseYear.required = true;
+  const brand = document.createElement('input');
+  brand.name = 'brand';
+  brand.type = 'text';
+  brand.maxLength = 100;
+  brand.placeholder = "e.g., Stampin' Up!, Echo Park";
+  const purchasedFrom = document.createElement('input');
+  purchasedFrom.name = 'purchasedFrom';
+  purchasedFrom.type = 'text';
+  purchasedFrom.maxLength = 100;
+  purchasedFrom.placeholder = "e.g., Stampin' Up!, Amazon, Scrapbooking.com";
   const favorite = document.createElement('input');
   favorite.name = 'favorite';
   favorite.type = 'checkbox';
@@ -754,7 +768,7 @@ function createSetFormView() {
   const message = document.createElement('p');
   message.className = 'form-message';
   message.setAttribute('role', 'status');
-  fields.append(createField('Set Name', name), createField('Owner', owner, newOwner), createField('Release Year', releaseYear), favoriteLabel, imageControls, tags, cardPicker.section, message);
+  fields.append(createField('Set Name', name), createField('Owner', owner, newOwner), createField('Brand', brand), createField('Purchased From', purchasedFrom), createField('Release Year', releaseYear), favoriteLabel, imageControls, tags, cardPicker.section, message);
   const actions = document.createElement('div');
   actions.className = 'card-add-actions';
   const cancel = document.createElement('button');
@@ -768,7 +782,7 @@ function createSetFormView() {
   actions.append(cancel, save);
   form.append(fields, actions);
   dialog.append(header, form);
-  return { dialog, title, close, form, fields, name, owner, newOwner, releaseYear, favorite, tags, cardPicker, message, cancel, save, chooseImages, imageInput, chooseLibrary, folderMessage, imageMessage, previews };
+  return { dialog, title, close, form, fields, name, owner, newOwner, brand, purchasedFrom, releaseYear, favorite, tags, cardPicker, message, cancel, save, chooseImages, imageInput, chooseLibrary, folderMessage, imageMessage, previews };
 }
 
 function createField(text, ...inputs) {

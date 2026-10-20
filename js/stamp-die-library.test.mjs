@@ -150,7 +150,7 @@ async function harness(t, otherCatalogServices = {}) {
     input.checked = true;
     await form.querySelector('.global-tag-picker').emit('change', { target: input });
   }
-  return { sort, headerAdd, saveOptions, filterControls, owners, owner: form.querySelector('select[name="ownerId"]'), newOwner: form.querySelector('input[name="owner"]'), document, add, gallery, status, dialog, form, name, year, favorite, cancel, records, select,
+  return { sort, headerAdd, saveOptions, filterControls, owners, owner: form.querySelector('select[name="ownerId"]'), newOwner: form.querySelector('input[name="owner"]'), brand: form.querySelector('input[name="brand"]'), purchasedFrom: form.querySelector('input[name="purchasedFrom"]'), document, add, gallery, status, dialog, form, name, year, favorite, cancel, records, select,
     recordReads: () => recordReads, calls: () => calls, setFailure: (value) => { failure = value; }, setGate: (value) => { commitGate = value; },
     renameTag: () => { catalog.tags[0].name = 'Botanical'; } };
 }
@@ -189,6 +189,24 @@ test('header Add Stamp Set opens the existing Add form and saves through its nor
   assert.equal(h.name.value, '');
 });
 
+test('Set Brand and Purchased From inputs save and prepopulate on edit', async (t) => {
+  const h = await harness(t);
+  await h.add.emit('click');
+  assert.equal(h.brand.maxLength, 100);
+  assert.equal(h.purchasedFrom.maxLength, 100);
+  h.name.value = 'Metadata Set';
+  h.brand.value = "Stampin' Up!";
+  h.purchasedFrom.value = 'Amazon';
+  await h.form.emit('submit');
+  assert.deepEqual(
+    { brand: h.records[0].brand, purchasedFrom: h.records[0].purchasedFrom },
+    { brand: "Stampin' Up!", purchasedFrom: 'Amazon' }
+  );
+  await h.gallery.querySelector('button[aria-label="Edit Metadata Set"]').emit('click');
+  assert.equal(h.brand.value, "Stampin' Up!");
+  assert.equal(h.purchasedFrom.value, 'Amazon');
+});
+
 test('Stamp form uses a full-height right-edge panel without moving Stamp Detail', async () => {
   const css = await readFile(new URL('../css/cards.css', import.meta.url), 'utf8');
   const panel = css.match(/\.stamp-set-form-panel\s*\{([^}]+)\}/)[1];
@@ -222,7 +240,7 @@ test('save persists Favorite and universal stable tag IDs, then renders a no-ima
   await h.form.emit('submit');
   const record = h.records[0];
   assert.match(record.id, /^set-/);
-  assert.deepEqual(record, { schemaVersion: CATALOG_SCHEMA_VERSION, id: record.id, ownerId: 'owner-nina', name: 'Garden', dateCreated: getLocalDateValue(), releaseYear: 2024, favorite: true, recentlyAdded: true, tagIds: ['stable-paper', 'stable-card'], imageRefs: [] });
+  assert.deepEqual(record, { schemaVersion: CATALOG_SCHEMA_VERSION, id: record.id, ownerId: 'owner-nina', name: 'Garden', dateCreated: getLocalDateValue(), releaseYear: 2024, favorite: true, recentlyAdded: true, brand: '', purchasedFrom: '', tagIds: ['stable-paper', 'stable-card'], imageRefs: [] });
   assert.equal(h.dialog.open, false);
   assert.equal(saves, 1);
   assert.match(h.gallery.textContent, /Garden.*No image.*Floral.*Birthday.*2024/);

@@ -2092,11 +2092,14 @@ function createDetailMeta(paperPack) {
   const list = document.createElement("dl");
   list.className = "detail-meta-list";
 
-  list.append(
+  const facts = [
     createDetailMetaItem("Owner", paperPack.owner),
     createDetailMetaItem("Status", formatAvailabilityLabel(paperPack.availability)),
     createDetailMetaItem("Release", `${paperPack.releaseYear}`)
-  );
+  ];
+  if (paperPack.brand?.trim()) facts.push(createDetailMetaItem("Brand", paperPack.brand));
+  if (paperPack.purchasedFrom?.trim()) facts.push(createDetailMetaItem("Purchased From", paperPack.purchasedFrom));
+  list.append(...facts);
 
   meta.append(heading, list);
 

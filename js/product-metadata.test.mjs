@@ -5,6 +5,7 @@ import { normalizeStampDieSet } from './stamp-die-sets.js';
 import { buildPaperPackFromForm } from './add-dsp.js';
 import { createCardRecord } from './cards.js';
 import { createStampDieSetRecord } from './stamp-die-library.js';
+import { readFile } from 'node:fs/promises';
 
 const catalog = { schemaVersion: 1, tags: [], categories: [] };
 const metadata = { brand: 'Stampin\' Up!', purchasedFrom: 'Scrapbooking.com' };
@@ -49,4 +50,26 @@ test('existing edit record builders retain Brand and Purchased From when those f
 
   const setResult = createStampDieSetRecord(set(metadata), catalog);
   assert.deepEqual({ brand: setResult.brand, purchasedFrom: setResult.purchasedFrom }, metadata);
+});
+
+test('Paper, Card, and Set forms and Detail views expose nonblank Brand and Purchased From values', async () => {
+  const [html, paper, library, cards, sets] = await Promise.all([
+    readFile(new URL('../index.html', import.meta.url), 'utf8'),
+    readFile(new URL('./add-dsp.js', import.meta.url), 'utf8'),
+    readFile(new URL('./library.js', import.meta.url), 'utf8'),
+    readFile(new URL('./cards.js', import.meta.url), 'utf8'),
+    readFile(new URL('./stamp-die-library.js', import.meta.url), 'utf8')
+  ]);
+  assert.match(html, /name="brand"[^>]*maxlength="100"/);
+  assert.match(html, /name="purchasedFrom"[^>]*maxlength="100"/);
+  assert.match(paper, /form\.elements\.brand\.value = paperPack\.brand \|\| ""/);
+  assert.match(paper, /form\.elements\.purchasedFrom\.value = paperPack\.purchasedFrom \|\| ""/);
+  for (const source of [paper, cards, sets]) {
+    assert.match(source, /Brand/);
+    assert.match(source, /Purchased From/);
+  }
+  for (const source of [library, cards, sets]) {
+    assert.match(source, /\.brand\?\.trim\(\)/);
+    assert.match(source, /\.purchasedFrom\?\.trim\(\)/);
+  }
 });

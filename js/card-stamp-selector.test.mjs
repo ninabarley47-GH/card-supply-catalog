@@ -141,6 +141,22 @@ test('Edit loads current names, preserves missing IDs, and adds/removes referenc
   assert.equal(view.stampDiePicker.selected.childElementCount, 0);
 });
 
+test('Card Brand and Purchased From inputs populate on edit and save their values', async (t) => {
+  const view = harness(t);
+  const existing = { ...card(), brand: "Stampin' Up!", purchasedFrom: 'Amazon' };
+  await openEditCardView(view, existing);
+  assert.equal(view.brand.value, "Stampin' Up!");
+  assert.equal(view.purchasedFrom.value, 'Amazon');
+  assert.equal(view.brand.maxLength, 100);
+  assert.equal(view.purchasedFrom.maxLength, 100);
+  view.brand.value = 'Echo Park';
+  view.purchasedFrom.value = 'Scrapbooking.com';
+  assert.deepEqual(
+    { brand: createCardRecord(view).brand, purchasedFrom: createCardRecord(view).purchasedFrom },
+    { brand: 'Echo Park', purchasedFrom: 'Scrapbooking.com' }
+  );
+});
+
 test('legacy Cards open with no selected Sets; reopening refreshes Set names', async (t) => {
   let current = structuredClone(sets);
   const view = harness(t, async () => current);

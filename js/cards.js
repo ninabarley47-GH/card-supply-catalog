@@ -474,6 +474,16 @@ export function createAddCardView({ owners = [], tagCatalog, loadStampDieSets = 
   newOwner.name = 'owner';
   newOwner.placeholder = 'New owner name';
   initializeOwnerPicker(owner, newOwner, owners);
+  const brand = document.createElement('input');
+  brand.type = 'text';
+  brand.name = 'brand';
+  brand.maxLength = 100;
+  brand.placeholder = "e.g., Stampin' Up!, Echo Park";
+  const purchasedFrom = document.createElement('input');
+  purchasedFrom.type = 'text';
+  purchasedFrom.name = 'purchasedFrom';
+  purchasedFrom.maxLength = 100;
+  purchasedFrom.placeholder = "e.g., Stampin' Up!, Amazon, Scrapbooking.com";
   const sizePreset = document.createElement('select');
   sizePreset.name = 'cardSize';
   Object.entries(CARD_SIZE_PRESETS).forEach(([value, preset]) => {
@@ -497,6 +507,8 @@ export function createAddCardView({ owners = [], tagCatalog, loadStampDieSets = 
   controls.append(
     createAddCardField('Date Created', dateCreated),
     createAddCardField('Owner', owner, newOwner),
+    createAddCardField('Brand', brand),
+    createAddCardField('Purchased From', purchasedFrom),
     createAddCardField('Status', status),
     createAddCardField('Card Size', sizePreset),
     dimensions,
@@ -554,6 +566,8 @@ export function createAddCardView({ owners = [], tagCatalog, loadStampDieSets = 
     status,
     owner,
     newOwner,
+    brand,
+    purchasedFrom,
     sizePreset,
     width,
     height,
@@ -698,6 +712,8 @@ export function openEditCardView(addCardView, card) {
   addCardView.save.textContent = 'Save Changes';
   addCardView.dateCreated.value = card.dateCreated;
   addCardView.notes.value = normalizeCardNotes(card.notes);
+  addCardView.brand.value = card.brand || '';
+  addCardView.purchasedFrom.value = card.purchasedFrom || '';
   addCardView.status.value = card.status;
   setOwnerPickerValue(addCardView.owner, addCardView.newOwner, card.ownerId, '', addCardView.owners);
   addCardView.sizePreset.value = getCardSizePreset(card.size);
@@ -1651,6 +1667,8 @@ function createCardFacts(card) {
   appendFact(facts, 'Date created', card.dateCreated);
   appendFact(facts, 'Card size', `${card.size.width} × ${card.size.height} inches`);
   appendFact(facts, 'Status', card.status === 'sent' ? 'Sent' : 'Available');
+  if (card.brand?.trim()) appendFact(facts, 'Brand', card.brand);
+  if (card.purchasedFrom?.trim()) appendFact(facts, 'Purchased From', card.purchasedFrom);
   return facts;
 }
 
