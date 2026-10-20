@@ -884,14 +884,14 @@ export function normalizeCardForRuntime(card, catalog = null) {
     }
   }
 
-  const runtimeCard = normalizeProductMetadata({
+  const runtimeCard = {
     ...cardWithoutLegacyStampSet,
     stampDieSetIds: normalizeStampDieSetIds(cardWithoutLegacyStampSet.stampDieSetIds),
     notes: normalizeCardNotes(cardWithoutLegacyStampSet.notes),
     status: cardWithoutLegacyStampSet.status === "sent" ? "sent" : "available",
     tags,
     stampSets
-  });
+  };
   return Array.isArray(card?.tagIds)
     ? hydrateCardTagNames({ ...runtimeCard, tagIds: card.tagIds }, catalog)
     : runtimeCard;
@@ -913,8 +913,6 @@ export function isCard(card) {
   return (
     card &&
     typeof card.id === "string" &&
-    isOptionalProductMetadata(card.brand) &&
-    isOptionalProductMetadata(card.purchasedFrom) &&
     (card.notes == null || typeof card.notes === "string") &&
     (card.ownerId === undefined || typeof card.ownerId === "string") &&
     (card.status === undefined || card.status === "available" || card.status === "sent") &&

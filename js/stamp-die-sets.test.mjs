@@ -190,7 +190,7 @@ test('Phase 2A canonical creation survives storage reload with empty imageRefs',
   } finally { globalThis.window = previousWindow; }
 });
 
-test('Brand and Purchased From persist across Paper, Card, and Set storage reloads', async () => {
+test('Brand and Purchased From persist across Paper and Set storage reloads while legacy Card values remain retained', async () => {
   const harness = databaseHarness();
   const previousWindow = globalThis.window;
   globalThis.window = { indexedDB: harness.indexedDB, localStorage: { getItem: () => 'true' } };
@@ -212,9 +212,10 @@ test('Brand and Purchased From persist across Paper, Card, and Set storage reloa
     const [savedPaper] = await nextSession.loadSavedPaperPacks();
     const [savedCard] = await nextSession.loadSavedCards();
     const [savedSet] = await nextSession.loadSavedStampDieSets();
-    for (const record of [savedPaper, savedCard, savedSet]) assert.deepEqual(
+    for (const record of [savedPaper, savedSet]) assert.deepEqual(
       { brand: record.brand, purchasedFrom: record.purchasedFrom }, metadata
     );
+    assert.deepEqual({ brand: savedCard.brand, purchasedFrom: savedCard.purchasedFrom }, metadata);
   } finally { globalThis.window = previousWindow; }
 });
 

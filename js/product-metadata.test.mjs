@@ -16,13 +16,11 @@ const card = (values = {}) => ({ id: 'card-1', dateCreated: '2026-10-19', size: 
 const set = (values = {}) => ({ id: 'set-1', name: 'Garden', dateCreated: '2026-10-19', imageRefs: [],
   tagIds: [], favorite: false, ...values });
 
-test('Paper, Card, and Stamp & Die normalization preserve short Brand and Purchased From metadata', () => {
+test('Paper and Stamp & Die normalization preserve short Brand and Purchased From metadata', () => {
   assert.deepEqual(normalizePaperPackForRuntime(paper(metadata), catalog).brand, metadata.brand);
-  assert.deepEqual(normalizeCardForRuntime(card(metadata), catalog).purchasedFrom, metadata.purchasedFrom);
   assert.deepEqual(normalizeStampDieSet(set(metadata), catalog).brand, metadata.brand);
   for (const normalize of [
     value => normalizePaperPackForRuntime(paper(value), catalog),
-    value => normalizeCardForRuntime(card(value), catalog),
     value => normalizeStampDieSet(set(value), catalog)
   ]) {
     assert.equal(normalize({ brand: '  Stampin\' Up!  ', purchasedFrom: '  Amazon  ' }).brand, metadata.brand);
@@ -35,7 +33,7 @@ test('Paper, Card, and Stamp & Die normalization preserve short Brand and Purcha
   }
 });
 
-test('existing edit record builders retain Brand and Purchased From when those fields are not in the UI', () => {
+test('Paper and Set record builders retain Brand and Purchased From while Card legacy values remain opaque', () => {
   const form = new FormData();
   for (const [key, value] of Object.entries({ name: 'Edited Paper', owner: 'Nina', releaseYear: '2026', patternCount: '1', colors: 'red', availability: 'available', refillAvailable: '' })) form.set(key, value);
   const existingPaper = paper({ ...metadata, owner: 'Nina', keywords: [] });
@@ -47,12 +45,13 @@ test('existing edit record builders retain Brand and Purchased From when those f
     dateCreated: { value: existingCard.dateCreated }, sizePreset: { value: 'custom' }, width: { value: 4 }, height: { value: 6 },
     tagPicker: { getSelectedTags: () => [] }, stampSets: [], paperPackIds: [], favorite: { checked: false } });
   assert.deepEqual({ brand: cardResult.brand, purchasedFrom: cardResult.purchasedFrom }, metadata);
+  assert.deepEqual({ brand: normalizeCardForRuntime(card(metadata), catalog).brand, purchasedFrom: normalizeCardForRuntime(card(metadata), catalog).purchasedFrom }, metadata);
 
   const setResult = createStampDieSetRecord(set(metadata), catalog);
   assert.deepEqual({ brand: setResult.brand, purchasedFrom: setResult.purchasedFrom }, metadata);
 });
 
-test('Paper, Card, and Set forms and Detail views expose nonblank Brand and Purchased From values', async () => {
+test('Paper and Set forms and Detail views expose nonblank Brand and Purchased From values, not Cards', async () => {
   const [html, paper, library, cards, sets] = await Promise.all([
     readFile(new URL('../index.html', import.meta.url), 'utf8'),
     readFile(new URL('./add-dsp.js', import.meta.url), 'utf8'),
@@ -64,12 +63,13 @@ test('Paper, Card, and Set forms and Detail views expose nonblank Brand and Purc
   assert.match(html, /name="purchasedFrom"[^>]*maxlength="100"/);
   assert.match(paper, /form\.elements\.brand\.value = paperPack\.brand \|\| ""/);
   assert.match(paper, /form\.elements\.purchasedFrom\.value = paperPack\.purchasedFrom \|\| ""/);
-  for (const source of [paper, cards, sets]) {
+  for (const source of [paper, sets]) {
     assert.match(source, /Brand/);
     assert.match(source, /Purchased From/);
   }
-  for (const source of [library, cards, sets]) {
+  for (const source of [library, sets]) {
     assert.match(source, /\.brand\?\.trim\(\)/);
     assert.match(source, /\.purchasedFrom\?\.trim\(\)/);
   }
+  assert.doesNotMatch(cards, /name = 'brand'|name = 'purchasedFrom'|appendFact\(facts, 'Brand'|appendFact\(facts, 'Purchased From'/);
 });
