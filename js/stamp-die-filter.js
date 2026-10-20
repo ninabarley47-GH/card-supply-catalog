@@ -14,7 +14,7 @@ export function filterStampDieSets(records, filters, catalog, owners = []) {
     if (filters.releaseYear && String(record.releaseYear) !== String(filters.releaseYear)) return false;
     if (!matchesGlobalTagFilters(record.tagIds, filters.selectedTags, catalog)) return false;
     if (!query) return true;
-    const text = [record.name, record.releaseYear, ownerNames.get(record.ownerId),
+    const text = [record.name, record.releaseYear, ownerNames.get(record.ownerId), record.brand, record.purchasedFrom,
       ...getGlobalTagSearchNames(record.tagIds, catalog)].join(' ');
     return normalizeFilterText(text).includes(query);
   });

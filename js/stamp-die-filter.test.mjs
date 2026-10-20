@@ -14,8 +14,8 @@ const catalog = {
   categories: [{ id: 'tools', name: 'Tools' }, { id: 'nature', name: 'Nature' }]
 };
 const records = [
-  { id: 'one', name: 'Pine Boughs', releaseYear: 2026, ownerId: 'n', favorite: true, tagIds: ['s', 'd'], imageRefs: [{ imagePath: 'secret-file.jpg' }] },
-  { id: 'two', name: 'Summer Flowers', releaseYear: 2025, ownerId: 'a', favorite: false, tagIds: ['s', 'f'] },
+  { id: 'one', name: 'Pine Boughs', releaseYear: 2026, ownerId: 'n', favorite: true, tagIds: ['s', 'd'], brand: 'Northwoods Craft', imageRefs: [{ imagePath: 'secret-file.jpg' }] },
+  { id: 'two', name: 'Summer Flowers', releaseYear: 2025, ownerId: 'a', favorite: false, tagIds: ['s', 'f'], purchasedFrom: 'Paper Loft' },
   { id: 'three', name: 'Pine Mask', releaseYear: 2026, ownerId: 'n', favorite: false, tagIds: ['m', 'f'] },
   { id: 'four', name: 'Old Set', ownerId: 'old', favorite: true, tagIds: ['d'] }
 ];
@@ -27,6 +27,7 @@ for (const [query, expected] of [
   ['Pine Boughs', ['one']], ['pInE', ['one', 'three']], ['  pine   boughs  ', ['one']],
   ['pine-boughs', ['one']], ['2026', ['one', 'three']], ['NINA', ['one', 'three']],
   ['Floral', ['two', 'three']], ['Retired Owner', ['four']], ['missing', []],
+  ['CRAFT', ['one']], ['paper loft', ['two']],
   ['secret-file', []], ['one', []], ['tools', []]
 ]) test(`Set search: ${query}`, () => assert.deepEqual(ids({ query }), expected));
 

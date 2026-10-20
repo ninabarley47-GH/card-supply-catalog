@@ -1013,6 +1013,8 @@ export function matchesPaperPackFilters(paperPack, filterState, colorsById, tagC
     paperPack.name,
     paperPack.owner,
     paperPack.releaseYear,
+    paperPack.brand,
+    paperPack.purchasedFrom,
     ...tagNames,
     ...getSearchableColorText(paperPack, colorsById)
   ]

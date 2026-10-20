@@ -97,6 +97,15 @@ test('existing non-tag Paper and Card search values remain searchable', () => {
   assert.deepEqual(filterAndSortCards(cards, { query: 'blooms', selectedTags: none, tagCatalog: catalog }).map((card) => card.id), ['card']);
 });
 
+test('Paper search includes Brand and Purchased From and ignores blank metadata', () => {
+  const paper = { id: 'paper', name: 'Meadow Pack', owner: 'Nina', releaseYear: 2025, colors: [], tagIds: [],
+    brand: 'Echo Park', purchasedFrom: 'Scrapbooking.com' };
+  const filters = (query) => ({ query, selectedTags: none, selectedColors: [] });
+  assert.equal(matchesPaperPackFilters(paper, filters('ECHO'), {}, catalog), true);
+  assert.equal(matchesPaperPackFilters(paper, filters('booking'), {}, catalog), true);
+  assert.equal(matchesPaperPackFilters({ ...paper, brand: '', purchasedFrom: null }, filters('echo'), {}, catalog), false);
+});
+
 test('Holiday filtering resolves identity once and matches canonical IDs', () => {
   const identity = resolveHolidayFilterIdentity(catalog);
   assert.deepEqual(identity, { tagId: 'holiday', categoryId: '' });
