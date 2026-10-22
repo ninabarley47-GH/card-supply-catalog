@@ -19,7 +19,7 @@ import { createTagPicker, projectTagNames } from './tag-picker.js';
 import { normalizeStampDieSet } from './stamp-die-sets.js';
 import { getLocalDateValue } from './ui.js';
 import { getTagKey } from './tag-utils.js';
-import { attachUncatalogedLibraryFinder } from './uncataloged-library.js';
+import { attachUncatalogedLibraryFinder, findUncatalogedStampItems, normalizeUncatalogedPath } from './uncataloged-library.js';
 import { partitionStampDieTagIds } from './stamp-die-tags.js';
 
 const LAST_OWNER_SETTING = 'addStampDieLastOwnerId';
@@ -197,6 +197,8 @@ export async function initializeStampDieLibrary(services = {}) {
   let draftId;
   let draftSession = 0;
   let autoLoadedName = '';
+  let pendingUncatalogedSet = null;
+  let activeUncatalogedSetPaths = [];
   let editingRecord = null;
   let initialCardIds = [];
   let selectedCardIds = [];
@@ -228,6 +230,18 @@ export async function initializeStampDieLibrary(services = {}) {
     screen,
     button: screen.querySelector('[data-find-uncataloged-sets]'),
     title: 'Stamp & Die Sets',
+    addButton: add,
+    addLabel: 'Add to Stamps & Dies Library',
+    refreshEvent: 'catalog:stamp-die-set-saved',
+    onAddItem: async item => {
+      const latestSets = await storage.loadSavedStampDieSets();
+      if (findUncatalogedStampItems([item], latestSets).length === 0) {
+        await refresh();
+        return false;
+      }
+      pendingUncatalogedSet = { name: item.name, imagePaths: [...(item.imagePaths || [])] };
+      return true;
+    },
     scan: () => scanUncatalogedStampItems(displayedRecords)
   });
   filters.refreshOwners();
@@ -306,6 +320,7 @@ export async function initializeStampDieLibrary(services = {}) {
     renderCardSelections();
     draftSession++;
     autoLoadedName = '';
+    activeUncatalogedSetPaths = [];
     clearDraftStampImages(draftImages);
     draftImages = [];
     inferredTags = [];
@@ -428,7 +443,17 @@ export async function initializeStampDieLibrary(services = {}) {
     }
   }
 
-  add.addEventListener('click', () => openForm());
+  add.addEventListener('click', async () => {
+    const uncatalogedSet = pendingUncatalogedSet;
+    pendingUncatalogedSet = null;
+    await openForm();
+    if (uncatalogedSet && view.dialog.open) {
+      activeUncatalogedSetPaths = uncatalogedSet.imagePaths;
+      view.name.value = uncatalogedSet.name;
+      await autoLoadImagesForCurrentSetName();
+      if (!draftImages.length) view.imageMessage.textContent = 'No matching source images were available to load. You can still add images in this form.';
+    }
+  });
   document.querySelector('[data-add-stamp-set-open]')?.addEventListener('click', () => openForm());
 
   function renderDraftImages() {
@@ -625,6 +650,16 @@ export async function initializeStampDieLibrary(services = {}) {
         view.message.dataset.tone = 'error';
         view.message.textContent = 'A Stamp & Die Set with this name already exists. Enter a different Set Name.';
         return;
+      }
+      if (!editingRecord && activeUncatalogedSetPaths.length) {
+        const uncatalogedPaths = new Set(activeUncatalogedSetPaths.map(normalizeUncatalogedPath));
+        const alreadyUsed = existingSets.some(record => (record.imageRefs || []).some(reference =>
+          reference?.imageLibrary === 'stamp-die-images' && uncatalogedPaths.has(normalizeUncatalogedPath(reference.imagePath))));
+        if (alreadyUsed) {
+          view.message.dataset.tone = 'error';
+          view.message.textContent = 'One or more source images are already represented in Stamps & Dies. Close this form and refresh Find Uncataloged.';
+          return;
+        }
       }
       const latestCatalog = await storage.loadGlobalTagCatalog();
       const reconciled = reconcileStampDieImageTags({ tagIds: picker.getSelectedTagIds() }, latestCatalog, inferredTags);

@@ -23,12 +23,13 @@ import {
   getCardDetailImageSource,
   getCardImageSelectionMode,
   getCardLibraryImageSource,
+  loadCardImageFromLibraryPath,
   scanUncatalogedCardImages,
   hydrateCardImageSources,
   prepareCardImageForSave
 } from './card-images.js';
 import { createTagPicker, resolveItemTagIds } from './tag-picker.js';
-import { attachUncatalogedLibraryFinder } from './uncataloged-library.js';
+import { attachUncatalogedLibraryFinder, isCardImagePathCataloged } from './uncataloged-library.js';
 
 const CARD_SIZE_PRESETS = {
   'a2-portrait': { label: 'A2 Portrait — 4.25 × 5.5 inches', width: 4.25, height: 5.5 },
@@ -55,6 +56,7 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   let tagCatalog = await loadGlobalTagCatalog();
   const addCardView = createAddCardView({ owners, tagCatalog });
   const cards = [];
+  let pendingUncatalogedCardPath = '';
   addCardView.releaseRetiredImage = card => {
     if (card && !cards.includes(card)) clearImageReferenceObjectUrls(card);
   };
@@ -171,17 +173,40 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
   });
 
   addCardButtons.forEach(addButton => addButton.addEventListener('click', async () => {
+    const uncatalogedPath = pendingUncatalogedCardPath;
+    pendingUncatalogedCardPath = '';
     const [defaultOwnerId, lastOwnerId] = await Promise.all([
       loadDefaultOwnerId().catch(() => ''),
       loadCatalogSetting(ADD_CARD_LAST_OWNER_SETTING_ID).catch(() => '')
     ]);
     loadAvailablePaperPacks(addCardView, paperPacks);
-    openAddCardView(addCardView, selectNewCardOwnerId(defaultOwnerId, lastOwnerId, owners));
+    await openAddCardView(addCardView, selectNewCardOwnerId(defaultOwnerId, lastOwnerId, owners));
+    if (uncatalogedPath) {
+      const result = await loadCardImageFromLibraryPath(uncatalogedPath);
+      if (result.image) {
+        addCardView.selectedImage = result.image;
+        renderSelectedCardImage(addCardView);
+      } else {
+        addCardView.imageMessage.textContent = 'The selected image is no longer available in the Card image folder.';
+      }
+    }
   }));
   attachUncatalogedLibraryFinder({
     screen: gallery.closest('#cards'),
     button: document.querySelector('[data-find-uncataloged-cards]'),
     title: 'Cards',
+    addButton: gallery.closest('#cards')?.querySelector('[data-add-card-open]'),
+    addLabel: 'Add to Card Library',
+    refreshEvent: ['catalog:card-saved', 'catalog:cards-updated'],
+    onAddItem: async item => {
+      const latestCards = await loadSavedCards();
+      if (isCardImagePathCataloged([...cards, ...latestCards], item.path)) {
+        await reloadCards();
+        return false;
+      }
+      pendingUncatalogedCardPath = item.path;
+      return true;
+    },
     scan: () => scanUncatalogedCardImages(cards)
   });
   searchInput?.addEventListener('input', renderCurrent);
@@ -376,6 +401,15 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     addCardView.save.disabled = true;
 
     try {
+      const usedStandardImageInput = addCardView.selectedImage?.imageSelectionStrategy === 'standard-file-input';
+      if (isNewCard && addCardView.selectedImage?.imagePath) {
+        const latestCards = await loadSavedCards();
+        if (isCardImagePathCataloged([...cards, ...latestCards], addCardView.selectedImage.imagePath)) {
+          addCardView.imageMessage.textContent = 'This image is already represented in the Card Library. Choose another image.';
+          await reloadCards();
+          return;
+        }
+      }
       const existingOwnerIndex = owners.findIndex((candidate) => candidate.id === owner.id);
       if (existingOwnerIndex < 0 || !isActiveOwner(owners[existingOwnerIndex])) {
         await saveOwner(owner);
@@ -384,7 +418,6 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
         refreshOwnerOptions(owners);
         notifyOwnerRegistryUpdated();
       }
-      const usedStandardImageInput = addCardView.selectedImage?.imageSelectionStrategy === 'standard-file-input';
       const imageResult = await prepareCardImageForSave(card, addCardView.selectedImage);
       await saveCard(imageResult.card);
       await hydrateCardImageSources([imageResult.card], { preferThumbnail: true });

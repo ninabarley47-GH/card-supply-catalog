@@ -7,7 +7,7 @@ import { loadCatalogSetting } from './storage.js';
 import { generateImageThumbnail } from './thumbnails.js';
 import { isSupportedImageFileName, isUsableThumbnailFile, runTasksWithConcurrency } from './images.js';
 import { supportsOpenFilePicker, supportsOrdinaryImageFileFallback } from './browser-capabilities.js';
-import { findUncatalogedCardImages, scanImageTree } from './uncataloged-library.js';
+import { findUncatalogedCardImages, isCardImagePathCataloged, scanImageTree } from './uncataloged-library.js';
 
 const IMAGE_LIBRARY_SETTING_ID = 'imageLibrary';
 const CARD_IMAGE_LIBRARY_SETTING_ID = 'cardImageLibrary';
@@ -38,6 +38,17 @@ export async function scanUncatalogedCardImages(cards = [], services = {}) {
     return { ok: true, items: findUncatalogedCardImages(entries, cards) };
   } catch {
     return { ok: false, items: [], message: 'The Card image folder could not be scanned.' };
+  }
+}
+
+export async function loadCardImageFromLibraryPath(imagePath) {
+  const directory = await getDirectoryHandle(CARD_IMAGE_LIBRARY_SETTING_ID, 'read');
+  if (!directory || !imagePath) return { ok: false, image: null };
+  try {
+    const file = await getFileFromRelativePath(directory, imagePath);
+    return { ok: true, image: { file, name: file.name, imagePath, previewSrc: URL.createObjectURL(file) } };
+  } catch {
+    return { ok: false, image: null };
   }
 }
 
