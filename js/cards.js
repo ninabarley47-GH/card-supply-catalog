@@ -41,7 +41,8 @@ const ADD_CARD_LAST_OWNER_SETTING_ID = 'addCardLastOwnerId';
 export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {}) {
   const gallery = document.querySelector('[data-card-library]');
   const toolbar = gallery?.closest('#cards')?.querySelector('.library-toolbar');
-  const addCardButton = document.querySelector('[data-add-card-open]');
+  const addCardButtons = [...document.querySelectorAll('[data-add-card-open]')];
+  const addCardButton = addCardButtons[0];
   const resultCount = toolbar?.querySelector('[data-card-library-result-count]');
 
   if (!gallery || !toolbar || !addCardButton) {
@@ -167,14 +168,14 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     await reloadCards();
   });
 
-  addCardButton.addEventListener('click', async () => {
+  addCardButtons.forEach(addButton => addButton.addEventListener('click', async () => {
     const [defaultOwnerId, lastOwnerId] = await Promise.all([
       loadDefaultOwnerId().catch(() => ''),
       loadCatalogSetting(ADD_CARD_LAST_OWNER_SETTING_ID).catch(() => '')
     ]);
     loadAvailablePaperPacks(addCardView, paperPacks);
     openAddCardView(addCardView, selectNewCardOwnerId(defaultOwnerId, lastOwnerId, owners));
-  });
+  }));
   searchInput?.addEventListener('input', renderCurrent);
   favoritesButton?.addEventListener('click', () => {
     favoritesButton.setAttribute(
