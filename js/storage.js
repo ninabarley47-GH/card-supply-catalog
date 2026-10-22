@@ -203,7 +203,7 @@ export function migrateCardStampRelationships(card, sets) {
   const matches = new Map();
   for (const set of sets) {
     if (typeof set?.id !== 'string' || !set.id.trim() || typeof set.name !== 'string') continue;
-    const key = set.name.trim().toLowerCase();
+    const key = normalizeLegacyStampName(set.name);
     if (!key) continue;
     if (!matches.has(key)) matches.set(key, new Set());
     matches.get(key).add(set.id);
@@ -211,7 +211,7 @@ export function migrateCardStampRelationships(card, sets) {
   const ids = new Set(normalizeStampDieSetIds(card.stampDieSetIds));
   let changed = false;
   const convert = (name) => {
-    const candidates = typeof name === 'string' ? matches.get(name.trim().toLowerCase()) : null;
+    const candidates = typeof name === 'string' ? matches.get(normalizeLegacyStampName(name)) : null;
     if (candidates?.size !== 1) return false;
     ids.add([...candidates][0]);
     changed = true;
@@ -227,6 +227,10 @@ export function migrateCardStampRelationships(card, sets) {
   }
   if (convertedSingular) delete migrated.stampSet;
   return migrated;
+}
+
+function normalizeLegacyStampName(value) {
+  return String(value).trim().toLowerCase().replace(/(^|\s)(?:and|&)(?=\s|$)/g, '$1and');
 }
 
 function hasLegacyStampNames(card) {

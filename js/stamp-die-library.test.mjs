@@ -338,6 +338,18 @@ for (const [variation, duplicateName] of [
   });
 }
 
+test('Stamp & Die duplicate detection treats standalone and and ampersand as equivalent', async (t) => {
+  const h = await harness(t);
+  await h.add.emit('click');
+  h.name.value = 'Beautiful And Balloons';
+  await h.form.emit('submit');
+  await h.add.emit('click');
+  h.name.value = 'Beautiful & Balloons';
+  await h.form.emit('submit');
+  assert.equal(h.calls(), 1);
+  assert.match(h.form.textContent, /A Stamp & Die Set with this name already exists/);
+});
+
 test('same names in Paper and Cards are irrelevant to Set validation', async (t) => {
   const paperRecords = [{ id: 'paper-one', name: 'Beautiful Balloons' }];
   const cardRecords = [{ id: 'card-one', name: 'Beautiful Balloons' }];

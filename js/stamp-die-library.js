@@ -18,7 +18,7 @@ import { loadCatalogSetting, saveCatalogSetting, loadGlobalTagCatalog, loadSaved
 import { createTagPicker, projectTagNames } from './tag-picker.js';
 import { normalizeStampDieSet } from './stamp-die-sets.js';
 import { getLocalDateValue } from './ui.js';
-import { getTagKey } from './tag-utils.js';
+import { getProductNameKey, getTagKey } from './tag-utils.js';
 import { attachUncatalogedLibraryFinder, findUncatalogedStampItems, normalizeUncatalogedPath } from './uncataloged-library.js';
 import { partitionStampDieTagIds } from './stamp-die-tags.js';
 
@@ -645,8 +645,8 @@ export async function initializeStampDieLibrary(services = {}) {
     try {
       // This is a Set-only data-quality check; generated IDs remain identity.
       const existingSets = await storage.loadSavedStampDieSets();
-      const nameKey = getTagKey(view.name.value);
-      if (existingSets.some((record) => record.id !== draftId && getTagKey(record.name) === nameKey)) {
+      const nameKey = getProductNameKey(view.name.value);
+      if (existingSets.some((record) => record.id !== draftId && getProductNameKey(record.name) === nameKey)) {
         view.message.dataset.tone = 'error';
         view.message.textContent = 'A Stamp & Die Set with this name already exists. Enter a different Set Name.';
         return;

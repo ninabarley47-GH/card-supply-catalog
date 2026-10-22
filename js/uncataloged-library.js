@@ -1,3 +1,5 @@
+import { getProductNameKey } from './tag-utils.js';
+
 export function normalizeUncatalogedPath(value) {
   return String(value || '').replace(/\\/g, '/').split('/').filter(Boolean).join('/').toLocaleLowerCase();
 }
@@ -16,12 +18,13 @@ export function isCardImagePathCataloged(cards = [], path = '') {
 }
 
 export function findUncatalogedStampItems(items, sets = []) {
-  const catalogKeys = new Set(sets.flatMap(set => [set?.id, set?.name]
-    .filter(Boolean).map(normalizeStampName)));
+  const catalogKeys = new Set(sets.flatMap(set => [set?.id, set?.name].filter(Boolean).map(normalizeStampName)));
+  const catalogNames = new Set(sets.flatMap(set => [set?.name].filter(Boolean).map(normalizeProductStampName)));
   const catalogedImagePaths = new Set(sets.flatMap(set => set?.imageRefs || [])
     .filter(reference => reference?.imageLibrary === 'stamp-die-images' && reference.imagePath)
     .map(reference => normalizeUncatalogedPath(reference.imagePath)));
-  return items.filter(item => !catalogKeys.has(normalizeStampName(item.name)) &&
+  return items.filter(item => !catalogKeys.has(normalizeStampName(item.id)) &&
+    !catalogKeys.has(normalizeStampName(item.name)) && !catalogNames.has(normalizeProductStampName(item.name)) &&
     !(item.imagePaths || []).some(path => catalogedImagePaths.has(normalizeUncatalogedPath(path))));
 }
 
@@ -65,6 +68,10 @@ export function groupStampImageEntries(entries) {
 
 function normalizeStampName(value) {
   return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function normalizeProductStampName(value) {
+  return normalizeStampName(getProductNameKey(value));
 }
 
 export function attachUncatalogedLibraryFinder({ screen, button, title, scan, addButton, addLabel, onAddItem, refreshEvent }) {

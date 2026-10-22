@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { applyDefaultOwner, buildPaperPackFromForm, getPatternImageHelpText, shouldShowPatternLibraryPicker, waitForPaperPackPersistence } from "./add-dsp.js";
+import { applyDefaultOwner, buildPaperPackFromForm, getPatternImageHelpText, shouldShowPatternLibraryPicker, validatePaperPackDuplicate, waitForPaperPackPersistence } from "./add-dsp.js";
 import { normalizePaperPackKeywords } from "./storage.js";
 
 function createValidPaperPackForm() {
@@ -29,6 +29,17 @@ const owners = [
   { id: "owner-nina", name: "Nina" },
   { id: "owner-amanda", name: "Amanda" }
 ];
+
+test('Paper duplicate detection treats standalone and and ampersand as equivalent', () => {
+  const result = validatePaperPackDuplicate({ id: 'blooms-and-bliss', name: 'Blooms & Bliss' }, [
+    { id: 'blooms-and-bliss-existing', name: ' Blooms   AND   Bliss ' }
+  ]);
+  assert.equal(result.ok, false);
+  assert.match(result.message, /already exists/);
+  assert.equal(validatePaperPackDuplicate({ id: 'blooms-bliss', name: 'Blooms Bliss' }, [
+    { id: 'other', name: 'Blooms and Bliss' }
+  ]).ok, true);
+});
 
 test("Add Paper applies the configured device-local Default Owner", () => {
   const form = { elements: { owner: { value: "Previous owner" } } };

@@ -14,6 +14,7 @@ import { initializeOwnerPicker, notifyOwnerRegistryUpdated, refreshOwnerOptions,
 import { supportsDirectoryPicker, supportsOpenFilePicker } from "./browser-capabilities.js";
 import { createTagPicker, projectTagNames, resolveItemTagIds } from "./tag-picker.js";
 import { normalizeOptionalProductMetadata } from './product-metadata.js';
+import { getProductNameKey } from './tag-utils.js';
 
 const ADD_DSP_DEFAULTS_SETTING_ID = "addDspDefaults";
 
@@ -539,11 +540,11 @@ export function buildPaperPackFromForm(formData, colorsById, selectedImages = []
   };
 }
 
-function validatePaperPackDuplicate(paperPack, paperPacks, editingPaperPack = null) {
-  const normalizedName = normalizeLookupValue(paperPack.name);
+export function validatePaperPackDuplicate(paperPack, paperPacks, editingPaperPack = null) {
+  const normalizedName = normalizeLookupValue(getProductNameKey(paperPack.name));
   const existingById = paperPacks.find((existingPack) => existingPack.id === paperPack.id);
   const existingByName = paperPacks.find(
-    (existingPack) => normalizeLookupValue(existingPack.name) === normalizedName
+    (existingPack) => normalizeLookupValue(getProductNameKey(existingPack.name)) === normalizedName
   );
   const isEditingSamePack = editingPaperPack && existingById?.id === editingPaperPack.id;
   const nameBelongsToSamePack = editingPaperPack && existingByName?.id === editingPaperPack.id;

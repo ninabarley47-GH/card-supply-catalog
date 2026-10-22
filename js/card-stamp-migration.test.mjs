@@ -21,6 +21,13 @@ test('migration merges with stable and missing IDs, deduplicates, and removes fu
   assert.deepEqual(migrateCardStampRelationships(card, sets), { ...base, stampDieSetIds: ['missing-set', 'view', 'garden'] });
 });
 
+test('migration matches legacy Stamp names with equivalent and and ampersand spellings', () => {
+  const result = migrateCardStampRelationships({ stampSet: 'Blooms And Bliss' }, [
+    { id: 'blooms-bliss', name: 'Blooms & Bliss' }
+  ]);
+  assert.deepEqual(result, { stampDieSetIds: ['blooms-bliss'] });
+});
+
 test('legacy singular stampSet is converted only on a unique match', () => {
   assert.deepEqual(migrateCardStampRelationships({ ...base, stampSet: 'peaceful view' }, sets), { ...base, stampDieSetIds: ['view'] });
   const partial = { ...base, stampSet: 'Unknown', stampSets: ['Peaceful View'] };

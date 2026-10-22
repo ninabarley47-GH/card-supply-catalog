@@ -21,6 +21,12 @@ test('Stamp & Die discovery groups folders and existing flat Set image naming co
   assert.deepEqual(uncataloged.map(item => [item.name, item.imageCount]), [['Garden Set', 2]]);
 });
 
+test('Stamp & Die discovery treats standalone and and ampersand as the same catalog name', () => {
+  const item = { id: 'uncataloged-id', name: 'Blooms & Bliss', imagePaths: ['Blooms & Bliss/01.jpg'] };
+  assert.deepEqual(findUncatalogedStampItems([item], [{ id: 'other-id', name: ' Blooms   AND   Bliss ' }]), []);
+  assert.deepEqual(findUncatalogedStampItems([item], [{ id: 'other-id', name: 'Blooms And Joy' }]), [item]);
+});
+
 test('Stamp & Die discovery excludes cataloged items, handles empty sources, and reports a missing source', async () => {
   const result = await scanUncatalogedStampItems([{ name: 'Rose' }], {
     loadDirectory: async () => directory([imageFile('rose-stamps.jpg')])

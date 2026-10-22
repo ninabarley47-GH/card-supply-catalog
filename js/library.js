@@ -17,6 +17,7 @@ import { initializeSettings } from "./settings.js";
 import { getCardLibraryImageSource } from "./card-images.js";
 import { refreshOwnerFilter } from "./owner-picker.js";
 import { normalizeFilterText } from "./search.js";
+import { getProductNameKey } from "./tag-utils.js";
 import { resolveItemTagIds } from "./tag-picker.js";
 import {
   clearGlobalTagFilter,
@@ -400,15 +401,17 @@ export function getUncatalogedPackControlPresentation(availability) {
   return { hidden: false, disabled: false, message: "" };
 }
 
-function getUncatalogedImageFolderCandidates(folders, paperPacks) {
+export function getUncatalogedImageFolderCandidates(folders, paperPacks) {
   const catalogKeys = new Set(
     paperPacks.flatMap((paperPack) => [normalizeFilterText(paperPack.id), normalizeFilterText(paperPack.name)])
   );
+  const catalogNames = new Set(paperPacks.map((paperPack) => getProductNameKey(normalizeFilterText(paperPack.name))));
 
   return folders.filter(
     (folder) =>
       !catalogKeys.has(normalizeFilterText(folder.id)) &&
-      !catalogKeys.has(normalizeFilterText(folder.paperPackName))
+      !catalogKeys.has(normalizeFilterText(folder.paperPackName)) &&
+      !catalogNames.has(getProductNameKey(normalizeFilterText(folder.paperPackName)))
   );
 }
 
