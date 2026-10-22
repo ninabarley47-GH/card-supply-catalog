@@ -3,6 +3,7 @@ import { supportsOpenFilePicker, supportsDirectoryPicker } from './browser-capab
 import { createCardImageFromFile, clearSelectedCardImage, getCardLibraryImageSource, getCardDetailImageSource } from './card-images.js';
 import { findPaperPackImageDirectory, isSupportedImageFileName } from './images.js';
 import { getTagKey } from './tag-utils.js';
+import { findUncatalogedStampItems, groupStampImageEntries, scanImageTree } from './uncataloged-library.js';
 import {
   prepareFolderBackedImage, prepareEmbeddedImage, hasDirectoryPermission,
   hydrateImageReference, clearImageReferenceObjectUrls, getFileFromRelativePath
@@ -15,6 +16,19 @@ export async function loadStampImageDirectory(mode = 'read', requestPermission =
   const setting = await (services.loadCatalogSetting || loadCatalogSetting)(STAMP_IMAGE_LIBRARY_SETTING_ID);
   const handle = setting?.directoryHandle;
   return await hasDirectoryPermission(handle, mode, requestPermission) ? handle : null;
+}
+
+export async function scanUncatalogedStampItems(sets = [], services = {}) {
+  let directory;
+  try { directory = await (services.loadDirectory || loadStampImageDirectory)('read'); } catch { directory = null; }
+  if (!directory) return { ok: false, items: [], message: 'Choose or reconnect the Stamp & Die image folder in Settings before scanning.' };
+  if (typeof directory.entries !== 'function') return { ok: false, items: [], message: 'This browser cannot scan the selected Stamp & Die image folder.' };
+  try {
+    const entries = await scanImageTree(directory);
+    return { ok: true, items: findUncatalogedStampItems(groupStampImageEntries(entries), sets) };
+  } catch {
+    return { ok: false, items: [], message: 'The Stamp & Die image folder could not be scanned.' };
+  }
 }
 
 export async function chooseStampImageDirectory(environment = globalThis, services = {}) {

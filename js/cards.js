@@ -23,10 +23,12 @@ import {
   getCardDetailImageSource,
   getCardImageSelectionMode,
   getCardLibraryImageSource,
+  scanUncatalogedCardImages,
   hydrateCardImageSources,
   prepareCardImageForSave
 } from './card-images.js';
 import { createTagPicker, resolveItemTagIds } from './tag-picker.js';
+import { attachUncatalogedLibraryFinder } from './uncataloged-library.js';
 
 const CARD_SIZE_PRESETS = {
   'a2-portrait': { label: 'A2 Portrait — 4.25 × 5.5 inches', width: 4.25, height: 5.5 },
@@ -176,6 +178,12 @@ export async function initializeCardLibrary({ paperPacks = [], owners = [] } = {
     loadAvailablePaperPacks(addCardView, paperPacks);
     openAddCardView(addCardView, selectNewCardOwnerId(defaultOwnerId, lastOwnerId, owners));
   }));
+  attachUncatalogedLibraryFinder({
+    screen: gallery.closest('#cards'),
+    button: document.querySelector('[data-find-uncataloged-cards]'),
+    title: 'Cards',
+    scan: () => scanUncatalogedCardImages(cards)
+  });
   searchInput?.addEventListener('input', renderCurrent);
   favoritesButton?.addEventListener('click', () => {
     favoritesButton.setAttribute(

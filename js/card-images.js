@@ -7,6 +7,7 @@ import { loadCatalogSetting } from './storage.js';
 import { generateImageThumbnail } from './thumbnails.js';
 import { isUsableThumbnailFile, runTasksWithConcurrency } from './images.js';
 import { supportsOpenFilePicker, supportsOrdinaryImageFileFallback } from './browser-capabilities.js';
+import { findUncatalogedCardImages, scanImageTree } from './uncataloged-library.js';
 
 const IMAGE_LIBRARY_SETTING_ID = 'imageLibrary';
 const CARD_IMAGE_LIBRARY_SETTING_ID = 'cardImageLibrary';
@@ -24,6 +25,20 @@ export function getCardImageSelectionMode(environment = globalThis) {
   if (supportsOpenFilePicker(environment)) return 'open-file-picker';
   if (supportsOrdinaryImageFileFallback(environment)) return 'standard-file-input';
   return 'unavailable';
+}
+
+export async function scanUncatalogedCardImages(cards = [], services = {}) {
+  const directory = services.loadDirectory
+    ? await services.loadDirectory('read')
+    : await getDirectoryHandle(CARD_IMAGE_LIBRARY_SETTING_ID, 'read');
+  if (!directory) return { ok: false, items: [], message: 'Choose or reconnect the Card image folder in Settings before scanning.' };
+  if (typeof directory.entries !== 'function') return { ok: false, items: [], message: 'This browser cannot scan the selected Card image folder.' };
+  try {
+    const entries = await scanImageTree(directory);
+    return { ok: true, items: findUncatalogedCardImages(entries, cards) };
+  } catch {
+    return { ok: false, items: [], message: 'The Card image folder could not be scanned.' };
+  }
 }
 
 export function createCardImageFromFile(file, environment = globalThis) {

@@ -9,7 +9,7 @@ import { isActiveOwner } from './owners.js';
 import { loadDefaultOwnerId } from './settings.js';
 import {
   chooseStampImages, selectStampImageFiles, loadStampImageDirectory, loadStampImagesForSetName,
-  prepareStampImagesForSave, hydrateStampImages, clearStampImageSources,
+  prepareStampImagesForSave, hydrateStampImages, clearStampImageSources, scanUncatalogedStampItems,
   clearDraftStampImages, removeDraftStampImage, getStampLibraryImageSource, getStampDetailImageSource
 } from './stamp-die-images.js';
 import { inferStampDieImageTags, reconcileStampDieImageTags, orderStampDieImages } from './stamp-die-image-tags.js';
@@ -19,6 +19,7 @@ import { createTagPicker, projectTagNames } from './tag-picker.js';
 import { normalizeStampDieSet } from './stamp-die-sets.js';
 import { getLocalDateValue } from './ui.js';
 import { getTagKey } from './tag-utils.js';
+import { attachUncatalogedLibraryFinder } from './uncataloged-library.js';
 import { partitionStampDieTagIds } from './stamp-die-tags.js';
 
 const LAST_OWNER_SETTING = 'addStampDieLastOwnerId';
@@ -223,6 +224,12 @@ export async function initializeStampDieLibrary(services = {}) {
     }
   });
   const filters = initializeStampDieFilters(owners, renderCurrent);
+  attachUncatalogedLibraryFinder({
+    screen,
+    button: screen.querySelector('[data-find-uncataloged-sets]'),
+    title: 'Stamp & Die Sets',
+    scan: () => scanUncatalogedStampItems(displayedRecords)
+  });
   filters.refreshOwners();
   sortControl?.addEventListener('change', renderCurrent);
 
