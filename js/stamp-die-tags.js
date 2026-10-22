@@ -1,6 +1,11 @@
 import { getTagKey } from './tag-utils.js';
 
-const TOOL_TYPE_NAMES = new Set(['stamp', 'die', 'punch', 'texture', 'mask']);
+export const STAMP_DIE_TOOL_TYPE_NAMES = Object.freeze(['Stamp', 'Die', 'Punch', 'Texture', 'Mask']);
+const TOOL_TYPE_NAMES = new Set(STAMP_DIE_TOOL_TYPE_NAMES.map(getTagKey));
+
+export function getStampDieToolTypeTags(catalog) {
+  return (catalog?.tags || []).filter((tag) => TOOL_TYPE_NAMES.has(getTagKey(tag.name)));
+}
 
 // Tag IDs remain the source of truth; type is a presentation convention based on the current name.
 export function partitionStampDieTagIds(tagIds = [], catalog) {

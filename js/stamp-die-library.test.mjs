@@ -105,6 +105,14 @@ async function harness(t, otherCatalogServices = {}) {
     filterControls[key] = control;
     filterForm.append(control);
   }
+  const toolTypeFilters = new Element('fieldset'); toolTypeFilters.dataset.setLibraryToolTypeFilters = '';
+  const toolTypeOptions = new Element('div'); toolTypeOptions.dataset.setLibraryToolTypeOptions = '';
+  const clearToolTypes = new Element('button'); clearToolTypes.dataset.setLibraryClearToolTypes = '';
+  const toggleToolTypes = new Element('button'); toggleToolTypes.dataset.setLibraryToggleToolTypes = '';
+  toggleToolTypes.setAttribute('aria-expanded', 'true');
+  toolTypeFilters.append(toolTypeOptions);
+  filterForm.append(toolTypeFilters, clearToolTypes, toggleToolTypes);
+  Object.assign(filterControls, { toolTypeFilters, toolTypeOptions, clearToolTypes, toggleToolTypes });
   document.body.append(filterForm);
   globalThis.Option = function(text, value) { return Object.assign(new Element('option'), { textContent: text, value }); };
   globalThis.document = document;
@@ -996,6 +1004,42 @@ test('Set sidebar combines filters, clears tags independently, resets all, and n
   assert.equal(h.calls(), 0);
   assert.equal(imageReads, imagesBefore);
   assert.equal(h.recordReads(), readsBefore);
+});
+
+test('Tool Type filter offers recognized tags, combines with Themes, clears independently and resets with Clear All', async (t) => {
+  const customCatalog = initialCatalog();
+  for (const [id, name] of [['stamp', 'Stamp'], ['die', 'Die'], ['punch', 'Punch'], ['texture', 'Texture'], ['mask', 'Mask'], ['christmas', 'Christmas']]) {
+    customCatalog.tags.push({ id, name, appliesTo: ['stamp'], categoryIds: [] });
+  }
+  const h = await harness(t, { initialTagCatalog: customCatalog });
+  await seedEdit(h, { tagIds: ['die', 'christmas'] }); await h.cancel.emit('click');
+  h.records.push(createStampDieSetRecord({ id: 'stamp-christmas', name: 'Stamp Christmas', dateCreated: '2020-01-03', favorite: false, tagIds: ['stamp', 'christmas'] }, h.catalog));
+  h.records.push(createStampDieSetRecord({ id: 'theme-only', name: 'Christmas only', dateCreated: '2020-01-04', favorite: false, tagIds: ['christmas'] }, h.catalog));
+  await h.document.emit('catalog:global-tags-updated');
+
+  const c = h.filterControls;
+  assert.deepEqual(c.toolTypeFilters.querySelectorAll('input[data-stamp-tool-type-id]').map((input) => input.dataset.stampToolTypeId), ['stamp', 'die', 'punch', 'texture', 'mask']);
+  assert.equal(h.gallery.querySelectorAll('article').length, 3); // No Tool Type selection keeps theme-only records visible.
+
+  const theme = c.tagFilters.querySelector('input[data-global-tag-id="christmas"]');
+  theme.checked = true; await c.tagFilters.emit('change', { target: theme });
+  assert.equal(h.gallery.querySelectorAll('article').length, 3); // Theme filter alone keeps its existing behavior.
+
+  const die = c.toolTypeFilters.querySelector('input[data-stamp-tool-type-id="die"]');
+  die.checked = true; await c.toolTypeFilters.emit('change', { target: die });
+  assert.deepEqual(h.gallery.querySelectorAll('article').map((tile) => tile.dataset.setId), ['set-existing']);
+  assert.equal(c.clear.hidden, false);
+  await c.clearToolTypes.emit('click');
+  assert.equal(c.toolTypeFilters.querySelector('input[data-stamp-tool-type-id="die"]').checked, false);
+  assert.equal(theme.checked, true);
+  assert.equal(h.gallery.querySelectorAll('article').length, 3);
+
+  die.checked = true; await c.toolTypeFilters.emit('change', { target: die });
+  await c.clear.emit('click');
+  assert.equal(c.toolTypeFilters.querySelector('input[data-stamp-tool-type-id="die"]').checked, false);
+  assert.equal(theme.checked, false);
+  assert.equal(c.clear.hidden, true);
+  assert.equal(h.gallery.querySelectorAll('article').length, 3);
 });
 
 test('Set category controls refine members, combine with owner, preserve renamed tags, and reset', async (t) => {

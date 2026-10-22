@@ -9,9 +9,11 @@ const catalog = {
     { id: 's', name: 'Stamp', categoryIds: ['tools'], appliesTo: ['paper'] },
     { id: 'd', name: 'Die', categoryIds: ['tools'], appliesTo: ['card'] },
     { id: 'm', name: 'Mask', categoryIds: [] },
-    { id: 'f', name: 'Floral', categoryIds: ['nature'] }
+    { id: 'f', name: 'Floral', categoryIds: ['nature'] },
+    { id: 't', name: 'Texture', categoryIds: [] },
+    { id: 'x', name: 'Christmas', categoryIds: ['holidays'] }
   ],
-  categories: [{ id: 'tools', name: 'Tools' }, { id: 'nature', name: 'Nature' }]
+  categories: [{ id: 'tools', name: 'Tools' }, { id: 'nature', name: 'Nature' }, { id: 'holidays', name: 'Holidays' }]
 };
 const records = [
   { id: 'one', name: 'Pine Boughs', releaseYear: 2026, ownerId: 'n', favorite: true, tagIds: ['s', 'd'], brand: 'Northwoods Craft', imageRefs: [{ imagePath: 'secret-file.jpg' }] },
@@ -62,6 +64,19 @@ test('renames change searchable display names while IDs and records stay intact'
   assert.deepEqual(ids({ ownerId: 'n', query: 'New Nina' }, catalog, renamedOwners), ['one', 'three']);
   assert.deepEqual(ids({ selectedTags: tag('d'), query: 'Cutting' }, renamedTags), ['one', 'four']);
   assert.deepEqual(records, before);
+});
+
+test('dedicated tool-type IDs combine with theme tags using AND semantics', () => {
+  const withChristmas = [
+    { id: 'die-christmas', name: 'Die Christmas', favorite: false, tagIds: ['d', 'x'] },
+    { id: 'stamp-christmas', name: 'Stamp Christmas', favorite: false, tagIds: ['s', 'x'] },
+    { id: 'christmas-only', name: 'Christmas Only', favorite: false, tagIds: ['x'] }
+  ];
+  assert.deepEqual(filterStampDieSets(withChristmas, {}, catalog).map((record) => record.id), ['die-christmas', 'stamp-christmas', 'christmas-only']);
+  assert.deepEqual(filterStampDieSets(withChristmas, { selectedTags: tag('x') }, catalog).map((record) => record.id), ['die-christmas', 'stamp-christmas', 'christmas-only']);
+  assert.deepEqual(filterStampDieSets(withChristmas, { selectedToolTypeTagIds: ['d'] }, catalog).map((record) => record.id), ['die-christmas']);
+  assert.deepEqual(filterStampDieSets(withChristmas, { selectedToolTypeTagIds: ['d'], selectedTags: tag('x') }, catalog).map((record) => record.id), ['die-christmas']);
+  assert.deepEqual(filterStampDieSets(withChristmas, { selectedToolTypeTagIds: ['m'] }, catalog).map((record) => record.id), []);
 });
 
 test('filtering is read-only and does not access images or creation dates', () => {
