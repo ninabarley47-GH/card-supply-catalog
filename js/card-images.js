@@ -5,7 +5,7 @@ import {
 } from './image-references.js';
 import { loadCatalogSetting } from './storage.js';
 import { generateImageThumbnail } from './thumbnails.js';
-import { isUsableThumbnailFile, runTasksWithConcurrency } from './images.js';
+import { isSupportedImageFileName, isUsableThumbnailFile, runTasksWithConcurrency } from './images.js';
 import { supportsOpenFilePicker, supportsOrdinaryImageFileFallback } from './browser-capabilities.js';
 import { findUncatalogedCardImages, scanImageTree } from './uncataloged-library.js';
 
@@ -34,7 +34,7 @@ export async function scanUncatalogedCardImages(cards = [], services = {}) {
   if (!directory) return { ok: false, items: [], message: 'Choose or reconnect the Card image folder in Settings before scanning.' };
   if (typeof directory.entries !== 'function') return { ok: false, items: [], message: 'This browser cannot scan the selected Card image folder.' };
   try {
-    const entries = await scanImageTree(directory);
+    const entries = await scanImageTree(directory, '', isSupportedImageFileName);
     return { ok: true, items: findUncatalogedCardImages(entries, cards) };
   } catch {
     return { ok: false, items: [], message: 'The Card image folder could not be scanned.' };

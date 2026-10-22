@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { findUncatalogedCardImages, findUncatalogedStampItems, groupStampImageEntries } from './uncataloged-library.js';
+import { findUncatalogedCardImages, findUncatalogedStampItems, groupStampImageEntries, scanImageTree } from './uncataloged-library.js';
 import { scanUncatalogedCardImages } from './card-images.js';
 import { scanUncatalogedStampItems } from './stamp-die-images.js';
 
@@ -44,11 +44,22 @@ test('Card discovery handles empty and missing sources and excludes cataloged pa
   const result = await scanUncatalogedCardImages([
     { imageLibrary: 'card-images', imagePath: 'sets/card-1.png' }
   ], { loadDirectory: async () => directory([
-    subDirectory('sets', [imageFile('card-1.png'), imageFile('card-2.png')])
+    subDirectory('sets', [imageFile('card-1.png'), imageFile('card-1.thumb.jpg'), imageFile('card-2.png'), imageFile('card-2.thumb.jpg')])
   ]) });
   assert.deepEqual(result.items.map(item => item.path), ['sets/card-2.png']);
   assert.deepEqual(await scanUncatalogedCardImages([], { loadDirectory: async () => directory([]) }), { ok: true, items: [] });
   const missing = await scanUncatalogedCardImages([], { loadDirectory: async () => null });
   assert.equal(missing.ok, false);
   assert.match(missing.message, /Card image folder/);
+});
+
+test('all discovery scans ignore generated thumbnail files', async () => {
+  const files = await scanImageTree(directory([
+    imageFile('full.jpg'), imageFile('full.thumb.jpg'), imageFile('full.thumb.jpeg'), imageFile('full.thumb.JPG')
+  ]));
+  assert.deepEqual(files.map(file => file.name), ['full.jpg']);
+  const stamp = await scanUncatalogedStampItems([], {
+    loadDirectory: async () => directory([imageFile('Sample stamps.jpg'), imageFile('Sample stamps.thumb.jpg')])
+  });
+  assert.deepEqual(stamp.items.map(item => item.name), ['Sample']);
 });

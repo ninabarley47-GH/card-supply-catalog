@@ -15,14 +15,18 @@ export function findUncatalogedStampItems(items, sets = []) {
   return items.filter(item => !catalogKeys.has(normalizeStampName(item.name)));
 }
 
-export async function scanImageTree(directory, path = '') {
+export async function scanImageTree(directory, path = '', isSupportedImage = isCatalogImageFile) {
   const files = [];
   for await (const [name, handle] of directory.entries()) {
     const relativePath = path ? `${path}/${name}` : name;
-    if (handle.kind === 'directory') files.push(...await scanImageTree(handle, relativePath));
-    else if (/\.(?:jpe?g|png|webp|gif)$/i.test(name)) files.push({ name, path: relativePath });
+    if (handle.kind === 'directory') files.push(...await scanImageTree(handle, relativePath, isSupportedImage));
+    else if (isSupportedImage(name)) files.push({ name, path: relativePath });
   }
   return files;
+}
+
+function isCatalogImageFile(name) {
+  return /\.(?:jpe?g|png|webp|gif)$/i.test(name) && !/\.thumb\.jpe?g$/i.test(name);
 }
 
 export function groupStampImageEntries(entries) {

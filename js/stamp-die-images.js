@@ -24,7 +24,7 @@ export async function scanUncatalogedStampItems(sets = [], services = {}) {
   if (!directory) return { ok: false, items: [], message: 'Choose or reconnect the Stamp & Die image folder in Settings before scanning.' };
   if (typeof directory.entries !== 'function') return { ok: false, items: [], message: 'This browser cannot scan the selected Stamp & Die image folder.' };
   try {
-    const entries = await scanImageTree(directory);
+    const entries = await scanImageTree(directory, '', isSupportedImageFileName);
     return { ok: true, items: findUncatalogedStampItems(groupStampImageEntries(entries), sets) };
   } catch {
     return { ok: false, items: [], message: 'The Stamp & Die image folder could not be scanned.' };

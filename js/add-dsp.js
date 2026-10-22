@@ -913,6 +913,7 @@ function renderFormMessage(message, text, tone) {
   }
 
   message.textContent = text;
+  message.classList.remove("form-message-with-actions");
   message.dataset.tone = tone;
 }
 
@@ -943,5 +944,6 @@ function renderMissingColorMessage(message, missingColors) {
   );
 
   message.replaceChildren(intro, actions);
+  message.classList.add("form-message-with-actions");
   message.dataset.tone = "error";
 }

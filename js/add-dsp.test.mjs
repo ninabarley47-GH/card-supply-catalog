@@ -155,6 +155,16 @@ test("Paper form titles use Add Paper and Edit Paper", async () => {
   assert.doesNotMatch(source, /"(?:Add|Edit) DSP"/);
 });
 
+test("missing-color actions occupy their own row above the Paper form actions", async () => {
+  const [source, styles] = await Promise.all([
+    readFile(new URL("./add-dsp.js", import.meta.url), "utf8"),
+    readFile(new URL("../css/styles.css", import.meta.url), "utf8")
+  ]);
+  assert.match(source, /message\.classList\.add\("form-message-with-actions"\)/);
+  assert.match(source, /message\.classList\.remove\("form-message-with-actions"\)/);
+  assert.match(styles, /\.form-message-with-actions\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;/);
+});
+
 
 test("Paper terminology covers visible labels, messages and app description while retaining internal hooks", async () => {
   const [html, source, library, settings, manifestText] = await Promise.all(
