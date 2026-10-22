@@ -19,6 +19,7 @@ import { createTagPicker, projectTagNames } from './tag-picker.js';
 import { normalizeStampDieSet } from './stamp-die-sets.js';
 import { getLocalDateValue } from './ui.js';
 import { getTagKey } from './tag-utils.js';
+import { partitionStampDieTagIds } from './stamp-die-tags.js';
 
 const LAST_OWNER_SETTING = 'addStampDieLastOwnerId';
 
@@ -84,23 +85,11 @@ export async function initializeStampDieLibrary(services = {}) {
     if (record.purchasedFrom?.trim()) facts.append(createSetDetailFact('Purchased From', record.purchasedFrom));
     detail.titleRow.replaceChildren(detail.title, favorite);
     info.append(facts);
-    const tagSection = createSetDetailSection('Tags');
-    const tags = document.createElement('ul');
-    tags.className = 'card-detail-chips';
-    tags.setAttribute('aria-label', 'Tags');
-    for (const name of projectTagNames(tagCatalog, record.tagIds, 'stamp')) {
-      const tag = document.createElement('li');
-      tag.textContent = name;
-      tags.append(tag);
-    }
-    if (tags.childElementCount) tagSection.append(tags);
-    else {
-      const empty = document.createElement('p');
-      empty.className = 'card-detail-empty';
-      empty.textContent = 'No tags';
-      tagSection.append(empty);
-    }
-    metadata.append(info, tagSection, createStampRelatedCardsSection(cards, record.id), detail.actions);
+    const tagGroups = partitionStampDieTagIds(record.tagIds, tagCatalog);
+    metadata.append(info,
+      createSetTagDetailSection('Tool Type', tagGroups.toolTypeTagIds, tagCatalog, 'No tool types'),
+      createSetTagDetailSection('Themes', tagGroups.themeTagIds, tagCatalog, 'No themes'),
+      createStampRelatedCardsSection(cards, record.id), detail.actions);
     const content = document.createElement('div');
     content.className = 'card-detail-content stamp-set-detail-content';
     content.append(createSetImageGrid(record.imageRefs, true), metadata);
@@ -359,7 +348,8 @@ export async function initializeStampDieLibrary(services = {}) {
       reset();
       initializeOwnerPicker(view.owner, view.newOwner, owners);
       if (!picker) {
-        picker = createTagPicker({ label: 'Tags', productType: 'stamp', catalog });
+        picker = createTagPicker({ label: 'Themes', productType: 'stamp', catalog,
+          onSelectionChange: (tagIds) => renderFormToolTypes(tagIds, catalog) });
         view.tags.append(picker.element);
       } else picker.setCatalog(catalog);
       if (id) {
@@ -381,6 +371,7 @@ export async function initializeStampDieLibrary(services = {}) {
         view.releaseYear.required = record.releaseYear !== undefined;
         view.favorite.checked = record.favorite;
         picker.setSelectedTagIds(record.tagIds);
+        renderFormToolTypes(record.tagIds, catalog);
         draftImages = record.imageRefs.map((reference) => ({
           existingReference: reference,
           name: reference.imageName || reference.imagePath?.split('/').pop() || 'Set image',
@@ -389,6 +380,7 @@ export async function initializeStampDieLibrary(services = {}) {
         renderDraftImages();
       }
       if (!id) {
+        renderFormToolTypes([], catalog);
         const [defaultId, lastId] = await Promise.all([
           storage.loadDefaultOwnerId().catch(() => ''),
           storage.loadCatalogSetting(LAST_OWNER_SETTING).catch(() => '')
@@ -410,6 +402,25 @@ export async function initializeStampDieLibrary(services = {}) {
       status.textContent = `${id ? 'Edit' : 'Add'} Set could not be opened. Please try again.`;
     } finally { add.disabled = false; }
   }
+
+  function renderFormToolTypes(tagIds, tagCatalog) {
+    const { toolTypeTagIds } = partitionStampDieTagIds(tagIds, tagCatalog);
+    const names = projectTagNames(tagCatalog, toolTypeTagIds, 'stamp');
+    view.toolTypes.replaceChildren();
+    if (names.length) {
+      const chips = document.createElement('ul');
+      chips.className = 'card-detail-chips';
+      chips.setAttribute('aria-label', 'Tool Type');
+      chips.append(...names.map((name) => Object.assign(document.createElement('li'), { textContent: name })));
+      view.toolTypes.append(chips);
+    } else {
+      const empty = document.createElement('p');
+      empty.className = 'card-detail-empty';
+      empty.textContent = 'No tool types assigned';
+      view.toolTypes.append(empty);
+    }
+  }
+
   add.addEventListener('click', () => openForm());
   document.querySelector('[data-add-stamp-set-open]')?.addEventListener('click', () => openForm());
 
@@ -463,6 +474,7 @@ export async function initializeStampDieLibrary(services = {}) {
       catalog = inferred.catalog;
       picker.setCatalog(catalog);
       picker.setSelectedTagIds(inferred.tagIds);
+      renderFormToolTypes(inferred.tagIds, catalog);
       draftImages.push(...images);
       renderDraftImages();
       view.imageMessage.textContent = 'Stamp/Die/Mask tags added from filenames. You can change them below.';
@@ -763,12 +775,20 @@ function createSetFormView() {
   previews.className = 'stamp-set-draft-images';
   imageControls.append(imageHeading, chooseLibrary, chooseImages, imageInput, folderMessage, imageMessage, previews);
   const tags = document.createElement('div');
+  const toolTypes = document.createElement('section');
+  toolTypes.className = 'detail-section stamp-set-form-tool-types';
+  const toolTypeHeading = document.createElement('h4');
+  toolTypeHeading.textContent = 'Tool Type';
+  const toolTypeEmpty = document.createElement('p');
+  toolTypeEmpty.className = 'card-detail-empty';
+  toolTypeEmpty.textContent = 'No tool types assigned';
+  toolTypes.append(toolTypeHeading, toolTypeEmpty);
   const cardPicker = createPaperPackPicker({ heading: 'Related Cards', search: 'Search Cards by date, size, or tags',
     results: 'Card search results', selected: 'Selected Cards' });
   const message = document.createElement('p');
   message.className = 'form-message';
   message.setAttribute('role', 'status');
-  fields.append(createField('Set Name', name), createField('Owner', owner, newOwner), createField('Brand', brand), createField('Purchased From', purchasedFrom), createField('Release Year', releaseYear), favoriteLabel, imageControls, tags, cardPicker.section, message);
+  fields.append(createField('Set Name', name), createField('Owner', owner, newOwner), createField('Brand', brand), createField('Purchased From', purchasedFrom), createField('Release Year', releaseYear), favoriteLabel, imageControls, toolTypes, tags, cardPicker.section, message);
   const actions = document.createElement('div');
   actions.className = 'card-add-actions';
   const cancel = document.createElement('button');
@@ -782,7 +802,25 @@ function createSetFormView() {
   actions.append(cancel, save);
   form.append(fields, actions);
   dialog.append(header, form);
-  return { dialog, title, close, form, fields, name, owner, newOwner, brand, purchasedFrom, releaseYear, favorite, tags, cardPicker, message, cancel, save, chooseImages, imageInput, chooseLibrary, folderMessage, imageMessage, previews };
+  return { dialog, title, close, form, fields, name, owner, newOwner, brand, purchasedFrom, releaseYear, favorite, tags, toolTypes, cardPicker, message, cancel, save, chooseImages, imageInput, chooseLibrary, folderMessage, imageMessage, previews };
+}
+
+function createSetTagDetailSection(label, tagIds, catalog, emptyText) {
+  const section = createSetDetailSection(label);
+  const names = projectTagNames(catalog, tagIds, 'stamp');
+  if (names.length) {
+    const tags = document.createElement('ul');
+    tags.className = 'card-detail-chips';
+    tags.setAttribute('aria-label', label);
+    tags.append(...names.map((name) => Object.assign(document.createElement('li'), { textContent: name })));
+    section.append(tags);
+  } else {
+    const empty = document.createElement('p');
+    empty.className = 'card-detail-empty';
+    empty.textContent = emptyText;
+    section.append(empty);
+  }
+  return section;
 }
 
 function createField(text, ...inputs) {

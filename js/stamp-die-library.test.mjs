@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { initializeStampDieLibrary, createStampDieSetRecord, findCardsUsingStampDieSet } from './stamp-die-library.js';
 import { getLocalDateValue } from './ui.js';
+import { partitionStampDieTagIds } from './stamp-die-tags.js';
 
 const initialCatalog = () => ({
   schemaVersion: 1,
@@ -109,7 +110,7 @@ async function harness(t, otherCatalogServices = {}) {
   globalThis.document = document;
   globalThis.window = { location: { hash: '#stamps-dies' } };
   const records = [];
-  let catalog = initialCatalog();
+  let catalog = structuredClone(otherCatalogServices.initialTagCatalog || initialCatalog());
   let failure = false;
   let commitGate;
   let calls = 0;
@@ -150,7 +151,7 @@ async function harness(t, otherCatalogServices = {}) {
     input.checked = true;
     await form.querySelector('.global-tag-picker').emit('change', { target: input });
   }
-  return { sort, headerAdd, saveOptions, filterControls, owners, owner: form.querySelector('select[name="ownerId"]'), newOwner: form.querySelector('input[name="owner"]'), brand: form.querySelector('input[name="brand"]'), purchasedFrom: form.querySelector('input[name="purchasedFrom"]'), document, add, gallery, status, dialog, form, name, year, favorite, cancel, records, select,
+  return { sort, headerAdd, saveOptions, filterControls, owners, catalog, owner: form.querySelector('select[name="ownerId"]'), newOwner: form.querySelector('input[name="owner"]'), brand: form.querySelector('input[name="brand"]'), purchasedFrom: form.querySelector('input[name="purchasedFrom"]'), document, add, gallery, status, dialog, form, name, year, favorite, cancel, records, select,
     recordReads: () => recordReads, calls: () => calls, setFailure: (value) => { failure = value; }, setGate: (value) => { commitGate = value; },
     renameTag: () => { catalog.tags[0].name = 'Botanical'; } };
 }
@@ -501,10 +502,78 @@ test('cancel during image loading discards late results without restoring draft 
 async function seedEdit(h, overrides = {}) {
   h.records.push(createStampDieSetRecord({ id: 'set-existing', name: 'Original',
     dateCreated: '2020-01-02', releaseYear: 2022, favorite: true,
-    tagIds: ['stable-paper'], imageRefs: [], ...overrides }, initialCatalog()));
+    tagIds: ['stable-paper'], imageRefs: [], ...overrides }, h.catalog || initialCatalog()));
   await h.document.emit('catalog:global-tags-updated');
   await h.gallery.querySelector('button[aria-label="Edit Original"]').emit('click');
 }
+
+test('Stamp & Die tag presentation partitions normalized tool names and leaves unknown assignments as themes', () => {
+  const catalog = { tags: [
+    ...['Stamp', 'Die', 'Punch', 'Texture', 'Mask'].map((name, index) => ({ id: `tool-${index}`, name: `  ${name.toUpperCase()}  ` })),
+    { id: 'theme', name: 'Christmas' }
+  ] };
+  assert.deepEqual(partitionStampDieTagIds(['tool-0', 'tool-1', 'tool-2', 'tool-3', 'tool-4', 'theme', 'missing'], catalog), {
+    toolTypeTagIds: ['tool-0', 'tool-1', 'tool-2', 'tool-3', 'tool-4'],
+    themeTagIds: ['theme', 'missing']
+  });
+  assert.deepEqual(partitionStampDieTagIds([], catalog), { toolTypeTagIds: [], themeTagIds: [] });
+});
+
+test('Set Detail separates assigned Tool Type and Themes and shows concise empty states', async (t) => {
+  const customCatalog = initialCatalog();
+  customCatalog.tags.push({ id: 'stable-die', name: 'Die', appliesTo: ['stamp'], categoryIds: [] });
+  const h = await harness(t, { initialTagCatalog: customCatalog });
+  await seedEdit(h, { tagIds: ['stable-paper', 'stable-die'] }); await h.cancel.emit('click');
+  await h.gallery.querySelector('article').emit('click');
+  const metadata = setDetail(h).querySelector('.detail-metadata');
+  assert.deepEqual(metadata.querySelectorAll('h4').map((heading) => heading.textContent).slice(1, 4), ['Tool Type', 'Themes', 'Related Cards']);
+  const sections = metadata.querySelectorAll('.detail-section');
+  assert.equal(sections.find((section) => section.querySelector('h4')?.textContent === 'Tool Type').querySelector('.card-detail-chips').textContent, 'Die');
+  assert.equal(sections.find((section) => section.querySelector('h4')?.textContent === 'Themes').querySelector('.card-detail-chips').textContent, 'Floral');
+
+  await setDetail(h).querySelector('[aria-label="Close set details"]').emit('click');
+  h.records[0].tagIds = [];
+  await h.document.emit('catalog:global-tags-updated');
+  await h.gallery.querySelector('article').emit('click');
+  const emptySections = setDetail(h).querySelectorAll('.detail-section');
+  assert.equal(emptySections.find((section) => section.querySelector('h4')?.textContent === 'Tool Type').querySelector('.card-detail-empty').textContent, 'No tool types');
+  assert.equal(emptySections.find((section) => section.querySelector('h4')?.textContent === 'Themes').querySelector('.card-detail-empty').textContent, 'No themes');
+});
+
+test('Add/Edit Tool Type display follows manual and inferred assignment changes', async (t) => {
+  const customCatalog = initialCatalog();
+  customCatalog.tags.push({ id: 'stable-die', name: 'Die', appliesTo: ['stamp'], categoryIds: [] });
+  const h = await harness(t, {
+    initialTagCatalog: customCatalog,
+    selectStampImageFiles: async (files) => files.map((file) => ({ file, name: file.name, previewSrc: 'data:image/jpeg;base64,cHJldmlldw==' }))
+  });
+  await h.add.emit('click');
+  const toolDisplay = h.form.querySelector('.stamp-set-form-tool-types');
+  assert.equal(toolDisplay.querySelector('.card-detail-empty').textContent, 'No tool types assigned');
+  const theme = h.form.querySelector('[data-tag-id="stable-paper"]');
+  theme.checked = true;
+  await h.form.querySelector('.global-tag-picker').emit('change', { target: theme });
+  assert.equal(toolDisplay.querySelector('.card-detail-empty').textContent, 'No tool types assigned');
+  const dieCheckbox = h.form.querySelector('[data-tag-id="stable-die"]');
+  dieCheckbox.checked = true;
+  await h.form.querySelector('.global-tag-picker').emit('change', { target: dieCheckbox });
+  assert.equal(toolDisplay.querySelector('.card-detail-chips').textContent, 'Die');
+  dieCheckbox.checked = false;
+  await h.form.querySelector('.global-tag-picker').emit('change', { target: dieCheckbox });
+  assert.equal(toolDisplay.querySelector('.card-detail-empty').textContent, 'No tool types assigned');
+  const input = h.form.querySelector('input[type="file"]');
+  input.files = [{ name: 'die.jpg' }];
+  await input.emit('change');
+  assert.equal(toolDisplay.querySelector('.card-detail-chips').textContent, 'Die');
+  await h.cancel.emit('click');
+  await seedEdit(h, { tagIds: ['stable-paper', 'stable-die'] });
+  assert.equal(h.form.querySelector('.stamp-set-form-tool-types .card-detail-chips').textContent, 'Die');
+  const die = h.form.querySelector('[data-tag-id="stable-die"]');
+  die.checked = false;
+  await h.form.querySelector('.global-tag-picker').emit('change', { target: die });
+  assert.equal(h.form.querySelector('.stamp-set-form-tool-types .card-detail-empty').textContent, 'No tool types assigned');
+  await h.cancel.emit('click');
+});
 
 const editReferences = () => [
   { imageName: 'Stamp.jpg', imageSrc: 'data:image/jpeg;base64,YQ==', thumbnailImageSrc: 'data:image/jpeg;base64,Yg==', imageStorageStrategy: 'embedded-indexed-db' },
@@ -1093,7 +1162,7 @@ test('Set Detail reuses context/title/close header and places destructive action
   assert.ok(content.className.includes('card-detail-content'));
   assert.ok(content.children[0].className.includes('stamp-set-detail-images'));
   const metadata = content.querySelector('.detail-metadata');
-  assert.deepEqual(metadata.querySelectorAll('h4').map((heading) => heading.textContent), ['Set Info', 'Tags', 'Related Cards', 'Actions']);
+  assert.deepEqual(metadata.querySelectorAll('h4').map((heading) => heading.textContent), ['Set Info', 'Tool Type', 'Themes', 'Related Cards', 'Actions']);
   const facts = metadata.querySelector('dl');
   assert.equal(facts.className, 'detail-meta-list');
   assert.deepEqual(facts.querySelectorAll('dt').map((term) => term.textContent), ['Owner', 'Release Year']);
@@ -1123,7 +1192,7 @@ for (const favorite of [false, true]) test(`Detail Favorite heart toggles direct
   assert.equal(heart.getAttribute('aria-label'), favorite ? 'Remove set from favorites' : 'Add set to favorites');
   assert.equal(heart.textContent, '\u2665');
   assert.doesNotMatch(detail.textContent, /Not a favorite/);
-  assert.equal(detail.querySelector('.card-detail-empty').textContent, 'No tags');
+  assert.equal(detail.querySelector('.card-detail-empty').textContent, 'No tool types');
   await heart.emit('click');
   assert.deepEqual(h.records, [{ ...before[0], favorite: !favorite }]); assert.equal(h.calls(), 1);
 });
@@ -1212,6 +1281,8 @@ test('Set tile metadata follows Paper placement: tag chips, owner/year, and bott
   const h = await harness(t);
   await seedEdit(h, { ownerId: 'owner-nina' }); await h.cancel.emit('click');
   const tile = h.gallery.querySelector('article');
+  assert.equal(tile.querySelector('.keyword-list').textContent, 'Floral');
+  assert.equal(tile.querySelector('.stamp-set-form-tool-types'), null);
   const body = tile.querySelector('.card-body');
   assert.equal(body.children[0].className, 'keyword-list');
   assert.equal(body.children[0].textContent, 'Floral');
