@@ -3,7 +3,7 @@ import { supportsOpenFilePicker, supportsDirectoryPicker } from './browser-capab
 import { createCardImageFromFile, clearSelectedCardImage, getCardLibraryImageSource, getCardDetailImageSource } from './card-images.js';
 import { findPaperPackImageDirectory, isSupportedImageFileName } from './images.js';
 import { getTagKey } from './tag-utils.js';
-import { findUncatalogedStampItems, groupStampImageEntries, scanImageTree } from './uncataloged-library.js';
+import { classifyStampImageItems, groupStampImageEntries, scanImageTree } from './uncataloged-library.js';
 import {
   prepareFolderBackedImage, prepareEmbeddedImage, hasDirectoryPermission,
   hydrateImageReference, clearImageReferenceObjectUrls, getFileFromRelativePath
@@ -25,7 +25,7 @@ export async function scanUncatalogedStampItems(sets = [], services = {}) {
   if (typeof directory.entries !== 'function') return { ok: false, items: [], message: 'This browser cannot scan the selected Stamp & Die image folder.' };
   try {
     const entries = await scanImageTree(directory, '', isSupportedImageFileName);
-    return { ok: true, items: findUncatalogedStampItems(groupStampImageEntries(entries), sets) };
+    return { ok: true, items: classifyStampImageItems(groupStampImageEntries(entries), sets) };
   } catch {
     return { ok: false, items: [], message: 'The Stamp & Die image folder could not be scanned.' };
   }
@@ -78,6 +78,24 @@ export async function selectStampImageFiles(files, environment = globalThis) {
     selected.forEach(clearSelectedCardImage);
     throw error;
   }
+}
+
+export async function loadStampImagesByRelativePaths(paths, environment = globalThis, services = {}) {
+  const directory = await (services.loadDirectory || loadStampImageDirectory)('read');
+  if (!directory) return [];
+  const files = [];
+  const handles = [];
+  for (const imagePath of paths) {
+    const parts = String(imagePath).split('/').filter(Boolean);
+    const fileName = parts.pop();
+    let parent = directory;
+    for (const directoryName of parts) parent = await parent.getDirectoryHandle(directoryName);
+    const handle = await parent.getFileHandle(fileName);
+    handles.push(handle);
+    files.push(await handle.getFile());
+  }
+  const images = await (services.selectStampImageFiles || selectStampImageFiles)(files, environment);
+  return images.map((image, index) => ({ ...image, fileHandle: handles[index] }));
 }
 
 export async function chooseStampImages(environment = globalThis, directory = null) {

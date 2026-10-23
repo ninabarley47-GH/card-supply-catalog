@@ -8,7 +8,7 @@ import { initializeOwnerPicker, resolveOwnerPicker, setOwnerPickerValue, refresh
 import { isActiveOwner } from './owners.js';
 import { loadDefaultOwnerId } from './settings.js';
 import {
-  chooseStampImages, selectStampImageFiles, loadStampImageDirectory, loadStampImagesForSetName,
+  chooseStampImages, selectStampImageFiles, loadStampImageDirectory, loadStampImagesForSetName, loadStampImagesByRelativePaths,
   prepareStampImagesForSave, hydrateStampImages, clearStampImageSources, scanUncatalogedStampItems,
   clearDraftStampImages, removeDraftStampImage, getStampLibraryImageSource, getStampDetailImageSource
 } from './stamp-die-images.js';
@@ -49,8 +49,8 @@ function createSetId() {
 
 export async function initializeStampDieLibrary(services = {}) {
   const storage = { loadGlobalTagCatalog, loadSavedStampDieSets, saveStampDieSet, deleteStampDieSet,
-    chooseStampImages, selectStampImageFiles, loadStampImageDirectory, loadStampImagesForSetName,
-    prepareStampImagesForSave, hydrateStampImages, loadDefaultOwnerId, loadCatalogSetting, saveCatalogSetting, ...services };
+    chooseStampImages, selectStampImageFiles, loadStampImageDirectory, loadStampImagesForSetName, loadStampImagesByRelativePaths,
+    prepareStampImagesForSave, hydrateStampImages, scanUncatalogedStampItems, loadDefaultOwnerId, loadCatalogSetting, saveCatalogSetting, ...services };
   const owners = services.owners || [];
   // Share the live Card collection, as Paper Detail does; reverse links are never persisted.
   const cards = Array.isArray(services.cards) ? services.cards : [];
@@ -232,6 +232,24 @@ export async function initializeStampDieLibrary(services = {}) {
     title: 'Stamp & Die Sets',
     addButton: add,
     addLabel: 'Add to Stamps & Dies Library',
+    associateLabel: item => `Add Images to ${item.matchedSet.name}`,
+    onAssociateItem: async item => {
+      const latestSets = await storage.loadSavedStampDieSets();
+      const matchedSet = latestSets.find(record => getProductNameKey(record.name) === getProductNameKey(item.name));
+      if (!matchedSet) return false;
+      const alreadyAssociated = new Set(latestSets.flatMap(record => (record.imageRefs || [])
+        .filter(reference => reference?.imageLibrary === 'stamp-die-images' && reference.imagePath)
+        .map(reference => normalizeUncatalogedPath(reference.imagePath))));
+      const imagePaths = (item.imagePaths || []).filter(path => !alreadyAssociated.has(normalizeUncatalogedPath(path)));
+      if (!imagePaths.length) return false;
+      const images = await storage.loadStampImagesByRelativePaths(imagePaths);
+      if (!images.length) return false;
+      await openForm(matchedSet.id);
+      if (!view.dialog.open) { clearDraftStampImages(images); return false; }
+      activeUncatalogedSetPaths = imagePaths;
+      await receiveImages(Promise.resolve(images));
+      return true;
+    },
     refreshEvent: 'catalog:stamp-die-set-saved',
     onAddItem: async item => {
       const latestSets = await storage.loadSavedStampDieSets();
@@ -242,7 +260,7 @@ export async function initializeStampDieLibrary(services = {}) {
       pendingUncatalogedSet = { name: item.name, imagePaths: [...(item.imagePaths || [])] };
       return true;
     },
-    scan: () => scanUncatalogedStampItems(displayedRecords)
+    scan: () => storage.scanUncatalogedStampItems(displayedRecords)
   });
   filters.refreshOwners();
   sortControl?.addEventListener('change', renderCurrent);
@@ -651,7 +669,7 @@ export async function initializeStampDieLibrary(services = {}) {
         view.message.textContent = 'A Stamp & Die Set with this name already exists. Enter a different Set Name.';
         return;
       }
-      if (!editingRecord && activeUncatalogedSetPaths.length) {
+      if (activeUncatalogedSetPaths.length) {
         const uncatalogedPaths = new Set(activeUncatalogedSetPaths.map(normalizeUncatalogedPath));
         const alreadyUsed = existingSets.some(record => (record.imageRefs || []).some(reference =>
           reference?.imageLibrary === 'stamp-die-images' && uncatalogedPaths.has(normalizeUncatalogedPath(reference.imagePath))));

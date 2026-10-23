@@ -36,6 +36,12 @@ class Element {
   get parentElement() { return this.parent; }
   get childElementCount() { return this.children.length; }
   append(...children) { for (const child of children) { child.parent = this; this.children.push(child); } }
+  insertBefore(child, before) {
+    child.parent = this;
+    const index = before ? this.children.indexOf(before) : -1;
+    if (index < 0) this.children.push(child);
+    else this.children.splice(index, 0, child);
+  }
   replaceChildren(...children) { this.children = []; this.ownText = ''; this.append(...children); }
   setAttribute(key, value) { this.attributes[key] = value; }
   getAttribute(key) { return this.attributes[key]; }
@@ -90,10 +96,11 @@ async function harness(t, otherCatalogServices = {}) {
   document.getElementById = (id) => document.querySelectorAll('[id]').find((element) => element.id === id);
   const screen = Object.assign(new Element('section'), { id: 'stamps-dies' });
   const add = new Element('button'); add.dataset.addSet = '';
+  const findUncataloged = new Element('button'); findUncataloged.dataset.findUncatalogedSets = '';
   const gallery = new Element('div'); gallery.dataset.setLibrary = '';
   const sort = new Element('select'); sort.dataset.setLibrarySort = ''; sort.value = 'recently-added';
   const status = new Element('p'); status.dataset.setLibraryStatus = '';
-  screen.append(add, sort, gallery, status);
+  screen.append(add, findUncataloged, sort, gallery, status);
   document.body.append(screen);
   const headerAdd = new Element('button'); headerAdd.dataset.addStampSetOpen = '';
   document.body.append(headerAdd);
@@ -159,7 +166,7 @@ async function harness(t, otherCatalogServices = {}) {
     input.checked = true;
     await form.querySelector('.global-tag-picker').emit('change', { target: input });
   }
-  return { sort, headerAdd, saveOptions, filterControls, owners, catalog, owner: form.querySelector('select[name="ownerId"]'), newOwner: form.querySelector('input[name="owner"]'), brand: form.querySelector('input[name="brand"]'), purchasedFrom: form.querySelector('input[name="purchasedFrom"]'), document, add, gallery, status, dialog, form, name, year, favorite, cancel, records, select,
+  return { sort, headerAdd, findUncataloged, saveOptions, filterControls, owners, catalog, owner: form.querySelector('select[name="ownerId"]'), newOwner: form.querySelector('input[name="owner"]'), brand: form.querySelector('input[name="brand"]'), purchasedFrom: form.querySelector('input[name="purchasedFrom"]'), document, add, gallery, status, dialog, form, name, year, favorite, cancel, records, select,
     recordReads: () => recordReads, calls: () => calls, setFailure: (value) => { failure = value; }, setGate: (value) => { commitGate = value; },
     renameTag: () => { catalog.tags[0].name = 'Botanical'; } };
 }
@@ -348,6 +355,70 @@ test('Stamp & Die duplicate detection treats standalone and and ampersand as equ
   await h.form.emit('submit');
   assert.equal(h.calls(), 1);
   assert.match(h.form.textContent, /A Stamp & Die Set with this name already exists/);
+});
+
+test('Find Uncataloged associates matching source images with the existing Set through Edit and keeps files in place', async (t) => {
+  const sourceContents = new Map([
+    ['Birds and Butterflies/Stamps 01.jpg', 'stamp-one'],
+    ['Birds and Butterflies/Stamps 02.jpg', 'stamp-two'],
+    ['Birds and Butterflies/Dies.jpg', 'die']
+  ]);
+  let loadedPaths = [];
+  const h = await harness(t, {
+    scanUncatalogedStampItems: async () => ({ ok: true, items: [{
+      id: 'birds and butterflies', name: 'Birds and Butterflies', imageCount: 3,
+      imagePaths: [...sourceContents.keys()], matchedSet: { id: 'set-birds', name: 'Birds & Butterflies' }
+    }] }),
+    loadStampImagesByRelativePaths: async paths => {
+      loadedPaths = [...paths];
+      return paths.map(path => ({
+        name: path.split('/').at(-1), file: { name: path.split('/').at(-1) },
+        fileHandle: { path }
+      }));
+    },
+    prepareStampImagesForSave: async images => ({ usedFallback: false, imageRefs: images.map(image =>
+      image.existingReference || { imageName: image.name, imagePath: image.fileHandle.path, imageLibrary: 'stamp-die-images' }) })
+  });
+  h.records.push(createStampDieSetRecord({ id: 'set-birds', name: 'Birds & Butterflies', dateCreated: '2025-01-01', favorite: false,
+    tagIds: [], imageRefs: [{ imageName: 'Old Stamp.jpg', imageSrc: 'data:image/png;base64,YQ==' }] }, h.catalog));
+  await h.document.emit('catalog:global-tags-updated', { detail: { source: 'other' } });
+  await h.findUncataloged.emit('click');
+  const panel = h.document.querySelector('.uncataloged-packs');
+  const associate = panel.querySelector('.button-primary');
+  assert.equal(associate.textContent, 'Add Images to Birds & Butterflies');
+  await associate.emit('click');
+  assert.equal(h.dialog.open, true);
+  assert.equal(h.name.value, 'Birds & Butterflies');
+  assert.deepEqual(loadedPaths, [...sourceContents.keys()]);
+  assert.deepEqual(h.form.querySelector('.stamp-set-draft-images').querySelectorAll('img').map(image => image.alt), [
+    'Old Stamp.jpg', 'Stamps 01.jpg', 'Stamps 02.jpg', 'Dies.jpg'
+  ]);
+  await h.form.emit('submit');
+  assert.equal(h.records.length, 1);
+  assert.equal(h.records[0].id, 'set-birds');
+  assert.equal(h.records[0].imageRefs.filter(reference => reference.imagePath === 'Birds and Butterflies/Stamps 01.jpg').length, 1);
+  assert.deepEqual([...sourceContents], [
+    ['Birds and Butterflies/Stamps 01.jpg', 'stamp-one'],
+    ['Birds and Butterflies/Stamps 02.jpg', 'stamp-two'],
+    ['Birds and Butterflies/Dies.jpg', 'die']
+  ]);
+});
+
+test('Find Uncataloged rechecks an existing Set association before opening Edit', async (t) => {
+  const path = 'Birds and Butterflies/Birds and Butterflies Dies.jpg';
+  const h = await harness(t, {
+    scanUncatalogedStampItems: async () => ({ ok: true, items: [{ id: 'birds', name: 'Birds and Butterflies', imageCount: 1,
+      imagePaths: [path], matchedSet: { id: 'set-birds', name: 'Birds & Butterflies' } }] }),
+    loadStampImagesByRelativePaths: async () => assert.fail('already-associated files must not be loaded')
+  });
+  h.records.push(createStampDieSetRecord({ id: 'set-birds', name: 'Birds & Butterflies', dateCreated: '2025-01-01', favorite: false,
+    tagIds: [], imageRefs: [{ imageName: 'Birds and Butterflies Dies.jpg', imagePath: path, imageLibrary: 'stamp-die-images' }] }, h.catalog));
+  await h.findUncataloged.emit('click');
+  const associate = h.document.querySelector('.uncataloged-packs').querySelector('.button-primary');
+  await associate.emit('click');
+  assert.equal(Boolean(h.dialog.open), false);
+  assert.equal(h.calls(), 0);
+  assert.equal(h.records[0].imageRefs.length, 1);
 });
 
 test('same names in Paper and Cards are irrelevant to Set validation', async (t) => {

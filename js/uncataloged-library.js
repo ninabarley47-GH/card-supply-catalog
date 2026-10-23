@@ -18,14 +18,30 @@ export function isCardImagePathCataloged(cards = [], path = '') {
 }
 
 export function findUncatalogedStampItems(items, sets = []) {
+  return classifyStampImageItems(items, sets).filter(item => !item.matchedSet);
+}
+
+export function findStampImagesForExistingSets(items, sets = []) {
+  return classifyStampImageItems(items, sets).filter(item => item.matchedSet);
+}
+
+export function classifyStampImageItems(items, sets = []) {
   const catalogKeys = new Set(sets.flatMap(set => [set?.id, set?.name].filter(Boolean).map(normalizeStampName)));
-  const catalogNames = new Set(sets.flatMap(set => [set?.name].filter(Boolean).map(normalizeProductStampName)));
   const catalogedImagePaths = new Set(sets.flatMap(set => set?.imageRefs || [])
     .filter(reference => reference?.imageLibrary === 'stamp-die-images' && reference.imagePath)
     .map(reference => normalizeUncatalogedPath(reference.imagePath)));
-  return items.filter(item => !catalogKeys.has(normalizeStampName(item.id)) &&
-    !catalogKeys.has(normalizeStampName(item.name)) && !catalogNames.has(normalizeProductStampName(item.name)) &&
-    !(item.imagePaths || []).some(path => catalogedImagePaths.has(normalizeUncatalogedPath(path))));
+  return items.flatMap(item => {
+    const matchedSet = sets.find(set => normalizeProductStampName(set?.name) === normalizeProductStampName(item.name));
+    const identityMatchesCatalog = catalogKeys.has(normalizeStampName(item.id)) || catalogKeys.has(normalizeStampName(item.name));
+    const imagePaths = item.imagePaths || [];
+    const unassociatedImagePaths = imagePaths.filter(path => !catalogedImagePaths.has(normalizeUncatalogedPath(path)));
+    if (matchedSet) {
+      if (!unassociatedImagePaths.length) return [];
+      return [{ ...item, imagePaths: unassociatedImagePaths, imageCount: unassociatedImagePaths.length, matchedSet }];
+    }
+    if (identityMatchesCatalog || imagePaths.some(path => catalogedImagePaths.has(normalizeUncatalogedPath(path)))) return [];
+    return [item];
+  });
 }
 
 export async function openUncatalogedItemAddWorkflow(addButton, panel, prepare = null) {
@@ -74,7 +90,7 @@ function normalizeProductStampName(value) {
   return normalizeStampName(getProductNameKey(value));
 }
 
-export function attachUncatalogedLibraryFinder({ screen, button, title, scan, addButton, addLabel, onAddItem, refreshEvent }) {
+export function attachUncatalogedLibraryFinder({ screen, button, title, scan, addButton, addLabel, onAddItem, associateLabel, onAssociateItem, refreshEvent }) {
   if (!screen || !button) return;
   const panel = document.createElement('section');
   panel.className = 'uncataloged-packs';
@@ -105,7 +121,24 @@ export function attachUncatalogedLibraryFinder({ screen, button, title, scan, ad
         const name = document.createElement('strong'); name.textContent = item.name;
         const count = document.createElement('span'); count.textContent = `${item.imageCount ?? 1} image${(item.imageCount ?? 1) === 1 ? '' : 's'}${item.path ? ` · ${item.path}` : ''}`;
         details.append(name, count); row.append(details);
-        if (addButton && addLabel) {
+        if (item.matchedSet && associateLabel && onAssociateItem) {
+          const actions = document.createElement('div'); actions.className = 'uncataloged-pack-actions';
+          const associate = document.createElement('button'); associate.className = 'button button-primary'; associate.type = 'button';
+          associate.textContent = typeof associateLabel === 'function' ? associateLabel(item) : associateLabel;
+          associate.addEventListener('click', async () => {
+            associate.disabled = true;
+            panel.hidden = true;
+            try {
+              const associated = await onAssociateItem(item);
+              if (!associated) { panel.hidden = false; await refreshResults(); }
+            } catch {
+              panel.hidden = false;
+              message.textContent = `The ${title.toLowerCase()} images could not be associated with the existing Set.`;
+              message.dataset.tone = 'error';
+            } finally { associate.disabled = false; }
+          });
+          actions.append(associate); row.append(actions);
+        } else if (addButton && addLabel) {
           const actions = document.createElement('div'); actions.className = 'uncataloged-pack-actions';
           const addItem = document.createElement('button'); addItem.className = 'button button-primary'; addItem.type = 'button'; addItem.textContent = addLabel;
           addItem.addEventListener('click', async () => {
