@@ -650,6 +650,7 @@ test('main Library navigation keeps its labels and targets in Paper, Stamp, Card
 test('Stamp Set catalog heading uses Stamp Sets terminology', async () => {
   const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /<h2 id="stamps-dies-title">Stamp Sets<\/h2>/);
+  assert.match(html, /<p class="result-count" data-set-library-status role="status">Your stamps, dies, punches, textures, and masks, together in one library\.<\/p>/);
 });
 
 test('Recently Added survives Set normalization while legacy Sets remain unmarked', () => {
