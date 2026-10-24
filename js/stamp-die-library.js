@@ -20,7 +20,7 @@ import { normalizeStampDieSet } from './stamp-die-sets.js';
 import { getLocalDateValue } from './ui.js';
 import { getProductNameKey, getTagKey } from './tag-utils.js';
 import { attachUncatalogedLibraryFinder, findUncatalogedStampItems, normalizeUncatalogedPath } from './uncataloged-library.js';
-import { getStampDieTagCategory, partitionStampDieTagIds } from './stamp-die-tags.js';
+import { getStampDieTagType, partitionStampDieTagIds } from './stamp-die-tags.js';
 
 const LAST_OWNER_SETTING = 'addStampDieLastOwnerId';
 
@@ -875,8 +875,8 @@ function createSetTagDetailSection(label, tagIds, catalog, emptyText) {
     tags.append(...names.map((name, index) => {
       const chip = document.createElement('li');
       chip.textContent = name;
-      const category = getStampDieTagCategory(catalog.tags.find((tag) => tag.id === tagIds[index]), catalog);
-      if (category) chip.classList.add(`stamp-tag-${category}`);
+      const type = getStampDieTagType(catalog.tags.find((tag) => tag.id === tagIds[index]));
+      chip.classList.add(`stamp-tag-${type}`);
       return chip;
     }));
     section.append(tags);
@@ -941,8 +941,8 @@ export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetai
       for (let index = 0; index < names.length; index += 1) {
         const tag = document.createElement('li');
         tag.textContent = names[index];
-        const category = getStampDieTagCategory(catalog.tags.find((entry) => entry.id === record.tagIds[index]), catalog);
-        if (category) tag.classList.add(`stamp-tag-${category}`);
+        const type = getStampDieTagType(catalog.tags.find((entry) => entry.id === record.tagIds[index]));
+        tag.classList.add(`stamp-tag-${type}`);
         tags.append(tag);
       }
       content.append(tags);

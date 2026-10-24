@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { initializeStampDieLibrary, createStampDieSetRecord, findCardsUsingStampDieSet } from './stamp-die-library.js';
 import { getLocalDateValue } from './ui.js';
-import { getStampDieTagCategory, partitionStampDieTagIds } from './stamp-die-tags.js';
+import { getStampDieTagType, partitionStampDieTagIds } from './stamp-die-tags.js';
 
 const initialCatalog = () => ({
   schemaVersion: 1,
@@ -616,7 +616,7 @@ test('Stamp & Die tag presentation partitions normalized tool names and leaves u
   assert.deepEqual(partitionStampDieTagIds([], catalog), { toolTypeTagIds: [], themeTagIds: [] });
 });
 
-test('Stamp Set chips use assigned category styles in cards and Detail while keeping tag order', async (t) => {
+test('Stamp Set chips style the five Tool Type tags green and all other tags warm in cards and Detail', async (t) => {
   const catalog = {
     schemaVersion: 1,
     categories: [
@@ -629,17 +629,20 @@ test('Stamp Set chips use assigned category styles in cards and Detail while kee
       { id: 'bare-tag', name: 'Bare tag', categoryIds: [], appliesTo: ['stamp'] }
     ]
   };
-  assert.equal(getStampDieTagCategory(catalog.tags[0], catalog), 'theme');
-  assert.equal(getStampDieTagCategory(catalog.tags[1], catalog), 'tool');
-  assert.equal(getStampDieTagCategory(catalog.tags[2], catalog), null);
-  assert.equal(getStampDieTagCategory(catalog.tags[3], catalog), null);
+  for (const name of ['Stamp', 'Die', 'Mask', 'Texture', 'Punch']) {
+    assert.equal(getStampDieTagType({ name }), 'tool');
+  }
+  assert.equal(getStampDieTagType(catalog.tags[0]), 'tool');
+  assert.equal(getStampDieTagType(catalog.tags[1]), 'theme');
+  assert.equal(getStampDieTagType(catalog.tags[2]), 'theme');
+  assert.equal(getStampDieTagType(catalog.tags[3]), 'theme');
 
   const h = await harness(t, { initialTagCatalog: catalog });
   await seedEdit(h, { tagIds: catalog.tags.map((tag) => tag.id) });
   const cardChips = h.gallery.querySelector('.keyword-list').querySelectorAll('li');
   assert.deepEqual(cardChips.map((chip) => chip.textContent), ['Stamp', 'Christmas', 'Other tag', 'Bare tag']);
   assert.deepEqual(cardChips.map((chip) => chip.className), [
-    'stamp-tag-theme', 'stamp-tag-tool', '', ''
+    'stamp-tag-tool', 'stamp-tag-theme', 'stamp-tag-theme', 'stamp-tag-theme'
   ]);
 
   await h.cancel.emit('click');
@@ -647,7 +650,7 @@ test('Stamp Set chips use assigned category styles in cards and Detail while kee
   const detailChips = setDetail(h).querySelectorAll('.card-detail-chips').flatMap((list) => list.children);
   assert.deepEqual(detailChips.map((chip) => chip.textContent), ['Stamp', 'Christmas', 'Other tag', 'Bare tag']);
   assert.deepEqual(detailChips.map((chip) => chip.className), [
-    'stamp-tag-theme', 'stamp-tag-tool', '', ''
+    'stamp-tag-tool', 'stamp-tag-theme', 'stamp-tag-theme', 'stamp-tag-theme'
   ]);
 
   const css = await readFile(new URL('../css/cards.css', import.meta.url), 'utf8');
