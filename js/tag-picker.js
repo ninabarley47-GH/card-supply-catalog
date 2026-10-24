@@ -75,7 +75,7 @@ export function createTagPickerState({ catalog, productType, selectedTagIds = []
 
 let nextPickerId = 0;
 
-export function createTagPicker({ label = 'Tags', productType, catalog, selectedTagIds = [], onSelectionChange = () => {} }) {
+export function createTagPicker({ label = 'Tags', productType, catalog, selectedTagIds = [], onSelectionChange = () => {}, groupByType = false }) {
   const state = createTagPickerState({ catalog, productType, selectedTagIds });
   const id = `global-tag-picker-${++nextPickerId}`;
   const section = document.createElement('section');
@@ -135,6 +135,13 @@ export function createTagPicker({ label = 'Tags', productType, catalog, selected
 
   function renderTaxonomy() {
     const model = state.getModel();
+    if (groupByType) {
+      taxonomy.replaceChildren(...[
+        { type: 'tool', label: 'Tool Tags' },
+        { type: 'theme', label: 'Theme Tags' }
+      ].map(({ type, label: groupLabel }) => createTypeGroup(model, type, groupLabel)));
+      return;
+    }
     const children = [];
     if (model.uncategorizedTags.length) {
       const group = document.createElement('fieldset');
@@ -162,6 +169,52 @@ export function createTagPicker({ label = 'Tags', productType, catalog, selected
     taxonomy.replaceChildren(...children);
   }
 
+  function createTypeGroup(model, type, groupLabel) {
+    const group = document.createElement('fieldset');
+    group.className = 'global-tag-picker-type-group';
+    group.dataset.tagType = type;
+    group.append(Object.assign(document.createElement('legend'), { textContent: groupLabel }));
+    const tags = model.applicableTags.filter((tag) => tag.type === type);
+    if (!tags.length) {
+      const empty = document.createElement('p');
+      empty.className = 'global-tag-picker-empty';
+      empty.textContent = `No ${groupLabel} available.`;
+      group.append(empty);
+      return group;
+    }
+
+    const tagIds = new Set(tags.map((tag) => tag.id));
+    const uncategorized = tags.filter((tag) => tag.categoryIds.length === 0);
+    if (uncategorized.length) {
+      const other = document.createElement('fieldset');
+      other.className = 'global-tag-picker-uncategorized';
+      other.append(Object.assign(document.createElement('legend'), { textContent: 'Other Tags' }));
+      other.append(...uncategorized.map((tag) => createTagOption(tag)));
+      group.append(other);
+    }
+
+    const categories = model.categories
+      .map((category) => ({ ...category, tags: category.tags.filter((tag) => tagIds.has(tag.id)) }))
+      .filter((category) => category.tags.length > 0);
+    if (categories.length) {
+      const categoriesHeading = document.createElement('h5');
+      categoriesHeading.className = 'global-tag-picker-categories-heading';
+      categoriesHeading.textContent = 'Categories';
+      group.append(categoriesHeading);
+    }
+    for (const category of categories) {
+      const details = document.createElement('details');
+      details.className = 'global-tag-picker-category';
+      details.dataset.categoryId = category.id;
+      details.append(Object.assign(document.createElement('summary'), { textContent: `${category.name} (${category.tags.length})` }));
+      const options = document.createElement('div');
+      options.append(...category.tags.map((tag) => createTagOption(tag)));
+      details.append(options);
+      group.append(details);
+    }
+    return group;
+  }
+
   function renderSearch() {
     const query = input.value.trim();
     if (!query) { searchResults.replaceChildren(); searchResults.hidden = true; return; }
@@ -170,6 +223,26 @@ export function createTagPicker({ label = 'Tags', productType, catalog, selected
       const empty = document.createElement('p');
       empty.textContent = 'No matching tags. New tags can be added in Settings.';
       searchResults.replaceChildren(empty);
+    } else if (groupByType) {
+      const groups = [
+        { type: 'tool', label: 'Tool Tags' },
+        { type: 'theme', label: 'Theme Tags' }
+      ].map(({ type, label: groupLabel }) => ({
+        type,
+        label: groupLabel,
+        tags: matches.filter((match) => state.getCatalog().tags.find((tag) => tag.id === match.id)?.type === type)
+      })).filter((group) => group.tags.length > 0);
+      searchResults.replaceChildren(...groups.map(({ type, label: groupLabel, tags }) => {
+        const group = document.createElement('fieldset');
+        group.className = 'global-tag-picker-type-group global-tag-picker-search-group';
+        group.dataset.tagType = type;
+        group.append(Object.assign(document.createElement('legend'), { textContent: groupLabel }));
+        group.append(...tags.map((match) => createTagOption(
+          state.getCatalog().tags.find((tag) => tag.id === match.id),
+          match.categoryNames.length ? match.categoryNames.join(' · ') : 'Other Tags'
+        )));
+        return group;
+      }));
     } else {
       searchResults.replaceChildren(...matches.map((match) => createTagOption(
         match,

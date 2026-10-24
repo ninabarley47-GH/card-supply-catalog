@@ -695,6 +695,66 @@ test('Set Detail separates assigned Tool Type and Themes and shows concise empty
   assert.equal(emptySections.find((section) => section.querySelector('h4')?.textContent === 'Themes').querySelector('.card-detail-empty').textContent, 'No themes');
 });
 
+test('Stamp Set picker groups by explicit type, shares selection, edits selections, and saves combined tag IDs', async (t) => {
+  const groupedCatalog = {
+    schemaVersion: 2,
+    categories: [{ id: 'shared-category', name: 'Shared Category' }],
+    tags: [
+      { id: 'tool-floral', name: 'Floral', type: 'tool', filenameTerms: ['floral'], categoryIds: ['shared-category'] },
+      { id: 'theme-die', name: 'Die', type: 'theme', categoryIds: ['shared-category'] },
+      { id: 'theme-sun', name: 'Sunshine', type: 'theme', categoryIds: [] }
+    ]
+  };
+  const h = await harness(t, { initialTagCatalog: groupedCatalog });
+  await h.add.emit('click');
+  const picker = h.form.querySelector('.global-tag-picker');
+  const groups = picker.querySelectorAll('fieldset[data-tag-type]');
+  assert.deepEqual(groups.map((group) => [group.dataset.tagType, group.querySelector('legend').textContent]), [
+    ['tool', 'Tool Tags'], ['theme', 'Theme Tags']
+  ]);
+  assert.deepEqual(groups[0].querySelectorAll('[data-tag-id]').map((input) => input.dataset.tagId), ['tool-floral']);
+  assert.deepEqual(groups[1].querySelectorAll('[data-tag-id]').map((input) => input.dataset.tagId), ['theme-sun', 'theme-die']);
+  assert.equal(groups[0].querySelector('[data-category-id="shared-category"]') !== null, true);
+  assert.equal(groups[1].querySelector('[data-category-id="shared-category"]') !== null, true);
+
+  await h.select('tool-floral');
+  await h.select('theme-die');
+  assert.deepEqual(picker.querySelectorAll('.tag-picker-selected-chip').map((chip) => chip.textContent.replace('×', '')), ['Floral', 'Die']);
+  h.name.value = 'Grouped Set';
+  await h.form.emit('submit');
+  assert.deepEqual(h.records[0].tagIds, ['tool-floral', 'theme-die']);
+
+  await h.gallery.querySelector('button[aria-label="Edit Grouped Set"]').emit('click');
+  assert.equal(h.form.querySelector('[data-tag-id="tool-floral"]').checked, true);
+  assert.equal(h.form.querySelector('[data-tag-id="theme-die"]').checked, true);
+  const deselected = h.form.querySelector('[data-tag-id="theme-die"]');
+  deselected.checked = false;
+  await picker.emit('change', { target: deselected });
+  await h.select('theme-sun');
+  await h.form.emit('submit');
+  assert.deepEqual(h.records[0].tagIds, ['tool-floral', 'theme-sun']);
+});
+
+test('Stamp Set picker renders empty type groups without placeholder tags', async (t) => {
+  for (const tags of [[], [
+    { id: 'tool-only', name: 'Only Tool', type: 'tool', filenameTerms: [], categoryIds: [] }
+  ]]) {
+    const h = await harness(t, { initialTagCatalog: { schemaVersion: 2, tags, categories: [] } });
+    await h.add.emit('click');
+    const picker = h.form.querySelector('.global-tag-picker');
+    const groups = picker.querySelectorAll('fieldset[data-tag-type]');
+    assert.deepEqual(groups.map((group) => group.querySelector('legend').textContent), ['Tool Tags', 'Theme Tags']);
+    assert.match(groups.find((group) => group.dataset.tagType === 'theme').textContent, /No Theme Tags available/);
+    if (!tags.length) {
+      assert.match(groups.find((group) => group.dataset.tagType === 'tool').textContent, /No Tool Tags available/);
+      assert.equal(picker.querySelectorAll('[data-tag-id]').length, 0);
+    } else {
+      assert.deepEqual(groups[0].querySelectorAll('[data-tag-id]').map((input) => input.dataset.tagId), ['tool-only']);
+    }
+    await h.cancel.emit('click');
+  }
+});
+
 test('Add/Edit Tool Type display follows manual and inferred assignment changes', async (t) => {
   const customCatalog = initialCatalog();
   customCatalog.schemaVersion = 2;

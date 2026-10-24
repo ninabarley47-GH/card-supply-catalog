@@ -388,7 +388,7 @@ export async function initializeStampDieLibrary(services = {}) {
       reset();
       initializeOwnerPicker(view.owner, view.newOwner, owners);
       if (!picker) {
-        picker = createTagPicker({ label: 'Themes', productType: 'stamp', catalog,
+        picker = createTagPicker({ label: 'Tags', productType: 'stamp', catalog, groupByType: catalog.schemaVersion === 2,
           onSelectionChange: (tagIds) => renderFormToolTypes(tagIds, catalog) });
         view.tags.append(picker.element);
       } else picker.setCatalog(catalog);
