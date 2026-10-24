@@ -1,6 +1,6 @@
 import { getTagKey } from './tag-utils.js';
 
-export const STAMP_DIE_TOOL_TYPE_NAMES = Object.freeze(['Stamp', 'Die', 'Punch', 'Texture', 'Mask']);
+export const STAMP_DIE_TOOL_TYPE_NAMES = Object.freeze(['Stamp', 'Die', 'Punch', 'Mask', 'Texture']);
 const TOOL_TYPE_NAMES = new Set(STAMP_DIE_TOOL_TYPE_NAMES.map(getTagKey));
 
 function getPresentationType(tag) {
@@ -26,5 +26,8 @@ export function partitionStampDieTagIds(tagIds = [], catalog) {
     const tag = tagsById.get(id);
     (tag && TOOL_TYPE_NAMES.has(getTagKey(tag.name)) ? toolTypeTagIds : themeTagIds).push(id);
   }
+  const toolTypeOrder = new Map(STAMP_DIE_TOOL_TYPE_NAMES.map((name, index) => [getTagKey(name), index]));
+  toolTypeTagIds.sort((leftId, rightId) =>
+    toolTypeOrder.get(getTagKey(tagsById.get(leftId).name)) - toolTypeOrder.get(getTagKey(tagsById.get(rightId).name)));
   return { toolTypeTagIds, themeTagIds };
 }

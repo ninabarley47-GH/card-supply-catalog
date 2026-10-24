@@ -933,20 +933,30 @@ export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetai
     titleRow.className = 'card-title-row';
     titleRow.append(name, favorite);
 
-    const names = projectTagNames(catalog, record.tagIds, 'stamp');
-    if (names.length) {
+    const tagGroups = partitionStampDieTagIds(record.tagIds, catalog);
+    const tagGroupContainer = document.createElement('div');
+    tagGroupContainer.className = 'stamp-set-tag-groups';
+    for (const [label, tagIds] of [['Tool Type', tagGroups.toolTypeTagIds], ['Themes', tagGroups.themeTagIds]]) {
+      const names = projectTagNames(catalog, tagIds, 'stamp');
+      if (!names.length) continue;
+      const group = document.createElement('section');
+      group.className = 'stamp-set-tag-group';
+      const heading = document.createElement('h5');
+      heading.textContent = label;
       const tags = document.createElement('ul');
       tags.className = 'keyword-list';
-      tags.setAttribute('aria-label', 'Tags');
+      tags.setAttribute('aria-label', label);
       for (let index = 0; index < names.length; index += 1) {
         const tag = document.createElement('li');
         tag.textContent = names[index];
-        const type = getStampDieTagType(catalog.tags.find((entry) => entry.id === record.tagIds[index]));
+        const type = getStampDieTagType(catalog.tags.find((entry) => entry.id === tagIds[index]));
         tag.classList.add(`stamp-tag-${type}`);
         tags.append(tag);
       }
-      content.append(tags);
+      group.append(heading, tags);
+      tagGroupContainer.append(group);
     }
+    if (tagGroupContainer.children.length) content.append(tagGroupContainer);
     content.append(release);
     tile.append(titleRow, placeholder, content);
     if (onEdit) {

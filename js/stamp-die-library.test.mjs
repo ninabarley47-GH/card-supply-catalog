@@ -610,7 +610,7 @@ test('Stamp & Die tag presentation partitions normalized tool names and leaves u
     { id: 'theme', name: 'Christmas' }
   ] };
   assert.deepEqual(partitionStampDieTagIds(['tool-0', 'tool-1', 'tool-2', 'tool-3', 'tool-4', 'theme', 'missing'], catalog), {
-    toolTypeTagIds: ['tool-0', 'tool-1', 'tool-2', 'tool-3', 'tool-4'],
+    toolTypeTagIds: ['tool-0', 'tool-1', 'tool-2', 'tool-4', 'tool-3'],
     themeTagIds: ['theme', 'missing']
   });
   assert.deepEqual(partitionStampDieTagIds([], catalog), { toolTypeTagIds: [], themeTagIds: [] });
@@ -639,7 +639,9 @@ test('Stamp Set chips style the five Tool Type tags green and all other tags war
 
   const h = await harness(t, { initialTagCatalog: catalog });
   await seedEdit(h, { tagIds: catalog.tags.map((tag) => tag.id) });
-  const cardChips = h.gallery.querySelector('.keyword-list').querySelectorAll('li');
+  const cardGroups = h.gallery.querySelectorAll('.stamp-set-tag-group');
+  assert.deepEqual(cardGroups.map((group) => group.querySelector('h5').textContent), ['Tool Type', 'Themes']);
+  const cardChips = cardGroups.flatMap((group) => group.querySelector('.keyword-list').children);
   assert.deepEqual(cardChips.map((chip) => chip.textContent), ['Stamp', 'Christmas', 'Other tag', 'Bare tag']);
   assert.deepEqual(cardChips.map((chip) => chip.className), [
     'stamp-tag-tool', 'stamp-tag-theme', 'stamp-tag-theme', 'stamp-tag-theme'
@@ -1459,8 +1461,8 @@ test('Set tile metadata follows Paper placement: tag chips, owner/year, and bott
   assert.equal(tile.querySelector('.keyword-list').textContent, 'Floral');
   assert.equal(tile.querySelector('.stamp-set-form-tool-types'), null);
   const body = tile.querySelector('.card-body');
-  assert.equal(body.children[0].className, 'keyword-list');
-  assert.equal(body.children[0].textContent, 'Floral');
+  assert.equal(body.children[0].className, 'stamp-set-tag-groups');
+  assert.equal(body.children[0].textContent, 'ThemesFloral');
   assert.equal(body.children[1].className, 'card-meta');
   assert.equal(body.children[1].textContent, 'Nina \u00b7 2022');
   assert.equal(tile.children.at(-1).className, 'card-edit-button');

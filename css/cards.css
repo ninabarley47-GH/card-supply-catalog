@@ -709,6 +709,24 @@
   color: #294c3b;
 }
 
+.stamp-set-tag-groups {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.stamp-set-tag-group h5 {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.stamp-set-tag-group .keyword-list {
+  gap: var(--space-2);
+  margin: 0;
+}
+
 .card-detail-relationship-metadata {
   padding: 0;
   border-top: 0;
