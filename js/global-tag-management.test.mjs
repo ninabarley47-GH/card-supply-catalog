@@ -4,11 +4,11 @@ import { readFile } from "node:fs/promises";
 import { validateGlobalTagCatalog } from "./global-tag-catalog.js";
 import {
   addGlobalCategory, addGlobalTag, addTagToCategory, editGlobalCategory, editGlobalTag,
-  getGlobalTagUsage, removeGlobalCategory, removeGlobalTag, removeTagFromCategory, sortGlobalTags
+  getGlobalTagUsage, removeGlobalCategory, removeGlobalTag, removeTagFromCategory, sortGlobalTags, sortGlobalTagsByType
 } from "./global-tag-management.js";
 
-const tag = (id, name, appliesTo = ["paper"], categoryIds = []) => ({ id, name, appliesTo, categoryIds });
-const catalog = (tags = [], categories = []) => ({ schemaVersion: 1, tags, categories });
+const tag = (id, name, appliesTo = ["paper"], categoryIds = [], type = "theme") => ({ id, name, appliesTo, categoryIds, type });
+const catalog = (tags = [], categories = []) => ({ schemaVersion: 2, tags, categories });
 
 test("Settings declares one flat global tag manager rather than product-specific managers", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
@@ -49,6 +49,16 @@ test("adds a universal global tag without writing deprecated applicability", () 
   const result = addGlobalTag(catalog(), { name: "  New   Tag ", idFactory: () => "opaque" });
   assert.equal(result.ok, true);
   assert.deepEqual(result.tag, { id: "opaque", name: "New Tag", type: "theme", categoryIds: [] });
+});
+
+test("adds Tool and Theme tags with schema-valid explicit types", () => {
+  for (const type of ["tool", "theme"]) {
+    const result = addGlobalTag(catalog(), { name: `${type} addition`, type, idFactory: () => `new-${type}` });
+    assert.equal(result.ok, true);
+    assert.equal(result.tag.type, type);
+    assert.equal(validateGlobalTagCatalog(result.catalog).ok, true);
+  }
+  assert.equal(addGlobalTag(catalog(), { name: "Unknown", type: "other" }).reason, "invalid-type");
 });
 
 test("blocks exact normalized duplicates and points to the existing entity", () => {
@@ -155,7 +165,8 @@ test("every category and membership mutation produces a valid complete catalog",
 test("C2 Settings stays flat, excludes assigned category choices, and does not use item or image deletion APIs", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const source = await readFile(new URL("./settings.js", import.meta.url), "utf8");
-  assert.equal((html.match(/data-tag-list/g) || []).length, 1);
+  assert.equal((html.match(/data-tool-tag-list/g) || []).length, 1);
+  assert.equal((html.match(/data-theme-tag-list/g) || []).length, 1);
   assert.match(html, /data-category-add-form/);
   assert.match(html, /data-category-list/);
   assert.match(source, /filter\(\(category\) => !tag\.categoryIds\.includes\(category\.id\)\)/);
@@ -201,9 +212,12 @@ test("C2 cleanup collapses creation forms and category choices in the resting st
   assert.match(html, /data-category-add-open[^>]*>\+ Add Category</);
   assert.match(html, /data-category-add-form hidden/);
   assert.match(html, /data-category-add-cancel/);
-  assert.match(html, /data-tag-add-open[^>]*>\+ Add Tag</);
-  assert.match(html, /data-tag-add-form hidden/);
-  assert.match(html, /data-tag-add-cancel/);
+  assert.match(html, /data-tool-tag-add-open[^>]*>\+ Add Tool Tag</);
+  assert.match(html, /data-tool-tag-add-form hidden/);
+  assert.match(html, /data-tool-tag-add-cancel/);
+  assert.match(html, /data-theme-tag-add-open[^>]*>\+ Add Theme Tag</);
+  assert.match(html, /data-theme-tag-add-form hidden/);
+  assert.match(html, /data-theme-tag-add-cancel/);
   assert.match(source, /reveal\.textContent = "\+ Add to category"/);
   assert.match(source, /select\.addEventListener\("change", async \(\) =>/);
   assert.doesNotMatch(source.slice(source.indexOf("const availableCategories"), source.indexOf("} else if (!catalog.categories.length)")), /textContent = "Add"/);
@@ -216,12 +230,38 @@ test("final C2 labels and tag actions match the category treatment", async () =>
   const tagRow = source.slice(source.indexOf("function createGlobalTagSettingsRow"), source.indexOf("function formatProductType"));
   assert.match(html, /Tags &amp; Categories/);
   assert.match(html, /Manage the shared tag system for Paper, Cards, and Stamp Sets\./);
-  assert.match(html, /<h5>All Tags<\/h5>/);
+  assert.match(html, /<h5 id="tool-tags-title">Tool Tags<\/h5>/);
+  assert.match(html, /<h5 id="theme-tags-title">Theme Tags<\/h5>/);
   assert.doesNotMatch(html, /Tags inventory/);
   assert.match(tagRow, /edit\.className = "tag-settings-action tag-edit-action"/);
   assert.match(tagRow, /edit\.innerHTML = '<svg/);
   assert.match(tagRow, /remove\.className = "tag-settings-action"/);
   assert.match(tagRow, /reveal\.textContent = "\+ Add to category"/);
+});
+
+test("Settings renders Tool Tags before Theme Tags after Categories", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const settings = html.slice(html.indexOf('data-global-tag-settings'), html.indexOf('id="library-folders-settings"'));
+  assert.ok(settings.indexOf("category-settings-title") < settings.indexOf("tool-tags-title"));
+  assert.ok(settings.indexOf("tool-tags-title") < settings.indexOf("theme-tags-title"));
+  assert.doesNotMatch(settings, /All Tags/);
+  assert.match(settings, /data-tool-tag-add-form/);
+  assert.match(settings, /data-theme-tag-add-form/);
+});
+
+test("tag sections filter by explicit type, ignore names, and sort alphabetically within each type", async () => {
+  const mixed = [
+    tag("theme-die", "Die", [], [], "theme"),
+    tag("tool-floral", "Floral", [], [], "tool"),
+    tag("tool-stamp", "Stamp", [], [], "tool"),
+    tag("theme-mask", "Mask", [], [], "theme")
+  ];
+  assert.deepEqual(sortGlobalTagsByType(mixed, "tool").map((entry) => entry.name), ["Floral", "Stamp"]);
+  assert.deepEqual(sortGlobalTagsByType(mixed, "theme").map((entry) => entry.name), ["Die", "Mask"]);
+  assert.deepEqual(mixed.map(({ id }) => id), ["theme-die", "tool-floral", "tool-stamp", "theme-mask"]);
+  const source = await readFile(new URL("./settings.js", import.meta.url), "utf8");
+  assert.match(source, /sortGlobalTagsByType\(catalog\.tags, group\.type\)/);
+  assert.match(source, /\{ type: "tool"[\s\S]*\{ type: "theme"/);
 });
 
 test("successful Settings messages clear without hiding errors automatically", async () => {

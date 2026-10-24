@@ -2371,6 +2371,7 @@ button.pattern {
 .category-settings-row > .tag-settings-action:last-child { grid-column: 3; grid-row: 1; margin: 0; }
 .tag-inventory-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
 .tag-inventory-heading h5 { margin: 0; }
+.tag-inventory-section + .tag-inventory-section { margin-top: var(--space-5); border-top: 1px solid var(--color-border); padding-top: var(--space-4); }
 .tag-settings-add { display: flex; align-items: center; gap: var(--space-2); }
 .tag-settings-add input { width: min(24rem, 70%); }
 .global-tag-settings-add { align-items: end; flex-wrap: wrap; }

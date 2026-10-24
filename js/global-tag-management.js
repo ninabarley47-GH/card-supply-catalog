@@ -22,8 +22,9 @@ export function getGlobalTagUsage(catalog, { paperRecords = [], cardRecords = []
   return usage;
 }
 
-export function addGlobalTag(catalog, { name, allowFuzzy = false, idFactory = createOpaqueTagId }) {
+export function addGlobalTag(catalog, { name, type = "theme", allowFuzzy = false, idFactory = createOpaqueTagId }) {
   assertCatalog(catalog);
+  if (type !== "tool" && type !== "theme") return { ok: false, reason: "invalid-type" };
   const normalizedName = normalizeGlobalTagName(name);
   if (!normalizedName) return { ok: false, reason: "invalid-name" };
   const exact = catalog.tags.find((tag) => getGlobalTagNameKey(tag.name) === getGlobalTagNameKey(normalizedName));
@@ -32,7 +33,10 @@ export function addGlobalTag(catalog, { name, allowFuzzy = false, idFactory = cr
     .filter((candidate) => candidate.firstName === normalizedName || candidate.secondName === normalizedName)
     .map((candidate) => candidate.firstName === normalizedName ? candidate.secondName : candidate.firstName);
   if (fuzzyCandidates.length && !allowFuzzy) return { ok: false, reason: "fuzzy", fuzzyCandidates };
-  const tag = { id: idFactory(), name: normalizedName, type: "theme", categoryIds: [] };
+  const tag = {
+    id: idFactory(), name: normalizedName, type, categoryIds: [],
+    ...(type === "tool" ? { filenameTerms: [] } : {})
+  };
   const nextCatalog = cloneCatalog(catalog);
   nextCatalog.tags.push(tag);
   assertCatalog(nextCatalog);
@@ -143,6 +147,10 @@ export function removeGlobalTag(catalog, tagId, recordGroups = {}) {
 
 export function sortGlobalTags(tags) {
   return [...tags].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+}
+
+export function sortGlobalTagsByType(tags, type) {
+  return sortGlobalTags(tags.filter((tag) => tag.type === type));
 }
 
 export function sortGlobalCategories(categories) {

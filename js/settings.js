@@ -11,7 +11,7 @@ import { checkCardImageLibraryHealth, generateMissingCardImageThumbnails } from 
 import { deleteGlobalTagEverywhere, loadCatalogSetting, loadGlobalTagCatalog, loadSavedCards, loadSavedStampDieSets, saveCatalogSetting, saveGlobalTagCatalog, saveOwner, savePaperPack, savePaperPacks } from "./storage.js";
 import {
   addGlobalCategory, addGlobalTag, addTagToCategory, editGlobalCategory, editGlobalTag,
-  getGlobalTagUsage, removeGlobalCategory, removeTagFromCategory, sortGlobalCategories, sortGlobalTags
+  getGlobalTagUsage, removeGlobalCategory, removeTagFromCategory, sortGlobalCategories, sortGlobalTagsByType
 } from "./global-tag-management.js";
 import { createLegacyOwnerId, getOwnerNameKey, isActiveOwner, normalizeOwnerName } from "./owners.js";
 import { supportsDirectoryPicker } from "./browser-capabilities.js";
@@ -160,9 +160,10 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
   if (!root) return;
   let cards = await loadSavedCards().catch(() => []);
   let stampSets = await loadSavedStampDieSets();
-  const form = root.querySelector("[data-tag-add-form]");
-  const input = root.querySelector("[data-tag-add-input]");
-  const list = root.querySelector("[data-tag-list]");
+  const tagAddGroups = [
+    { type: "tool", form: root.querySelector("[data-tool-tag-add-form]"), input: root.querySelector("[data-tool-tag-add-input]"), list: root.querySelector("[data-tool-tag-list]"), trigger: root.querySelector("[data-tool-tag-add-open]"), cancel: root.querySelector("[data-tool-tag-add-cancel]") },
+    { type: "theme", form: root.querySelector("[data-theme-tag-add-form]"), input: root.querySelector("[data-theme-tag-add-input]"), list: root.querySelector("[data-theme-tag-list]"), trigger: root.querySelector("[data-theme-tag-add-open]"), cancel: root.querySelector("[data-theme-tag-add-cancel]") }
+  ];
   const message = root.querySelector("[data-tag-message]");
   const total = root.querySelector("[data-tag-total]");
   const categoryForm = root.querySelector("[data-category-add-form]");
@@ -172,8 +173,6 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
   const categoryMessage = root.querySelector("[data-category-message]");
   const categoryAddOpen = root.querySelector("[data-category-add-open]");
   const categoryAddCancel = root.querySelector("[data-category-add-cancel]");
-  const tagAddOpen = root.querySelector("[data-tag-add-open]");
-  const tagAddCancel = root.querySelector("[data-tag-add-cancel]");
   let catalog = await loadGlobalTagCatalog();
   const announce = createSettingsAnnouncer(message);
   const announceCategory = createSettingsAnnouncer(categoryMessage);
@@ -198,8 +197,7 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
   };
   const render = () => {
     const usage = getGlobalTagUsage(catalog, { paperRecords: paperPacks, cardRecords: cards, stampRecords: stampSets });
-    const tags = sortGlobalTags(catalog.tags);
-    total.textContent = `${tags.length} tag${tags.length === 1 ? "" : "s"}`;
+    total.textContent = `${catalog.tags.length} tag${catalog.tags.length === 1 ? "" : "s"}`;
     const categories = sortGlobalCategories(catalog.categories);
     categoryTotal.textContent = `${categories.length} categor${categories.length === 1 ? "y" : "ies"}`;
     categoryList.replaceChildren(...categories.map((category) => createGlobalCategorySettingsRow({
@@ -227,7 +225,9 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
         await persistCatalogMutation(result, `Deleted “${category.name}” and removed its tag relationships. Tags and item assignments were unchanged.`, announceCategory);
       }
     })));
-    list.replaceChildren(...tags.map((tag) => createGlobalTagSettingsRow({
+    for (const group of tagAddGroups) {
+      const tags = sortGlobalTagsByType(catalog.tags, group.type);
+      group.list.replaceChildren(...tags.map((tag) => createGlobalTagSettingsRow({
       tag, catalog, usage: usage.get(tag.id),
       onAddCategory: async (categoryId) => {
         const result = addTagToCategory(catalog, tag.id, categoryId);
@@ -279,7 +279,8 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
           announce(`Deleted “${tag.name}” and removed it from ${assigned} item${assigned === 1 ? "" : "s"}. Image files were unchanged.`, "success");
         } catch (error) { announce(`“${tag.name}” could not be deleted. No changes were saved.`, "error"); }
       }
-    })));
+      })));
+    }
   };
   categoryAddOpen.addEventListener("click", () => {
     announceCategory("");
@@ -291,16 +292,18 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
     announceCategory("");
     toggleAddForm(categoryForm, categoryAddOpen, false);
   });
-  tagAddOpen.addEventListener("click", () => {
-    announce("");
-    toggleAddForm(form, tagAddOpen, true);
-    input.focus();
-  });
-  tagAddCancel.addEventListener("click", () => {
-    input.value = "";
-    announce("");
-    toggleAddForm(form, tagAddOpen, false);
-  });
+  for (const group of tagAddGroups) {
+    group.trigger.addEventListener("click", () => {
+      announce("");
+      toggleAddForm(group.form, group.trigger, true);
+      group.input.focus();
+    });
+    group.cancel.addEventListener("click", () => {
+      group.input.value = "";
+      announce("");
+      toggleAddForm(group.form, group.trigger, false);
+    });
+  }
   categoryForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     let result = addGlobalCategory(catalog, { name: categoryInput.value });
@@ -315,27 +318,29 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
       toggleAddForm(categoryForm, categoryAddOpen, false);
     }
   });
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    let result = addGlobalTag(catalog, { name: input.value });
-    if (!result.ok && result.reason === "duplicate") { announce(`That tag already exists as “${result.existingTag.name}”.`, "error"); return; }
-    if (!result.ok && result.reason === "fuzzy") {
-      if (!window.confirm(`Possible duplicate${result.fuzzyCandidates.length === 1 ? "" : "s"}: ${result.fuzzyCandidates.join(", ")}. Create a distinct tag anyway?`)) { announce("The possible duplicate was not created.", ""); return; }
-      result = addGlobalTag(catalog, { name: input.value, allowFuzzy: true });
-    }
-    if (!result.ok) { announce("Enter a unique tag name.", "error"); return; }
-    try {
-      await saveGlobalTagCatalog(result.catalog);
-      catalog = result.catalog;
-      input.value = "";
-      toggleAddForm(form, tagAddOpen, false);
-      render();
-      dispatchGlobalTagUpdates();
-      announce(`Added “${result.tag.name}”.`, "success");
-    } catch (error) {
-      announce("The tag could not be added. No changes were saved.", "error");
-    }
-  });
+  for (const group of tagAddGroups) {
+    group.form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      let result = addGlobalTag(catalog, { name: group.input.value, type: group.type });
+      if (!result.ok && result.reason === "duplicate") { announce(`That tag already exists as “${result.existingTag.name}”.`, "error"); return; }
+      if (!result.ok && result.reason === "fuzzy") {
+        if (!window.confirm(`Possible duplicate${result.fuzzyCandidates.length === 1 ? "" : "s"}: ${result.fuzzyCandidates.join(", ")}. Create a distinct tag anyway?`)) { announce("The possible duplicate was not created.", ""); return; }
+        result = addGlobalTag(catalog, { name: group.input.value, type: group.type, allowFuzzy: true });
+      }
+      if (!result.ok) { announce("Enter a unique tag name.", "error"); return; }
+      try {
+        await saveGlobalTagCatalog(result.catalog);
+        catalog = result.catalog;
+        group.input.value = "";
+        toggleAddForm(group.form, group.trigger, false);
+        render();
+        dispatchGlobalTagUpdates();
+        announce(`Added “${result.tag.name}”.`, "success");
+      } catch (error) {
+        announce("The tag could not be added. No changes were saved.", "error");
+      }
+    });
+  }
   const refreshAfterItemSave = async (event) => {
     catalog = await loadGlobalTagCatalog();
     if (event.type === "catalog:card-saved") cards = await loadSavedCards().catch(() => cards);
