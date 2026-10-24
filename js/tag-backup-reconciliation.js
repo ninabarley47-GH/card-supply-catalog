@@ -9,8 +9,8 @@ import {
 } from "./global-tag-catalog.js";
 
 export function reconcileBackupTagData({ localCatalog = createEmptyGlobalTagCatalog(), backup, overwriteExisting = false }) {
-  if (localCatalog?.schemaVersion === 1) localCatalog = migrateGlobalTagCatalogSchema(localCatalog);
-  if (backup?.tagCatalog?.schemaVersion === 1) {
+  if ([1, 2].includes(localCatalog?.schemaVersion)) localCatalog = migrateGlobalTagCatalogSchema(localCatalog);
+  if ([1, 2].includes(backup?.tagCatalog?.schemaVersion)) {
     backup = { ...backup, tagCatalog: migrateGlobalTagCatalogSchema(backup.tagCatalog) };
   }
   assertCatalog(localCatalog, "local");

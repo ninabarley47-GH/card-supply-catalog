@@ -53,7 +53,13 @@ export function migrateGlobalTagCatalogSchema(catalog) {
   if (catalog?.schemaVersion === GLOBAL_TAG_CATALOG_SCHEMA_VERSION) {
     const validation = validateGlobalTagCatalog(catalog);
     if (!validation.ok) throw new TypeError("The schema 2 global tag catalog is invalid.");
-    return structuredClone(catalog);
+    const normalized = structuredClone(catalog);
+    normalized.tags = normalized.tags.map((tag) =>
+      tag.type === "tool" && getGlobalTagNameKey(tag.name) === "stamp" && !("unmatchedFilenameFallback" in tag)
+        ? { ...tag, unmatchedFilenameFallback: true }
+        : tag
+    );
+    return normalized;
   }
   if (catalog?.schemaVersion !== LEGACY_GLOBAL_TAG_CATALOG_SCHEMA_VERSION) {
     throw new TypeError("Unsupported global tag catalog schema version.");
@@ -161,12 +167,12 @@ export function validateGlobalTagCatalog(catalog) {
         errors.push(error(`${path}.filenameTerms`, "Tool filename terms must be non-empty strings."));
       } else {
         for (const term of tag.filenameTerms) {
-          const key = term.trim().replace(/\s+/g, " ").toLocaleLowerCase();
-          const priorTagId = filenameTerms.get(key);
-          if (priorTagId && priorTagId !== tag.id) {
-            errors.push(error(`${path}.filenameTerms`, `Filename term "${term}" is already assigned to another Tool Tag.`));
+          const key = normalizeFilenameTermKey(term);
+          const priorTag = filenameTerms.get(key);
+          if (priorTag && priorTag.id !== tag.id) {
+            errors.push(error(`${path}.filenameTerms`, `Filename term "${term}" is already assigned to Tool Tag "${priorTag.name}".`));
           } else {
-            filenameTerms.set(key, tag.id);
+            filenameTerms.set(key, tag);
           }
         }
       }
@@ -202,6 +208,18 @@ export function validateGlobalTagCatalog(catalog) {
     });
   });
   return errors.length ? { ok: false, errors } : { ok: true, errors: [] };
+}
+
+export function normalizeToolFilenameTerm(value) {
+  return typeof value === "string" ? value.normalize("NFKC").trim().replace(/\s+/g, " ") : "";
+}
+
+export function getToolFilenameTermKey(value) {
+  return normalizeToolFilenameTerm(value).toLocaleLowerCase();
+}
+
+function normalizeFilenameTermKey(value) {
+  return getToolFilenameTermKey(value);
 }
 
 export function validateItemTagAssignments({ catalog, productType, tagIds }) {

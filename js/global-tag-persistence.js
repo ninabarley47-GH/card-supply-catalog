@@ -91,7 +91,7 @@ export function migrateGlobalTagCatalogSchemaInTransaction({ database, storeName
         try {
           const currentCatalog = request.result?.value;
           const upgradedCatalog = migrateGlobalTagCatalogSchema(currentCatalog);
-          const migrated = currentCatalog.schemaVersion !== upgradedCatalog.schemaVersion;
+          const migrated = JSON.stringify(currentCatalog) !== JSON.stringify(upgradedCatalog);
           if (migrated) store.put({ id: settingId, value: upgradedCatalog });
           result = { migrated, catalog: upgradedCatalog };
         } catch (error) {

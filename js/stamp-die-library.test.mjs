@@ -16,6 +16,18 @@ const initialCatalog = () => ({
   categories: [{ id: 'nature', name: 'Nature' }]
 });
 
+function catalogWithTools(source = initialCatalog(), names = ['Stamp', 'Die', 'Punch', 'Mask']) {
+  const catalog = structuredClone(source);
+  catalog.schemaVersion = 2;
+  catalog.tags = catalog.tags.map((tag) => ({ ...tag, type: 'theme' }));
+  for (const name of names) catalog.tags.push({
+    id: name.toLowerCase(), name, type: 'tool', categoryIds: [],
+    filenameTerms: name === 'Stamp' ? [] : [name.toLowerCase()],
+    ...(name === 'Stamp' ? { unmatchedFilenameFallback: true } : {})
+  });
+  return catalog;
+}
+
 // Minimal DOM/event harness runs the real form and shared tag picker without dependencies.
 class Element {
   constructor(tagName) {
@@ -519,8 +531,7 @@ test('Library does not present an older creation date as a release year', async 
 });
 
 test('Add Set previews selected images in order, preserves manual tag removal on save, and renders all images', async (t) => {
-  const imageCatalog = initialCatalog();
-  imageCatalog.tags.push({ id: 'stamp', name: 'Stamp', categoryIds: [] }, { id: 'die', name: 'Die', categoryIds: [] });
+  const imageCatalog = catalogWithTools(initialCatalog(), ['Stamp', 'Die']);
   let preparedNames;
   const h = await harness(t, {
     loadGlobalTagCatalog: async () => structuredClone(imageCatalog),
@@ -559,6 +570,7 @@ test('Add Set previews selected images in order, preserves manual tag removal on
 test('draft image removal never removes inferred tags; Cancel discards images without preparation or persistence', async (t) => {
   let preparationCalls = 0;
   const h = await harness(t, {
+    initialTagCatalog: catalogWithTools(initialCatalog(), ['Stamp', 'Die']),
     selectStampImageFiles: async (files) => files.map((file) => ({ file, name: file.name, previewSrc: 'data:image/jpeg;base64,cHJldmlldw==' })),
     prepareStampImagesForSave: async () => { preparationCalls++; throw new Error('Must not save'); }
   });
@@ -576,7 +588,7 @@ test('draft image removal never removes inferred tags; Cancel discards images wi
   await h.add.emit('click');
   assert.equal(previews.children.length, 0);
   assert.equal(h.form.querySelectorAll('[data-tag-id]').filter((checkbox) => checkbox.checked).length, 0);
-  assert.equal(h.form.querySelectorAll('[data-tag-id]').length, 2); // Only the original global tags remain.
+  assert.equal(h.form.querySelectorAll('[data-tag-id]').length, 4); // The two original tags and the configured Stamp/Die tags remain.
 });
 
 test('cancel during image loading discards late results without restoring draft state', async (t) => {
@@ -662,7 +674,9 @@ test('Stamp Set chips style the five Tool Type tags green and all other tags war
 
 test('Set Detail separates assigned Tool Type and Themes and shows concise empty states', async (t) => {
   const customCatalog = initialCatalog();
-  customCatalog.tags.push({ id: 'stable-die', name: 'Die', appliesTo: ['stamp'], categoryIds: [] });
+  customCatalog.schemaVersion = 2;
+  customCatalog.tags = customCatalog.tags.map((tag) => ({ ...tag, type: 'theme' }));
+  customCatalog.tags.push({ id: 'stable-die', name: 'Die', type: 'tool', filenameTerms: ['die'], appliesTo: ['stamp'], categoryIds: [] });
   const h = await harness(t, { initialTagCatalog: customCatalog });
   await seedEdit(h, { tagIds: ['stable-paper', 'stable-die'] }); await h.cancel.emit('click');
   await h.gallery.querySelector('article').emit('click');
@@ -683,7 +697,9 @@ test('Set Detail separates assigned Tool Type and Themes and shows concise empty
 
 test('Add/Edit Tool Type display follows manual and inferred assignment changes', async (t) => {
   const customCatalog = initialCatalog();
-  customCatalog.tags.push({ id: 'stable-die', name: 'Die', appliesTo: ['stamp'], categoryIds: [] });
+  customCatalog.schemaVersion = 2;
+  customCatalog.tags = customCatalog.tags.map((tag) => ({ ...tag, type: 'theme' }));
+  customCatalog.tags.push({ id: 'stable-die', name: 'Die', type: 'tool', filenameTerms: ['die'], appliesTo: ['stamp'], categoryIds: [] });
   const h = await harness(t, {
     initialTagCatalog: customCatalog,
     selectStampImageFiles: async (files) => files.map((file) => ({ file, name: file.name, previewSrc: 'data:image/jpeg;base64,cHJldmlldw==' }))
@@ -797,7 +813,12 @@ for (const dismiss of ['cancel', 'escape']) {
 
 test('Edit new images infer all types only at selection; manual removal survives Save and removal keeps tags', async (t) => {
   const catalog = initialCatalog();
-  for (const name of ['Stamp', 'Die', 'Mask']) catalog.tags.push({ id: name, name, categoryIds: [] });
+  catalog.schemaVersion = 2;
+  catalog.tags = catalog.tags.map((tag) => ({ ...tag, type: 'theme' }));
+  for (const name of ['Stamp', 'Die', 'Mask']) catalog.tags.push({
+    id: name, name, type: 'tool', categoryIds: [], filenameTerms: name === 'Stamp' ? [] : [name.toLowerCase()],
+    ...(name === 'Stamp' ? { unmatchedFilenameFallback: true } : {})
+  });
   const h = await harness(t, {
     loadGlobalTagCatalog: async () => structuredClone(catalog),
     hydrateStampImages: async () => {},
@@ -1481,8 +1502,7 @@ for (const mode of ['Add', 'Edit']) {
     globalThis.showDirectoryPicker = () => {};
     const root = { name: 'Independent Stamp folder' };
     let selections = 0;
-    const imageCatalog = initialCatalog();
-    imageCatalog.tags.push(...['Stamp', 'Die', 'Mask'].map((name) => ({ id: name.toLowerCase(), name, categoryIds: [] })));
+    const imageCatalog = catalogWithTools(initialCatalog(), ['Stamp', 'Die', 'Mask']);
     const h = await harness(t, {
       loadGlobalTagCatalog: async () => structuredClone(imageCatalog),
       loadStampImageDirectory: async () => root,
@@ -1503,7 +1523,9 @@ for (const mode of ['Add', 'Edit']) {
     assert.equal(selections, 1);
     assert.deepEqual(h.form.querySelector('.stamp-set-draft-images').querySelectorAll('img').map((image) => image.alt),
       ['Set.jpg', 'Set Dies Masks.jpg', 'Set Masks.jpg']);
-    for (const id of ['stamp', 'die', 'mask']) assert.equal(h.form.querySelector(`[data-tag-id="${id}"]`).checked, true);
+    for (const id of ['stamp', 'mask']) assert.equal(h.form.querySelector(`[data-tag-id="${id}"]`).checked, true);
+    assert.equal(h.form.querySelector('[data-tag-id="die"]').checked, false);
+    assert.match(h.form.querySelector('[role="status"]').textContent, /matches multiple Tool Tags/);
     assert.equal(h.calls(), 0);
     await h.cancel.emit('click');
   });
@@ -1897,6 +1919,7 @@ test('Add name change automatically populates ordered Stamp/Die/Mask images and 
   let lookups = 0;
   let prepared;
   const h = await harness(t, {
+    initialTagCatalog: catalogWithTools(),
     loadStampImageDirectory: async () => ({ name: 'Sets' }),
     loadStampImagesForSetName: async name => { lookups++; assert.equal(name, 'Garden'); return ['Garden MaSk.jpg', 'Garden DIES.jpg', 'Garden.jpg'].map(draftImage); },
     selectStampImageFiles: async files => files.map(file => draftImage(file.name)),

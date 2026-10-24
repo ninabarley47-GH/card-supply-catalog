@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createCatalogBackupSnapshot, createIpadCatalogBackup, restoreCatalogBackup } from "./backup.js";
+import { createCatalogBackupSnapshot, createIpadCatalogBackup, normalizeBackupTagCatalog, restoreCatalogBackup } from "./backup.js";
 import { migrateLegacyTagData } from "./global-tag-catalog.js";
 
 function createCatalogRecords() {
@@ -40,6 +40,38 @@ function createCatalogRecords() {
 
   return { color, paperPack, card };
 }
+
+test("schema 2 backup normalization adds missing Stamp fallback without altering explicit types or assignments", () => {
+  const backup = { tagCatalog: {
+    schemaVersion: 2,
+    categories: [{ id: "cat", name: "Nature" }],
+    tags: [
+      { id: "stamp", name: "Stamp", type: "tool", filenameTerms: ["custom"], categoryIds: ["cat"] },
+      { id: "die", name: "Die", type: "tool", filenameTerms: ["die"], categoryIds: [] },
+      { id: "theme", name: "Floral", type: "theme", categoryIds: ["cat"] }
+    ]
+  }, paperPacks: [{ id: "paper", tagIds: ["stamp"] }], cards: [{ id: "card", tagIds: ["theme"] }] };
+  const before = structuredClone(backup);
+  const normalized = normalizeBackupTagCatalog(backup);
+  assert.equal(normalized.tagCatalog.tags[0].unmatchedFilenameFallback, true);
+  assert.equal("unmatchedFilenameFallback" in normalized.tagCatalog.tags[1], false);
+  assert.equal("unmatchedFilenameFallback" in normalized.tagCatalog.tags[2], false);
+  assert.deepEqual(normalized.tagCatalog.tags.map(({ id, categoryIds, filenameTerms }) => ({ id, categoryIds, filenameTerms })),
+    before.tagCatalog.tags.map(({ id, categoryIds, filenameTerms }) => ({ id, categoryIds, filenameTerms })));
+  assert.deepEqual(normalized.paperPacks, before.paperPacks);
+  assert.deepEqual(normalized.cards, before.cards);
+  assert.deepEqual(backup, before);
+  assert.deepEqual(normalizeBackupTagCatalog(normalized), normalized);
+
+  const explicitFalse = normalizeBackupTagCatalog({ tagCatalog: { schemaVersion: 2, categories: [], tags: [
+    { id: "stamp", name: "Stamp", type: "tool", filenameTerms: [], categoryIds: [], unmatchedFilenameFallback: false }
+  ] } });
+  assert.equal(explicitFalse.tagCatalog.tags[0].unmatchedFilenameFallback, false);
+  const themeStamp = { tagCatalog: { schemaVersion: 2, categories: [], tags: [
+    { id: "theme-stamp", name: "Stamp", type: "theme", categoryIds: [] }
+  ] } };
+  assert.deepEqual(normalizeBackupTagCatalog(themeStamp), themeStamp);
+});
 
 test("backup and restore round-trip includes Cards and their persistent image references", async () => {
   const { color, paperPack, card } = createCatalogRecords();

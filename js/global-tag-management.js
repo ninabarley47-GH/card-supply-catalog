@@ -1,7 +1,9 @@
 import {
   findFuzzyDuplicateCandidates,
   getGlobalTagNameKey,
+  getToolFilenameTermKey,
   normalizeGlobalTagName,
+  normalizeToolFilenameTerm,
   validateGlobalTagCatalog
 } from "./global-tag-catalog.js";
 
@@ -22,7 +24,7 @@ export function getGlobalTagUsage(catalog, { paperRecords = [], cardRecords = []
   return usage;
 }
 
-export function addGlobalTag(catalog, { name, type = "theme", allowFuzzy = false, idFactory = createOpaqueTagId }) {
+export function addGlobalTag(catalog, { name, type = "theme", filenameTerms = [], allowFuzzy = false, idFactory = createOpaqueTagId }) {
   assertCatalog(catalog);
   if (type !== "tool" && type !== "theme") return { ok: false, reason: "invalid-type" };
   const normalizedName = normalizeGlobalTagName(name);
@@ -33,9 +35,18 @@ export function addGlobalTag(catalog, { name, type = "theme", allowFuzzy = false
     .filter((candidate) => candidate.firstName === normalizedName || candidate.secondName === normalizedName)
     .map((candidate) => candidate.firstName === normalizedName ? candidate.secondName : candidate.firstName);
   if (fuzzyCandidates.length && !allowFuzzy) return { ok: false, reason: "fuzzy", fuzzyCandidates };
+  if (type === "tool" && (!Array.isArray(filenameTerms) || filenameTerms.some((term) => typeof term !== "string"))) {
+    return { ok: false, reason: "invalid-filename-terms" };
+  }
+  const normalizedTerms = type === "tool" ? normalizeFilenameTerms(filenameTerms) : [];
+  const termConflict = type === "tool" ? findFilenameTermConflict(catalog, normalizedTerms) : null;
+  if (termConflict) return { ok: false, reason: "duplicate-filename-term", ...termConflict };
   const tag = {
     id: idFactory(), name: normalizedName, type, categoryIds: [],
-    ...(type === "tool" ? { filenameTerms: [] } : {})
+    ...(type === "tool" ? {
+      filenameTerms: normalizedTerms,
+      ...(getGlobalTagNameKey(normalizedName) === "stamp" ? { unmatchedFilenameFallback: true } : {})
+    } : {})
   };
   const nextCatalog = cloneCatalog(catalog);
   nextCatalog.tags.push(tag);
@@ -118,7 +129,7 @@ export function removeTagFromCategory(catalog, tagId, categoryId) {
   return { ok: true, catalog: nextCatalog, tag };
 }
 
-export function editGlobalTag(catalog, tagId, { name }) {
+export function editGlobalTag(catalog, tagId, { name, filenameTerms }) {
   assertCatalog(catalog);
   const current = catalog.tags.find((tag) => tag.id === tagId);
   if (!current) return { ok: false, reason: "not-found" };
@@ -128,6 +139,14 @@ export function editGlobalTag(catalog, tagId, { name }) {
   if (duplicate) return { ok: false, reason: "duplicate", existingTag: duplicate };
   const nextCatalog = cloneCatalog(catalog);
   const edited = nextCatalog.tags.find((tag) => tag.id === tagId);
+  if (filenameTerms !== undefined) {
+    if (edited.type !== "tool") return { ok: false, reason: "not-tool" };
+    if (!Array.isArray(filenameTerms) || filenameTerms.some((term) => typeof term !== "string")) return { ok: false, reason: "invalid-filename-terms" };
+    const normalizedTerms = normalizeFilenameTerms(filenameTerms);
+    const termConflict = findFilenameTermConflict(nextCatalog, normalizedTerms, tagId);
+    if (termConflict) return { ok: false, reason: "duplicate-filename-term", ...termConflict };
+    edited.filenameTerms = normalizedTerms;
+  }
   edited.name = normalizedName;
   assertCatalog(nextCatalog);
   return { ok: true, catalog: nextCatalog, tag: edited };
@@ -181,8 +200,30 @@ function cloneCatalog(catalog) {
     tags: catalog.tags.map((tag) => ({
       ...tag,
       ...(Array.isArray(tag.appliesTo) ? { appliesTo: [...tag.appliesTo] } : {}),
+      ...(Array.isArray(tag.filenameTerms) ? { filenameTerms: [...tag.filenameTerms] } : {}),
       categoryIds: [...tag.categoryIds]
     })),
     categories: catalog.categories.map((category) => ({ ...category }))
   };
+}
+
+function normalizeFilenameTerms(terms) {
+  if (!Array.isArray(terms)) return [];
+  const seen = new Set();
+  return terms.map(normalizeToolFilenameTerm).filter((term) => {
+    const key = getToolFilenameTermKey(term);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function findFilenameTermConflict(catalog, terms, excludedTagId = null) {
+  for (const term of terms) {
+    const key = getToolFilenameTermKey(term);
+    const conflictingTag = catalog.tags.find((tag) => tag.type === "tool" && tag.id !== excludedTagId &&
+      (tag.filenameTerms || []).some((existing) => getToolFilenameTermKey(existing) === key));
+    if (conflictingTag) return { term, conflictingTag };
+  }
+  return null;
 }

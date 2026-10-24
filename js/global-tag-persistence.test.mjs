@@ -250,6 +250,23 @@ test("a second migration uses the current schema 2 catalog and performs no rewri
   assert.equal(harness.putCount(), 0);
 });
 
+test("schema 2 Stamp fallback backfill persists once and is idempotent", async () => {
+  const schema2 = { schemaVersion: 2, categories: [{ id: "cat", name: "Nature" }], tags: [
+    { id: "stamp", name: "Stamp", type: "tool", filenameTerms: [], categoryIds: ["cat"] }
+  ] };
+  const harness = catalogTransactionHarness(schema2);
+  const first = await migrateCatalogInHarness(harness);
+  assert.equal(first.migrated, true);
+  assert.equal(first.catalog.tags[0].unmatchedFilenameFallback, true);
+  assert.deepEqual(harness.read().tags[0].categoryIds, ["cat"]);
+  assert.equal(harness.putCount(), 1);
+
+  const second = await migrateCatalogInHarness(harness);
+  assert.equal(second.migrated, false);
+  assert.deepEqual(second.catalog, first.catalog);
+  assert.equal(harness.putCount(), 1);
+});
+
 test("a stale schema 1 snapshot cannot overwrite a newer schema 2 classification", async () => {
   const staleSchema1 = { schemaVersion: 1, tags: [{ id: "stable", name: "Die", categoryIds: [] }], categories: [] };
   const currentSchema2 = { schemaVersion: 2, tags: [{ id: "stable", name: "Die", type: "theme", categoryIds: [] }], categories: [] };

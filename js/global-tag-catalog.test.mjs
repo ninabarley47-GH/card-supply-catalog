@@ -58,6 +58,37 @@ test("schema migration does not seed missing built-in Tool Tags and rejects inva
   assert.throws(() => migrateGlobalTagCatalogSchema({ ...source, schemaVersion: 99 }), /Unsupported/);
 });
 
+test("schema 2 backfills only missing Stamp Tool fallback while preserving catalog relationships", () => {
+  const source = {
+    schemaVersion: 2,
+    categories: [{ id: "cat", name: "Nature" }],
+    tags: [
+      { id: "stamp-missing", name: "  STAMP  ", type: "tool", filenameTerms: ["custom stamp"], categoryIds: ["cat"], appliesTo: ["stamp"] },
+      { id: "die", name: "Die", type: "tool", filenameTerms: ["die"], categoryIds: ["cat"] }
+    ]
+  };
+  const normalized = migrateGlobalTagCatalogSchema(source);
+  assert.equal(normalized.tags[0].unmatchedFilenameFallback, true);
+  assert.equal("unmatchedFilenameFallback" in normalized.tags[1], false);
+  assert.deepEqual(normalized.tags.map(({ id, categoryIds, filenameTerms }) => ({ id, categoryIds, filenameTerms })),
+    source.tags.map(({ id, categoryIds, filenameTerms }) => ({ id, categoryIds, filenameTerms })));
+  assert.deepEqual(source.tags[0].unmatchedFilenameFallback, undefined);
+  assert.deepEqual(normalized.categories, source.categories);
+  for (const [productType, tagIds] of [["paper", ["stamp-missing"]], ["card", ["die"]], ["stamp", ["stamp-missing", "die"]]]) {
+    assert.equal(validateItemTagAssignments({ catalog: normalized, productType, tagIds }).ok, true);
+  }
+  assert.deepEqual(migrateGlobalTagCatalogSchema(normalized), normalized);
+
+  const themeStamp = { schemaVersion: 2, categories: [], tags: [
+    { id: "theme-stamp", name: "Stamp", type: "theme", categoryIds: [] }
+  ] };
+  assert.deepEqual(migrateGlobalTagCatalogSchema(themeStamp), themeStamp);
+  const explicitFalse = { schemaVersion: 2, categories: [], tags: [
+    { id: "stamp-false", name: "Stamp", type: "tool", filenameTerms: [], categoryIds: [], unmatchedFilenameFallback: false }
+  ] };
+  assert.deepEqual(migrateGlobalTagCatalogSchema(explicitFalse), explicitFalse);
+});
+
 test("schema 2 rejects duplicate normalized filename terms across Tool Tags", () => {
   const catalog = catalogWith({ tags: [
     tag({ id: "one", name: "One", type: "tool", filenameTerms: ["die"] }),

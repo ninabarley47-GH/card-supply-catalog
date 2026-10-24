@@ -61,6 +61,64 @@ test("adds Tool and Theme tags with schema-valid explicit types", () => {
   assert.equal(addGlobalTag(catalog(), { name: "Unknown", type: "other" }).reason, "invalid-type");
 });
 
+test("new Stamp Tool Tags receive explicit fallback configuration that survives rename", () => {
+  const added = addGlobalTag(catalog(), { name: " Stamp ", type: "tool", idFactory: () => "stable-stamp" });
+  assert.equal(added.ok, true);
+  assert.equal(added.tag.unmatchedFilenameFallback, true);
+  assert.equal(validateGlobalTagCatalog(added.catalog).ok, true);
+
+  const renamed = editGlobalTag(added.catalog, "stable-stamp", { name: "Unmatched Design Tool" });
+  assert.equal(renamed.ok, true);
+  assert.equal(renamed.tag.id, "stable-stamp");
+  assert.equal(renamed.tag.unmatchedFilenameFallback, true);
+  assert.equal(validateGlobalTagCatalog(renamed.catalog).ok, true);
+
+  const other = addGlobalTag(catalog(), { name: "Texture", type: "tool", idFactory: () => "texture" });
+  assert.equal("unmatchedFilenameFallback" in other.tag, false);
+});
+
+test("Tool filename terms normalize on add and can be edited without changing identity or relationships", () => {
+  const source = catalog([
+    { id: "tool-1", name: "Dies", type: "tool", filenameTerms: ["die"], categoryIds: ["nature"] },
+    { id: "theme-1", name: "Floral", type: "theme", categoryIds: [] }
+  ], [{ id: "nature", name: "Nature" }]);
+  const added = addGlobalTag(source, { name: " Texture tool ", type: "tool", filenameTerms: [" Texture  Map ", "texture map", "  GRAIN "], idFactory: () => "new-tool" });
+  assert.equal(added.ok, true);
+  assert.deepEqual(added.tag.filenameTerms, ["Texture Map", "GRAIN"]);
+  const renamed = editGlobalTag(added.catalog, "tool-1", { name: "Named Tool" });
+  assert.equal(renamed.ok, true);
+  assert.equal(renamed.tag.id, "tool-1");
+  assert.deepEqual(renamed.tag.filenameTerms, ["die"]);
+  const edited = editGlobalTag(added.catalog, "tool-1", { name: "Cutting Dies", filenameTerms: ["  DIE ", "dies"] });
+  assert.equal(edited.ok, true);
+  assert.equal(edited.tag.id, "tool-1");
+  assert.equal(edited.tag.name, "Cutting Dies");
+  assert.deepEqual(edited.tag.filenameTerms, ["DIE", "dies"]);
+  assert.deepEqual(edited.tag.categoryIds, ["nature"]);
+  assert.deepEqual(edited.catalog.tags.find((tag) => tag.id === "theme-1"), source.tags[1]);
+});
+
+test("identical normalized filename terms across Tool Tags are rejected with the conflict identified", () => {
+  const source = catalog([
+    { id: "tool-1", name: "Die", type: "tool", filenameTerms: ["die"], categoryIds: [] },
+    { id: "tool-2", name: "Punch", type: "tool", filenameTerms: ["punch"], categoryIds: [] }
+  ]);
+  const added = addGlobalTag(source, { name: "Mask", type: "tool", filenameTerms: [" DIE "] });
+  assert.equal(added.reason, "duplicate-filename-term");
+  assert.equal(added.conflictingTag.name, "Die");
+  const edited = editGlobalTag(source, "tool-2", { name: "Punch", filenameTerms: [" Die  "] });
+  assert.equal(edited.reason, "duplicate-filename-term");
+  assert.equal(edited.conflictingTag.name, "Die");
+  assert.equal(source.tags[1].filenameTerms[0], "punch");
+});
+
+test("Theme Tags cannot acquire active Tool filename configuration", () => {
+  const source = catalog([tag("theme", "Die", [], [], "theme")]);
+  const added = addGlobalTag(source, { name: "Texture", type: "theme", filenameTerms: ["texture"], idFactory: () => "other" });
+  assert.equal("filenameTerms" in added.tag, false);
+  assert.equal(editGlobalTag(added.catalog, "theme", { name: "Dies", filenameTerms: ["die"] }).reason, "not-tool");
+});
+
 test("blocks exact normalized duplicates and points to the existing entity", () => {
   const existing = tag("one", "Birthday");
   const result = addGlobalTag(catalog([existing]), { name: " birthday ", appliesTo: ["card"] });
@@ -247,6 +305,16 @@ test("Settings renders Tool Tags before Theme Tags after Categories", async () =
   assert.doesNotMatch(settings, /All Tags/);
   assert.match(settings, /data-tool-tag-add-form/);
   assert.match(settings, /data-theme-tag-add-form/);
+  assert.match(settings, /data-tool-tag-terms-input/);
+  assert.doesNotMatch(settings, /data-theme-tag-terms-input/);
+});
+
+test("Tool row editor exposes filename terms while Theme row editor does not", async () => {
+  const source = await readFile(new URL("./settings.js", import.meta.url), "utf8");
+  const row = source.slice(source.indexOf("function createGlobalTagSettingsRow"), source.indexOf("export async function initializeExportLibrarySettings"));
+  assert.match(row, /tag\.type === "tool" \? document\.createElement\("textarea"\) : null/);
+  assert.match(row, /Filename matching terms for/);
+  assert.ok(source.includes('editGlobalTag(catalog, tag.id, { name, ...(tag.type === "tool" ? { filenameTerms: terms } : {}) })'));
 });
 
 test("tag sections filter by explicit type, ignore names, and sort alphabetically within each type", async () => {

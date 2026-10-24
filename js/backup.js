@@ -1690,7 +1690,12 @@ export function validateBackup(backup) {
 }
 
 export function normalizeBackupTagCatalog(backup) {
-  if (!backup?.tagCatalog || backup.tagCatalog.schemaVersion !== 1) return backup;
+  if (!backup?.tagCatalog) return backup;
+  if (backup.tagCatalog.schemaVersion === 2) {
+    try { return { ...backup, tagCatalog: migrateGlobalTagCatalogSchema(backup.tagCatalog) }; }
+    catch { return backup; }
+  }
+  if (backup.tagCatalog.schemaVersion !== 1) return backup;
   return { ...backup, tagCatalog: migrateGlobalTagCatalogSchema(backup.tagCatalog) };
 }
 

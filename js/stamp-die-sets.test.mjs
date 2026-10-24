@@ -12,6 +12,13 @@ const catalog = {
   categories: [{ id: 'flowers', name: 'Flowers' }]
 };
 const upgradedCatalog = migrateGlobalTagCatalogSchema(catalog);
+const configuredCatalog = {
+  ...upgradedCatalog,
+  tags: [...upgradedCatalog.tags,
+    { id: 'tool-stamp', name: 'Stamp', type: 'tool', filenameTerms: [], unmatchedFilenameFallback: true, categoryIds: [] },
+    { id: 'tool-die', name: 'Die', type: 'tool', filenameTerms: ['die'], categoryIds: [] },
+    { id: 'tool-mask', name: 'Mask', type: 'tool', filenameTerms: ['mask'], categoryIds: [] }]
+};
 function assertStoresPreservedExceptMigratedCatalog(before, after) {
   for (const [name, records] of before) {
     if (name !== 'settings') assert.deepEqual(after.get(name), records);
@@ -273,14 +280,15 @@ test('Release Year validates the Paper year range while legacy creation dates re
 });
 
 
-test('image references and inferred ordinary tags commit together and survive reload', async () => {
+test('image references and assignments to configured Tool Tags commit together and survive reload', async () => {
   const harness = databaseHarness();
   const previousWindow = globalThis.window;
   globalThis.window = { indexedDB: harness.indexedDB, localStorage: { getItem: () => 'true' } };
   try {
     const { inferStampDieImageTags } = await import('./stamp-die-image-tags.js');
     const storage = await import('./storage.js?image-set-save');
-    const inferred = inferStampDieImageTags(catalog, ['stable-one'], ['stamp.jpg', 'die.jpg', 'mask.jpg']);
+    await storage.saveGlobalTagCatalog(configuredCatalog);
+    const inferred = inferStampDieImageTags(configuredCatalog, ['stable-one'], ['stamp.jpg', 'die.jpg', 'mask.jpg']);
     const refs = [
       { imageName: 'stamp.jpg', imagePath: 'stamp.jpg', imageLibrary: 'stamp-die-images', thumbnailImagePath: 'stamp.thumb.jpg', imageStorageStrategy: 'local-folder' },
       { imageName: 'die.jpg', imageSrc: 'data:image/jpeg;base64,ZnVsbA==', thumbnailImageSrc: 'data:image/jpeg;base64,dGh1bWI=', imageStorageStrategy: 'embedded-indexed-db' }
@@ -292,14 +300,12 @@ test('image references and inferred ordinary tags commit together and survive re
     assert.deepEqual(reloaded.imageRefs, refs);
     assert.deepEqual(reloaded.tagIds, inferred.tagIds);
     const savedCatalog = await nextSession.loadGlobalTagCatalog();
-    assert.equal(savedCatalog.tags.length, 4);
-    assert.ok(savedCatalog.tags.some((tag) => tag.name === 'Stamp'));
-    assert.ok(savedCatalog.tags.some((tag) => tag.name === 'Die'));
-    assert.ok(savedCatalog.tags.some((tag) => tag.name === 'Mask'));
+    assert.deepEqual(savedCatalog, configuredCatalog);
+    assert.deepEqual(reloaded.tagIds, ['stable-one', 'tool-stamp', 'tool-die', 'tool-mask']);
   } finally { globalThis.window = previousWindow; }
 });
 
-test('failed Set transaction leaves both image references and inferred global tags unpersisted', async () => {
+test('failed Set transaction leaves image references and Tool Tag assignments unpersisted', async () => {
   const harness = databaseHarness();
   const previousWindow = globalThis.window;
   globalThis.window = { indexedDB: harness.indexedDB, localStorage: { getItem: () => 'true' } };
@@ -307,12 +313,13 @@ test('failed Set transaction leaves both image references and inferred global ta
     const { inferStampDieImageTags } = await import('./stamp-die-image-tags.js');
     const storage = await import('./storage.js?image-set-abort');
     await storage.loadSavedStampDieSets();
+    await storage.saveGlobalTagCatalog(configuredCatalog);
     const before = structuredClone(harness.stores);
-    const inferred = inferStampDieImageTags(catalog, [], ['stamp.jpg']);
+    const inferred = inferStampDieImageTags(configuredCatalog, [], ['stamp.jpg']);
     harness.failNextCommit();
     await assert.rejects(storage.saveStampDieSet({ ...setRecord(), tagIds: inferred.tagIds, imageRefs: [{ imageSrc: 'data:image/jpeg;base64,ZnVsbA==' }] }, { inferredTags: inferred.inferredTags }));
     assert.deepEqual(harness.stores, before);
-    assert.deepEqual(await storage.loadGlobalTagCatalog(), upgradedCatalog);
+    assert.deepEqual(await storage.loadGlobalTagCatalog(), configuredCatalog);
   } finally { globalThis.window = previousWindow; }
 });
 

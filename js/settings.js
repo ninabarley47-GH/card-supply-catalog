@@ -161,7 +161,7 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
   let cards = await loadSavedCards().catch(() => []);
   let stampSets = await loadSavedStampDieSets();
   const tagAddGroups = [
-    { type: "tool", form: root.querySelector("[data-tool-tag-add-form]"), input: root.querySelector("[data-tool-tag-add-input]"), list: root.querySelector("[data-tool-tag-list]"), trigger: root.querySelector("[data-tool-tag-add-open]"), cancel: root.querySelector("[data-tool-tag-add-cancel]") },
+    { type: "tool", form: root.querySelector("[data-tool-tag-add-form]"), input: root.querySelector("[data-tool-tag-add-input]"), termsInput: root.querySelector("[data-tool-tag-terms-input]"), list: root.querySelector("[data-tool-tag-list]"), trigger: root.querySelector("[data-tool-tag-add-open]"), cancel: root.querySelector("[data-tool-tag-add-cancel]") },
     { type: "theme", form: root.querySelector("[data-theme-tag-add-form]"), input: root.querySelector("[data-theme-tag-add-input]"), list: root.querySelector("[data-theme-tag-list]"), trigger: root.querySelector("[data-theme-tag-add-open]"), cancel: root.querySelector("[data-theme-tag-add-cancel]") }
   ];
   const message = root.querySelector("[data-tag-message]");
@@ -241,10 +241,12 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
         if (!result.ok) { announce("That category relationship could not be removed.", "error"); return false; }
         return persistCatalogMutation(result, `Removed “${tag.name}” from “${category.name}”.`);
       },
-      onSave: async (name) => {
-        const result = editGlobalTag(catalog, tag.id, { name });
+      onSave: async (name, terms) => {
+        const result = editGlobalTag(catalog, tag.id, { name, ...(tag.type === "tool" ? { filenameTerms: terms } : {}) });
         if (!result.ok) {
-          announce(result.reason === "duplicate" ? `That name already belongs to “${result.existingTag.name}”.` : "Enter a unique tag name.", "error");
+          announce(result.reason === "duplicate" ? `That name already belongs to “${result.existingTag.name}”.`
+            : result.reason === "duplicate-filename-term" ? `Filename term “${result.term}” is already assigned to Tool Tag “${result.conflictingTag.name}”.`
+            : "Enter a unique tag name.", "error");
           return false;
         }
         try {
@@ -300,6 +302,7 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
     });
     group.cancel.addEventListener("click", () => {
       group.input.value = "";
+      if (group.termsInput) group.termsInput.value = "";
       announce("");
       toggleAddForm(group.form, group.trigger, false);
     });
@@ -321,17 +324,22 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
   for (const group of tagAddGroups) {
     group.form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      let result = addGlobalTag(catalog, { name: group.input.value, type: group.type });
+      const filenameTerms = group.type === "tool" ? parseFilenameTerms(group.termsInput.value) : undefined;
+      let result = addGlobalTag(catalog, { name: group.input.value, type: group.type, ...(filenameTerms ? { filenameTerms } : {}) });
+      if (!result.ok && result.reason === "duplicate-filename-term") {
+        announce(`Filename term “${result.term}” is already assigned to Tool Tag “${result.conflictingTag.name}”.`, "error"); return;
+      }
       if (!result.ok && result.reason === "duplicate") { announce(`That tag already exists as “${result.existingTag.name}”.`, "error"); return; }
       if (!result.ok && result.reason === "fuzzy") {
         if (!window.confirm(`Possible duplicate${result.fuzzyCandidates.length === 1 ? "" : "s"}: ${result.fuzzyCandidates.join(", ")}. Create a distinct tag anyway?`)) { announce("The possible duplicate was not created.", ""); return; }
-        result = addGlobalTag(catalog, { name: group.input.value, type: group.type, allowFuzzy: true });
+        result = addGlobalTag(catalog, { name: group.input.value, type: group.type, ...(filenameTerms ? { filenameTerms } : {}), allowFuzzy: true });
       }
       if (!result.ok) { announce("Enter a unique tag name.", "error"); return; }
       try {
         await saveGlobalTagCatalog(result.catalog);
         catalog = result.catalog;
         group.input.value = "";
+        if (group.termsInput) group.termsInput.value = "";
         toggleAddForm(group.form, group.trigger, false);
         render();
         dispatchGlobalTagUpdates();
@@ -522,6 +530,7 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
   const relationships = document.createElement("div");
   const input = document.createElement("input");
   const editor = document.createElement("div");
+  const filenameTermsInput = tag.type === "tool" ? document.createElement("textarea") : null;
   const save = document.createElement("button");
   const cancel = document.createElement("button");
   const edit = document.createElement("button");
@@ -583,12 +592,19 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
     empty.textContent = "Create a category above to organize this tag.";
     relationships.append(empty);
   }
-  display.append(label, details, relationships);
+  display.append(label, details);
+  display.append(relationships);
   input.value = tag.name;
   input.setAttribute("aria-label", `Tag name for ${tag.name}`);
   input.className = "tag-settings-name-input";
-  editor.className = "global-tag-editor";
+  editor.className = `global-tag-editor${filenameTermsInput ? " tool-tag-editor" : ""}`;
   editor.hidden = true;
+  if (filenameTermsInput) {
+    filenameTermsInput.className = "tag-settings-filename-terms";
+    filenameTermsInput.rows = 2;
+    filenameTermsInput.setAttribute("aria-label", `Filename matching terms for ${tag.name}, comma or line separated`);
+    filenameTermsInput.placeholder = "Filename matching terms (comma or line separated)";
+  }
   save.className = cancel.className = edit.className = "button button-compact";
   save.type = cancel.type = edit.type = remove.type = "button";
   save.textContent = "Save";
@@ -601,6 +617,7 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
   remove.setAttribute("aria-label", `Delete ${tag.name}`);
   remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6"/></svg>';
   const beginEditing = () => {
+    if (filenameTermsInput) filenameTermsInput.value = (tag.filenameTerms || []).join(", ");
     display.hidden = true;
     edit.hidden = true;
     editor.hidden = false;
@@ -609,6 +626,7 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
   };
   const cancelEditing = () => {
     input.value = tag.name;
+    if (filenameTermsInput) filenameTermsInput.value = (tag.filenameTerms || []).join(", ");
     editor.hidden = true;
     display.hidden = false;
     edit.hidden = false;
@@ -616,12 +634,16 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
   edit.addEventListener("click", beginEditing);
   cancel.addEventListener("click", cancelEditing);
   save.addEventListener("click", async () => {
-    if (await onSave(input.value)) cancelEditing();
+    if (await onSave(input.value, filenameTermsInput ? parseFilenameTerms(filenameTermsInput.value) : undefined)) cancelEditing();
   });
   remove.addEventListener("click", onDelete);
-  editor.append(input, save, cancel);
+  editor.append(input, ...(filenameTermsInput ? [filenameTermsInput] : []), save, cancel);
   row.append(display, editor, edit, remove);
   return row;
+}
+
+function parseFilenameTerms(value) {
+  return String(value || "").split(/[\n,]/).map((term) => term.trim().replace(/\s+/g, " ")).filter(Boolean);
 }
 
 export async function initializeExportLibrarySettings(services = {}) {

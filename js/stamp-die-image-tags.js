@@ -1,6 +1,12 @@
-import { validateItemTagAssignments } from './global-tag-catalog.js';
-import { addGlobalTag } from './global-tag-management.js';
-import { getTagKey } from './tag-utils.js';
+import { validateItemTagAssignments, getGlobalTagNameKey } from './global-tag-catalog.js';
+
+const BUILT_IN_TOOL_CUES = Object.freeze({
+  stamp: ['stamp'],
+  die: ['die'],
+  punch: ['punch'],
+  mask: ['mask'],
+  texture: ['texture']
+});
 
 export function getStampDieImageType(filename) {
   return /die/i.test(filename) ? 'Die' : /punch/i.test(filename) ? 'Punch' : /mask/i.test(filename) ? 'Mask' : 'Stamp';
@@ -8,47 +14,109 @@ export function getStampDieImageType(filename) {
 
 // Stable presentation ordering; classification is derived, never persisted.
 export function orderStampDieImages(images) {
-  const rank = { Stamp: 0, Die: 1, Punch: 2, Mask: 3 };
+  const rank = { Stamp: 0, Die: 1, Punch: 2, Mask: 3, Texture: 4 };
   return [...images].sort((a, b) => rank[getStampDieImageType(a.name || a.imageName || a.imagePath?.split('/').pop() || '')]
     - rank[getStampDieImageType(b.name || b.imageName || b.imagePath?.split('/').pop() || '')]);
 }
 
 // Runs only for newly selected filenames, never for save, removal, or reload.
+// Inference only assigns existing Tool Tag IDs; it never creates catalog entries.
 export function inferStampDieImageTags(catalog, tagIds, filenames) {
   if (!validateItemTagAssignments({ catalog, productType: 'stamp', tagIds }).ok) throw new TypeError('Invalid image inference assignments.');
-  let nextCatalog = catalog;
   const selected = new Set(tagIds);
-  const inferredTags = [];
-  for (const name of new Set(filenames.map(getStampDieImageType))) {
-    let tag = nextCatalog.tags.find((entry) => getTagKey(entry.name) === getTagKey(name));
-    if (!tag) {
-      const added = addGlobalTag(nextCatalog, { name, allowFuzzy: true });
-      if (!added.ok) throw new TypeError('The inferred tag could not be created.');
-      nextCatalog = added.catalog;
-      tag = added.tag;
+  const warnings = [];
+  const matchedTags = new Map();
+  for (const filename of new Set(filenames)) {
+    const result = matchToolFilename(catalog, filename);
+    if (result.missingBuiltIns.length) {
+      warnings.push(`${filename}: missing Tool Tag configuration for ${result.missingBuiltIns.join(', ')}.`);
+      continue;
     }
-    selected.add(tag.id);
-    inferredTags.push(tag);
+    if (result.matches.length > 1) {
+      warnings.push(`${filename}: matches multiple Tool Tags (${result.matches.map((tag) => tag.name).join(', ')}); no tag was assigned.`);
+      continue;
+    }
+    if (result.matches.length === 1) {
+      selected.add(result.matches[0].id);
+      matchedTags.set(result.matches[0].id, result.matches[0]);
+      continue;
+    }
+    const stampFallback = catalog.tags.find((tag) => tag.type === 'tool' && tag.unmatchedFilenameFallback === true);
+    if (result.recognizedBuiltIns.some((name) => name !== 'stamp') || (result.recognizedBuiltIns.includes('stamp') && !stampFallback)) {
+      warnings.push(`${filename}: no configured Tool Tag matches this filename.`);
+      continue;
+    }
+    if (stampFallback) { selected.add(stampFallback.id); matchedTags.set(stampFallback.id, stampFallback); }
+    else warnings.push(`${filename}: no Stamp Tool Tag is configured, so no tag was assigned.`);
   }
-  return { catalog: nextCatalog, tagIds: [...selected], inferredTags };
+  return { catalog, tagIds: [...selected], inferredTags: [], matchedTags: [...matchedTags.values()], warnings };
 }
 
-// Reconcile only selected, not-yet-persisted inference tags into the current catalog.
-// A manual removal stays removed. A concurrent exact-name creation reuses its ID.
-export function reconcileStampDieImageTags(record, catalog, inferredTags = []) {
-  let nextCatalog = catalog;
-  const remaps = new Map();
-  for (const tag of inferredTags) {
-    if (!record.tagIds.includes(tag.id) || nextCatalog.tags.some((entry) => entry.id === tag.id)) continue;
-    if (!['stamp', 'die', 'punch', 'mask'].includes(getTagKey(tag.name))) throw new TypeError('Invalid image inference tag.');
-    let current = nextCatalog.tags.find((entry) => getTagKey(entry.name) === getTagKey(tag.name));
-    if (!current) {
-      const added = addGlobalTag(nextCatalog, { name: tag.name, allowFuzzy: true, idFactory: () => tag.id });
-      if (!added.ok) throw new TypeError('The inferred tag could not be saved.');
-      nextCatalog = added.catalog;
-      current = added.tag;
-    }
-    remaps.set(tag.id, current.id);
+function matchToolFilename(catalog, filename) {
+  const words = tokenize(filename);
+  const matches = [];
+  for (const tag of catalog.tags.filter((entry) => entry.type === 'tool')) {
+    if ((tag.filenameTerms || []).some((term) => containsTerm(words, term))) matches.push(tag);
   }
-  return { catalog: nextCatalog, record: { ...record, tagIds: [...new Set(record.tagIds.map((id) => remaps.get(id) || id))] } };
+  const recognizedBuiltIns = Object.entries(BUILT_IN_TOOL_CUES)
+    .filter(([, terms]) => terms.some((term) => containsTerm(words, term)))
+    .map(([name]) => name);
+  const missingBuiltIns = recognizedBuiltIns.filter((name) => {
+    const configuredNameTag = catalog.tags.find((tag) => tag.type === 'tool' && getGlobalTagNameKey(tag.name) === name);
+    const configuredCueMatch = matches.some((tag) => tag.filenameTerms.some((term) =>
+      termsForBuiltInCue(name).some((cue) => containsTerm(tokenize(term), cue))));
+    const stampFallback = name === 'stamp' && catalog.tags.some((tag) => tag.type === 'tool' && tag.unmatchedFilenameFallback === true);
+    return !configuredNameTag && !configuredCueMatch && !stampFallback;
+  }).map(capitalize);
+  return { matches, recognizedBuiltIns, missingBuiltIns };
+}
+
+function termsForBuiltInCue(name) {
+  return BUILT_IN_TOOL_CUES[name] || [];
+}
+
+function containsTerm(words, term) {
+  const termWords = tokenize(term);
+  if (!termWords.length) return false;
+  const last = termWords.at(-1);
+  const variants = new Set([last, ...pluralVariants(last), ...singularVariants(last)]);
+  for (let start = 0; start <= words.length - termWords.length; start += 1) {
+    if (termWords.slice(0, -1).every((word, offset) => words[start + offset] === word) &&
+        variants.has(words[start + termWords.length - 1])) return true;
+  }
+  return false;
+}
+
+function tokenize(value) {
+  const normalized = String(value || '').normalize('NFKC').toLocaleLowerCase();
+  return normalized.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+function pluralVariants(word) {
+  if (word.endsWith('ss')) return [`${word}es`];
+  if (word.endsWith('s')) return [];
+  if (/[sxz]$|ch$|sh$/.test(word)) return [`${word}es`];
+  if (/[^aeiou]y$/.test(word)) return [`${word.slice(0, -1)}ies`];
+  return [`${word}s`];
+}
+
+function singularVariants(word) {
+  if (word === 'dies') return ['die'];
+  if (word.endsWith('sses') && word.length > 4) return [word.slice(0, -2)];
+  if (word.endsWith('ies') && word.length > 3) return [word.slice(0, -3) + 'y'];
+  if (/(ches|shes|xes|zes)$/.test(word) && word.length > 2) return [word.slice(0, -2)];
+  if (word.endsWith('s') && !word.endsWith('ss') && word.length > 2) return [word.slice(0, -1)];
+  return [];
+}
+
+function capitalize(value) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+// Pending draft compatibility: retain assigned IDs only when they still exist
+// in the current catalog. Never recreate a Tool Tag during reconciliation.
+export function reconcileStampDieImageTags(record, catalog, inferredTags = []) {
+  const pendingIds = new Set(inferredTags.map((tag) => tag.id));
+  const currentIds = new Set(catalog.tags.map((tag) => tag.id));
+  return { catalog, record: { ...record, tagIds: [...new Set(record.tagIds || [])].filter((id) => !pendingIds.has(id) || currentIds.has(id)) } };
 }

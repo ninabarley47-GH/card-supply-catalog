@@ -527,7 +527,11 @@ export async function initializeStampDieLibrary(services = {}) {
       renderFormToolTypes(inferred.tagIds, catalog);
       draftImages.push(...images);
       renderDraftImages();
-      view.imageMessage.textContent = 'Stamp/Die/Mask tags added from filenames. You can change them below.';
+      const messages = [];
+      if (inferred.matchedTags.length) messages.push(`Tool Tags matched from filenames: ${inferred.matchedTags.map((tag) => tag.name).join(', ')}.`);
+      messages.push(...inferred.warnings);
+      view.imageMessage.textContent = messages.join(' ');
+      view.imageMessage.dataset.tone = '';
     } catch (error) {
       if (currentDraft !== draftSession) return;
       view.imageMessage.textContent = error?.name === 'AbortError' ? '' : 'Images could not be selected. Choose JPEG, PNG, WebP, or GIF files and try again.';

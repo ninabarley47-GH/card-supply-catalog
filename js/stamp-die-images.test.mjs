@@ -170,12 +170,12 @@ test('folder hydration provides transient thumbnail/full sources and releases th
   assert.deepEqual(h.writes, []);
 });
 
-const catalog = () => ({ schemaVersion: 1, tags: [
-  { id: 'manual', name: 'Floral', categoryIds: [] },
-  { id: 'stamp-id', name: 'Stamp', categoryIds: ['supplies'], appliesTo: ['paper'] },
-  { id: 'die-id', name: 'Die', categoryIds: ['supplies'], appliesTo: ['card'] },
-  { id: 'punch-id', name: 'Punch', categoryIds: ['supplies'], appliesTo: ['stamp'] },
-  { id: 'mask-id', name: 'Mask', categoryIds: ['supplies'], appliesTo: ['paper'] }
+const catalog = () => ({ schemaVersion: 2, tags: [
+  { id: 'manual', name: 'Floral', type: 'theme', categoryIds: [] },
+  { id: 'stamp-id', name: 'Stamp', type: 'tool', filenameTerms: [], unmatchedFilenameFallback: true, categoryIds: ['supplies'] },
+  { id: 'die-id', name: 'Die', type: 'tool', filenameTerms: ['die'], categoryIds: ['supplies'] },
+  { id: 'punch-id', name: 'Punch', type: 'tool', filenameTerms: ['punch'], categoryIds: ['supplies'] },
+  { id: 'mask-id', name: 'Mask', type: 'tool', filenameTerms: ['mask'], categoryIds: ['supplies'] }
 ], categories: [{ id: 'supplies', name: 'Supplies' }] });
 
 for (const [filename, expected] of [['die.jpg', 'die-id'], ['DIES.JPG', 'die-id'], ['Punch.jpg', 'punch-id'], ['PUNCH.JPG', 'punch-id'], ['Stamp.jpg', 'stamp-id']]) {
@@ -191,18 +191,17 @@ test('mixed inference adds both tags, preserves manual/existing assignments, and
   assert.deepEqual(inferStampDieImageTags(result.catalog, result.tagIds, []).tagIds, result.tagIds);
 });
 
-test('missing Stamp/Die tags stay in memory until selected assignments are reconciled for save', () => {
-  const original = { schemaVersion: 1, tags: [], categories: [] };
+test('missing Tool Tags are reported and never created during inference', () => {
+  const original = { schemaVersion: 2, tags: [], categories: [] };
   const inferred = inferStampDieImageTags(original, [], ['stamp.jpg', 'die.jpg']);
   assert.equal(original.tags.length, 0);
+  assert.deepEqual(inferred.tagIds, []);
+  assert.equal(inferred.warnings.length, 2);
   const removedManually = reconcileStampDieImageTags({ tagIds: [] }, original, inferred.inferredTags);
   assert.equal(removedManually.catalog.tags.length, 0);
   assert.deepEqual(removedManually.record.tagIds, []);
-  const current = { ...original, tags: [{ id: 'existing-stamp', name: 'Stamp', categoryIds: [] }] };
-  const saved = reconcileStampDieImageTags({ tagIds: inferred.tagIds }, current, inferred.inferredTags);
-  assert.equal(saved.catalog.tags.length, 2);
-  assert.equal(saved.record.tagIds[0], 'existing-stamp');
-  assert.equal(saved.catalog.tags.find((tag) => tag.id === saved.record.tagIds[1]).name, 'Die');
+  const saved = reconcileStampDieImageTags({ tagIds: ['manual', 'manual'] }, original, []);
+  assert.deepEqual(saved.record.tagIds, ['manual']);
 });
 
 test('Cards continue using the shared folder implementation with the Card library marker', async () => {
@@ -239,12 +238,13 @@ for (const [filename, expected] of [
   ['Frosted Pines Masks.jpg', 'mask-id'],
   ['Frosted Pines MASK.JPG', 'mask-id'],
   ['Frosted Pines mAsKs.jpg', 'mask-id'],
-  ['Frosted Pines Dies Masks.jpg', 'die-id'],
-  ['Frosted Pines MASKS dIeS.jpg', 'die-id']
+  ['Frosted Pines Dies Masks.jpg', null],
+  ['Frosted Pines MASKS dIeS.jpg', null]
 ]) {
-  test(`filename inference: ${filename} selects only ${expected}`, () => {
+  test(`filename inference: ${filename} ${expected ? `selects ${expected}` : 'reports ambiguity'}`, () => {
     const result = inferStampDieImageTags(catalog(), ['manual'], [filename]);
-    assert.deepEqual(result.tagIds, ['manual', expected]);
+    assert.deepEqual(result.tagIds, expected ? ['manual', expected] : ['manual']);
+    if (!expected) assert.match(result.warnings[0], /matches multiple Tool Tags/);
     assert.equal(result.tagIds.includes('supplies'), false);
   });
 }
@@ -256,21 +256,60 @@ test('mixed Stamp/Die/Punch/Mask inference preserves all existing and manual tag
   assert.deepEqual(inferStampDieImageTags(mixed.catalog, mixed.tagIds, []).tagIds, mixed.tagIds);
 });
 
-test('missing Mask is an ordinary draft global tag; reconciliation respects manual removal and existing identity', () => {
-  const original = { schemaVersion: 1, tags: [], categories: [] };
+test('missing Mask is reported without creating a global tag', () => {
+  const original = { schemaVersion: 2, tags: [], categories: [] };
   const inferred = inferStampDieImageTags(original, [], ['Frosted Pines Masks.jpg']);
   assert.deepEqual(original.tags, []);
-  assert.equal(inferred.catalog.tags[0].name, 'Mask');
+  assert.deepEqual(inferred.tagIds, []);
+  assert.match(inferred.warnings[0], /Mask/);
   const saved = reconcileStampDieImageTags({ tagIds: inferred.tagIds }, original, inferred.inferredTags);
-  assert.equal(saved.catalog.tags[0].name, 'Mask');
-  assert.deepEqual(saved.record.tagIds, inferred.tagIds);
-  const removed = reconcileStampDieImageTags({ tagIds: [] }, original, inferred.inferredTags);
-  assert.deepEqual(removed.catalog.tags, []);
-  assert.deepEqual(removed.record.tagIds, []);
-  const current = { ...original, tags: [{ id: 'existing-mask', name: 'Mask', categoryIds: [] }] };
-  const reconciled = reconcileStampDieImageTags({ tagIds: inferred.tagIds }, current, inferred.inferredTags);
-  assert.deepEqual(reconciled.record.tagIds, ['existing-mask']);
-  assert.equal(reconciled.catalog.tags.length, 1);
+  assert.deepEqual(saved.catalog.tags, []);
+  assert.deepEqual(saved.record.tagIds, []);
+});
+
+test('terms are case and separator insensitive, respect word boundaries, and support singular/plural', () => {
+  const configured = catalog();
+  const result = inferStampDieImageTags(configured, [], ['set_dIeS-v2.jpg', 'the-diesel-engine.jpg']);
+  assert.deepEqual(result.tagIds, ['die-id', 'stamp-id']);
+  assert.equal(result.catalog, configured);
+  const pluralConfigured = structuredClone(configured);
+  pluralConfigured.tags.find((tag) => tag.id === 'die-id').filenameTerms = ['DIES'];
+  assert.deepEqual(inferStampDieImageTags(pluralConfigured, [], ['die tool.jpg']).tagIds, ['die-id']);
+});
+
+test('one set can infer multiple tools across separate filenames without duplicate IDs', () => {
+  const result = inferStampDieImageTags(catalog(), ['manual', 'die-id'], ['Die set.jpg', 'Masks set.jpg', 'Punches set.jpg']);
+  assert.deepEqual(result.tagIds, ['manual', 'die-id', 'mask-id', 'punch-id']);
+});
+
+test('custom filename terms select renamed Tool Tags while Theme Tags remain inactive', () => {
+  const source = catalog();
+  source.tags.find((tag) => tag.id === 'die-id').name = 'Cutting Tool';
+  const result = inferStampDieImageTags(source, [], ['Dies.jpg']);
+  assert.deepEqual(result.tagIds, ['die-id']);
+  const themeOnly = { schemaVersion: 2, tags: [{ id: 'theme-die', name: 'Die', type: 'theme', categoryIds: [] }], categories: [] };
+  const ignoredTheme = inferStampDieImageTags(themeOnly, [], ['Dies.jpg']);
+  assert.deepEqual(ignoredTheme.tagIds, []);
+  assert.match(ignoredTheme.warnings[0], /Die/);
+});
+
+test('Stamp fallback applies only to unmatched names and missing Stamp is reported', () => {
+  const source = catalog();
+  assert.deepEqual(inferStampDieImageTags(source, [], ['Unknown design.jpg']).tagIds, ['stamp-id']);
+  source.tags.find((tag) => tag.id === 'stamp-id').name = 'Unmatched Design Tool';
+  assert.deepEqual(inferStampDieImageTags(source, [], ['Another unknown design.jpg']).tagIds, ['stamp-id']);
+
+  const unrelatedTool = { schemaVersion: 2, tags: [
+    { id: 'tool', name: 'Other Tool', type: 'tool', filenameTerms: [], categoryIds: [] }
+  ], categories: [] };
+  const noFallback = inferStampDieImageTags(unrelatedTool, [], ['Unknown design.jpg']);
+  assert.deepEqual(noFallback.tagIds, []);
+  assert.match(noFallback.warnings[0], /no Stamp Tool Tag/);
+
+  source.tags = source.tags.filter((tag) => tag.id !== 'stamp-id');
+  const result = inferStampDieImageTags(source, [], ['Unknown design.jpg']);
+  assert.deepEqual(result.tagIds, []);
+  assert.match(result.warnings[0], /no Stamp Tool Tag/);
 });
 
 test('presentation sorting is stable within Stamp, Die, Punch and Mask and never mutates stored input', () => {
@@ -331,8 +370,8 @@ test('automatic Set folder lookup reuses Paper matching, excludes thumbnails, an
     assert.ok(image.file instanceof File);
     assert.ok(image.previewSrc);
   }
-  const inferred = inferStampDieImageTags({ schemaVersion: 1, tags: [], categories: [] }, [], images.map(image => image.name));
-  assert.deepEqual(inferred.catalog.tags.map(tag => tag.name).sort(), ['Die', 'Mask', 'Stamp']);
+  const inferred = inferStampDieImageTags(catalog(), [], images.map(image => image.name));
+  assert.deepEqual(inferred.tagIds, ['die-id', 'mask-id', 'stamp-id']);
   assert.deepEqual(await loadStampImagesForSetName('Missing', { ...environment(), showDirectoryPicker() {} }, { loadDirectory: async () => root }), []);
 });
 

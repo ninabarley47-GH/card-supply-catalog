@@ -125,6 +125,30 @@ test("schema 1 backup catalogs upgrade in memory and preserve assignments and ca
   assert.deepEqual(backup, before);
 });
 
+test("schema 2 backup normalization backfills only absent Stamp fallback and preserves data", () => {
+  const imported = {
+    schemaVersion: 2,
+    categories: [{ id: "cat", name: "Nature" }],
+    tags: [
+      { id: "stamp", name: "Stamp", type: "tool", filenameTerms: ["rubber stamp"], categoryIds: ["cat"] },
+      { id: "stamp-false", name: "Stamp (manual)", type: "tool", filenameTerms: [], categoryIds: [], unmatchedFilenameFallback: false },
+      { id: "theme", name: "Floral", type: "theme", categoryIds: ["cat"] }
+    ]
+  };
+  const backup = modern(imported, [paper("p", ["stamp"])], [card("c", ["theme"]) ]);
+  const before = structuredClone(backup);
+  const result = reconcileBackupTagData({ localCatalog: createEmptyGlobalTagCatalog(), backup });
+  assert.equal(result.ok, true);
+  assert.equal(result.catalog.tags.find(({ id }) => id === "stamp").unmatchedFilenameFallback, true);
+  assert.equal(result.catalog.tags.find(({ id }) => id === "stamp-false").unmatchedFilenameFallback, false);
+  assert.equal("unmatchedFilenameFallback" in result.catalog.tags.find(({ id }) => id === "theme"), false);
+  assert.deepEqual(result.catalog.tags.map(({ id, categoryIds, filenameTerms }) => ({ id, categoryIds, filenameTerms })),
+    before.tagCatalog.tags.map(({ id, categoryIds, filenameTerms }) => ({ id, categoryIds, filenameTerms })));
+  assert.deepEqual(result.paperPacks[0].tagIds, ["stamp"]);
+  assert.deepEqual(result.cards[0].tagIds, ["theme"]);
+  assert.deepEqual(backup, before);
+});
+
 test("cross-product assignments are accepted while mixed records are rejected", () => {
   const result = reconcileBackupTagData({
     localCatalog: createEmptyGlobalTagCatalog(),
