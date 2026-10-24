@@ -644,7 +644,12 @@ test('main Library navigation keeps its labels and targets in Paper, Stamp, Card
   const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   const links = [...html.matchAll(/<a[^>]*href="(#[^"]+)"[^>]*data-nav-link>([^<]+)<\/a>/g)];
   assert.deepEqual(links.map(match => match[1]), ['#library', '#stamps-dies', '#cards', '#color-library', '#settings']);
-  assert.deepEqual(links.map(match => match[2]), ['Paper Library', 'Stamps &amp; Dies', 'Card Library', 'Color Library', 'Settings']);
+  assert.deepEqual(links.map(match => match[2]), ['Paper Library', 'Stamp Sets', 'Card Library', 'Color Library', 'Settings']);
+});
+
+test('Stamp Set catalog heading uses Stamp Sets terminology', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /<h2 id="stamps-dies-title">Stamp Sets<\/h2>/);
 });
 
 test('Recently Added survives Set normalization while legacy Sets remain unmarked', () => {
