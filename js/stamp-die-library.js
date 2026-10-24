@@ -20,7 +20,7 @@ import { normalizeStampDieSet } from './stamp-die-sets.js';
 import { getLocalDateValue } from './ui.js';
 import { getProductNameKey, getTagKey } from './tag-utils.js';
 import { attachUncatalogedLibraryFinder, findUncatalogedStampItems, normalizeUncatalogedPath } from './uncataloged-library.js';
-import { partitionStampDieTagIds } from './stamp-die-tags.js';
+import { getStampDieTagCategory, partitionStampDieTagIds } from './stamp-die-tags.js';
 
 const LAST_OWNER_SETTING = 'addStampDieLastOwnerId';
 
@@ -872,7 +872,13 @@ function createSetTagDetailSection(label, tagIds, catalog, emptyText) {
     const tags = document.createElement('ul');
     tags.className = 'card-detail-chips';
     tags.setAttribute('aria-label', label);
-    tags.append(...names.map((name) => Object.assign(document.createElement('li'), { textContent: name })));
+    tags.append(...names.map((name, index) => {
+      const chip = document.createElement('li');
+      chip.textContent = name;
+      const category = getStampDieTagCategory(catalog.tags.find((tag) => tag.id === tagIds[index]), catalog);
+      if (category) chip.classList.add(`stamp-tag-${category}`);
+      return chip;
+    }));
     section.append(tags);
   } else {
     const empty = document.createElement('p');
@@ -932,9 +938,11 @@ export function renderStampDieLibrary(gallery, records, catalog, onEdit, onDetai
       const tags = document.createElement('ul');
       tags.className = 'keyword-list';
       tags.setAttribute('aria-label', 'Tags');
-      for (const text of names) {
+      for (let index = 0; index < names.length; index += 1) {
         const tag = document.createElement('li');
-        tag.textContent = text;
+        tag.textContent = names[index];
+        const category = getStampDieTagCategory(catalog.tags.find((entry) => entry.id === record.tagIds[index]), catalog);
+        if (category) tag.classList.add(`stamp-tag-${category}`);
         tags.append(tag);
       }
       content.append(tags);

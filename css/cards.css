@@ -693,6 +693,22 @@
   font-weight: 650;
 }
 
+/* Stamp Set tags use the shared catalog category, with the same treatment in
+   the compact library cards and the detail sections. */
+.keyword-list li.stamp-tag-theme,
+.card-detail-chips li.stamp-tag-theme {
+  border: 1px solid #e7d8c5;
+  background: #faf4ea;
+  color: #4a3b2c;
+}
+
+.keyword-list li.stamp-tag-tool,
+.card-detail-chips li.stamp-tag-tool {
+  border: 1px solid #a9c8b8;
+  background: #f0f7f2;
+  color: #294c3b;
+}
+
 .card-detail-relationship-metadata {
   padding: 0;
   border-top: 0;

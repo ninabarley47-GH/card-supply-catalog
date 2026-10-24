@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { initializeStampDieLibrary, createStampDieSetRecord, findCardsUsingStampDieSet } from './stamp-die-library.js';
 import { getLocalDateValue } from './ui.js';
-import { partitionStampDieTagIds } from './stamp-die-tags.js';
+import { getStampDieTagCategory, partitionStampDieTagIds } from './stamp-die-tags.js';
 
 const initialCatalog = () => ({
   schemaVersion: 1,
@@ -53,7 +53,13 @@ class Element {
   }
   dispatchEvent(event) { return this.emit(event.type, { target: event.target || this, detail: event.detail }); }
   remove() { this.parent.children = this.parent.children.filter((child) => child !== this); }
-  get classList() { return { toggle() {} }; }
+  get classList() {
+    return {
+      add: (...names) => { this.className = [...new Set(`${this.className} ${names.join(' ')}`.trim().split(/\s+/))].join(' '); },
+      contains: (name) => this.className.split(/\s+/).includes(name),
+      toggle() {}
+    };
+  }
   matches(selector) {
     for (const match of selector.matchAll(/:not\(([^)]+)\)/g)) if (this.matches(match[1])) return false;
     selector = selector.replace(/:not\([^)]+\)/g, '');
@@ -608,6 +614,45 @@ test('Stamp & Die tag presentation partitions normalized tool names and leaves u
     themeTagIds: ['theme', 'missing']
   });
   assert.deepEqual(partitionStampDieTagIds([], catalog), { toolTypeTagIds: [], themeTagIds: [] });
+});
+
+test('Stamp Set chips use assigned category styles in cards and Detail while keeping tag order', async (t) => {
+  const catalog = {
+    schemaVersion: 1,
+    categories: [
+      { id: 'tools', name: 'Tools' }, { id: 'themes', name: 'Themes' }, { id: 'other', name: 'Other' }
+    ],
+    tags: [
+      { id: 'theme-stamp', name: 'Stamp', categoryIds: ['themes'], appliesTo: ['stamp'] },
+      { id: 'tool-holiday', name: 'Christmas', categoryIds: ['tools'], appliesTo: ['stamp'] },
+      { id: 'other-tag', name: 'Other tag', categoryIds: ['other'], appliesTo: ['stamp'] },
+      { id: 'bare-tag', name: 'Bare tag', categoryIds: [], appliesTo: ['stamp'] }
+    ]
+  };
+  assert.equal(getStampDieTagCategory(catalog.tags[0], catalog), 'theme');
+  assert.equal(getStampDieTagCategory(catalog.tags[1], catalog), 'tool');
+  assert.equal(getStampDieTagCategory(catalog.tags[2], catalog), null);
+  assert.equal(getStampDieTagCategory(catalog.tags[3], catalog), null);
+
+  const h = await harness(t, { initialTagCatalog: catalog });
+  await seedEdit(h, { tagIds: catalog.tags.map((tag) => tag.id) });
+  const cardChips = h.gallery.querySelector('.keyword-list').querySelectorAll('li');
+  assert.deepEqual(cardChips.map((chip) => chip.textContent), ['Stamp', 'Christmas', 'Other tag', 'Bare tag']);
+  assert.deepEqual(cardChips.map((chip) => chip.className), [
+    'stamp-tag-theme', 'stamp-tag-tool', '', ''
+  ]);
+
+  await h.cancel.emit('click');
+  await h.gallery.querySelector('article').emit('click');
+  const detailChips = setDetail(h).querySelectorAll('.card-detail-chips').flatMap((list) => list.children);
+  assert.deepEqual(detailChips.map((chip) => chip.textContent), ['Stamp', 'Christmas', 'Other tag', 'Bare tag']);
+  assert.deepEqual(detailChips.map((chip) => chip.className), [
+    'stamp-tag-theme', 'stamp-tag-tool', '', ''
+  ]);
+
+  const css = await readFile(new URL('../css/cards.css', import.meta.url), 'utf8');
+  assert.match(css, /\.keyword-list li\.stamp-tag-theme,[\s\S]*?\.card-detail-chips li\.stamp-tag-theme\s*\{[^}]*background:\s*#faf4ea/i);
+  assert.match(css, /\.keyword-list li\.stamp-tag-tool,[\s\S]*?\.card-detail-chips li\.stamp-tag-tool\s*\{[^}]*background:\s*#f0f7f2/i);
 });
 
 test('Set Detail separates assigned Tool Type and Themes and shows concise empty states', async (t) => {
