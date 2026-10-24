@@ -616,55 +616,58 @@ async function seedEdit(h, overrides = {}) {
   await h.gallery.querySelector('button[aria-label="Edit Original"]').emit('click');
 }
 
-test('Stamp & Die tag presentation partitions normalized tool names and leaves unknown assignments as themes', () => {
+test('Stamp Set tag presentation follows explicit types and preserves built-in Tool order', () => {
   const catalog = { tags: [
-    ...['Stamp', 'Die', 'Punch', 'Texture', 'Mask'].map((name, index) => ({ id: `tool-${index}`, name: `  ${name.toUpperCase()}  ` })),
-    { id: 'theme', name: 'Christmas' }
+    ...['Stamp', 'Die', 'Punch', 'Texture', 'Mask'].map((name, index) => ({ id: `tool-${index}`, name: `  ${name.toUpperCase()}  `, type: 'tool' })),
+    { id: 'renamed-tool', name: 'Embossing', type: 'tool' },
+    { id: 'theme-die', name: 'Die', type: 'theme' },
+    { id: 'theme-stamp', name: 'Stamp', type: 'theme' },
+    { id: 'theme', name: 'Christmas', type: 'theme' }
   ] };
-  assert.deepEqual(partitionStampDieTagIds(['tool-0', 'tool-1', 'tool-2', 'tool-3', 'tool-4', 'theme', 'missing'], catalog), {
-    toolTypeTagIds: ['tool-0', 'tool-1', 'tool-2', 'tool-4', 'tool-3'],
-    themeTagIds: ['theme', 'missing']
+  assert.equal(getStampDieTagType(catalog.tags.find((tag) => tag.id === 'renamed-tool')), 'tool');
+  assert.equal(getStampDieTagType(catalog.tags.find((tag) => tag.id === 'theme-die')), 'theme');
+  assert.equal(getStampDieTagType(catalog.tags.find((tag) => tag.id === 'theme-stamp')), 'theme');
+  assert.deepEqual(partitionStampDieTagIds(['tool-0', 'tool-1', 'tool-2', 'tool-3', 'tool-4', 'renamed-tool', 'theme-die', 'theme-stamp', 'theme', 'missing'], catalog), {
+    toolTypeTagIds: ['tool-0', 'tool-1', 'tool-2', 'tool-4', 'tool-3', 'renamed-tool'],
+    themeTagIds: ['theme-die', 'theme-stamp', 'theme', 'missing']
   });
   assert.deepEqual(partitionStampDieTagIds([], catalog), { toolTypeTagIds: [], themeTagIds: [] });
 });
 
-test('Stamp Set chips style the five Tool Type tags green and all other tags warm in cards and Detail', async (t) => {
+test('Stamp Set cards and Detail style tags by explicit type, independent of familiar names', async (t) => {
   const catalog = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     categories: [
       { id: 'tools', name: 'Tools' }, { id: 'themes', name: 'Themes' }, { id: 'other', name: 'Other' }
     ],
     tags: [
-      { id: 'theme-stamp', name: 'Stamp', categoryIds: ['themes'], appliesTo: ['stamp'] },
-      { id: 'tool-holiday', name: 'Christmas', categoryIds: ['tools'], appliesTo: ['stamp'] },
-      { id: 'other-tag', name: 'Other tag', categoryIds: ['other'], appliesTo: ['stamp'] },
-      { id: 'bare-tag', name: 'Bare tag', categoryIds: [], appliesTo: ['stamp'] }
+      { id: 'tool-holiday', name: 'Christmas', type: 'tool', filenameTerms: [], categoryIds: ['tools'], appliesTo: ['stamp'] },
+      { id: 'theme-stamp', name: 'Stamp', type: 'theme', categoryIds: ['themes'], appliesTo: ['stamp'] },
+      { id: 'theme-die', name: 'Die', type: 'theme', categoryIds: ['themes'], appliesTo: ['stamp'] },
+      { id: 'other-tag', name: 'Other tag', type: 'theme', categoryIds: ['other'], appliesTo: ['stamp'] },
+      { id: 'bare-tag', name: 'Bare tag', type: 'theme', categoryIds: [], appliesTo: ['stamp'] }
     ]
   };
-  for (const name of ['Stamp', 'Die', 'Mask', 'Texture', 'Punch']) {
-    assert.equal(getStampDieTagType({ name }), 'tool');
-  }
-  assert.equal(getStampDieTagType(catalog.tags[0]), 'tool');
-  assert.equal(getStampDieTagType(catalog.tags[1]), 'theme');
-  assert.equal(getStampDieTagType(catalog.tags[2]), 'theme');
-  assert.equal(getStampDieTagType(catalog.tags[3]), 'theme');
+  assert.equal(getStampDieTagType({ name: 'Die', type: 'theme' }), 'theme');
+  assert.equal(getStampDieTagType({ name: 'Stamp', type: 'theme' }), 'theme');
+  assert.equal(getStampDieTagType({ name: 'Embossing', type: 'tool' }), 'tool');
 
   const h = await harness(t, { initialTagCatalog: catalog });
   await seedEdit(h, { tagIds: catalog.tags.map((tag) => tag.id) });
   const cardGroups = h.gallery.querySelectorAll('.stamp-set-tag-group');
   assert.deepEqual(cardGroups.map((group) => group.querySelector('h5').textContent), ['Tool Type', 'Themes']);
   const cardChips = cardGroups.flatMap((group) => group.querySelector('.keyword-list').children);
-  assert.deepEqual(cardChips.map((chip) => chip.textContent), ['Stamp', 'Christmas', 'Other tag', 'Bare tag']);
+  assert.deepEqual(cardChips.map((chip) => chip.textContent), ['Christmas', 'Stamp', 'Die', 'Other tag', 'Bare tag']);
   assert.deepEqual(cardChips.map((chip) => chip.className), [
-    'stamp-tag-tool', 'stamp-tag-theme', 'stamp-tag-theme', 'stamp-tag-theme'
+    'stamp-tag-tool', 'stamp-tag-theme', 'stamp-tag-theme', 'stamp-tag-theme', 'stamp-tag-theme'
   ]);
 
   await h.cancel.emit('click');
   await h.gallery.querySelector('article').emit('click');
   const detailChips = setDetail(h).querySelectorAll('.card-detail-chips').flatMap((list) => list.children);
-  assert.deepEqual(detailChips.map((chip) => chip.textContent), ['Stamp', 'Christmas', 'Other tag', 'Bare tag']);
+  assert.deepEqual(detailChips.map((chip) => chip.textContent), ['Christmas', 'Stamp', 'Die', 'Other tag', 'Bare tag']);
   assert.deepEqual(detailChips.map((chip) => chip.className), [
-    'stamp-tag-tool', 'stamp-tag-theme', 'stamp-tag-theme', 'stamp-tag-theme'
+    'stamp-tag-tool', 'stamp-tag-theme', 'stamp-tag-theme', 'stamp-tag-theme', 'stamp-tag-theme'
   ]);
 
   const css = await readFile(new URL('../css/cards.css', import.meta.url), 'utf8');
@@ -1222,8 +1225,10 @@ test('Set sidebar combines filters, clears tags independently, resets all, and n
 
 test('Tool Type filter offers recognized tags, combines with Themes, clears independently and resets with Clear All', async (t) => {
   const customCatalog = initialCatalog();
-  for (const [id, name] of [['stamp', 'Stamp'], ['die', 'Die'], ['punch', 'Punch'], ['texture', 'Texture'], ['mask', 'Mask'], ['christmas', 'Christmas']]) {
-    customCatalog.tags.push({ id, name, appliesTo: ['stamp'], categoryIds: [] });
+  customCatalog.schemaVersion = 2;
+  customCatalog.tags = customCatalog.tags.map((tag) => ({ ...tag, type: 'theme' }));
+  for (const [id, name, type] of [['stamp', 'Stamp', 'tool'], ['die', 'Cutting', 'tool'], ['punch', 'Punch', 'tool'], ['texture', 'Texture', 'tool'], ['mask', 'Mask', 'tool'], ['christmas', 'Christmas', 'theme'], ['theme-die', 'Die', 'theme'], ['custom-tool', 'Embossing', 'tool']]) {
+    customCatalog.tags.push({ id, name, type, ...(type === 'tool' ? { filenameTerms: [] } : {}), appliesTo: ['stamp'], categoryIds: [] });
   }
   const h = await harness(t, { initialTagCatalog: customCatalog });
   await seedEdit(h, { tagIds: ['die', 'christmas'] }); await h.cancel.emit('click');
@@ -1232,7 +1237,10 @@ test('Tool Type filter offers recognized tags, combines with Themes, clears inde
   await h.document.emit('catalog:global-tags-updated');
 
   const c = h.filterControls;
-  assert.deepEqual(c.toolTypeFilters.querySelectorAll('input[data-stamp-tool-type-id]').map((input) => input.dataset.stampToolTypeId), ['stamp', 'die', 'punch', 'texture', 'mask']);
+  assert.deepEqual(c.toolTypeFilters.querySelectorAll('input[data-stamp-tool-type-id]').map((input) => input.dataset.stampToolTypeId), ['stamp', 'die', 'punch', 'texture', 'mask', 'custom-tool']);
+  assert.equal(c.toolTypeFilters.querySelector('input[data-stamp-tool-type-id="theme-die"]'), null);
+  assert.equal(c.toolTypeFilters.querySelector('label').textContent, 'Stamp');
+  assert.equal(c.toolTypeFilters.querySelector('input[data-stamp-tool-type-id="die"]').parentElement.textContent, 'Cutting');
   assert.equal(h.gallery.querySelectorAll('article').length, 3); // No Tool Type selection keeps theme-only records visible.
 
   const theme = c.tagFilters.querySelector('input[data-global-tag-id="christmas"]');
@@ -1254,6 +1262,12 @@ test('Tool Type filter offers recognized tags, combines with Themes, clears inde
   assert.equal(theme.checked, false);
   assert.equal(c.clear.hidden, true);
   assert.equal(h.gallery.querySelectorAll('article').length, 3);
+
+  const christmasTag = h.catalog.tags.find((tag) => tag.id === 'christmas');
+  christmasTag.type = 'tool';
+  christmasTag.filenameTerms = [];
+  await h.document.emit('catalog:global-tags-updated');
+  assert.ok(c.toolTypeFilters.querySelector('input[data-stamp-tool-type-id="christmas"]'), 'type changes refresh Tool options even when ID and name stay the same');
 });
 
 test('Set category controls refine members, combine with owner, preserve renamed tags, and reset', async (t) => {

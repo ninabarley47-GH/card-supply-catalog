@@ -4,14 +4,14 @@ import { filterStampDieSets } from './stamp-die-filter.js';
 
 const owners = [{ id: 'n', name: 'Nina' }, { id: 'a', name: 'Amanda' }, { id: 'old', name: 'Retired Owner', archived: true }];
 const catalog = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   tags: [
-    { id: 's', name: 'Stamp', categoryIds: ['tools'], appliesTo: ['paper'] },
-    { id: 'd', name: 'Die', categoryIds: ['tools'], appliesTo: ['card'] },
-    { id: 'm', name: 'Mask', categoryIds: [] },
-    { id: 'f', name: 'Floral', categoryIds: ['nature'] },
-    { id: 't', name: 'Texture', categoryIds: [] },
-    { id: 'x', name: 'Christmas', categoryIds: ['holidays'] }
+    { id: 's', name: 'Stamp', type: 'tool', filenameTerms: [], categoryIds: ['tools'], appliesTo: ['paper'] },
+    { id: 'd', name: 'Die', type: 'tool', filenameTerms: ['die'], categoryIds: ['tools'], appliesTo: ['card'] },
+    { id: 'm', name: 'Mask', type: 'tool', filenameTerms: ['mask'], categoryIds: [] },
+    { id: 'f', name: 'Floral', type: 'theme', categoryIds: ['nature'] },
+    { id: 't', name: 'Texture', type: 'tool', filenameTerms: [], categoryIds: [] },
+    { id: 'x', name: 'Christmas', type: 'theme', categoryIds: ['holidays'] }
   ],
   categories: [{ id: 'tools', name: 'Tools' }, { id: 'nature', name: 'Nature' }, { id: 'holidays', name: 'Holidays' }]
 };
@@ -64,6 +64,22 @@ test('renames change searchable display names while IDs and records stay intact'
   assert.deepEqual(ids({ ownerId: 'n', query: 'New Nina' }, catalog, renamedOwners), ['one', 'three']);
   assert.deepEqual(ids({ selectedTags: tag('d'), query: 'Cutting' }, renamedTags), ['one', 'four']);
   assert.deepEqual(records, before);
+});
+
+test('search uses current tag names while Tool filtering uses tag IDs independently of names', () => {
+  const typedCatalog = { schemaVersion: 2, categories: [], tags: [
+    { id: 'renamed-tool', name: 'Embossing', type: 'tool', filenameTerms: [], categoryIds: [] },
+    { id: 'theme-die', name: 'Die', type: 'theme', categoryIds: [] }
+  ] };
+  const typedRecords = [
+    { id: 'tool-set', name: 'Set', tagIds: ['renamed-tool'] },
+    { id: 'theme-set', name: 'Die Set', tagIds: ['theme-die'] }
+  ];
+  assert.deepEqual(filterStampDieSets(typedRecords, { query: 'Embossing' }, typedCatalog).map((record) => record.id), ['tool-set']);
+  assert.deepEqual(filterStampDieSets(typedRecords, { query: 'Die' }, typedCatalog).map((record) => record.id), ['theme-set']);
+  assert.deepEqual(filterStampDieSets(typedRecords, { selectedToolTypeTagIds: ['renamed-tool'] }, typedCatalog).map((record) => record.id), ['tool-set']);
+  // The dedicated filter remains ID-based; the UI keeps this Theme ID out of its Tool options.
+  assert.deepEqual(filterStampDieSets(typedRecords, { selectedToolTypeTagIds: ['theme-die'] }, typedCatalog).map((record) => record.id), ['theme-set']);
 });
 
 test('dedicated tool-type IDs combine with theme tags using AND semantics', () => {

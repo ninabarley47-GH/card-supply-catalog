@@ -129,7 +129,7 @@ export function renderStampDieToolTypeFilter(container, catalog) {
   if (!container) return;
   const options = container.querySelector('[data-set-library-tool-type-options]');
   const available = getStampDieToolTypeTags(catalog);
-  const signature = JSON.stringify(available.map((tag) => [tag.id, tag.name]));
+  const signature = JSON.stringify(available.map((tag) => [tag.id, tag.name, tag.type]));
   if (options && renderedToolTypeOptions.get(container) === signature) return;
   const previous = new Set(readStampDieToolTypeFilter(container));
   const wasHidden = options?.hidden || false;
