@@ -6,6 +6,7 @@ import {
   findFuzzyDuplicateCandidates,
   getGlobalTagNameKey,
   migrateLegacyTagData,
+  migrateGlobalTagCatalogSchema,
   normalizeGlobalTagName,
   normalizeLegacyPaperTagName,
   validateGlobalTagCatalog,
@@ -17,12 +18,52 @@ function catalogWith(overrides = {}) {
 }
 
 function tag(overrides = {}) {
-  return { id: "tag-one", name: "One", appliesTo: ["paper"], categoryIds: [], ...overrides };
+  return { id: "tag-one", name: "One", appliesTo: ["paper"], type: "theme", categoryIds: [], ...overrides };
 }
 
 test("normalizes tag names and comparison keys", () => {
   assert.equal(normalizeGlobalTagName("  Fun\t Fold \n"), "Fun Fold");
   assert.equal(getGlobalTagNameKey(" FUN  fold "), "fun fold");
+});
+
+test("schema 1 classification migration applies approved defaults without changing identity or relationships", () => {
+  const source = {
+    schemaVersion: 1,
+    categories: [{ id: "cat-tools", name: "Supplies" }],
+    tags: ["Stamp", "Die", "Punch", "Mask", "Texture", "Floral"].map((name) => ({
+      id: `stable-${name}`, name, categoryIds: ["cat-tools"]
+    }))
+  };
+  const upgraded = migrateGlobalTagCatalogSchema(source);
+  assert.equal(upgraded.schemaVersion, 2);
+  assert.deepEqual(upgraded.tags.map(({ id, name, type }) => [id, name, type]), source.tags.map((tag) => [tag.id, tag.name, ["Stamp", "Die", "Punch", "Mask", "Texture"].includes(tag.name) ? "tool" : "theme"]));
+  assert.deepEqual(upgraded.tags.find(({ name }) => name === "Die").filenameTerms, ["die"]);
+  assert.deepEqual(upgraded.tags.find(({ name }) => name === "Punch").filenameTerms, ["punch"]);
+  assert.deepEqual(upgraded.tags.find(({ name }) => name === "Mask").filenameTerms, ["mask"]);
+  assert.deepEqual(upgraded.tags.find(({ name }) => name === "Texture").filenameTerms, []);
+  assert.equal(upgraded.tags.find(({ name }) => name === "Stamp").unmatchedFilenameFallback, true);
+  assert.equal("filenameTerms" in upgraded.tags.find(({ name }) => name === "Floral"), false);
+  assert.deepEqual(upgraded.categories, source.categories);
+  assert.deepEqual(upgraded.tags.map(({ categoryIds }) => categoryIds), source.tags.map(({ categoryIds }) => categoryIds));
+  assert.equal(source.schemaVersion, 1);
+  assert.deepEqual(migrateGlobalTagCatalogSchema(upgraded), upgraded);
+});
+
+test("schema migration does not seed missing built-in Tool Tags and rejects invalid or future schemas", () => {
+  const source = { schemaVersion: 1, categories: [], tags: [{ id: "floral", name: "Floral", categoryIds: [] }] };
+  const upgraded = migrateGlobalTagCatalogSchema(source);
+  assert.deepEqual(upgraded.tags.map(({ id }) => id), ["floral"]);
+  assert.equal(upgraded.tags[0].type, "theme");
+  assert.throws(() => migrateGlobalTagCatalogSchema({ ...source, tags: [{ id: "bad", name: "X", categoryIds: ["missing"] }] }), /schema 1/);
+  assert.throws(() => migrateGlobalTagCatalogSchema({ ...source, schemaVersion: 99 }), /Unsupported/);
+});
+
+test("schema 2 rejects duplicate normalized filename terms across Tool Tags", () => {
+  const catalog = catalogWith({ tags: [
+    tag({ id: "one", name: "One", type: "tool", filenameTerms: ["die"] }),
+    tag({ id: "two", name: "Two", type: "tool", filenameTerms: [" DIE "] })
+  ] });
+  assert.equal(validateGlobalTagCatalog(catalog).ok, false);
 });
 
 test("creates deterministic migrated IDs from exact normalized names", () => {
@@ -52,7 +93,7 @@ test("consolidates exact Paper and Card duplicates and unions applicability", ()
   });
   assert.deepEqual(result.catalog.tags, [{
     id: createMigratedTagId("Holiday"), name: "Holiday",
-    appliesTo: ["paper", "card"], categoryIds: []
+    appliesTo: ["paper", "card"], type: "theme", categoryIds: []
   }]);
 });
 

@@ -3,11 +3,16 @@ import {
   findFuzzyDuplicateCandidates,
   getGlobalTagNameKey,
   migrateLegacyTagData,
+  migrateGlobalTagCatalogSchema,
   validateGlobalTagCatalog,
   validateItemTagAssignments
 } from "./global-tag-catalog.js";
 
 export function reconcileBackupTagData({ localCatalog = createEmptyGlobalTagCatalog(), backup, overwriteExisting = false }) {
+  if (localCatalog?.schemaVersion === 1) localCatalog = migrateGlobalTagCatalogSchema(localCatalog);
+  if (backup?.tagCatalog?.schemaVersion === 1) {
+    backup = { ...backup, tagCatalog: migrateGlobalTagCatalogSchema(backup.tagCatalog) };
+  }
   assertCatalog(localCatalog, "local");
   if (backup?.tagCatalog && overwriteExisting) return replaceModern(localCatalog, backup);
   return backup?.tagCatalog

@@ -58,6 +58,25 @@ test("accepts optional tag vocabularies and backups without them", () => {
   assert.equal(validateBackup(backup).ok, true);
 });
 
+test("accepts schema 1 global catalogs in existing modern backups", () => {
+  const backup = createValidBackup();
+  backup.schemaVersion = 4;
+  backup.catalogSchemaVersion = 8;
+  backup.tagCatalog = {
+    schemaVersion: 1,
+    categories: [{ id: "nature", name: "Nature" }],
+    tags: [{ id: "die-id", name: "Die", categoryIds: ["nature"] },
+      { id: "floral-id", name: "Floral", categoryIds: ["nature"] }]
+  };
+  delete backup.paperPacks[0].keywords;
+  backup.paperPacks[0].tagIds = ["die-id", "floral-id"];
+  delete backup.cards[0].tags;
+  backup.cards[0].tagIds = ["floral-id"];
+  const original = structuredClone(backup);
+  assert.equal(validateBackup(backup).ok, true);
+  assert.deepEqual(backup, original);
+});
+
 test("rejects malformed tag vocabularies", () => {
   const backup = createValidBackup();
   backup.tagVocabularies = { paper: ["Floral"], card: "Birthday" };

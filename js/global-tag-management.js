@@ -32,7 +32,7 @@ export function addGlobalTag(catalog, { name, allowFuzzy = false, idFactory = cr
     .filter((candidate) => candidate.firstName === normalizedName || candidate.secondName === normalizedName)
     .map((candidate) => candidate.firstName === normalizedName ? candidate.secondName : candidate.firstName);
   if (fuzzyCandidates.length && !allowFuzzy) return { ok: false, reason: "fuzzy", fuzzyCandidates };
-  const tag = { id: idFactory(), name: normalizedName, categoryIds: [] };
+  const tag = { id: idFactory(), name: normalizedName, type: "theme", categoryIds: [] };
   const nextCatalog = cloneCatalog(catalog);
   nextCatalog.tags.push(tag);
   assertCatalog(nextCatalog);

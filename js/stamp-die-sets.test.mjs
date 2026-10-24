@@ -4,12 +4,25 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { normalizeStampDieSet } from './stamp-die-sets.js';
 import { initializeScreenNavigation } from './library.js';
+import { migrateGlobalTagCatalogSchema } from './global-tag-catalog.js';
 
 const catalog = {
   schemaVersion: 1,
   tags: [{ id: 'stable-one', name: 'Floral', appliesTo: ['paper'], categoryIds: ['flowers'] }],
   categories: [{ id: 'flowers', name: 'Flowers' }]
 };
+const upgradedCatalog = migrateGlobalTagCatalogSchema(catalog);
+function assertStoresPreservedExceptMigratedCatalog(before, after) {
+  for (const [name, records] of before) {
+    if (name !== 'settings') assert.deepEqual(after.get(name), records);
+  }
+  const originalSettings = [...(before.get('settings') || new Map()).values()];
+  const actualSettings = [...(after.get('settings') || new Map()).values()];
+  const originalWithoutCatalog = originalSettings.filter((record) => record.id !== 'globalTagCatalog');
+  const actualWithoutCatalog = actualSettings.filter((record) => record.id !== 'globalTagCatalog');
+  assert.deepEqual(actualWithoutCatalog, originalWithoutCatalog);
+  assert.deepEqual(actualSettings.find((record) => record.id === 'globalTagCatalog')?.value, upgradedCatalog);
+}
 const setRecord = () => ({
   id: 'set-one', name: 'Garden', imageRefs: [{ imagePath: 'Garden/stamps.jpg' }, { imagePath: 'Garden/dies.jpg' }],
   tagIds: ['stable-one'], favorite: false, dateCreated: '2026-09-05'
@@ -158,11 +171,11 @@ test('database upgrade preserves all existing stores and set saves round-trip ca
     const storage = await import('./storage.js?stamp-die-storage-test');
     assert.deepEqual(await storage.loadSavedStampDieSets(), []);
     assert.deepEqual(harness.added, ['stampDieSets']);
-    for (const [name, records] of before) assert.deepEqual(harness.stores.get(name), records);
+    assertStoresPreservedExceptMigratedCatalog(before, harness.stores);
     await storage.saveStampDieSet(setRecord());
     assert.deepEqual(await storage.loadSavedStampDieSets(), [normalizeStampDieSet(setRecord(), catalog)]);
     await assert.rejects(storage.saveStampDieSet({ ...setRecord(), tagIds: ['flowers'] }));
-    for (const [name, records] of before) assert.deepEqual(harness.stores.get(name), records);
+    assertStoresPreservedExceptMigratedCatalog(before, harness.stores);
     const withoutTags = { ...catalog, tags: [] };
     await assert.rejects(storage.saveGlobalTagCatalog(withoutTags));
     const result = await storage.deleteGlobalTagEverywhere('stable-one');
@@ -170,6 +183,30 @@ test('database upgrade preserves all existing stores and set saves round-trip ca
     assert.deepEqual((await storage.loadSavedStampDieSets())[0].tagIds, []);
     assert.deepEqual((await storage.loadSavedStampDieSets())[0].imageRefs, setRecord().imageRefs);
   } finally { globalThis.window = oldWindow; }
+});
+
+test('schema classification migration preserves complete Paper, Card, Set records and assignments in IndexedDB', async () => {
+  const harness = databaseHarness();
+  const records = {
+    paper: { id: 'paper-existing', tagIds: ['stable-one'], patterns: [{ id: 'pattern', imagePath: 'paper.png' }] },
+    card: { id: 'card-existing', tagIds: ['stable-one'], notes: 'keep this' },
+    set: { ...setRecord(), tagIds: ['stable-one'], custom: { retained: true } }
+  };
+  harness.stores.get('paperPacks').set(records.paper.id, structuredClone(records.paper));
+  harness.stores.get('cards').set(records.card.id, structuredClone(records.card));
+  harness.stores.set('stampDieSets', new Map());
+  harness.stores.get('stampDieSets').set(records.set.id, structuredClone(records.set));
+  const previousWindow = globalThis.window;
+  globalThis.window = { indexedDB: harness.indexedDB, localStorage: { getItem: () => 'true' } };
+  try {
+    const storage = await import('./storage.js?classification-preservation');
+    const migrated = await storage.loadGlobalTagCatalog();
+    assert.equal(migrated.schemaVersion, 2);
+    assert.deepEqual(harness.stores.get('paperPacks').get(records.paper.id), records.paper);
+    assert.deepEqual(harness.stores.get('cards').get(records.card.id), records.card);
+    assert.deepEqual(harness.stores.get('stampDieSets').get(records.set.id), records.set);
+    assert.equal(harness.stores.get('settings').get('globalTagMigrationVersion').value, 1);
+  } finally { globalThis.window = previousWindow; }
 });
 
 test('Phase 2A canonical creation survives storage reload with empty imageRefs', async () => {
@@ -275,7 +312,7 @@ test('failed Set transaction leaves both image references and inferred global ta
     harness.failNextCommit();
     await assert.rejects(storage.saveStampDieSet({ ...setRecord(), tagIds: inferred.tagIds, imageRefs: [{ imageSrc: 'data:image/jpeg;base64,ZnVsbA==' }] }, { inferredTags: inferred.inferredTags }));
     assert.deepEqual(harness.stores, before);
-    assert.deepEqual(await storage.loadGlobalTagCatalog(), catalog);
+    assert.deepEqual(await storage.loadGlobalTagCatalog(), upgradedCatalog);
   } finally { globalThis.window = previousWindow; }
 });
 
@@ -672,8 +709,8 @@ for (const profile of ['standard', 'compact']) for (const failCommit of [false, 
     globalThis.window = { indexedDB: h.indexedDB, location: { search: '' }, localStorage: { getItem: () => 'true' } };
     const storage = await import(`./storage.js?taxonomy-${profile}-${failCommit}`);
     await storage.loadSavedStampDieRecordsForRestore();
-    const localCatalog = { ...catalog, tags: [...catalog.tags,
-      { id: 'deleted', name: 'Deleted', categoryIds: [] }, { id: 'alias', name: 'Shared', categoryIds: [] }] };
+    const localCatalog = migrateGlobalTagCatalogSchema({ ...catalog, tags: [...catalog.tags,
+      { id: 'deleted', name: 'Deleted', categoryIds: [] }, { id: 'alias', name: 'Shared', categoryIds: [] }] });
     await storage.saveGlobalTagCatalog(localCatalog);
     const assignments = ['stable-one', 'deleted', 'alias'];
     const localPaper = { id: 'local-paper', name: 'Local Paper', ownerId: 'owner', releaseYear: 2024,
@@ -688,9 +725,9 @@ for (const profile of ['standard', 'compact']) for (const failCommit of [false, 
     h.stores.get('stampDieSets').set(localSet.id, structuredClone(localSet));
     const matchingCard = { ...localCard, id: 'matching-card', tagIds: ['stable-one'], imageSrc: undefined };
     h.stores.get('cards').set(matchingCard.id, structuredClone(matchingCard));
-    const nextCatalog = { schemaVersion: 1,
+    const nextCatalog = migrateGlobalTagCatalogSchema({ schemaVersion: 1,
       tags: [{ id: 'stable-one', name: 'Renamed', categoryIds: [] }, { id: 'remote', name: 'Shared', categoryIds: ['new-category'] }],
-      categories: [{ id: 'new-category', name: 'New Category' }] };
+      categories: [{ id: 'new-category', name: 'New Category' }] });
     const importedCard = { ...matchingCard, dateCreated: '2026-09-11', favorite: false, stampDieSetIds: [] };
     const exportInput = { paperPacks: [], colorsById: {}, cards: [importedCard], tagCatalog: nextCatalog };
     const backup = profile === 'standard' ? createCatalogBackupSnapshot(exportInput) : await createIpadCatalogBackup({

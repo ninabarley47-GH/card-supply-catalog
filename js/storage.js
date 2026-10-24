@@ -5,11 +5,12 @@ import { normalizeStampDieSet } from "./stamp-die-sets.js";
 import { isOptionalProductMetadata, normalizeProductMetadata } from './product-metadata.js';
 import { PAPER_TAG_SEED } from "./tag-utils.js";
 import { buildOwnerRegistry, isOwner, migratePaperPackOwners, serializePaperPackOwner } from "./owners.js";
-import { getGlobalTagNameKey, validateGlobalTagCatalog, validateItemTagAssignments } from "./global-tag-catalog.js";
+import { getGlobalTagNameKey, migrateGlobalTagCatalogSchema, validateGlobalTagCatalog, validateItemTagAssignments } from "./global-tag-catalog.js";
 import {
   GLOBAL_TAG_CATALOG_SETTING_ID,
   GLOBAL_TAG_MIGRATION_SETTING_ID,
   GLOBAL_TAG_MIGRATION_VERSION,
+  migrateGlobalTagCatalogSchemaInTransaction,
   dehydrateCardTagNames,
   dehydratePaperTagNames,
   hydrateCardTagNames,
@@ -290,6 +291,7 @@ export async function loadGlobalTagCatalog() {
 }
 
 export async function saveGlobalTagCatalog(catalog) {
+  catalog = migrateGlobalTagCatalogSchema(catalog);
   if (!validateGlobalTagCatalog(catalog).ok) throw new TypeError("Cannot save an invalid global tag catalog.");
   const database = await openCatalogDatabase();
   await migrateLegacyLocalStorage(database);
@@ -650,7 +652,14 @@ async function ensureGlobalTagPersistence(database) {
         settingsStore.put({ id: GLOBAL_TAG_CATALOG_SETTING_ID, value: globalTagCatalog });
         settingsStore.put({ id: GLOBAL_TAG_MIGRATION_SETTING_ID, value: migrationVersion });
       })
-  }).then(({ catalog }) => catalog).catch((error) => {
+  }).then(async ({ catalog }) => {
+    const result = await migrateGlobalTagCatalogSchemaInTransaction({
+      database,
+      storeName: SETTINGS_STORE,
+      settingId: GLOBAL_TAG_CATALOG_SETTING_ID
+    });
+    return result.catalog || catalog;
+  }).catch((error) => {
     globalTagMigrationPromise = null;
     throw error;
   });

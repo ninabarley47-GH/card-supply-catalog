@@ -18,7 +18,7 @@ import {
   saveCatalogSetting
 } from "./storage.js";
 import { buildOwnerRegistry, isOwner, normalizeOwnerName, migratePaperPackOwners, serializePaperPackOwner } from "./owners.js";
-import { createEmptyGlobalTagCatalog, migrateLegacyTagData, validateGlobalTagCatalog, validateItemTagAssignments } from "./global-tag-catalog.js";
+import { createEmptyGlobalTagCatalog, migrateGlobalTagCatalogSchema, migrateLegacyTagData, validateGlobalTagCatalog, validateItemTagAssignments } from "./global-tag-catalog.js";
 import { dehydrateCardTagNames, dehydratePaperTagNames, hydratePaperTagNames } from "./global-tag-persistence.js";
 import { reconcileBackupTagData, remapRetainedRecordTags } from "./tag-backup-reconciliation.js";
 import { getCardDetailImageSource, hydrateCardImageSources } from "./card-images.js";
@@ -168,7 +168,8 @@ export function initializeCatalogBackup({ paperPacks, colorsById, owners = [], o
       }
 
       try {
-        const backup = await readBackupFile(backupFile);
+        let backup = await readBackupFile(backupFile);
+        backup = normalizeBackupTagCatalog(backup);
         const validation = validateBackup(backup);
         if (!validation.ok) {
           renderBackupMessage(message, validation.message, "error");
@@ -963,6 +964,7 @@ export async function restoreCatalogBackup({
   diagnosticContext = null,
   services = {}
 }) {
+  backup = normalizeBackupTagCatalog(backup);
   const summary = {
     packsImported: 0,
     packsSkipped: 0,
@@ -1551,6 +1553,9 @@ function logImportError(message, error, details = {}) {
 }
 
 export function validateBackup(backup) {
+  try { backup = normalizeBackupTagCatalog(backup); } catch {
+    return { ok: false, message: "Nothing was imported because the global tag catalog is invalid." };
+  }
   if (!backup || backup.app !== "card-supply-catalog") {
     return {
       ok: false,
@@ -1682,6 +1687,11 @@ export function validateBackup(backup) {
     ok: true,
     message: ""
   };
+}
+
+export function normalizeBackupTagCatalog(backup) {
+  if (!backup?.tagCatalog || backup.tagCatalog.schemaVersion !== 1) return backup;
+  return { ...backup, tagCatalog: migrateGlobalTagCatalogSchema(backup.tagCatalog) };
 }
 
 function upsertPaperPack(paperPacks, paperPack) {

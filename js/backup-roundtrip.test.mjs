@@ -317,7 +317,7 @@ test('replacement of a legacy backup does not infer tag/category deletions', asy
       restoreCatalogRecords: async records => { saved = records; } }
   });
   assert.deepEqual(result.errors, []);
-  assert.deepEqual(saved.tagCatalog, local);
+  assert.deepEqual(saved.tagCatalog, { ...local, schemaVersion: 2, tags: [{ ...local.tags[0], type: "theme" }] });
   assert.equal(saved.retainedTagIdMap, undefined);
   assert.ok(result.notes.some(note => note.includes('deletions were not applied')));
 });

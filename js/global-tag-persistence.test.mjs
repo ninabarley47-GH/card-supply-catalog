@@ -8,8 +8,10 @@ import {
   hydrateCardTagNames,
   hydratePaperTagNames,
   mergeLegacyVocabularyIntoGlobalCatalog,
-  migrateGlobalTagPersistence
+  migrateGlobalTagPersistence,
+  migrateGlobalTagCatalogSchemaInTransaction
 } from "./global-tag-persistence.js";
+import { migrateGlobalTagCatalogSchema } from "./global-tag-catalog.js";
 
 function legacyState(overrides = {}) {
   return {
@@ -174,4 +176,97 @@ test("cached storage modules retain the side-effect-free legacy merge export dur
   const merged = mergeLegacyVocabularyIntoGlobalCatalog(catalog, { paperVocabulary: ["Floral"] });
   assert.equal(merged.tags[0].name, "Floral");
   assert.deepEqual(catalog, { schemaVersion: 1, tags: [], categories: [] });
+});
+
+function catalogTransactionHarness(catalog) {
+  let stored = { id: "globalTagCatalog", value: structuredClone(catalog) };
+  let failNext = false;
+  let putCount = 0;
+  const database = {
+    transaction(storeNames, mode) {
+      assert.deepEqual(storeNames, ["settings"]);
+      assert.equal(mode, "readwrite");
+      const transaction = new EventTarget();
+      const before = structuredClone(stored);
+      let aborted = false;
+      transaction.objectStore = () => ({
+        get: (id) => {
+          assert.equal(id, "globalTagCatalog");
+          const request = new EventTarget();
+          queueMicrotask(() => {
+            request.result = structuredClone(stored);
+            request.dispatchEvent(new Event("success"));
+          });
+          return request;
+        },
+        put: (record) => { putCount += 1; stored = structuredClone(record); }
+      });
+      transaction.abort = () => {
+        if (aborted) return;
+        aborted = true;
+        stored = before;
+        transaction.error = new Error("simulated transaction abort");
+        transaction.dispatchEvent(new Event("abort"));
+      };
+      setTimeout(() => {
+        if (failNext) { failNext = false; transaction.abort(); }
+        else if (!aborted) transaction.dispatchEvent(new Event("complete"));
+      });
+      return transaction;
+    }
+  };
+  return {
+    database,
+    read: () => structuredClone(stored.value),
+    writeFromOtherTab: (nextCatalog) => { stored = { id: "globalTagCatalog", value: structuredClone(nextCatalog) }; },
+    failNextCommit: () => { failNext = true; },
+    putCount: () => putCount
+  };
+}
+
+const migrateCatalogInHarness = (harness) => migrateGlobalTagCatalogSchemaInTransaction({
+  database: harness.database, storeName: "settings", settingId: "globalTagCatalog"
+});
+
+test("catalog schema migration reads and upgrades schema 1 atomically while preserving IDs and categories", async () => {
+  const original = { schemaVersion: 1, categories: [{ id: "cat", name: "Nature" }], tags: [
+    { id: "die", name: "Die", categoryIds: ["cat"] }, { id: "floral", name: "Floral", categoryIds: ["cat"] }
+  ] };
+  const harness = catalogTransactionHarness(original);
+  const result = await migrateCatalogInHarness(harness);
+  assert.equal(result.migrated, true);
+  assert.equal(result.catalog.schemaVersion, 2);
+  assert.deepEqual(result.catalog.tags.map(({ id, categoryIds }) => [id, categoryIds]), [["die", ["cat"]], ["floral", ["cat"]]]);
+  assert.deepEqual(harness.read(), result.catalog);
+  assert.equal(harness.putCount(), 1);
+});
+
+test("a second migration uses the current schema 2 catalog and performs no rewrite", async () => {
+  const schema2 = migrateGlobalTagCatalogSchema({ schemaVersion: 1, tags: [{ id: "die", name: "Die", categoryIds: [] }], categories: [] });
+  const harness = catalogTransactionHarness(schema2);
+  const result = await migrateCatalogInHarness(harness);
+  assert.equal(result.migrated, false);
+  assert.deepEqual(harness.read(), schema2);
+  assert.equal(harness.putCount(), 0);
+});
+
+test("a stale schema 1 snapshot cannot overwrite a newer schema 2 classification", async () => {
+  const staleSchema1 = { schemaVersion: 1, tags: [{ id: "stable", name: "Die", categoryIds: [] }], categories: [] };
+  const currentSchema2 = { schemaVersion: 2, tags: [{ id: "stable", name: "Die", type: "theme", categoryIds: [] }], categories: [] };
+  const harness = catalogTransactionHarness(staleSchema1);
+  harness.writeFromOtherTab(currentSchema2);
+  const result = await migrateCatalogInHarness(harness);
+  assert.equal(result.migrated, false);
+  assert.deepEqual(harness.read(), currentSchema2);
+  assert.equal(harness.read().tags[0].type, "theme");
+  assert.equal(harness.putCount(), 0);
+});
+
+test("an aborted migration leaves the catalog unchanged and a subsequent retry succeeds", async () => {
+  const original = { schemaVersion: 1, tags: [{ id: "die", name: "Die", categoryIds: [] }], categories: [] };
+  const harness = catalogTransactionHarness(original);
+  harness.failNextCommit();
+  await assert.rejects(() => migrateCatalogInHarness(harness), /simulated transaction abort/);
+  assert.deepEqual(harness.read(), original);
+  assert.equal((await migrateCatalogInHarness(harness)).migrated, true);
 });

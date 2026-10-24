@@ -1,6 +1,7 @@
 import { getTagKey, normalizeTagName } from "./tag-utils.js";
 
-export const GLOBAL_TAG_CATALOG_SCHEMA_VERSION = 1;
+export const GLOBAL_TAG_CATALOG_SCHEMA_VERSION = 2;
+export const LEGACY_GLOBAL_TAG_CATALOG_SCHEMA_VERSION = 1;
 export const TAG_PRODUCT_TYPES = Object.freeze(["paper", "card", "stamp"]);
 
 const LEGACY_PAPER_TAG_REPLACEMENTS = new Map([
@@ -18,6 +19,65 @@ export function createEmptyGlobalTagCatalog() {
     tags: [],
     categories: []
   };
+}
+
+const BUILT_IN_TOOL_NAMES = new Map([
+  ["stamp", { filenameTerms: [], unmatchedFilenameFallback: true }],
+  ["die", { filenameTerms: ["die"] }],
+  ["punch", { filenameTerms: ["punch"] }],
+  ["mask", { filenameTerms: ["mask"] }],
+  ["texture", { filenameTerms: [] }]
+]);
+
+export function validateLegacyGlobalTagCatalog(catalog) {
+  if (!catalog || typeof catalog !== "object" || Array.isArray(catalog) ||
+      catalog.schemaVersion !== LEGACY_GLOBAL_TAG_CATALOG_SCHEMA_VERSION ||
+      !Array.isArray(catalog.tags) || !Array.isArray(catalog.categories)) {
+    return invalid("catalog", "The schema 1 global tag catalog is invalid.");
+  }
+  // Apply schema 2 defaults only to a copy so the strict validator can check
+  // all of schema 1's existing identity and relationship invariants.
+  const candidate = {
+    ...catalog,
+    schemaVersion: GLOBAL_TAG_CATALOG_SCHEMA_VERSION,
+    tags: catalog.tags.map((tag) => ({
+      ...tag,
+      type: "theme",
+      categoryIds: Array.isArray(tag?.categoryIds) ? [...tag.categoryIds] : tag?.categoryIds
+    }))
+  };
+  return validateGlobalTagCatalog(candidate);
+}
+
+export function migrateGlobalTagCatalogSchema(catalog) {
+  if (catalog?.schemaVersion === GLOBAL_TAG_CATALOG_SCHEMA_VERSION) {
+    const validation = validateGlobalTagCatalog(catalog);
+    if (!validation.ok) throw new TypeError("The schema 2 global tag catalog is invalid.");
+    return structuredClone(catalog);
+  }
+  if (catalog?.schemaVersion !== LEGACY_GLOBAL_TAG_CATALOG_SCHEMA_VERSION) {
+    throw new TypeError("Unsupported global tag catalog schema version.");
+  }
+  const validation = validateLegacyGlobalTagCatalog(catalog);
+  if (!validation.ok) throw new TypeError("The schema 1 global tag catalog is invalid.");
+
+  const upgraded = {
+    ...structuredClone(catalog),
+    schemaVersion: GLOBAL_TAG_CATALOG_SCHEMA_VERSION,
+    tags: catalog.tags.map((tag) => {
+      const defaults = BUILT_IN_TOOL_NAMES.get(getGlobalTagNameKey(tag.name));
+      return {
+        ...structuredClone(tag),
+        type: defaults ? "tool" : "theme",
+        ...(defaults ? {
+          filenameTerms: [...defaults.filenameTerms],
+          ...(defaults.unmatchedFilenameFallback ? { unmatchedFilenameFallback: true } : {})
+        } : {})
+      };
+    })
+  };
+  if (!validateGlobalTagCatalog(upgraded).ok) throw new TypeError("The migrated global tag catalog is invalid.");
+  return upgraded;
 }
 
 export function normalizeGlobalTagName(value) {
@@ -54,6 +114,9 @@ export function createMigratedTagId(value, occupiedIds = new Map()) {
 }
 
 export function validateGlobalTagCatalog(catalog) {
+  if (catalog?.schemaVersion === LEGACY_GLOBAL_TAG_CATALOG_SCHEMA_VERSION) {
+    return validateLegacyGlobalTagCatalog(catalog);
+  }
   const errors = [];
   if (!catalog || typeof catalog !== "object" || Array.isArray(catalog)) {
     return invalid("catalog", "The global tag catalog must be an object.");
@@ -69,6 +132,7 @@ export function validateGlobalTagCatalog(catalog) {
   const categoryIds = new Set();
   const tagNames = new Set();
   const categoryNames = new Set();
+  const filenameTerms = new Map();
 
   catalog.categories.forEach((category, index) => {
     const path = `categories[${index}]`;
@@ -91,6 +155,27 @@ export function validateGlobalTagCatalog(catalog) {
     }
     addUnique(tagIds, tag.id, `${path}.id`, "tag ID", errors);
     addUnique(tagNames, getGlobalTagNameKey(tag.name), `${path}.name`, "normalized tag name", errors);
+    if (!["tool", "theme"].includes(tag.type)) errors.push(error(`${path}.type`, "Tag type must be tool or theme."));
+    if (tag.type === "tool") {
+      if (!Array.isArray(tag.filenameTerms) || tag.filenameTerms.some((term) => typeof term !== "string" || !term.trim())) {
+        errors.push(error(`${path}.filenameTerms`, "Tool filename terms must be non-empty strings."));
+      } else {
+        for (const term of tag.filenameTerms) {
+          const key = term.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+          const priorTagId = filenameTerms.get(key);
+          if (priorTagId && priorTagId !== tag.id) {
+            errors.push(error(`${path}.filenameTerms`, `Filename term "${term}" is already assigned to another Tool Tag.`));
+          } else {
+            filenameTerms.set(key, tag.id);
+          }
+        }
+      }
+      if ("unmatchedFilenameFallback" in tag && typeof tag.unmatchedFilenameFallback !== "boolean") {
+        errors.push(error(`${path}.unmatchedFilenameFallback`, "Tool fallback setting must be boolean."));
+      }
+    } else if ("filenameTerms" in tag || "unmatchedFilenameFallback" in tag) {
+      errors.push(error(path, "Theme tags cannot contain Tool filename configuration."));
+    }
     // appliesTo is deprecated compatibility metadata. Existing catalogs and
     // backups may retain it, but new tags do not need to write it.
     if ("appliesTo" in tag && (!Array.isArray(tag.appliesTo) ||
@@ -167,6 +252,9 @@ export function migrateLegacyTagData({
   paperRecords = [],
   cardRecords = []
 } = {}) {
+  if (catalog?.schemaVersion === LEGACY_GLOBAL_TAG_CATALOG_SCHEMA_VERSION) {
+    catalog = migrateGlobalTagCatalogSchema(catalog);
+  }
   const validation = validateGlobalTagCatalog(catalog);
   if (!validation.ok) throw new TypeError("Cannot migrate into an invalid global tag catalog.");
 
@@ -178,7 +266,14 @@ export function migrateLegacyTagData({
     if (!key) return null;
     let tag = tagsByKey.get(key);
     if (!tag) {
-      tag = { id: createMigratedTagId(name, occupiedIds), name, appliesTo: [], categoryIds: [] };
+      tag = {
+        id: createMigratedTagId(name, occupiedIds), name, appliesTo: [], categoryIds: [],
+        type: BUILT_IN_TOOL_NAMES.has(getGlobalTagNameKey(name)) ? "tool" : "theme",
+        ...(BUILT_IN_TOOL_NAMES.has(getGlobalTagNameKey(name))
+          ? { filenameTerms: [...BUILT_IN_TOOL_NAMES.get(getGlobalTagNameKey(name)).filenameTerms],
+              ...(BUILT_IN_TOOL_NAMES.get(getGlobalTagNameKey(name)).unmatchedFilenameFallback ? { unmatchedFilenameFallback: true } : {}) }
+          : {})
+      };
       tagsByKey.set(key, tag);
       occupiedIds.set(tag.id, key);
     }

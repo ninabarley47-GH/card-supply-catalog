@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createEmptyGlobalTagCatalog, createMigratedTagId } from "./global-tag-catalog.js";
+import { createEmptyGlobalTagCatalog, createMigratedTagId, migrateGlobalTagCatalogSchema } from "./global-tag-catalog.js";
 import { reconcileBackupTagData } from "./tag-backup-reconciliation.js";
 
-const tag = (id, name, appliesTo = ["paper"], categoryIds = []) => ({ id, name, appliesTo, categoryIds });
+const tag = (id, name, appliesTo = ["paper"], categoryIds = []) => ({ id, name, appliesTo, type: "theme", categoryIds });
 const category = (id, name) => ({ id, name });
 const catalog = (tags = [], categories = []) => ({ schemaVersion: 1, tags, categories });
 const modern = (tagCatalog, paperPacks = [], cards = []) => ({ tagCatalog, paperPacks, cards });
@@ -104,6 +104,27 @@ test("unknown category and item tag references are rejected before reconciliatio
   }), /unknown tag/);
 });
 
+test("schema 1 backup catalogs upgrade in memory and preserve assignments and category relationships", () => {
+  const legacyCatalog = { schemaVersion: 1,
+    categories: [{ id: "c", name: "Nature" }],
+    tags: [{ id: "die-stable", name: "Die", categoryIds: ["c"] },
+      { id: "floral-stable", name: "Floral", categoryIds: ["c"] }] };
+  const backup = { tagCatalog: legacyCatalog,
+    paperPacks: [{ id: "p", tagIds: ["die-stable", "floral-stable"] }],
+    cards: [{ id: "card", tagIds: ["floral-stable"] }],
+    stampDieSets: [{ id: "set", tagIds: ["die-stable"] }] };
+  const before = structuredClone(backup);
+  const result = reconcileBackupTagData({ localCatalog: createEmptyGlobalTagCatalog(), backup });
+  assert.equal(result.ok, true);
+  assert.equal(result.catalog.schemaVersion, 2);
+  assert.equal(result.catalog.tags.find((tag) => tag.id === "die-stable").type, "tool");
+  assert.deepEqual(result.catalog.tags.map((tag) => tag.categoryIds), [["c"], ["c"]]);
+  assert.deepEqual(result.paperPacks[0].tagIds, ["die-stable", "floral-stable"]);
+  assert.deepEqual(result.cards[0].tagIds, ["floral-stable"]);
+  assert.deepEqual(result.stampDieSets[0].tagIds, ["die-stable"]);
+  assert.deepEqual(backup, before);
+});
+
 test("cross-product assignments are accepted while mixed records are rejected", () => {
   const result = reconcileBackupTagData({
     localCatalog: createEmptyGlobalTagCatalog(),
@@ -135,7 +156,7 @@ test('replacement uses the complete backup taxonomy and maps retained local iden
   const before = structuredClone({ local, backup });
   const result = reconcileBackupTagData({ localCatalog: local, backup, overwriteExisting: true });
   assert.equal(result.ok, true);
-  assert.deepEqual(result.catalog, incoming);
+  assert.deepEqual(result.catalog, migrateGlobalTagCatalogSchema(incoming));
   assert.deepEqual([...result.retainedTagIdMap], [['same', 'same'], ['alias', 'remote'], ['deleted', null]]);
   assert.equal(result.report.tagsRemoved, 1);
   assert.equal(result.report.categoriesRemoved, 1);
@@ -147,10 +168,10 @@ test('replacement uses the complete backup taxonomy and maps retained local iden
 test('empty modern replacement removes the taxonomy; legacy replacement remains a merge', () => {
   const local = catalog([tag('local', 'Floral')], [category('cat', 'Nature')]);
   const modernResult = reconcileBackupTagData({ localCatalog: local, backup: modern(catalog()), overwriteExisting: true });
-  assert.deepEqual(modernResult.catalog, catalog());
+  assert.deepEqual(modernResult.catalog, migrateGlobalTagCatalogSchema(catalog()));
   assert.equal(modernResult.retainedTagIdMap.get('local'), null);
   const legacy = reconcileBackupTagData({ localCatalog: local, backup: { paperPacks: [], cards: [] }, overwriteExisting: true });
-  assert.deepEqual(legacy.catalog, local);
+  assert.deepEqual(legacy.catalog, migrateGlobalTagCatalogSchema(local));
   assert.equal(legacy.retainedTagIdMap, undefined);
 });
 

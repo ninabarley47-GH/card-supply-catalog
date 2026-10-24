@@ -2,7 +2,9 @@ import {
   GLOBAL_TAG_CATALOG_SCHEMA_VERSION,
   createEmptyGlobalTagCatalog,
   migrateLegacyTagData,
+  migrateGlobalTagCatalogSchema,
   validateGlobalTagCatalog,
+  validateLegacyGlobalTagCatalog,
   validateItemTagAssignments
 } from "./global-tag-catalog.js";
 
@@ -16,7 +18,9 @@ export async function migrateGlobalTagPersistence({ readState, commitMigration }
     throw new TypeError("The global tag migration marker exists without a catalog.");
   }
   const existingCatalog = state.globalTagCatalog ?? createEmptyGlobalTagCatalog();
-  const catalogValidation = validateGlobalTagCatalog(existingCatalog);
+  const catalogValidation = existingCatalog.schemaVersion === 1
+    ? validateLegacyGlobalTagCatalog(existingCatalog)
+    : validateGlobalTagCatalog(existingCatalog);
   if (!catalogValidation.ok) throw new TypeError("The persisted global tag catalog is invalid.");
 
   if (state.migrationVersion === GLOBAL_TAG_MIGRATION_VERSION) {
@@ -50,6 +54,57 @@ export async function migrateGlobalTagPersistence({ readState, commitMigration }
     catalog: cloneCatalog(result.catalog),
     fuzzyDuplicateCandidates: result.fuzzyDuplicateCandidates
   };
+}
+
+export function migrateGlobalTagCatalogSchemaInTransaction({ database, storeName, settingId }) {
+  return new Promise((resolve, reject) => {
+    let result;
+    let failure = null;
+    let settled = false;
+    let transaction;
+    const fail = (error) => {
+      failure = error || new Error("Global tag catalog migration transaction failed.");
+      try { transaction.abort(); } catch { /* The transaction may already be inactive. */ }
+    };
+
+    try {
+      transaction = database.transaction([storeName], "readwrite");
+      transaction.addEventListener("complete", () => {
+        if (settled) return;
+        settled = true;
+        resolve(result);
+      });
+      transaction.addEventListener("error", () => {
+        if (settled) return;
+        settled = true;
+        reject(failure || transaction.error || new Error("Global tag catalog migration transaction failed."));
+      });
+      transaction.addEventListener("abort", () => {
+        if (settled) return;
+        settled = true;
+        reject(failure || transaction.error || new Error("Global tag catalog migration transaction aborted."));
+      });
+
+      const store = transaction.objectStore(storeName);
+      const request = store.get(settingId);
+      request.addEventListener("success", () => {
+        try {
+          const currentCatalog = request.result?.value;
+          const upgradedCatalog = migrateGlobalTagCatalogSchema(currentCatalog);
+          const migrated = currentCatalog.schemaVersion !== upgradedCatalog.schemaVersion;
+          if (migrated) store.put({ id: settingId, value: upgradedCatalog });
+          result = { migrated, catalog: upgradedCatalog };
+        } catch (error) {
+          fail(error);
+        }
+      });
+      request.addEventListener("error", () => fail(request.error));
+    } catch (error) {
+      failure = error;
+      try { transaction?.abort(); } catch { /* The transaction may already be inactive. */ }
+      if (!transaction) reject(error);
+    }
+  });
 }
 
 export function hydratePaperTagNames(record, catalog) {

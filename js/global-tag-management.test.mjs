@@ -48,7 +48,7 @@ test("usage reports Paper, Card, and Stamp assignment counts", () => {
 test("adds a universal global tag without writing deprecated applicability", () => {
   const result = addGlobalTag(catalog(), { name: "  New   Tag ", idFactory: () => "opaque" });
   assert.equal(result.ok, true);
-  assert.deepEqual(result.tag, { id: "opaque", name: "New Tag", categoryIds: [] });
+  assert.deepEqual(result.tag, { id: "opaque", name: "New Tag", type: "theme", categoryIds: [] });
 });
 
 test("blocks exact normalized duplicates and points to the existing entity", () => {
