@@ -163,7 +163,7 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
   let stampSets = await loadSavedStampDieSets();
   const tagAddGroups = [
     { type: "tool", form: root.querySelector("[data-tool-tag-add-form]"), input: root.querySelector("[data-tool-tag-add-input]"), termsInput: root.querySelector("[data-tool-tag-terms-input]"), list: root.querySelector("[data-tool-tag-list]"), total: root.querySelector("[data-tool-tag-total]"), trigger: root.querySelector("[data-tool-tag-add-open]"), cancel: root.querySelector("[data-tool-tag-add-cancel]") },
-    { type: "theme", form: root.querySelector("[data-theme-tag-add-form]"), input: root.querySelector("[data-theme-tag-add-input]"), list: root.querySelector("[data-theme-tag-list]"), trigger: root.querySelector("[data-theme-tag-add-open]"), cancel: root.querySelector("[data-theme-tag-add-cancel]") }
+    { type: "theme", form: root.querySelector("[data-theme-tag-add-form]"), input: root.querySelector("[data-theme-tag-add-input]"), list: root.querySelector("[data-theme-tag-list]"), total: root.querySelector("[data-theme-tag-total]"), trigger: root.querySelector("[data-theme-tag-add-open]"), cancel: root.querySelector("[data-theme-tag-add-cancel]") }
   ];
   const message = root.querySelector("[data-tag-message]");
   const total = root.querySelector("[data-tag-total]");
