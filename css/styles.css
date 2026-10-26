@@ -2347,6 +2347,11 @@ button.pattern {
 .tag-settings-total { white-space: nowrap; }
 .settings-body { border-top: 1px solid var(--color-border); padding: var(--space-4) var(--space-5) var(--space-2); }
 .category-settings { margin-bottom: var(--space-5); border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-4); }
+.tag-settings-collapsible > summary { cursor: pointer; list-style: disclosure-closed; }
+.tag-settings-collapsible[open] > summary { list-style: disclosure-open; }
+.category-settings.tag-settings-collapsible > summary { margin-bottom: var(--space-3); }
+.tag-inventory-section.tag-settings-collapsible { margin-top: var(--space-4); border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+.library-tag-categories-toggle-all { justify-self: start; }
 .category-settings-heading { display: flex; align-items: start; justify-content: space-between; gap: var(--space-3); }
 .category-settings-heading h5, .category-settings-heading p { margin: 0; }
 .category-settings-heading p, .category-settings-heading > span { color: var(--color-muted); font-size: 0.82rem; }

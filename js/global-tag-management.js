@@ -107,6 +107,7 @@ export function addTagToCategory(catalog, tagId, categoryId) {
   assertCatalog(catalog);
   const current = catalog.tags.find((tag) => tag.id === tagId);
   if (!current) return { ok: false, reason: "tag-not-found" };
+  if (current.type === "tool") return { ok: false, reason: "tool-tags-have-no-categories" };
   if (!catalog.categories.some((category) => category.id === categoryId)) return { ok: false, reason: "category-not-found" };
   if (current.categoryIds.includes(categoryId)) return { ok: false, reason: "duplicate-membership" };
   const nextCatalog = cloneCatalog(catalog);
@@ -129,7 +130,7 @@ export function removeTagFromCategory(catalog, tagId, categoryId) {
   return { ok: true, catalog: nextCatalog, tag };
 }
 
-export function editGlobalTag(catalog, tagId, { name, filenameTerms }) {
+export function editGlobalTag(catalog, tagId, { name, filenameTerms, type }) {
   assertCatalog(catalog);
   const current = catalog.tags.find((tag) => tag.id === tagId);
   if (!current) return { ok: false, reason: "not-found" };
@@ -139,6 +140,12 @@ export function editGlobalTag(catalog, tagId, { name, filenameTerms }) {
   if (duplicate) return { ok: false, reason: "duplicate", existingTag: duplicate };
   const nextCatalog = cloneCatalog(catalog);
   const edited = nextCatalog.tags.find((tag) => tag.id === tagId);
+  if (type !== undefined && !["tool", "theme"].includes(type)) return { ok: false, reason: "invalid-type" };
+  if (type === "tool" && edited.type !== "tool") {
+    edited.type = "tool";
+    edited.categoryIds = [];
+    edited.filenameTerms = [];
+  }
   if (filenameTerms !== undefined) {
     if (edited.type !== "tool") return { ok: false, reason: "not-tool" };
     if (!Array.isArray(filenameTerms) || filenameTerms.some((term) => typeof term !== "string")) return { ok: false, reason: "invalid-filename-terms" };

@@ -6,7 +6,7 @@ export function createGlobalTagFilterModel(catalog) {
   const categories = sortByName(catalog.categories)
     .map((category) => ({
       ...category,
-      tags: tags.filter((tag) => tag.categoryIds.includes(category.id))
+      tags: tags.filter((tag) => tag.type !== 'tool' && tag.categoryIds.includes(category.id))
     }))
     .filter((category) => category.tags.length > 0);
   return { tags, categories };
@@ -17,7 +17,7 @@ export function getRelevantTagFilterOptions(items, catalog) {
   const usedIds = new Set(items.flatMap((item) => item.tagIds || []));
   const model = createGlobalTagFilterModel(catalog);
   return {
-    tags: model.tags.filter((tag) => usedIds.has(tag.id) && tag.categoryIds.length === 0),
+    tags: model.tags.filter((tag) => usedIds.has(tag.id) && (tag.type === 'tool' || tag.categoryIds.length === 0)),
     categories: model.categories.map((category) => ({
       ...category, tags: category.tags.filter((tag) => usedIds.has(tag.id))
     })).filter((category) => category.tags.length > 0)
@@ -78,6 +78,7 @@ export function renderGlobalTagFilter(container, catalog, { inputPrefix, options
   const existing = container.querySelector('[data-global-tag-filter-options]');
   if (existing && renderedFilterModels.get(container) === signature) return;
   const previous = readGlobalTagFilter(container);
+  const hadExisting = Boolean(existing);
   const expandedIds = new Set([...container.querySelectorAll('details[data-filter-category]')]
     .filter((details) => details.open).map((details) => details.dataset.filterCategory));
   const hidden = existing?.hidden || false;
@@ -94,6 +95,16 @@ export function renderGlobalTagFilter(container, catalog, { inputPrefix, options
   options.append(tags);
 
   if (model.categories.length) options.append(createHeading('Categories'));
+  if (model.categories.length) {
+    const toggleAll = document.createElement('button');
+    toggleAll.type = 'button';
+    toggleAll.className = 'text-action library-tag-categories-toggle-all';
+    toggleAll.dataset.toggleAllFilterCategories = '';
+    const allExpanded = !hadExisting || model.categories.every((category) => expandedIds.has(category.id));
+    toggleAll.textContent = allExpanded ? '− Collapse all' : '+ Expand all';
+    toggleAll.setAttribute('aria-expanded', String(allExpanded));
+    options.append(toggleAll);
+  }
   for (const category of model.categories) {
     const previousSelection = previous.categories.find((entry) => entry.categoryId === category.id);
     const memberIds = new Set(category.tags.map((tag) => tag.id));
@@ -104,7 +115,7 @@ export function renderGlobalTagFilter(container, catalog, { inputPrefix, options
     const details = document.createElement('details');
     details.className = 'library-tag-category';
     details.dataset.filterCategory = category.id;
-    details.open = expandedIds.has(category.id);
+    details.open = hadExisting ? expandedIds.has(category.id) : true;
     const summary = document.createElement('summary');
     summary.textContent = `${category.name} (${category.tags.length})`;
     const members = document.createElement('div');
@@ -126,6 +137,12 @@ export function renderGlobalTagFilter(container, catalog, { inputPrefix, options
   }
   existing?.remove();
   container.append(options);
+  options.querySelector('[data-toggle-all-filter-categories]')?.addEventListener('click', (event) => {
+    const expand = event.currentTarget.getAttribute('aria-expanded') !== 'true';
+    for (const details of options.querySelectorAll('details[data-filter-category]')) details.open = expand;
+    event.currentTarget.setAttribute('aria-expanded', String(expand));
+    event.currentTarget.textContent = expand ? '− Collapse all' : '+ Expand all';
+  });
   renderedFilterModels.set(container, signature);
 }
 

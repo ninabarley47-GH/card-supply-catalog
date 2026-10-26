@@ -256,7 +256,7 @@ test("category rows match tag rows with read-only display, Edit, Save/Cancel, an
 test("category validation feedback is rendered beside category controls", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const source = await readFile(new URL("./settings.js", import.meta.url), "utf8");
-  const categorySection = html.slice(html.indexOf('<section class="category-settings"'), html.indexOf("</section>", html.indexOf('<section class="category-settings"')));
+  const categorySection = html.slice(html.indexOf('<details class="category-settings'), html.indexOf("</details>", html.indexOf('<details class="category-settings')));
   assert.match(categorySection, /data-category-message/);
   assert.ok(categorySection.indexOf("data-category-message") < categorySection.indexOf("data-category-list"));
   assert.match(source, /announceCategory\(result\.reason === "duplicate"/);
@@ -288,7 +288,7 @@ test("final C2 labels and tag actions match the category treatment", async () =>
   const tagRow = source.slice(source.indexOf("function createGlobalTagSettingsRow"), source.indexOf("function formatProductType"));
   assert.match(html, /Tags &amp; Categories/);
   assert.match(html, /Manage the shared tag system for Paper, Cards, and Stamp Sets\./);
-  assert.match(html, /<h5 id="tool-tags-title">Tool Tags<\/h5>/);
+  assert.match(html, /<summary class="tag-inventory-heading"><h5 id="tool-tags-title">Tool Tags<\/h5><\/summary>/);
   assert.match(html, /<h5 id="theme-tags-title">Theme Tags<\/h5>/);
   assert.doesNotMatch(html, /Tags inventory/);
   assert.match(tagRow, /edit\.className = "tag-settings-action tag-edit-action"/);

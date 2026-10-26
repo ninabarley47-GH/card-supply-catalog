@@ -28,7 +28,7 @@ class Element {
   getAttribute(key) { return this.attributes[key]; }
   addEventListener(type, listener) { (this.listeners[type] ||= []).push(listener); }
   async emit(type, values = {}) {
-    const event = { type, target: this, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, ...values };
+    const event = { type, target: this, currentTarget: this, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, ...values };
     for (const listener of this.listeners[type] || []) await listener(event);
     return event;
   }
@@ -147,6 +147,22 @@ test('rendered controls do not duplicate categorized tags at top level', (t) => 
   assert.ok(h.member('birthday', 'celebrations'));
   assert.equal(h.member('thanks'), null);
   assert.ok(h.individual('winter'));
+});
+
+test('category sections start expanded and the expand-all control matches their state', (t) => {
+  const h = renderer(t);
+  const options = h.container.querySelector('[data-global-tag-filter-options]');
+  const categories = options.querySelectorAll('details[data-filter-category]');
+  const toggle = options.querySelector('[data-toggle-all-filter-categories]');
+  assert.ok(categories.length > 0);
+  assert.ok(categories.every((details) => details.open));
+  assert.equal(toggle.textContent, '− Collapse all');
+  assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+  return toggle.emit('click').then(() => {
+    assert.ok(categories.every((details) => !details.open));
+    assert.equal(toggle.textContent, '+ Expand all');
+    assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+  });
 });
 
 test('unchanged usage keeps DOM, selections, and expanded categories despite narrowing results', (t) => {

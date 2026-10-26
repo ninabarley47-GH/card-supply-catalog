@@ -16,6 +16,7 @@ import {
 import { createLegacyOwnerId, getOwnerNameKey, isActiveOwner, normalizeOwnerName } from "./owners.js";
 import { supportsDirectoryPicker } from "./browser-capabilities.js";
 import { refreshOwnerOptions, notifyOwnerRegistryUpdated } from './owner-picker.js';
+import { getGlobalTagNameKey } from "./global-tag-catalog.js";
 
 const IMAGE_LIBRARY_SETTING_ID = "imageLibrary";
 const CARD_IMAGE_LIBRARY_SETTING_ID = "cardImageLibrary";
@@ -202,7 +203,7 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
     categoryTotal.textContent = `${categories.length} categor${categories.length === 1 ? "y" : "ies"}`;
     categoryList.replaceChildren(...categories.map((category) => createGlobalCategorySettingsRow({
       category,
-      memberCount: catalog.tags.filter((tag) => tag.categoryIds.includes(category.id)).length,
+      memberCount: catalog.tags.filter((tag) => tag.type !== "tool" && tag.categoryIds.includes(category.id)).length,
       onRename: async (name) => {
         let result = editGlobalCategory(catalog, category.id, { name });
         if (!result.ok && result.reason === "fuzzy") {
@@ -219,7 +220,7 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
         return persistCatalogMutation(result, `Renamed category to “${result.category.name}”. Its relationships were preserved.`, announceCategory);
       },
       onDelete: async () => {
-        const memberCount = catalog.tags.filter((tag) => tag.categoryIds.includes(category.id)).length;
+        const memberCount = catalog.tags.filter((tag) => tag.type !== "tool" && tag.categoryIds.includes(category.id)).length;
         if (!window.confirm(`Delete “${category.name}”? Its relationship will be removed from ${memberCount} tag${memberCount === 1 ? "" : "s"}. The tags and all item assignments will remain unchanged.`)) return;
         const result = removeGlobalCategory(catalog, category.id);
         await persistCatalogMutation(result, `Deleted “${category.name}” and removed its tag relationships. Tags and item assignments were unchanged.`, announceCategory);
@@ -229,6 +230,11 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
       const tags = sortGlobalTagsByType(catalog.tags, group.type);
       group.list.replaceChildren(...tags.map((tag) => createGlobalTagSettingsRow({
       tag, catalog, usage: usage.get(tag.id),
+      onConvertToTool: async () => {
+        const result = editGlobalTag(catalog, tag.id, { name: tag.name, type: "tool", filenameTerms: [] });
+        if (!result.ok) { announce("Texture could not be moved to Tool Tags.", "error"); return; }
+        await persistCatalogMutation(result, "Texture is now a Tool Tag. Item assignments were preserved.");
+      },
       onAddCategory: async (categoryId) => {
         const result = addTagToCategory(catalog, tag.id, categoryId);
         if (!result.ok) { announce("That category relationship could not be added.", "error"); return false; }
@@ -522,7 +528,7 @@ function createGlobalCategorySettingsRow({ category, memberCount, onRename, onDe
   return row;
 }
 
-function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0, stamp: 0 }, onSave, onDelete, onAddCategory, onRemoveCategory }) {
+function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0, stamp: 0 }, onSave, onDelete, onAddCategory, onRemoveCategory, onConvertToTool }) {
   const row = document.createElement("div");
   const display = document.createElement("div");
   const label = document.createElement("strong");
@@ -535,12 +541,13 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
   const cancel = document.createElement("button");
   const edit = document.createElement("button");
   const remove = document.createElement("button");
+  const convert = document.createElement("button");
   row.className = "tag-settings-row global-tag-settings-row";
   display.className = "global-tag-display";
   label.textContent = tag.name;
   details.textContent = `Paper: ${usage.paper} used · Card: ${usage.card} used · Stamp: ${usage.stamp} used`;
   relationships.className = "tag-category-relationships";
-  for (const category of sortGlobalCategories(catalog.categories.filter((entry) => tag.categoryIds.includes(entry.id)))) {
+  for (const category of (tag.type === "tool" ? [] : sortGlobalCategories(catalog.categories.filter((entry) => tag.categoryIds.includes(entry.id))))) {
     const chip = document.createElement("span");
     const removeCategory = document.createElement("button");
     chip.className = "tag-category-chip";
@@ -552,7 +559,7 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
     chip.append(removeCategory);
     relationships.append(chip);
   }
-  const availableCategories = sortGlobalCategories(catalog.categories.filter((category) => !tag.categoryIds.includes(category.id)));
+  const availableCategories = tag.type === "tool" ? [] : sortGlobalCategories(catalog.categories.filter((category) => !tag.categoryIds.includes(category.id)));
   if (availableCategories.length) {
     const select = document.createElement("select");
     const reveal = document.createElement("button");
@@ -593,6 +600,13 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
     relationships.append(empty);
   }
   display.append(label, details);
+  if (tag.type === "theme" && getGlobalTagNameKey(tag.name) === "texture") {
+    convert.type = "button";
+    convert.className = "text-action";
+    convert.textContent = "Move to Tool Tags";
+    convert.addEventListener("click", () => onConvertToTool?.());
+    display.append(convert);
+  }
   display.append(relationships);
   input.value = tag.name;
   input.setAttribute("aria-label", `Tag name for ${tag.name}`);
