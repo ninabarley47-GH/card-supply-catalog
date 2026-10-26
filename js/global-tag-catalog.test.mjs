@@ -30,22 +30,23 @@ test("schema 1 classification migration preserves identity and non-Texture relat
   const source = {
     schemaVersion: 1,
     categories: [{ id: "cat-tools", name: "Supplies" }],
-    tags: ["Stamp", "Die", "Punch", "Mask", "Texture", "Floral"].map((name) => ({
+    tags: ["Stamp", "Die", "Punch", "Mask", "Texture", "Textures", "Floral"].map((name) => ({
       id: `stable-${name}`, name, categoryIds: ["cat-tools"]
     }))
   };
   const upgraded = migrateGlobalTagCatalogSchema(source);
   assert.equal(upgraded.schemaVersion, 2);
-  assert.deepEqual(upgraded.tags.map(({ id, name, type }) => [id, name, type]), source.tags.map((tag) => [tag.id, tag.name, ["Stamp", "Die", "Punch", "Mask", "Texture"].includes(tag.name) ? "tool" : "theme"]));
+  assert.deepEqual(upgraded.tags.map(({ id, name, type }) => [id, name, type]), source.tags.map((tag) => [tag.id, tag.name, ["Stamp", "Die", "Punch", "Mask", "Texture", "Textures"].includes(tag.name) ? "tool" : "theme"]));
   assert.deepEqual(upgraded.tags.find(({ name }) => name === "Die").filenameTerms, ["die"]);
   assert.deepEqual(upgraded.tags.find(({ name }) => name === "Punch").filenameTerms, ["punch"]);
   assert.deepEqual(upgraded.tags.find(({ name }) => name === "Mask").filenameTerms, ["mask"]);
   assert.deepEqual(upgraded.tags.find(({ name }) => name === "Texture").filenameTerms, []);
+  assert.deepEqual(upgraded.tags.find(({ name }) => name === "Textures").filenameTerms, []);
   assert.equal(upgraded.tags.find(({ name }) => name === "Stamp").unmatchedFilenameFallback, true);
   assert.equal("filenameTerms" in upgraded.tags.find(({ name }) => name === "Floral"), false);
   assert.deepEqual(upgraded.categories, source.categories);
   assert.deepEqual(upgraded.tags.map(({ categoryIds }) => categoryIds), source.tags.map((tag) =>
-    getGlobalTagNameKey(tag.name) === "texture" ? [] : tag.categoryIds
+    ["texture", "textures"].includes(getGlobalTagNameKey(tag.name)) ? [] : tag.categoryIds
   ));
   assert.equal(source.schemaVersion, 1);
   assert.deepEqual(migrateGlobalTagCatalogSchema(upgraded), upgraded);
@@ -91,15 +92,15 @@ test("schema 2 backfills only missing Stamp Tool fallback while preserving catal
   assert.deepEqual(migrateGlobalTagCatalogSchema(explicitFalse), explicitFalse);
 });
 
-test("schema 2 moves an existing Texture theme to Tool Tags without changing its ID or product assignment", () => {
+test("schema 2 moves an existing Textures theme to Tool Tags without changing its ID or product assignment", () => {
   const source = {
     schemaVersion: 2,
     categories: [{ id: "cat", name: "Supplies" }],
-    tags: [{ id: "stable-texture", name: " Texture ", type: "theme", categoryIds: ["cat"] }]
+    tags: [{ id: "stable-texture", name: "Textures", type: "theme", categoryIds: ["cat"] }]
   };
   const migrated = migrateGlobalTagCatalogSchema(source);
-  assert.deepEqual(migrated.tags, [{ id: "stable-texture", name: " Texture ", type: "tool", categoryIds: [], filenameTerms: [] }]);
-  assert.deepEqual(source.tags[0], { id: "stable-texture", name: " Texture ", type: "theme", categoryIds: ["cat"] });
+  assert.deepEqual(migrated.tags, [{ id: "stable-texture", name: "Textures", type: "tool", categoryIds: [], filenameTerms: [] }]);
+  assert.deepEqual(source.tags[0], { id: "stable-texture", name: "Textures", type: "theme", categoryIds: ["cat"] });
   assert.equal(validateItemTagAssignments({ catalog: migrated, productType: "paper", tagIds: ["stable-texture"] }).ok, true);
   assert.equal(validateItemTagAssignments({ catalog: migrated, productType: "card", tagIds: ["stable-texture"] }).ok, true);
 });

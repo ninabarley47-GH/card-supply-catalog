@@ -322,6 +322,7 @@ test("collapsible Categories and Tool Tags headers have full-row cues, counts, a
   assert.match(styles, /\.tag-inventory-section\.tag-settings-collapsible > summary\s*\{[^}]*background:/);
   assert.match(html, /<details class="tag-inventory-section tag-settings-collapsible" open>\s*<summary class="tag-inventory-heading"><h5 id="theme-tags-title">Theme Tags<\/h5><span data-theme-tag-total>0 tags<\/span><\/summary>\s*<button class="text-action settings-reveal-action" type="button" data-theme-tag-add-open aria-expanded="false">\+ Add Theme Tag<\/button>/);
   assert.match(settings, /group\.total\) group\.total\.textContent = `\$\{tags\.length\} tag/);
+  assert.match(settings, /\["texture", "textures"\]\.includes\(getGlobalTagNameKey\(tag\.name\)\)/);
 });
 
 test("Tool row editor exposes filename terms while Theme row editor does not", async () => {

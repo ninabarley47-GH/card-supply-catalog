@@ -269,7 +269,7 @@ test("schema 2 Stamp fallback backfill persists once and is idempotent", async (
 
 test("schema 2 Texture classification persists with its stable ID so existing item tagIds still resolve", async () => {
   const schema2 = { schemaVersion: 2, categories: [{ id: "tools", name: "Tools" }], tags: [
-    { id: "stable-texture", name: "Texture", type: "theme", categoryIds: ["tools"] }
+    { id: "stable-texture", name: "Textures", type: "theme", categoryIds: ["tools"] }
   ] };
   const existingAssignments = { paper: ["stable-texture"], card: ["stable-texture"], stamp: ["stable-texture"] };
   const harness = catalogTransactionHarness(schema2);

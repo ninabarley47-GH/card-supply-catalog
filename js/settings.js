@@ -601,7 +601,7 @@ function createGlobalTagSettingsRow({ tag, catalog, usage = { paper: 0, card: 0,
     relationships.append(empty);
   }
   display.append(label, details);
-  if (tag.type === "theme" && getGlobalTagNameKey(tag.name) === "texture") {
+  if (tag.type === "theme" && ["texture", "textures"].includes(getGlobalTagNameKey(tag.name))) {
     convert.type = "button";
     convert.className = "text-action";
     convert.textContent = "Move to Tool Tags";

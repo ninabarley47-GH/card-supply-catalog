@@ -26,7 +26,8 @@ const BUILT_IN_TOOL_NAMES = new Map([
   ["die", { filenameTerms: ["die"] }],
   ["punch", { filenameTerms: ["punch"] }],
   ["mask", { filenameTerms: ["mask"] }],
-  ["texture", { filenameTerms: [] }]
+  ["texture", { filenameTerms: [] }],
+  ["textures", { filenameTerms: [] }]
 ]);
 
 export function validateLegacyGlobalTagCatalog(catalog) {
@@ -55,7 +56,7 @@ export function migrateGlobalTagCatalogSchema(catalog) {
     if (!validation.ok) throw new TypeError("The schema 2 global tag catalog is invalid.");
     const normalized = structuredClone(catalog);
     normalized.tags = normalized.tags.map((tag) => {
-      const isTexture = getGlobalTagNameKey(tag.name) === "texture";
+      const isTexture = ["texture", "textures"].includes(getGlobalTagNameKey(tag.name));
       let upgraded = tag;
       if (isTexture && (tag.type !== "tool" || tag.categoryIds.length)) {
         upgraded = { ...tag, type: "tool", filenameTerms: tag.type === "tool" ? tag.filenameTerms : [], categoryIds: [] };
@@ -80,7 +81,7 @@ export function migrateGlobalTagCatalogSchema(catalog) {
       const defaults = BUILT_IN_TOOL_NAMES.get(getGlobalTagNameKey(tag.name));
       return {
         ...structuredClone(tag),
-        ...(defaults && getGlobalTagNameKey(tag.name) === "texture" ? { categoryIds: [] } : {}),
+        ...(defaults && ["texture", "textures"].includes(getGlobalTagNameKey(tag.name)) ? { categoryIds: [] } : {}),
         type: defaults ? "tool" : "theme",
         ...(defaults ? {
           filenameTerms: [...defaults.filenameTerms],
