@@ -162,7 +162,7 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
   let cards = await loadSavedCards().catch(() => []);
   let stampSets = await loadSavedStampDieSets();
   const tagAddGroups = [
-    { type: "tool", form: root.querySelector("[data-tool-tag-add-form]"), input: root.querySelector("[data-tool-tag-add-input]"), termsInput: root.querySelector("[data-tool-tag-terms-input]"), list: root.querySelector("[data-tool-tag-list]"), trigger: root.querySelector("[data-tool-tag-add-open]"), cancel: root.querySelector("[data-tool-tag-add-cancel]") },
+    { type: "tool", form: root.querySelector("[data-tool-tag-add-form]"), input: root.querySelector("[data-tool-tag-add-input]"), termsInput: root.querySelector("[data-tool-tag-terms-input]"), list: root.querySelector("[data-tool-tag-list]"), total: root.querySelector("[data-tool-tag-total]"), trigger: root.querySelector("[data-tool-tag-add-open]"), cancel: root.querySelector("[data-tool-tag-add-cancel]") },
     { type: "theme", form: root.querySelector("[data-theme-tag-add-form]"), input: root.querySelector("[data-theme-tag-add-input]"), list: root.querySelector("[data-theme-tag-list]"), trigger: root.querySelector("[data-theme-tag-add-open]"), cancel: root.querySelector("[data-theme-tag-add-cancel]") }
   ];
   const message = root.querySelector("[data-tag-message]");
@@ -228,6 +228,7 @@ async function initializeTagSettings({ paperPacks = [], onPaperPacksUpdated } = 
     })));
     for (const group of tagAddGroups) {
       const tags = sortGlobalTagsByType(catalog.tags, group.type);
+      if (group.total) group.total.textContent = `${tags.length} tag${tags.length === 1 ? "" : "s"}`;
       group.list.replaceChildren(...tags.map((tag) => createGlobalTagSettingsRow({
       tag, catalog, usage: usage.get(tag.id),
       onConvertToTool: async () => {

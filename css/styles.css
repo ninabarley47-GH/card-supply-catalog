@@ -2347,10 +2347,28 @@ button.pattern {
 .tag-settings-total { white-space: nowrap; }
 .settings-body { border-top: 1px solid var(--color-border); padding: var(--space-4) var(--space-5) var(--space-2); }
 .category-settings { margin-bottom: var(--space-5); border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-4); }
-.tag-settings-collapsible > summary { cursor: pointer; list-style: disclosure-closed; }
-.tag-settings-collapsible[open] > summary { list-style: disclosure-open; }
+.tag-settings-collapsible > summary {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 3rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(255, 255, 255, 0.68);
+  cursor: pointer;
+  list-style: none;
+}
+.tag-settings-collapsible > summary::-webkit-details-marker { display: none; }
+.tag-settings-collapsible > summary::before { content: "+"; color: var(--color-accent-dark); font-size: 1.35rem; font-weight: 700; line-height: 1; text-align: center; }
+.tag-settings-collapsible[open] > summary::before { content: "−"; }
+.tag-settings-collapsible > summary:focus-visible { outline: 3px solid rgba(82, 120, 109, 0.45); outline-offset: 3px; }
 .category-settings.tag-settings-collapsible > summary { margin-bottom: var(--space-3); }
-.tag-inventory-section.tag-settings-collapsible { margin-top: var(--space-4); border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+.tag-inventory-section.tag-settings-collapsible { margin-top: var(--space-4); border-top: 0; padding-top: 0; }
+.tag-inventory-section.tag-settings-collapsible > summary { background: rgba(216, 225, 220, 0.58); }
+.tag-settings-collapsible > summary > span { color: var(--color-muted); font-size: 0.82rem; font-weight: 700; text-align: right; }
 .library-tag-categories-toggle-all { justify-self: start; }
 .category-settings-heading { display: flex; align-items: start; justify-content: space-between; gap: var(--space-3); }
 .category-settings-heading h5, .category-settings-heading p { margin: 0; }

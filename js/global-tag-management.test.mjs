@@ -288,7 +288,7 @@ test("final C2 labels and tag actions match the category treatment", async () =>
   const tagRow = source.slice(source.indexOf("function createGlobalTagSettingsRow"), source.indexOf("function formatProductType"));
   assert.match(html, /Tags &amp; Categories/);
   assert.match(html, /Manage the shared tag system for Paper, Cards, and Stamp Sets\./);
-  assert.match(html, /<summary class="tag-inventory-heading"><h5 id="tool-tags-title">Tool Tags<\/h5><\/summary>/);
+  assert.match(html, /<summary class="tag-inventory-heading"><h5 id="tool-tags-title">Tool Tags<\/h5><span data-tool-tag-total>0 tags<\/span><\/summary>/);
   assert.match(html, /<h5 id="theme-tags-title">Theme Tags<\/h5>/);
   assert.doesNotMatch(html, /Tags inventory/);
   assert.match(tagRow, /edit\.className = "tag-settings-action tag-edit-action"/);
@@ -307,6 +307,20 @@ test("Settings renders Tool Tags before Theme Tags after Categories", async () =
   assert.match(settings, /data-theme-tag-add-form/);
   assert.match(settings, /data-tool-tag-terms-input/);
   assert.doesNotMatch(settings, /data-theme-tag-terms-input/);
+});
+
+test("collapsible Categories and Tool Tags headers have full-row cues, counts, and focus styling", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../css/styles.css", import.meta.url), "utf8");
+  const settings = await readFile(new URL("./settings.js", import.meta.url), "utf8");
+  assert.match(html, /<summary class="category-settings-heading"><strong id="category-settings-title">Categories<\/strong><span data-category-total>0 categories<\/span><\/summary>/);
+  assert.match(html, /data-tool-tag-total>0 tags/);
+  assert.match(styles, /\.tag-settings-collapsible > summary\s*\{[^}]*width:\s*100%;[^}]*cursor:\s*pointer;/);
+  assert.match(styles, /\.tag-settings-collapsible > summary::before\s*\{[^}]*content:\s*"\+"/);
+  assert.match(styles, /\.tag-settings-collapsible\[open\] > summary::before\s*\{[^}]*content:\s*"−"/);
+  assert.match(styles, /\.tag-settings-collapsible > summary:focus-visible/);
+  assert.match(styles, /\.tag-inventory-section\.tag-settings-collapsible > summary\s*\{[^}]*background:/);
+  assert.match(settings, /group\.total\) group\.total\.textContent = `\$\{tags\.length\} tag/);
 });
 
 test("Tool row editor exposes filename terms while Theme row editor does not", async () => {
