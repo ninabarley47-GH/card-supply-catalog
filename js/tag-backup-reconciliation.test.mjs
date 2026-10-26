@@ -9,6 +9,19 @@ const catalog = (tags = [], categories = []) => ({ schemaVersion: 1, tags, categ
 const modern = (tagCatalog, paperPacks = [], cards = []) => ({ tagCatalog, paperPacks, cards });
 const paper = (id, tagIds) => ({ id, tagIds });
 const card = (id, tagIds) => ({ id, tagIds });
+const modernCatalog = (tags = [], categories = []) => ({ schemaVersion: 2, tags, categories });
+const toolTag = (id, name, filenameTerms = [], extra = {}) => ({ id, name, type: "tool", filenameTerms, categoryIds: [], ...extra });
+
+function assertConfigurationConflict(result, setting, matchBy) {
+  assert.equal(result.ok, false);
+  assert.equal(result.conflicts.length, 1);
+  assert.equal(result.conflicts[0].type, "tag-configuration");
+  assert.equal(result.conflicts[0].matchBy, matchBy);
+  assert.ok(result.conflicts[0].differences.some((difference) => difference.setting === setting));
+  assert.match(result.conflicts[0].message, /Tag configuration conflict/);
+  assert.equal("catalog" in result, false);
+  assert.equal("paperPacks" in result, false);
+}
 
 test("same stable ID keeps the local name and unions applicability and categories", () => {
   const local = catalog([tag("tag-1", "Local name", ["paper"], ["cat-local"])], [category("cat-local", "Local")]);
@@ -29,6 +42,43 @@ test("different IDs with the same normalized name remap to the local tag and cat
   assert.deepEqual(result.cards[0].tagIds, ["local-tag"]);
   assert.equal(result.report.tagIdsRemapped, 1);
   assert.equal(result.report.categoryIdsRemapped, 1);
+});
+
+test("modern backup blocks a type conflict matched by stable ID without mutating either input", () => {
+  const local = modernCatalog([toolTag("shared", "Embossing", ["emboss"])]);
+  const backup = modern(modernCatalog([{ id: "shared", name: "Embossing", type: "theme", categoryIds: [] }]), [paper("p", ["shared"])]);
+  const before = structuredClone({ local, backup });
+  const result = reconcileBackupTagData({ localCatalog: local, backup });
+  assertConfigurationConflict(result, "type", "id");
+  assert.deepEqual({ local, backup }, before);
+  assert.match(result.conflicts[0].message, /type \(local: tool; backup: theme\)/);
+});
+
+test("modern backup blocks a filenameTerms conflict matched by normalized name", () => {
+  const local = modernCatalog([toolTag("local", "Embossing", ["emboss", "powder"])]);
+  const backup = modern(modernCatalog([toolTag("remote", " embossing ", ["emboss", "heat"])]), [], [card("c", ["remote"])]);
+  const before = structuredClone({ local, backup });
+  const result = reconcileBackupTagData({ localCatalog: local, backup });
+  assertConfigurationConflict(result, "filenameTerms", "normalized-name");
+  assert.deepEqual({ local, backup }, before);
+  assert.match(result.conflicts[0].message, /filenameTerms \(local: \[emboss, powder\]; backup: \[emboss, heat\]\)/);
+});
+
+test("modern backup blocks fallback presence/value conflicts matched by stable ID", () => {
+  const local = modernCatalog([toolTag("shared", "Special Tool", [])]);
+  const backup = modern(modernCatalog([toolTag("shared", "Special Tool", [], { unmatchedFilenameFallback: false })]));
+  const result = reconcileBackupTagData({ localCatalog: local, backup });
+  assertConfigurationConflict(result, "unmatchedFilenameFallback", "id");
+  assert.match(result.conflicts[0].message, /unmatchedFilenameFallback \(local: not set; backup: false\)/);
+});
+
+test("matching modern Tool Tag configurations reconcile as before", () => {
+  const local = modernCatalog([toolTag("local", "Embossing", ["heat", "powder"], { unmatchedFilenameFallback: false, categoryIds: ["local-cat"] })], [category("local-cat", "Tools")]);
+  const backup = modern(modernCatalog([toolTag("remote", " embossing ", ["heat", "powder"], { unmatchedFilenameFallback: false, categoryIds: ["remote-cat"] })], [category("remote-cat", " tools ")]), [], [card("c", ["remote"])]);
+  const result = reconcileBackupTagData({ localCatalog: local, backup });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.cards[0].tagIds, ["local"]);
+  assert.deepEqual(result.catalog.tags[0].categoryIds, ["local-cat"]);
 });
 
 test("an empty local catalog preserves imported stable IDs", () => {

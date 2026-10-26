@@ -175,6 +175,39 @@ test("restore planning does not hydrate existing Cards against the pre-reconcili
   assert.equal(writes.length, 1);
 });
 
+test("Tool configuration conflicts block backup import before catalog or item changes", async () => {
+  const { color, paperPack, card } = createCatalogRecords();
+  const importedTool = { id: "stable-tool", name: "Embossing", type: "tool", filenameTerms: ["heat", "powder"], categoryIds: [] };
+  const backupCatalog = { schemaVersion: 2, tags: [importedTool], categories: [] };
+  paperPack.tagIds = [importedTool.id];
+  card.tagIds = [importedTool.id];
+  const backup = createCatalogBackupSnapshot({
+    paperPacks: [paperPack], colorsById: { [color.id]: color }, cards: [card], tagCatalog: backupCatalog
+  });
+  const localCatalog = { schemaVersion: 2, tags: [
+    { ...importedTool, filenameTerms: ["emboss"] }
+  ], categories: [] };
+  const existingPaperPacks = [{ id: "local-paper", tagIds: ["stable-tool"] }];
+  const existingColors = { existing: { id: "existing", name: "Existing" } };
+  const before = structuredClone({ backup, existingPaperPacks, existingColors, localCatalog });
+  const writes = [];
+  const summary = await restoreCatalogBackup({
+    backup, paperPacks: existingPaperPacks, colorsById: existingColors,
+    services: {
+      loadGlobalTagCatalog: async () => localCatalog,
+      loadSavedCardRecordsForRestore: async () => [],
+      restoreCatalogRecords: async (records) => writes.push(records),
+      preparePaperPack: async (record) => ({ paperPack: record })
+    }
+  });
+  assert.equal(summary.packsImported, 0);
+  assert.equal(summary.cardsImported, 0);
+  assert.equal(writes.length, 0);
+  assert.equal(summary.conflicts.length, 1);
+  assert.match(summary.errors.join(" "), /filenameTerms/);
+  assert.deepEqual({ backup, existingPaperPacks, existingColors, localCatalog }, before);
+});
+
 test("legacy backup without tag vocabularies reconstructs them from records and the Paper seed", async () => {
   const { color, paperPack, card } = createCatalogRecords();
   paperPack.keywords = ["Legacy Paper Assignment"];

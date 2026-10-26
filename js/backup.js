@@ -1004,6 +1004,7 @@ export async function restoreCatalogBackup({
   summary.conflicts = reconciliation.conflicts || [];
   if (!reconciliation.ok) {
     summary.errors.push("Nothing was imported because tag conflicts require review.");
+    summary.errors.push(...summary.conflicts.map((conflict) => conflict.message).filter(Boolean));
     return summary;
   }
 

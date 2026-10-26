@@ -84,6 +84,7 @@ function reconcileModern(localCatalog, backup) {
   const tagIdMap = new Map();
   const localTagsById = new Map(catalog.tags.map((entry) => [entry.id, entry]));
   const localTagsByName = new Map(catalog.tags.map((entry) => [getGlobalTagNameKey(entry.name), entry]));
+  const configurationConflicts = [];
   for (const imported of backup.tagCatalog.tags) {
     const remappedCategories = imported.categoryIds.map((id) => categoryIdMap.get(id));
     if (remappedCategories.some((id) => !id)) throw new TypeError("Imported tag references an unknown category.");
@@ -91,6 +92,19 @@ function reconcileModern(localCatalog, backup) {
     const byName = localTagsByName.get(getGlobalTagNameKey(imported.name));
     const target = byId || byName;
     if (target) {
+      const differences = getTagConfigurationDifferences(target, imported);
+      if (differences.length) {
+        configurationConflicts.push({
+          type: "tag-configuration",
+          matchBy: byId ? "id" : "normalized-name",
+          tagId: target.id,
+          localName: target.name,
+          importedName: imported.name,
+          differences,
+          message: formatTagConfigurationConflict(target, imported, byId ? "ID" : "normalized name", differences)
+        });
+        continue;
+      }
       tagIdMap.set(imported.id, target.id);
       if (byId && getGlobalTagNameKey(byId.name) !== getGlobalTagNameKey(imported.name)) {
         report.localNamesRetained.push({ id: byId.id, localName: byId.name, importedName: imported.name });
@@ -114,7 +128,34 @@ function reconcileModern(localCatalog, backup) {
       report.tagsAdded += 1;
     }
   }
+  if (configurationConflicts.length) return { ok: false, conflicts: configurationConflicts, report };
   return finish(catalog, backup, tagIdMap, report);
+}
+
+function getTagConfigurationDifferences(local, imported) {
+  return ["type", "filenameTerms", "unmatchedFilenameFallback"].flatMap((setting) => {
+    const localPresent = Object.hasOwn(local, setting);
+    const importedPresent = Object.hasOwn(imported, setting);
+    const localValue = local[setting];
+    const importedValue = imported[setting];
+    const equalValue = Array.isArray(localValue) && Array.isArray(importedValue)
+      ? localValue.length === importedValue.length && localValue.every((value, index) => value === importedValue[index])
+      : Object.is(localValue, importedValue);
+    if (localPresent === importedPresent && equalValue) return [];
+    return [{ setting, localPresent, localValue, importedPresent, importedValue }];
+  });
+}
+
+function formatTagConfigurationConflict(local, imported, matchDescription, differences) {
+  const settings = differences.map(({ setting, localPresent, localValue, importedPresent, importedValue }) =>
+    `${setting} (local: ${formatConfigValue(localPresent, localValue)}; backup: ${formatConfigValue(importedPresent, importedValue)})`
+  ).join(", ");
+  return `Tag configuration conflict for “${imported.name}” (matched by ${matchDescription}): ${settings}. Nothing was imported.`;
+}
+
+function formatConfigValue(present, value) {
+  if (!present) return "not set";
+  return Array.isArray(value) ? `[${value.join(", ")}]` : String(value);
 }
 
 function reconcileLegacy(localCatalog, backup) {
