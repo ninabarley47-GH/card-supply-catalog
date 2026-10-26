@@ -54,11 +54,17 @@ export function migrateGlobalTagCatalogSchema(catalog) {
     const validation = validateGlobalTagCatalog(catalog);
     if (!validation.ok) throw new TypeError("The schema 2 global tag catalog is invalid.");
     const normalized = structuredClone(catalog);
-    normalized.tags = normalized.tags.map((tag) =>
-      tag.type === "tool" && getGlobalTagNameKey(tag.name) === "stamp" && !("unmatchedFilenameFallback" in tag)
-        ? { ...tag, unmatchedFilenameFallback: true }
-        : tag
-    );
+    normalized.tags = normalized.tags.map((tag) => {
+      const isTexture = getGlobalTagNameKey(tag.name) === "texture";
+      let upgraded = tag;
+      if (isTexture && (tag.type !== "tool" || tag.categoryIds.length)) {
+        upgraded = { ...tag, type: "tool", filenameTerms: tag.type === "tool" ? tag.filenameTerms : [], categoryIds: [] };
+      }
+      if (upgraded.type === "tool" && getGlobalTagNameKey(upgraded.name) === "stamp" && !("unmatchedFilenameFallback" in upgraded)) {
+        upgraded = { ...upgraded, unmatchedFilenameFallback: true };
+      }
+      return upgraded;
+    });
     return normalized;
   }
   if (catalog?.schemaVersion !== LEGACY_GLOBAL_TAG_CATALOG_SCHEMA_VERSION) {
@@ -74,6 +80,7 @@ export function migrateGlobalTagCatalogSchema(catalog) {
       const defaults = BUILT_IN_TOOL_NAMES.get(getGlobalTagNameKey(tag.name));
       return {
         ...structuredClone(tag),
+        ...(defaults && getGlobalTagNameKey(tag.name) === "texture" ? { categoryIds: [] } : {}),
         type: defaults ? "tool" : "theme",
         ...(defaults ? {
           filenameTerms: [...defaults.filenameTerms],

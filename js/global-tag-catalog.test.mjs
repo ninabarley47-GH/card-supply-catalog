@@ -26,7 +26,7 @@ test("normalizes tag names and comparison keys", () => {
   assert.equal(getGlobalTagNameKey(" FUN  fold "), "fun fold");
 });
 
-test("schema 1 classification migration applies approved defaults without changing identity or relationships", () => {
+test("schema 1 classification migration preserves identity and non-Texture relationships", () => {
   const source = {
     schemaVersion: 1,
     categories: [{ id: "cat-tools", name: "Supplies" }],
@@ -44,7 +44,9 @@ test("schema 1 classification migration applies approved defaults without changi
   assert.equal(upgraded.tags.find(({ name }) => name === "Stamp").unmatchedFilenameFallback, true);
   assert.equal("filenameTerms" in upgraded.tags.find(({ name }) => name === "Floral"), false);
   assert.deepEqual(upgraded.categories, source.categories);
-  assert.deepEqual(upgraded.tags.map(({ categoryIds }) => categoryIds), source.tags.map(({ categoryIds }) => categoryIds));
+  assert.deepEqual(upgraded.tags.map(({ categoryIds }) => categoryIds), source.tags.map((tag) =>
+    getGlobalTagNameKey(tag.name) === "texture" ? [] : tag.categoryIds
+  ));
   assert.equal(source.schemaVersion, 1);
   assert.deepEqual(migrateGlobalTagCatalogSchema(upgraded), upgraded);
 });
@@ -87,6 +89,19 @@ test("schema 2 backfills only missing Stamp Tool fallback while preserving catal
     { id: "stamp-false", name: "Stamp", type: "tool", filenameTerms: [], categoryIds: [], unmatchedFilenameFallback: false }
   ] };
   assert.deepEqual(migrateGlobalTagCatalogSchema(explicitFalse), explicitFalse);
+});
+
+test("schema 2 moves an existing Texture theme to Tool Tags without changing its ID or product assignment", () => {
+  const source = {
+    schemaVersion: 2,
+    categories: [{ id: "cat", name: "Supplies" }],
+    tags: [{ id: "stable-texture", name: " Texture ", type: "theme", categoryIds: ["cat"] }]
+  };
+  const migrated = migrateGlobalTagCatalogSchema(source);
+  assert.deepEqual(migrated.tags, [{ id: "stable-texture", name: " Texture ", type: "tool", categoryIds: [], filenameTerms: [] }]);
+  assert.deepEqual(source.tags[0], { id: "stable-texture", name: " Texture ", type: "theme", categoryIds: ["cat"] });
+  assert.equal(validateItemTagAssignments({ catalog: migrated, productType: "paper", tagIds: ["stable-texture"] }).ok, true);
+  assert.equal(validateItemTagAssignments({ catalog: migrated, productType: "card", tagIds: ["stable-texture"] }).ok, true);
 });
 
 test("schema 2 rejects duplicate normalized filename terms across Tool Tags", () => {

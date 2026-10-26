@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createMigratedTagId } from "./global-tag-catalog.js";
+import { createMigratedTagId, validateItemTagAssignments } from "./global-tag-catalog.js";
 import {
   GLOBAL_TAG_MIGRATION_VERSION,
   dehydrateCardTagNames,
@@ -264,6 +264,24 @@ test("schema 2 Stamp fallback backfill persists once and is idempotent", async (
   const second = await migrateCatalogInHarness(harness);
   assert.equal(second.migrated, false);
   assert.deepEqual(second.catalog, first.catalog);
+  assert.equal(harness.putCount(), 1);
+});
+
+test("schema 2 Texture classification persists with its stable ID so existing item tagIds still resolve", async () => {
+  const schema2 = { schemaVersion: 2, categories: [{ id: "tools", name: "Tools" }], tags: [
+    { id: "stable-texture", name: "Texture", type: "theme", categoryIds: ["tools"] }
+  ] };
+  const existingAssignments = { paper: ["stable-texture"], card: ["stable-texture"], stamp: ["stable-texture"] };
+  const harness = catalogTransactionHarness(schema2);
+  const result = await migrateCatalogInHarness(harness);
+  assert.equal(result.migrated, true);
+  assert.equal(result.catalog.tags[0].id, "stable-texture");
+  assert.equal(result.catalog.tags[0].type, "tool");
+  assert.deepEqual(result.catalog.tags[0].categoryIds, []);
+  for (const [productType, tagIds] of Object.entries(existingAssignments)) {
+    assert.equal(validateItemTagAssignments({ catalog: result.catalog, productType, tagIds }).ok, true);
+  }
+  assert.deepEqual(existingAssignments, { paper: ["stable-texture"], card: ["stable-texture"], stamp: ["stable-texture"] });
   assert.equal(harness.putCount(), 1);
 });
 
