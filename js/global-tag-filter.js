@@ -137,11 +137,21 @@ export function renderGlobalTagFilter(container, catalog, { inputPrefix, options
   }
   existing?.remove();
   container.append(options);
-  options.querySelector('[data-toggle-all-filter-categories]')?.addEventListener('click', (event) => {
+  const toggleAll = options.querySelector('[data-toggle-all-filter-categories]');
+  const synchronizeToggleAll = () => {
+    if (!toggleAll) return;
+    const details = options.querySelectorAll('details[data-filter-category]');
+    const allExpanded = details.length > 0 && details.every((section) => section.open);
+    toggleAll.setAttribute('aria-expanded', String(allExpanded));
+    toggleAll.textContent = allExpanded ? '− Collapse all' : '+ Expand all';
+  };
+  for (const details of options.querySelectorAll('details[data-filter-category]')) {
+    details.addEventListener('toggle', synchronizeToggleAll);
+  }
+  toggleAll?.addEventListener('click', (event) => {
     const expand = event.currentTarget.getAttribute('aria-expanded') !== 'true';
     for (const details of options.querySelectorAll('details[data-filter-category]')) details.open = expand;
-    event.currentTarget.setAttribute('aria-expanded', String(expand));
-    event.currentTarget.textContent = expand ? '− Collapse all' : '+ Expand all';
+    synchronizeToggleAll();
   });
   renderedFilterModels.set(container, signature);
 }

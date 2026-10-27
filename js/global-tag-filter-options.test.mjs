@@ -162,7 +162,42 @@ test('category sections start expanded and the expand-all control matches their 
     assert.ok(categories.every((details) => !details.open));
     assert.equal(toggle.textContent, '+ Expand all');
     assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+    return toggle.emit('click');
+  }).then(() => {
+    assert.ok(categories.every((details) => details.open));
+    assert.equal(toggle.textContent, '− Collapse all');
+    assert.equal(toggle.getAttribute('aria-expanded'), 'true');
   });
+});
+
+test('manual category toggles keep the expand-all control synchronized', async (t) => {
+  const h = renderer(t);
+  const options = h.container.querySelector('[data-global-tag-filter-options]');
+  const toggle = options.querySelector('[data-toggle-all-filter-categories]');
+  const section = options.querySelector('details[data-filter-category]');
+
+  section.open = false;
+  await section.emit('toggle');
+  assert.equal(toggle.textContent, '+ Expand all');
+  assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+
+  section.open = true;
+  await section.emit('toggle');
+  assert.equal(toggle.textContent, '− Collapse all');
+  assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+});
+
+test('filter without categories renders without an expand-all control', (t) => {
+  const h = renderer(t);
+  const standalone = {
+    schemaVersion: 1,
+    categories: [],
+    tags: [{ id: 'plain', name: 'Plain', categoryIds: [] }]
+  };
+  assert.doesNotThrow(() => h.draw([{ tagIds: ['plain'] }], standalone));
+  const options = h.container.querySelector('[data-global-tag-filter-options]');
+  assert.ok(options.querySelector('input[data-global-tag-id="plain"]'));
+  assert.equal(options.querySelector('[data-toggle-all-filter-categories]'), null);
 });
 
 test('unchanged usage keeps DOM, selections, and expanded categories despite narrowing results', (t) => {
