@@ -10,16 +10,17 @@ const catalog = {
     { id: 'd', name: 'Die', type: 'tool', filenameTerms: ['die'], categoryIds: ['tools'], appliesTo: ['card'] },
     { id: 'm', name: 'Mask', type: 'tool', filenameTerms: ['mask'], categoryIds: [] },
     { id: 'f', name: 'Floral', type: 'theme', categoryIds: ['nature'] },
+    { id: 'b', name: 'Botanical', type: 'theme', categoryIds: ['nature'] },
     { id: 't', name: 'Texture', type: 'tool', filenameTerms: [], categoryIds: [] },
     { id: 'x', name: 'Christmas', type: 'theme', categoryIds: ['holidays'] }
   ],
   categories: [{ id: 'tools', name: 'Tools' }, { id: 'nature', name: 'Nature' }, { id: 'holidays', name: 'Holidays' }]
 };
 const records = [
-  { id: 'one', name: 'Pine Boughs', releaseYear: 2026, ownerId: 'n', favorite: true, tagIds: ['s', 'd'], brand: 'Northwoods Craft', imageRefs: [{ imagePath: 'secret-file.jpg' }] },
-  { id: 'two', name: 'Summer Flowers', releaseYear: 2025, ownerId: 'a', favorite: false, tagIds: ['s', 'f'], purchasedFrom: 'Paper Loft' },
+  { id: 'one', name: 'Pine Boughs', releaseYear: 2026, ownerId: 'n', favorite: true, tagIds: ['s', 'd', 'b'], brand: 'Northwoods Craft', imageRefs: [{ imagePath: 'secret-file.jpg' }] },
+  { id: 'two', name: 'Summer Flowers', releaseYear: 2025, ownerId: 'a', favorite: false, tagIds: ['s', 'f', 'x'], purchasedFrom: 'Paper Loft' },
   { id: 'three', name: 'Pine Mask', releaseYear: 2026, ownerId: 'n', favorite: false, tagIds: ['m', 'f'] },
-  { id: 'four', name: 'Old Set', ownerId: 'old', favorite: true, tagIds: ['d'] }
+  { id: 'four', name: 'Old Set', ownerId: 'old', favorite: true, tagIds: ['d', 'b'] }
 ];
 const ids = (filters = {}, tags = catalog, registry = owners) => filterStampDieSets(records, filters, tags, registry).map((record) => record.id);
 const tag = (...individualTagIds) => ({ individualTagIds, categories: [] });
@@ -43,9 +44,10 @@ for (const [label, filters, expected] of [
   ['explicit tags AND', { selectedTags: tag('s', 'd') }, ['one']],
   ['display tag name is not identity', { selectedTags: tag('Stamp') }, []],
   ['category ID is not an assignment', { selectedTags: tag('tools') }, []],
-  ['category children OR', { selectedTags: category('tools') }, ['one', 'two', 'four']],
-  ['category refinement', { selectedTags: category('tools', ['d']) }, ['one', 'four']],
-  ['categories AND', { selectedTags: { individualTagIds: [], categories: [...category('tools').categories, ...category('nature').categories] } }, ['two']],
+  ['tool-only category is ignored', { selectedTags: category('tools') }, []],
+  ['category children OR', { selectedTags: category('nature') }, ['one', 'two', 'three', 'four']],
+  ['category refinement', { selectedTags: category('nature', ['f']) }, ['two', 'three']],
+  ['categories AND', { selectedTags: { individualTagIds: [], categories: [...category('nature').categories, ...category('holidays').categories] } }, ['two']],
   ['favorites', { favoritesOnly: true }, ['one', 'four']],
   ['release year', { releaseYear: '2025' }, ['two']],
   ['absent year', { releaseYear: 2024 }, []],
@@ -53,7 +55,7 @@ for (const [label, filters, expected] of [
   ['search + owner', { query: 'pine', ownerId: 'a' }, []],
   ['owner + favorite', { ownerId: 'n', favoritesOnly: true }, ['one']],
   ['year + tag', { releaseYear: 2026, selectedTags: tag('m') }, ['three']],
-  ['category + owner', { selectedTags: category('tools'), ownerId: 'a' }, ['two']],
+  ['category + owner', { selectedTags: category('nature'), ownerId: 'a' }, ['two']],
   ['all constraints', { query: 'pine', selectedTags: tag('d'), ownerId: 'n', favoritesOnly: true }, ['one']]
 ]) test(`Set filtering: ${label}`, () => assert.deepEqual(ids(filters), expected));
 

@@ -125,6 +125,67 @@ test("backup and restore round-trip includes Cards and their persistent image re
   assert.equal(cardsRestoredEvents, 1);
 });
 
+test("Tool Tag settings and Paper, Card, and Stamp Set assignments round-trip intact", async () => {
+  const { color, paperPack, card } = createCatalogRecords();
+  const toolTags = [
+    { id: "custom-embossing", name: "Embossing", type: "tool", filenameTerms: ["heat emboss", "embossing powder"], categoryIds: [] },
+    { id: "custom-stamp", name: "Stamp", type: "tool", filenameTerms: ["rubber stamp", "clear stamp"], unmatchedFilenameFallback: true, categoryIds: [] },
+    { id: "custom-texture", name: "Special Texture", type: "tool", filenameTerms: ["texture plate", "grain"], unmatchedFilenameFallback: false, categoryIds: [] }
+  ];
+  const toolTagIds = toolTags.map(({ id }) => id);
+  const tagCatalog = {
+    schemaVersion: 2,
+    tags: [...toolTags, { id: "floral", name: "Floral", type: "theme", categoryIds: ["nature"] }],
+    categories: [{ id: "nature", name: "Nature" }]
+  };
+  paperPack.tagIds = [...toolTagIds];
+  delete paperPack.keywords;
+  card.tagIds = [...toolTagIds, "floral"];
+  delete card.tags;
+  const stampDieSet = {
+    id: "roundtrip-set", name: "Round-trip Set", dateCreated: "2026-08-18",
+    favorite: false, tagIds: [...toolTagIds], imageRefs: []
+  };
+  const sourceBefore = structuredClone({ color, paperPack, card, stampDieSet, tagCatalog });
+
+  const backup = createCatalogBackupSnapshot({
+    paperPacks: [paperPack], colorsById: { [color.id]: color }, cards: [card],
+    stampDieSets: [stampDieSet], tagCatalog
+  });
+
+  assert.deepEqual({ color, paperPack, card, stampDieSet, tagCatalog }, sourceBefore);
+  assert.equal(backup.schemaVersion, 4);
+  assert.equal(backup.tagCatalog.schemaVersion, 2);
+  const normalizedBackup = normalizeBackupTagCatalog(backup);
+  assert.deepEqual(normalizeBackupTagCatalog(normalizedBackup), normalizedBackup);
+  assert.deepEqual(backup, normalizedBackup);
+
+  const persistedCalls = [];
+  const summary = await restoreCatalogBackup({
+    backup: JSON.parse(JSON.stringify(normalizedBackup)), paperPacks: [], colorsById: {},
+    services: {
+      loadGlobalTagCatalog: async () => ({ schemaVersion: 1, tags: [], categories: [] }),
+      loadSavedCardRecordsForRestore: async () => [],
+      loadSavedStampDieRecordsForRestore: async () => [],
+      preparePaperPack: async (record) => ({ paperPack: record }),
+      restoreCatalogRecords: async (records) => persistedCalls.push(records),
+      dispatchCardsRestored: () => {}, dispatchStampSetsRestored: () => {}, dispatchCatalogRestored: () => {}
+    }
+  });
+
+  assert.deepEqual(summary.errors, []);
+  assert.equal(persistedCalls.length, 1);
+  const restored = persistedCalls[0];
+  const restoredTools = restored.tagCatalog.tags.filter(({ type }) => type === "tool");
+  assert.deepEqual(restoredTools, toolTags);
+  assert.deepEqual(restored.tagCatalog.categories, tagCatalog.categories);
+  assert.deepEqual(restored.tagCatalog.tags.find(({ id }) => id === "floral").categoryIds, ["nature"]);
+  assert.deepEqual(restored.paperPacks[0].tagIds, toolTagIds);
+  assert.deepEqual(restored.cards[0].tagIds, [...toolTagIds, "floral"]);
+  assert.deepEqual(restored.stampDieSets[0].tagIds, toolTagIds);
+  assert.deepEqual(normalizeBackupTagCatalog(normalizedBackup).tagCatalog.tags.filter(({ type }) => type === "tool"), toolTags);
+});
+
 test("compact iPad backup round-trip carries the global catalog and tagIds", async () => {
   const { color, paperPack, card } = createCatalogRecords();
   const migrated = migrateLegacyTagData({ paperRecords: [paperPack], cardRecords: [card] });
