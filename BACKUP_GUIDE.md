@@ -63,22 +63,27 @@ The backup JSON contains two separate version numbers:
 - `schemaVersion` versions the backup envelope: the top-level JSON structure, collection layout, image-storage information, and import contract.
 - `catalogSchemaVersion` versions the catalog records stored inside that envelope, including the fields and allowed values on Cards, Paper Packs, and Stamp & Die Sets.
 
-The current combination is backup envelope version 4 and catalog-record version 7:
+The current combination is backup envelope version 4 and catalog-record version 8.
+The nested global tag catalog has its own independent schema version, currently 2.
 
 ```json
 {
   "schemaVersion": 4,
-  "catalogSchemaVersion": 7
+  "catalogSchemaVersion": 8
 }
 ```
 
+`catalogSchemaVersion` applies to Paper Pack, Card, and Stamp & Die Set records.
+The separate `tagCatalog.schemaVersion` applies to global tags and categories; it
+is not the backup envelope or catalog-record version.
+
 Envelope version 4 adds `stampDieSets` and standard-backup descriptive
 `imageStorage.configuredStampDieLibrary` metadata. The Set record format has not
-changed, so catalog version 6 and IndexedDB version 6 remain unchanged. Version-1/2
-legacy taxonomy backups and version-3 global-tag backups remain importable. An
-absent Set section means no Sets to import; it never clears existing Sets or
-creates inferred records. Backups declaring a newer backup/catalog version are
-rejected before restore.
+changed when that envelope version was introduced; the catalog-record schema was
+version 6 at that time. Version-1/2 legacy taxonomy backups and version-3
+global-tag backups remain importable. An absent Set section means no Sets to
+import; it never clears existing Sets or creates inferred records. Backups
+declaring a newer backup/catalog version are rejected before restore.
 
 For future changes, increment `catalogSchemaVersion` for record fields, validation rules, or record migrations. Increment the backup `schemaVersion` only for changes to the top-level envelope or its import contract. If a change affects both, increment and document both versions.
 
@@ -107,8 +112,9 @@ Cloud-synced folders such as OneDrive, Dropbox, iCloud Drive, or Google Drive ca
 
 ## Import Modes
 
-- Incremental import is the default. It adds Paper Packs, colors, Cards, and Stamp & Die Sets whose IDs are not already present and skips matching IDs.
-- Overlay import is enabled with **Replace existing catalog entries during import**. It replaces matching IDs with the backup versions and also adds missing IDs. Existing records absent from the backup remain untouched.
+- Incremental import is the default. It adds Paper Packs, colors, Cards, and Stamp & Die Sets whose IDs are not already present and skips matching IDs. It merges tag/category data while retaining local names for matching tags.
+- If a modern backup matches a tag by ID or normalized name but has different `type`, `filenameTerms`, or `unmatchedFilenameFallback` settings, import stops before changing the catalog or any items. The restore summary identifies the tag, how it matched, and local versus backup values.
+- Overlay import is enabled with **Replace existing catalog entries during import**. It replaces matching IDs with the backup versions, uses the backup's modern tag/category configuration, and also adds missing IDs. Existing records absent from the backup remain untouched.
 
 Paper Packs, Cards, and Stamp & Die Sets use the same ID-based rules. Two Cards that look alike but have different IDs are distinct records and are retained in either mode.
 
@@ -179,6 +185,7 @@ compact export reads accessible images. Restore writes catalog metadata only.
 After a successful restore, CSC refreshes shared Owner and tag/category views,
 including Settings usage counts, without requiring an app reload.
 
-Card Notes advances the catalog-record version to 7. Standard and iPad backups
+Card Notes was introduced in catalog-record version 7. Standard and iPad backups
 preserve its plain multiline text; older backups without Notes remain importable.
-The backup envelope and IndexedDB versions are unchanged by Notes.
+The current catalog-record version is 8. The backup envelope and IndexedDB
+versions were unchanged by Notes.

@@ -18,7 +18,9 @@ Use a test browser profile or a browser where app data can be safely cleared.
    - all packs return
    - pack names are correct
    - colors are correct
-   - tags are correct
+   - Paper Pack, Card, and Stamp & Die Set tag assignments are correct
+   - category memberships are correct
+   - Tool Tags retain their IDs, type, custom filename terms, and explicit `true` and `false` fallback settings
    - owners are correct
    - release years are correct
    - notes/status fields return
@@ -29,6 +31,8 @@ Use a test browser profile or a browser where app data can be safely cleared.
    - Card dates, sizes, favorites, tags, stamp sets, paper-pack links, and color links are correct
    - embedded Card images return when the backup includes embedded image data
    - folder-backed Card image references return and display after the Card image folder is reconnected
+   - all Stamp & Die Sets return with their names, owners, release years, favorites, and tag assignments
+   - embedded Stamp & Die images return when present; folder-backed image references display after the Stamp & Die image folder is reconnected
 10. Confirm restored app behavior:
     - search still works
     - tag filters still work
@@ -46,22 +50,36 @@ Expected differences:
 - `exportedAt`
 - future verification metadata, if added later
 
-Folder-backed image files are not embedded in the standard JSON backup. The Paper and Card image folders must be backed up or shared separately. The iPad backup embeds accessible Paper and Card images.
+Folder-backed image files are not embedded in the standard JSON backup. The Paper,
+Card, and Stamp & Die image folders must be backed up or shared separately. The
+compact iPad backup embeds accessible images from all three libraries.
 
 ## Import Mode Verification
 
-1. With existing test paper packs and Cards present, import a backup with replacement unchecked.
-2. Confirm matching paper-pack and Card IDs are skipped, missing IDs are added, and current matching records remain unchanged.
+1. With sample Paper Packs, Cards, and Stamp & Die Sets present, import a backup with replacement unchecked.
+2. Confirm matching IDs are skipped, missing IDs are added, and current matching records remain unchanged.
 3. Import the same backup with **Replace existing catalog entries during import** checked and approve the confirmation.
-4. Confirm matching paper-pack and Card IDs now contain the backup values, missing IDs are added, and records absent from the backup remain unchanged.
-5. Confirm the restore summary reports imported and skipped paper packs, colors, and Cards accurately.
+4. Confirm matching IDs now contain the backup values, missing IDs are added, and records absent from the backup remain unchanged.
+5. Confirm the restore summary reports imported and skipped Paper Packs, colors, Cards, and Stamp & Die Sets accurately.
 
-# Atomic Failure Verification
-## If validation, preparation, or any database write fails, the transaction is aborted and the existing catalog remains unchanged.
+## Tag Configuration Conflict
+
+Use only a disposable test profile with sample records. Keep a copy of the valid
+backup, then edit the copy so a tag that matches a local tag has a different Tool
+Tag setting. For example, change its `filenameTerms` while keeping the tag ID.
+Import the edited backup with replacement unchecked. Confirm the summary names the
+tag, says how it matched, and shows the local and backup settings. Confirm that no
+catalog or item values changed. Repeat with replacement checked and verify that
+the backup's tag configuration is used.
+
+## Atomic Failure Verification
+
+If validation, preparation, or any database write fails, the transaction is
+aborted and the existing catalog remains unchanged.
 
 Use only a disposable test profile for this check.
 
-1. Record the current paper-pack, color, and Card counts and the values of several recognizable records.
+1. Record the current Paper Pack, color, Card, Stamp & Die Set, tag, and Owner counts, plus a few recognizable values.
 2. Make a copy of a valid backup and deliberately invalidate one Card, such as changing `size.width` from a number to text.
 3. Import the invalid backup.
 4. Confirm the restore reports that nothing was imported.

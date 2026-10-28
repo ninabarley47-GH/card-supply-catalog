@@ -136,7 +136,7 @@ Backups are explicit, user-triggered JSON exports rather than automatic rolling 
 
 - Standard backup: includes Paper Packs, Cards, Stamp & Die Sets, colors, the versioned global tag catalog, `tagIds` assignments, embedded fallback images, and relative references to folder-backed Paper, Card, and Stamp & Die images. The image folders must be backed up separately.
 - iPad backup: includes the same global tag catalog and `tagIds` assignments while embedding compressed copies of accessible Paper, Card, and Stamp & Die images so the catalog can be restored where folder access is unavailable.
-- Import: validates and reconciles the complete taxonomy and all catalog records in memory before writing; then persists the global catalog and selected Paper/Card/Set records, colors, and Owners in one IndexedDB transaction. Any unresolved identity conflict, validation, preparation, or transaction failure leaves IndexedDB and in-memory catalog state unchanged. Legacy name-based backups remain importable through the approved conversion rules.
+- Import: validates and reconciles the complete taxonomy and all catalog records in memory before writing; then persists the global catalog and selected Paper/Card/Set records, colors, and Owners in one IndexedDB transaction. Any tag-configuration conflict, unresolved identity conflict, validation, preparation, or transaction failure leaves IndexedDB and in-memory catalog state unchanged. Regular merge imports report differing Tool Tag settings for a tag matched by ID or normalized name; explicit replacement mode uses the backup's modern taxonomy configuration. Legacy name-based backups remain importable through the approved conversion rules.
 - Destination: the independently configured, optional Export Library receives exports when writable; otherwise exports use a browser download. Image-library roots are never chosen implicitly as export destinations.
 
 ## Schema Version Boundaries
@@ -146,13 +146,21 @@ Catalog-record schema and backup-envelope schema are versioned independently in 
 - `CATALOG_SCHEMA_VERSION` describes the structure and interpretation of catalog records such as Paper Packs, Cards, and colors. Increment it when persisted record fields, allowed values, validation, or record migration behavior changes.
 - `BACKUP_SCHEMA_VERSION` describes the top-level backup envelope: its identifying fields, collection layout, image-storage metadata, and import contract. Increment it only when that envelope structure or its interpretation changes incompatibly.
 
-The Card Status change raised the catalog schema to version 3. Cards now persist `status` as either `available` or `sent`; legacy Cards without a status are normalized to `available` when loaded or imported. The later Stamp & Die Release Year addition raises the shared catalog schema to version 4; current exports declare `catalogSchemaVersion: 5` after the Set image-reference extension.
+Historical changes raised the catalog-record schema through versions 3 to 5 for Card Status, Stamp & Die Release Year, and Set image references. Current exports use `catalogSchemaVersion: 8`; the backup envelope is version 4. The nested global tag catalog is separately versioned at schema 2.
 
 Phase B2 raises the backup envelope to version 3. Version-3 Standard and Compact iPad exports contain one `tagCatalog` object (`schemaVersion`, `tags`, and `categories`), and Paper/Card records contain only `tagIds`. Version-1/2 backups with optional `tagVocabularies` and legacy `keywords`/`tags` remain importable through in-memory conversion and reconciliation. At Phase B2 the record catalog schema remained version 3; the later Release Year change uses version 4.
 
 Paper and Card Add/Edit forms select global tags by stable ID through the shared category-aware picker and persist canonical `tagIds`. Runtime `keywords` and `tags` arrays are derived display projections used only by existing Paper/Card tile and detail renderers. They remain enumerable so ordinary runtime record copies retain canonical `tagIds`; persistence validates and writes `tagIds` directly and never rebuilds identity from those display names.
 
-Every global tag is assignable to Paper Packs, Cards, and Stamp Sets. Assignment validation checks that each `tagId` identifies a real tag and never a category; it does not filter by product type. The legacy `appliesTo` field is optional, deprecated compatibility metadata. Existing catalogs and backups may retain and round-trip it, but current selection, search, validation, legacy fallback resolution, and runtime projections ignore it. Newly created tags omit it without changing the catalog or backup schema version.
+Global tags have an explicit `type`: `tool` or `theme`. Both types can be assigned to Paper Packs, Cards, and Stamp Sets; assignment validation checks that each `tagId` identifies a real tag and never a category, without filtering by product type. Tool Tags have filename-matching settings and cannot be added to categories through Settings. In the current filter UI they appear as standalone tags and are excluded from category membership and category filters. The data model can preserve older stored Tool category links, but the current Settings and filter behavior does not use those links.
+
+The current global tag catalog schema is version 2; schema-1 catalogs are upgraded
+on load. Migration classifies built-in Texture/Textures entries as Tool Tags,
+clears their category links, and preserves their stable IDs and item assignments.
+The legacy `appliesTo` field is optional, deprecated compatibility metadata.
+Existing catalogs and backups may retain and round-trip it, but current selection,
+search, validation, legacy fallback resolution, and runtime projections ignore it.
+Newly created tags omit it without changing the catalog or backup schema version.
 
 Paper, Card, and Stamp & Die Library tag filters consume canonical item `tagIds`. Individual tag constraints use AND semantics. Each category constraint resolves its current member IDs from the global catalog and uses OR semantics; selected category members replace the full membership set as a refinement. Independent tag and category constraints combine with AND semantics. General Library search resolves assigned tag IDs to current display names, so renaming a tag changes searchable text without changing persisted assignments. Category names are not general-search terms. The retained Holiday quick filter resolves the current Holiday tag (or a Holiday/Holidays category fallback) to stable identity before evaluating item IDs.
 
@@ -174,7 +182,7 @@ Never lose user data.
 Validate before saving.
 Recover gracefully.
 Never leave an invalid or partially written catalog record in IndexedDB.
-Backup restore is atomic across paper packs, deletion markers, colors, and Cards: either the complete selected import commits or none of it does.
+Backup restore is atomic across Paper Packs, Cards, Stamp & Die Sets, deletion markers, colors, Owners, and taxonomy: either the complete selected import commits or none of it does.
 
 # Performance Goals
 Startup feels instantaneous.
@@ -242,7 +250,7 @@ No feature may require an internet connection to use the catalog.
 Never introduce a framework without approval.
 Never combine unrelated responsibilities into a single module.
 Never sacrifice readability for brevity.
-Do not create competing writable sources of truth. IndexedDB is authoritative for writable catalog records; the selected Paper and Card image-library folders are authoritative for their respective folder-backed image files; exported JSON is a portable backup.
+Do not create competing writable sources of truth. IndexedDB is authoritative for writable catalog records; the selected Paper, Card, and Stamp & Die image-library folders are authoritative for their respective folder-backed image files; exported JSON is a portable backup.
 Never duplicate business logic across modules.
 Prefer extending existing modules over creating unnecessary new ones.
 

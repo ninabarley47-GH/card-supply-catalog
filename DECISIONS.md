@@ -345,16 +345,30 @@ Deleting a category removes only its relationships and never deletes member tags
 
 The former inline legacy-name creation bridge was removed after the global Add/Edit picker shipped. Modern create/edit, filtering, search, and persistence are ID-authoritative. Legacy names remain accepted only at explicit migration and older-backup import boundaries.
 
-### Proposed Import Conflict Policy — Pending Separate Approval
+### Backup Tag Reconciliation and Conflicts
 
-These rules are documented for review and are not implemented by Phase A:
+Regular (merge) backup imports reconcile modern tags by stable ID first, then by
+normalized name. When a matching tag has different Tool/Theme configuration, the
+import stops before applying catalog or item changes. The conflict identifies the
+tag, whether it matched by ID or normalized name, and the local and imported values
+for each differing setting: `type`, `filenameTerms`, and
+`unmatchedFilenameFallback`. Missing and explicitly set values are reported as
+different. The user can review the conflict and choose whether to retry using
+replacement mode.
+
+With **Replace existing catalog entries during import** selected, modern backup
+configuration is authoritative: the backup's tag/category catalog and Tool Tag
+settings replace local taxonomy configuration as part of the restore transaction.
+This mode does not retain local settings through merge reconciliation.
+
+For a modern merge with matching Tool Tag settings:
 
 - For a new-format import with the same stable tag ID but different names, the ID establishes identity. Keep the local name by default, remap imported assignments to that ID, and union valid category relationships. Deprecated applicability metadata may still round-trip for compatibility. An explicit conflict choice may instead adopt the imported name after normalized-name validation.
 - For different stable IDs with the same normalized name, keep the local ID and display name, remap imported references to the local ID, and union valid category relationships. An empty local catalog retains the imported ID.
 - For a legacy name-only backup imported into a migrated catalog, resolve an exact normalized current name first. If none exists, create a new uncategorized tag. Fuzzy matches require review and never merge automatically.
 - A deterministic legacy ID that happens to match a renamed local tag does not prove identity because the legacy backup contains no ID. If no current exact-name match exists, require explicit resolution between the renamed local tag and a separate newly created tag.
 - For a new-format backup containing a tag renamed on another installation, the shared stable ID establishes identity. Retain the local name by default and report the divergent imported name; backup time alone does not decide which rename wins.
-- All reconciliation and ID remapping must finish before validation and the atomic restore transaction. Unresolved conflicts result in no writes.
+- For an unsupported or ambiguous legacy match, require review rather than guessing. All reconciliation and ID remapping finish before validation and the atomic restore transaction. Conflicts or validation failures result in no import writes.
 
 # Decision 32
 ## Selected Image Folders Are Non-Destructive Shared Libraries
