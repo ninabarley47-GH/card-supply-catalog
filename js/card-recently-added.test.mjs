@@ -14,6 +14,7 @@ const view = () => ({ existingCard: null, notes: { value: '' }, status: { value:
 test('Card Add sets Recently Added; Edit and runtime normalization preserve explicit status without marking legacy Cards', () => {
   const form = view(); const added = createCardRecord(form);
   assert.equal(added.recentlyAdded, true);
+  assert.ok(Number.isFinite(Date.parse(added.createdAt)));
   for (const flag of [true, false, undefined]) {
     form.existingCard = { ...added, recentlyAdded: flag };
     const edited = createCardRecord(form);
@@ -23,16 +24,20 @@ test('Card Add sets Recently Added; Edit and runtime normalization preserve expl
   }
 });
 
-test('Card default sorting promotes explicitly Recently Added Cards and retains explicit date/favorite sorts', () => {
-  const cards = [{ id: 'old', dateCreated: '2026-09-09', favorite: true },
-    { id: 'recent', dateCreated: '2020-01-01', recentlyAdded: true },
-    { id: 'dismissed', dateCreated: '2025-01-01', recentlyAdded: false }];
+test('Card Recently Added sorts flagged cards by timestamp and untitled cards by date', () => {
+  const cards = [
+    { id: 'old', name: 'Zulu', dateCreated: '2026-09-09', createdAt: '2026-09-09T12:00:00.000Z', favorite: true },
+    { id: 'recent-older', name: 'Earlier', dateCreated: '2020-01-01', createdAt: '2026-10-20T12:00:00.000Z', recentlyAdded: true },
+    { id: 'dismissed', name: '2026-01-01', dateCreated: '2026-01-01', createdAt: '2026-09-10T12:00:00.000Z', recentlyAdded: false },
+    { id: 'recent-newer', name: 'Later', dateCreated: '2020-01-02', createdAt: '2026-10-21T12:00:00.000Z', recentlyAdded: true },
+    { id: 'newer-date', name: '2026-05-01', dateCreated: '2026-05-01', createdAt: '2026-09-11T12:00:00.000Z' }
+  ];
   const options = { tagCatalog: { schemaVersion: 1, tags: [], categories: [] } };
-  assert.deepEqual(filterAndSortCards(cards, options).map(card => card.id), ['recent', 'old', 'dismissed']);
-  assert.deepEqual(filterAndSortCards(cards, { ...options, sortOrder: 'date-desc' }).map(card => card.id), ['old', 'dismissed', 'recent']);
-  assert.deepEqual(filterAndSortCards(cards, { ...options, sortOrder: 'date-asc' }).map(card => card.id), ['recent', 'dismissed', 'old']);
-  assert.deepEqual(filterAndSortCards(cards, { ...options, sortOrder: 'favorite-desc' }).map(card => card.id), ['old', 'dismissed', 'recent']);
-  assert.deepEqual(cards.map(card => card.id), ['old', 'recent', 'dismissed']);
+  assert.deepEqual(filterAndSortCards(cards, options).map(card => card.id), ['recent-newer', 'recent-older', 'old', 'newer-date', 'dismissed']);
+  assert.deepEqual(filterAndSortCards(cards, { ...options, sortOrder: 'date-desc' }).map(card => card.id), ['old', 'newer-date', 'dismissed', 'recent-newer', 'recent-older']);
+  assert.deepEqual(filterAndSortCards(cards, { ...options, sortOrder: 'date-asc' }).map(card => card.id), ['recent-older', 'recent-newer', 'dismissed', 'newer-date', 'old']);
+  assert.deepEqual(filterAndSortCards(cards, { ...options, sortOrder: 'favorite-desc' }).map(card => card.id), ['old', 'newer-date', 'dismissed', 'recent-newer', 'recent-older']);
+  assert.deepEqual(cards.map(card => card.id), ['old', 'recent-older', 'dismissed', 'recent-newer', 'newer-date']);
 });
 
 function node(tag) { return { tag, dataset: {}, children: [], attributes: {},

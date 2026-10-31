@@ -28,6 +28,7 @@ export function createStampDieSetRecord(values, catalog) {
   return normalizeStampDieSet({
     id: values.id || createSetId(),
     name: values.name,
+    createdAt: values.createdAt,
     dateCreated: values.dateCreated,
     releaseYear: values.releaseYear,
     ownerId: values.ownerId,
@@ -688,6 +689,7 @@ export async function initializeStampDieLibrary(services = {}) {
       const record = createStampDieSetRecord({
         id: draftId,
         name: view.name.value,
+        createdAt: editingRecord ? editingRecord.createdAt : new Date().toISOString(),
         ownerId: owner?.id || editingRecord?.ownerId,
         dateCreated: editingRecord?.dateCreated || getLocalDateValue(),
         releaseYear: editingRecord && editingRecord.releaseYear === undefined && !view.releaseYear.value

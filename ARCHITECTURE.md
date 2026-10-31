@@ -146,7 +146,7 @@ Catalog-record schema and backup-envelope schema are versioned independently in 
 - `CATALOG_SCHEMA_VERSION` describes the structure and interpretation of catalog records such as Paper Packs, Cards, and colors. Increment it when persisted record fields, allowed values, validation, or record migration behavior changes.
 - `BACKUP_SCHEMA_VERSION` describes the top-level backup envelope: its identifying fields, collection layout, image-storage metadata, and import contract. Increment it only when that envelope structure or its interpretation changes incompatibly.
 
-Historical changes raised the catalog-record schema through versions 3 to 5 for Card Status, Stamp & Die Release Year, and Set image references. Current exports use `catalogSchemaVersion: 8`; the backup envelope is version 4. The nested global tag catalog is separately versioned at schema 2.
+Historical changes raised the catalog-record schema through versions 3 to 5 for Card Status, Stamp & Die Release Year, and Set image references. Current exports use `catalogSchemaVersion: 9`; the backup envelope is version 4. The nested global tag catalog is separately versioned at schema 2. Paper Packs and Stamp & Die Sets store `createdAt` timestamps for Recently Added ordering; Cards already store this timestamp.
 
 Phase B2 raises the backup envelope to version 3. Version-3 Standard and Compact iPad exports contain one `tagCatalog` object (`schemaVersion`, `tags`, and `categories`), and Paper/Card records contain only `tagIds`. Version-1/2 backups with optional `tagVocabularies` and legacy `keywords`/`tags` remain importable through in-memory conversion and reconciliation. At Phase B2 the record catalog schema remained version 3; the later Release Year change uses version 4.
 

@@ -498,7 +498,7 @@ test('Card Stamp references normalize through real storage APIs without rewritin
     assert.deepEqual(h.stores, before, 'loading does not rewrite stored records');
     await storage.restoreCatalogRecords({ cards: [raw], tagCatalog: catalog });
     assert.deepEqual(h.stores.get('cards').get(base.id).stampDieSetIds, expected);
-    assert.equal(h.stores.get('cards').get(base.id).schemaVersion, 8);
+    assert.equal(h.stores.get('cards').get(base.id).schemaVersion, 9);
     await storage.saveCard(raw);
     assert.deepEqual((await storage.loadSavedCards()).find(card => card.id === base.id).stampDieSetIds, expected);
   }

@@ -1223,6 +1223,13 @@ function sortCards(cards, sortOrder = 'recently-added') {
     if (sortOrder === 'recently-added') {
       const recentComparison = Number(second.recentlyAdded === true) - Number(first.recentlyAdded === true);
       if (recentComparison) return recentComparison;
+      if (first.recentlyAdded === true && second.recentlyAdded === true) {
+        const timestampComparison = compareCreatedAtDescending(first.createdAt, second.createdAt);
+        if (timestampComparison) return timestampComparison;
+      }
+      // Cards have no title, so their non-recent fallback remains newest date first.
+      return String(second.dateCreated || '').localeCompare(String(first.dateCreated || '')) ||
+        compareCreatedAtDescending(first.createdAt, second.createdAt);
     }
 
     if (sortOrder === 'favorite-desc') {
@@ -1236,6 +1243,16 @@ function sortCards(cards, sortOrder = 'recently-added') {
     return String(first.dateCreated).localeCompare(String(second.dateCreated)) * direction ||
       String(first.createdAt || '').localeCompare(String(second.createdAt || '')) * direction;
   });
+}
+
+function compareCreatedAtDescending(firstValue, secondValue) {
+  const firstTimestamp = Date.parse(firstValue || '');
+  const secondTimestamp = Date.parse(secondValue || '');
+  const firstIsValid = Number.isFinite(firstTimestamp);
+  const secondIsValid = Number.isFinite(secondTimestamp);
+  if (firstIsValid !== secondIsValid) return firstIsValid ? -1 : 1;
+  if (!firstIsValid || firstTimestamp === secondTimestamp) return 0;
+  return secondTimestamp - firstTimestamp;
 }
 
 function renderCardLibrary(gallery, cards, totalCount = cards.length, paperPackNamesById = new Map(), stampDieSetNamesById = null) {

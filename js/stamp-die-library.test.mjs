@@ -274,7 +274,7 @@ test('save persists Favorite and universal stable tag IDs, then renders a no-ima
   await h.form.emit('submit');
   const record = h.records[0];
   assert.match(record.id, /^set-/);
-  assert.deepEqual(record, { schemaVersion: CATALOG_SCHEMA_VERSION, id: record.id, ownerId: 'owner-nina', name: 'Garden', dateCreated: getLocalDateValue(), releaseYear: 2024, favorite: true, recentlyAdded: true, brand: '', purchasedFrom: '', tagIds: ['stable-paper', 'stable-card'], imageRefs: [] });
+  assert.deepEqual(record, { schemaVersion: CATALOG_SCHEMA_VERSION, id: record.id, ownerId: 'owner-nina', name: 'Garden', createdAt: record.createdAt, dateCreated: getLocalDateValue(), releaseYear: 2024, favorite: true, recentlyAdded: true, brand: '', purchasedFrom: '', tagIds: ['stable-paper', 'stable-card'], imageRefs: [] });
   assert.equal(h.dialog.open, false);
   assert.equal(saves, 1);
   assert.match(h.gallery.textContent, /Garden.*No image.*Floral.*Birthday.*2024/);
@@ -1905,6 +1905,8 @@ test('Stamp Recently Added is set on Add, survives Edit, and dismisses without c
   const h = await harness(t);
   await h.add.emit('click'); h.name.value = 'New Set'; await h.form.emit('submit');
   assert.equal(h.records[0].recentlyAdded, true);
+  assert.ok(Number.isFinite(Date.parse(h.records[0].createdAt)));
+  const createdAt = h.records[0].createdAt;
   let tile = h.gallery.querySelector('article');
   assert.equal(tile.children[0].className, 'card-context-bar');
   assert.match(tile.children[0].textContent, /Recently Added/);
@@ -1912,6 +1914,7 @@ test('Stamp Recently Added is set on Add, survives Edit, and dismisses without c
   assert.match(button.getAttribute('aria-label'), /Clear Recently Added status for New Set/);
   await tile.querySelector('.card-edit-button').emit('click'); await h.form.emit('submit');
   assert.equal(h.records[0].recentlyAdded, true);
+  assert.equal(h.records[0].createdAt, createdAt);
   const before = structuredClone(h.records[0]);
   button = h.gallery.querySelector('[data-clear-recently-added]');
   await h.gallery.emit('click', { target: button, stopPropagation() {} });
@@ -1922,19 +1925,24 @@ test('Stamp Recently Added is set on Add, survives Edit, and dismisses without c
   assert.equal(h.records[0].recentlyAdded, false);
 });
 
-test('Stamp Recently Added uses Paper ordering and explicit eligibility, with failed dismissal retained for session', async (t) => {
+test('Stamp Recently Added sorts flagged sets by timestamp and unflagged sets by name', async (t) => {
   const h = await harness(t);
-  for (const [id, name, flag] of [['old', 'Alpha', undefined], ['recent-z', 'Zulu', true], ['recent-b', 'Bravo', true]]) {
-    h.records.push(createStampDieSetRecord({ id, name, dateCreated: '2026-09-01', favorite: false, tagIds: [], recentlyAdded: flag }, initialCatalog()));
+  for (const [id, name, flag, createdAt] of [
+    ['old-z', 'Zulu', false, '2026-10-30T12:00:00.000Z'],
+    ['recent-z', 'Zulu', true, '2026-10-20T12:00:00.000Z'],
+    ['recent-b', 'Bravo', true, '2026-10-21T12:00:00.000Z'],
+    ['old-a', 'Alpha', false, '2026-10-01T12:00:00.000Z']
+  ]) {
+    h.records.push(createStampDieSetRecord({ id, name, createdAt, dateCreated: '2026-09-01', favorite: false, tagIds: [], recentlyAdded: flag }, initialCatalog()));
   }
   await h.document.emit('catalog:global-tags-updated');
-  assert.deepEqual(h.gallery.querySelectorAll('article').map(tile => tile.dataset.setId), ['recent-b', 'recent-z', 'old']);
+  assert.deepEqual(h.gallery.querySelectorAll('article').map(tile => tile.dataset.setId), ['recent-b', 'recent-z', 'old-a', 'old-z']);
   h.setFailure(true); let notice;
   window.alert = value => { notice = value; };
   const button = h.gallery.querySelector('[data-clear-recently-added]');
   await h.gallery.emit('click', { target: button, stopPropagation() {} });
   assert.match(notice, /cleared for this session/);
-  assert.deepEqual(h.gallery.querySelectorAll('article').map(tile => tile.dataset.setId), ['recent-z', 'old', 'recent-b']);
+  assert.deepEqual(h.gallery.querySelectorAll('article').map(tile => tile.dataset.setId), ['recent-z', 'old-a', 'recent-b', 'old-z']);
   assert.equal(h.records.find(record => record.id === 'recent-b').recentlyAdded, true);
 });
 

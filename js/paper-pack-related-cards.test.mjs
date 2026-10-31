@@ -43,6 +43,16 @@ test("Paper Library favorites-first sorting prioritizes favorites then names", (
   );
 });
 
+test("Recently Added sorts flagged Paper Packs by creation time and the rest by name", () => {
+  const paperPacks = [
+    { id: "later", name: "Later", recentlyAdded: true, createdAt: "2026-10-20T12:00:00.000Z" },
+    { id: "zulu", name: "Zulu", recentlyAdded: false, createdAt: "2026-10-30T12:00:00.000Z" },
+    { id: "earlier", name: "Earlier", recentlyAdded: true, createdAt: "2026-10-21T12:00:00.000Z" },
+    { id: "alpha", name: "Alpha", recentlyAdded: false, createdAt: "2026-10-01T12:00:00.000Z" }
+  ];
+  assert.deepEqual(sortPaperPacks(paperPacks).map((paperPack) => paperPack.id), ["earlier", "later", "alpha", "zulu"]);
+});
+
 test("Card Detail resolves one paper-pack ID to its display name", () => {
   assert.deepEqual(
     resolvePaperPackDisplayNames(["beautiful-gallery"], [

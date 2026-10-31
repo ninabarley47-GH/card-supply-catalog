@@ -73,14 +73,16 @@ test("Add Paper saves a user-changed owner using that owner's stable ID", () => 
 test("Add Paper stores canonical picker IDs with a temporary keyword projection", () => {
   const result = buildPaperPackFromForm(createValidPaperPackForm(), colorsById, [], null, ["tag-floral", "tag-fun-fold"], [], tagCatalog);
   assert.equal(result.ok, true);
+  assert.ok(Number.isFinite(Date.parse(result.paperPack.createdAt)));
   assert.deepEqual(result.paperPack.tagIds, ["tag-floral", "tag-fun-fold"]);
   assert.deepEqual(result.paperPack.keywords, ["Floral", "Fun Fold"]);
 });
 
 test("Edit Paper round-trips the existing id, favorite, and canonical tag IDs", () => {
-  const existing = { id: "original-id", recentlyAdded: true, favorite: true, patterns: [], tagIds: ["tag-floral"], keywords: ["Floral"] };
+  const existing = { id: "original-id", createdAt: "2026-10-01T10:00:00.000Z", recentlyAdded: true, favorite: true, patterns: [], tagIds: ["tag-floral"], keywords: ["Floral"] };
   const result = buildPaperPackFromForm(createValidPaperPackForm(), colorsById, [], existing, existing.tagIds, [], tagCatalog);
   assert.equal(result.paperPack.id, "original-id");
+  assert.equal(result.paperPack.createdAt, existing.createdAt);
   assert.equal(result.paperPack.favorite, true);
   assert.deepEqual(result.paperPack.tagIds, ["tag-floral"]);
   assert.deepEqual(result.paperPack.keywords, ["Floral"]);

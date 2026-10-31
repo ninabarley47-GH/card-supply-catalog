@@ -94,15 +94,15 @@ for (const [label, overrides, expected] of cases) {
     const card = await restore(backup);
     assert.deepEqual(card.stampDieSetIds, expected);
     assert.deepEqual(card.paperPackIds, source.paperPackIds);
-    assert.equal(card.schemaVersion, 8);
+    assert.equal(card.schemaVersion, 9);
     assert.deepEqual(backup, before);
     const again = await restore(snapshot(card));
     assert.deepEqual(again, card, 'second export/import preserves stable IDs and Card fields');
   });
 }
 
-test('schema 8 standard and compact exports retain both relationship fields; future schemas are rejected', async () => {
-  assert.equal(CATALOG_SCHEMA_VERSION, 8);
+test('schema 9 standard and compact exports retain both relationship fields; future schemas are rejected', async () => {
+  assert.equal(CATALOG_SCHEMA_VERSION, 9);
   assert.equal(BACKUP_SCHEMA_VERSION, 4);
   const card = createCard({ tags: undefined, tagIds: [], stampDieSetIds: ['set-one', 'set-two'] });
   const services = {
@@ -112,16 +112,16 @@ test('schema 8 standard and compact exports retain both relationship fields; fut
   };
   for (const exportBackup of [createCatalogBackup, createIpadCatalogBackup]) {
     const backup = await exportBackup({ paperPacks: [], colorsById: {}, services });
-    assert.equal(backup.catalogSchemaVersion, 8);
+    assert.equal(backup.catalogSchemaVersion, 9);
     assert.equal(backup.schemaVersion, 4);
-    assert.equal(backup.cards[0].schemaVersion, 8);
+    assert.equal(backup.cards[0].schemaVersion, 9);
     assert.equal(validateBackup(backup).ok, true);
     assert.deepEqual(backup.cards[0].stampDieSetIds, card.stampDieSetIds);
     assert.deepEqual(backup.cards[0].paperPackIds, card.paperPackIds);
     const restored = await restore(backup);
     assert.deepEqual(restored.stampDieSetIds, card.stampDieSetIds);
     assert.deepEqual(restored.paperPackIds, card.paperPackIds);
-    backup.catalogSchemaVersion = 9;
+    backup.catalogSchemaVersion = 10;
     assert.equal(validateBackup(backup).ok, false);
   }
 });

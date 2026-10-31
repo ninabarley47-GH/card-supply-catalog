@@ -516,11 +516,13 @@ export function buildPaperPackFromForm(formData, colorsById, selectedImages = []
   }
 
   const patterns = createPatternSlots(patternCount, selectedImages, editingPaperPack?.patterns);
+  const createdAt = editingPaperPack ? editingPaperPack.createdAt : new Date().toISOString();
 
   return {
     ok: true,
     paperPack: addCatalogSchemaVersion({
       id: editingPaperPack?.id || createId(name),
+      ...(createdAt === undefined ? {} : { createdAt }),
       name,
       owner,
       ownerId,

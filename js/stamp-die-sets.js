@@ -25,6 +25,7 @@ export function normalizeStampDieSet(record, catalog) {
   return addCatalogSchemaVersion({
     id: record.id,
     name: record.name.trim(),
+    ...(record.createdAt === undefined ? {} : { createdAt: record.createdAt }),
     ...(record.ownerId === undefined ? {} : { ownerId: record.ownerId }),
     imageRefs: record.imageRefs.map(normalizeImageReference),
     tagIds: [...record.tagIds],

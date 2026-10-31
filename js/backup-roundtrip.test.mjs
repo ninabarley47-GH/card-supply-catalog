@@ -75,6 +75,8 @@ test("schema 2 backup normalization adds missing Stamp fallback without altering
 
 test("backup and restore round-trip includes Cards and their persistent image references", async () => {
   const { color, paperPack, card } = createCatalogRecords();
+  paperPack.createdAt = "2026-10-20T12:00:00.000Z";
+  card.createdAt = "2026-10-21T12:00:00.000Z";
   const backup = createCatalogBackupSnapshot({
     paperPacks: [paperPack],
     colorsById: { [color.id]: color },
@@ -143,7 +145,7 @@ test("Tool Tag settings and Paper, Card, and Stamp Set assignments round-trip in
   card.tagIds = [...toolTagIds, "floral"];
   delete card.tags;
   const stampDieSet = {
-    id: "roundtrip-set", name: "Round-trip Set", dateCreated: "2026-08-18",
+    id: "roundtrip-set", name: "Round-trip Set", dateCreated: "2026-08-18", createdAt: "2026-10-22T12:00:00.000Z",
     favorite: false, tagIds: [...toolTagIds], imageRefs: []
   };
   const sourceBefore = structuredClone({ color, paperPack, card, stampDieSet, tagCatalog });
@@ -181,8 +183,11 @@ test("Tool Tag settings and Paper, Card, and Stamp Set assignments round-trip in
   assert.deepEqual(restored.tagCatalog.categories, tagCatalog.categories);
   assert.deepEqual(restored.tagCatalog.tags.find(({ id }) => id === "floral").categoryIds, ["nature"]);
   assert.deepEqual(restored.paperPacks[0].tagIds, toolTagIds);
+  assert.equal(restored.paperPacks[0].createdAt, paperPack.createdAt);
   assert.deepEqual(restored.cards[0].tagIds, [...toolTagIds, "floral"]);
+  assert.equal(restored.cards[0].createdAt, card.createdAt);
   assert.deepEqual(restored.stampDieSets[0].tagIds, toolTagIds);
+  assert.equal(restored.stampDieSets[0].createdAt, stampDieSet.createdAt);
   assert.deepEqual(normalizeBackupTagCatalog(normalizedBackup).tagCatalog.tags.filter(({ type }) => type === "tool"), toolTags);
 });
 

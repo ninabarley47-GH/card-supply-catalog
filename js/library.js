@@ -1167,10 +1167,15 @@ function createInactivePaperPackSection(paperPacks, colorsById, label) {
 export function sortPaperPacks(paperPacks, sortOrder = "recently-added") {
   if (sortOrder === "recently-added") {
     return [...paperPacks].sort((firstPack, secondPack) => {
-      const recentComparison =
-        Number(isRecentlyAddedPaperPack(secondPack)) - Number(isRecentlyAddedPaperPack(firstPack));
-
-      return recentComparison || compareTextValues(firstPack.name, secondPack.name);
+      const firstIsRecent = isRecentlyAddedPaperPack(firstPack);
+      const secondIsRecent = isRecentlyAddedPaperPack(secondPack);
+      const recentComparison = Number(secondIsRecent) - Number(firstIsRecent);
+      if (recentComparison) return recentComparison;
+      if (firstIsRecent) {
+        const timestampComparison = compareCreatedAtDescending(firstPack.createdAt, secondPack.createdAt);
+        if (timestampComparison) return timestampComparison;
+      }
+      return compareTextValues(firstPack.name, secondPack.name);
     });
   }
 
@@ -1197,6 +1202,16 @@ export function sortPaperPacks(paperPacks, sortOrder = "recently-added") {
 
     return comparison || compareTextValues(firstPack.name, secondPack.name);
   });
+}
+
+function compareCreatedAtDescending(firstValue, secondValue) {
+  const firstTimestamp = Date.parse(firstValue || "");
+  const secondTimestamp = Date.parse(secondValue || "");
+  const firstIsValid = Number.isFinite(firstTimestamp);
+  const secondIsValid = Number.isFinite(secondTimestamp);
+  if (firstIsValid !== secondIsValid) return firstIsValid ? -1 : 1;
+  if (!firstIsValid || firstTimestamp === secondTimestamp) return 0;
+  return secondTimestamp - firstTimestamp;
 }
 
 function compareReleaseYears(firstYear, secondYear, multiplier) {

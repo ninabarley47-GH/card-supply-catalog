@@ -63,13 +63,13 @@ The backup JSON contains two separate version numbers:
 - `schemaVersion` versions the backup envelope: the top-level JSON structure, collection layout, image-storage information, and import contract.
 - `catalogSchemaVersion` versions the catalog records stored inside that envelope, including the fields and allowed values on Cards, Paper Packs, and Stamp & Die Sets.
 
-The current combination is backup envelope version 4 and catalog-record version 8.
+The current combination is backup envelope version 4 and catalog-record version 9.
 The nested global tag catalog has its own independent schema version, currently 2.
 
 ```json
 {
   "schemaVersion": 4,
-  "catalogSchemaVersion": 8
+  "catalogSchemaVersion": 9
 }
 ```
 
@@ -187,5 +187,5 @@ including Settings usage counts, without requiring an app reload.
 
 Card Notes was introduced in catalog-record version 7. Standard and iPad backups
 preserve its plain multiline text; older backups without Notes remain importable.
-The current catalog-record version is 8. The backup envelope and IndexedDB
+The current catalog-record version is 9. The backup envelope and IndexedDB
 versions were unchanged by Notes.
